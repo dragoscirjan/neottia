@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { loadMemoryConfig } from './config.js';
-import type { MemoryConfig } from './config.js';
+import type { MemoryConfigInput } from './config.js';
 import { MemoryError } from './errors.js';
 import { ULID_PATTERN } from './identities.js';
 import { MemoryStore, type SearchMemoryInput, type StoreMemoryInput } from './store.js';
@@ -71,10 +71,10 @@ export interface MemoryToolContext {
   /** Whether the host harness can prompt the user (extensions: yes, MCP: no). */
   readonly interactive: boolean;
   /** Optional config overrides resolved by the host before calling core. */
-  readonly configOverrides?: Partial<MemoryConfig>;
+  readonly configOverrides?: Partial<MemoryConfigInput>;
 }
 
-export interface MemoryToolDefinition<S extends z.ZodType = z.ZodType> {
+export interface MemoryToolDefinition<S extends z.ZodObject<z.ZodRawShape> = z.ZodObject<z.ZodRawShape>> {
   readonly name: string;
   readonly description: string;
   /** Runtime input contract; validated before the handler runs. */
@@ -88,7 +88,7 @@ function storeFor(context: MemoryToolContext): MemoryStore {
   return MemoryStore.fromConfig(loadMemoryConfig(context.cwd, context.configOverrides), context.cwd);
 }
 
-function makeTool<S extends z.ZodType>(
+function makeTool<S extends z.ZodObject<z.ZodRawShape>>(
   name: string,
   description: string,
   inputSchema: S,
@@ -109,7 +109,7 @@ function makeTool<S extends z.ZodType>(
   };
 }
 
-export const MEMORY_TOOLS: readonly MemoryToolDefinition<z.ZodType>[] = [
+export const MEMORY_TOOLS: readonly MemoryToolDefinition<z.ZodObject<z.ZodRawShape>>[] = [
   makeTool(
     'memory_store',
     'Store a new memory record (fact/decision/event/lesson) in the project memory shard.',

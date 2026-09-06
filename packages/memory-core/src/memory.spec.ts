@@ -56,11 +56,11 @@ function storeFor(cwd: string, overrides: Partial<MemoryConfig> = {}): MemorySto
 }
 
 describe('memory store (filesystem + SQLite index)', () => {
-  it('rejects disabled operations before touching memory or cache state', () => {
+  it('rejects disabled operations before touching memory or cache state', async () => {
     const cwd = disabledFixture();
     expect(() => storeFor(cwd).store(fact('Blocked memory write.'))).toThrow(/skills\.memory\.enabled=true.*disabled/u);
     expect(() => storeFor(cwd).list()).toThrow(/skills\.memory\.enabled=true.*disabled/u);
-    expect(() => storeFor(cwd).search({ query: 'blocked' })).toThrow(/skills\.memory\.enabled=true.*disabled/u);
+    await expect(storeFor(cwd).search({ query: 'blocked' })).rejects.toThrow(/skills\.memory\.enabled=true.*disabled/u);
     expect(() => storeFor(cwd).export()).toThrow(/skills\.memory\.enabled=true.*disabled/u);
     expect(storeFor(cwd).validate()).toEqual(
       expect.objectContaining({
@@ -139,23 +139,23 @@ describe('memory store (filesystem + SQLite index)', () => {
     expect(store.list()).toHaveLength(0);
   });
 
-  it('searches through the SQLite index with BM25 ranking and topic filters', () => {
+  it('searches through the SQLite index with BM25 ranking and topic filters', async () => {
     const store = storeFor(fixture());
     const alpha = store.store({ ...fact('Alpha architecture decision'), topic: 'architecture' });
     store.store({ ...fact('Beta test convention'), topic: 'testing' });
-    expect(store.search({ query: 'Alpha', topic: 'architecture' })).toEqual([alpha]);
-    expect(store.search({ query: 'missing' })).toHaveLength(0);
-    expect(store.search({ query: 'convention', limit: 1 })).toHaveLength(1);
+    await expect(store.search({ query: 'Alpha', topic: 'architecture' })).resolves.toEqual([alpha]);
+    await expect(store.search({ query: 'missing' })).resolves.toHaveLength(0);
+    await expect(store.search({ query: 'convention', limit: 1 })).resolves.toHaveLength(1);
   });
 
-  it('rebuilds missing or malformed SQLite bytes without losing canonical records', () => {
+  it('rebuilds missing or malformed SQLite bytes without losing canonical records', async () => {
     const cwd = fixture();
     const store = storeFor(cwd);
     const stored = store.store(fact('Portable cache migration fact'));
     const cachePath = join(cwd, '.neottia', 'memory', 'index.db');
     writeFileSync(cachePath, Buffer.from('SQLite format 3\0legacy cache bytes'));
 
-    expect(store.search({ query: 'portable migration' })).toEqual([stored]);
+    await expect(store.search({ query: 'portable migration' })).resolves.toEqual([stored]);
     expect(store.validate()).toMatchObject({ valid: true, records: 1 });
   });
 
@@ -188,7 +188,7 @@ describe('memory store (filesystem + SQLite index)', () => {
     expect(destination.list()).toEqual([]);
   });
 
-  it('loads, validates, retrieves, searches, and exports canonical records at schema limits', () => {
+  it('loads, validates, retrieves, searches, and exports canonical records at schema limits', async () => {
     const cwd = fixture();
     const store = storeFor(cwd);
     const seed = store.store(fact('Seed'));
@@ -198,7 +198,7 @@ describe('memory store (filesystem + SQLite index)', () => {
 
     expect(store.validate()).toMatchObject({ valid: true, records: 1 });
     expect(store.get(seed.id)).toEqual(legacy);
-    expect(store.search({ query: 's'.repeat(100), max_chars: 100_000 })).toEqual([legacy]);
+    await expect(store.search({ query: 's'.repeat(100), max_chars: 100_000 })).resolves.toEqual([legacy]);
     const exported = store.export();
     expect(exported).toContain('s'.repeat(1000));
 
@@ -256,6 +256,34 @@ describe('memory store (filesystem + SQLite index)', () => {
     expect(store.scopeKey).toBe('local--project--feat/memory-core');
     store.store(fact('Scoped fact'));
     expect(store.list()).toHaveLength(1);
+  });
+
+  it('honors cache.stale_policy fail and the prompt host hook', async () => {
+    const cwd = fixture();
+    const failStore = storeFor(cwd, { cache: { max_age_ms: 0, stale_policy: 'fail' } });
+    await failStore.store(fact('Fail policy fact'));
+    await expect(failStore.search({ query: 'fact' })).rejects.toThrow(/stale.*fail/u);
+
+    let prompted = false;
+    const declined = new MemoryStore({
+      config: loadMemoryConfig(cwd, { env: {}, cache: { max_age_ms: 0, stale_policy: 'prompt' } }),
+      cwd,
+      onStaleCache: () => {
+        prompted = true;
+        return false;
+      },
+    });
+    await declined.store(fact('Prompt declined fact'));
+    await expect(declined.search({ query: 'declined' })).rejects.toThrow(/rebuild declined/u);
+    expect(prompted).toBe(true);
+
+    const accepted = new MemoryStore({
+      config: loadMemoryConfig(cwd, { env: {}, cache: { max_age_ms: 0, stale_policy: 'prompt' } }),
+      cwd,
+      onStaleCache: () => true,
+    });
+    await accepted.store(fact('Prompt accepted fact'));
+    await expect(accepted.search({ query: 'accepted' })).resolves.toHaveLength(1);
   });
 
   it('rejects the unimplemented postgres backend with a pointer to the follow-up', () => {

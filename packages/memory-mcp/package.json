@@ -1,0 +1,53 @@
+{
+  "name": "@neottia/memory-mcp",
+  "version": "0.1.0",
+  "description": "MCP stdio server exposing the Neottia memory tools (same tool names as the pi/OpenCode extensions)",
+  "author": "Dragos Cirjan",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dragoscirjan/neottia.git",
+    "directory": "packages/memory-mcp"
+  },
+  "bugs": {
+    "url": "https://github.com/dragoscirjan/neottia/issues"
+  },
+  "homepage": "https://github.com/dragoscirjan/neottia#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "bin": {
+    "memory-mcp": "./dist/cli.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "engines": {
+    "node": ">=22.16.0"
+  },
+  "scripts": {
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
+    "test": "vitest run --root ../.. packages/memory-mcp/src",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@neottia/memory-core": "workspace:*",
+    "zod": "^4.1.8"
+  },
+  "devDependencies": {
+    "@templ-project/tsconfig": "^0.2.2",
+    "@types/node": "^25.0.3",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7",
+    "yaml": "^2.9.0"
+  }
+}

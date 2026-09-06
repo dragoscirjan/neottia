@@ -5,8 +5,8 @@ import { MemoryLockError } from './errors.js';
 /**
  * Shard-scoped cross-process lock (neottia#1 decision #2): one lock directory
  * per namespace shard under the memory root. Acquisition uses atomic mkdir;
- * a lock older than `staleMs` is stolen so crashed writers cannot wedge the
- * shard forever. The v1 repo-global barrier becomes per-shard here.
+ * a lock is stolen only when it is stale AND its writer is provably gone, so
+ * a live-but-slow writer on the same host is never interrupted mid-operation.
  */
 
 export interface ShardBarrierOptions {
@@ -26,17 +26,12 @@ const MAX_WAIT_MS = 60_000;
 
 const activeLocks = new Set<string>();
 
-/**
- * Runs `operation` while holding the exclusive lock for one memory shard.
- * Lock metadata records the owner PID and acquisition time so stale locks
- * can be identified and stolen.
- */
-export function withShardBarrier<T>(
-  memoryRoot: string,
-  scopeKey: string,
-  operation: (lease: ShardLease) => T,
-  options: ShardBarrierOptions = {},
-): T {
+interface AcquiredLock {
+  readonly lease: ShardLease;
+  readonly release: () => void;
+}
+
+function acquire(memoryRoot: string, scopeKey: string, options: ShardBarrierOptions): AcquiredLock {
   const waitMs = clampInteger(options.waitMs ?? DEFAULT_WAIT_MS, 0, MAX_WAIT_MS, 'waitMs');
   const staleMs = clampInteger(options.staleMs ?? DEFAULT_STALE_MS, 1, Number.MAX_SAFE_INTEGER, 'staleMs');
   const pollMs = clampInteger(options.pollMs ?? DEFAULT_POLL_MS, 1, 1_000, 'pollMs');
@@ -54,9 +49,6 @@ export function withShardBarrier<T>(
       break;
     } catch (error: unknown) {
       if (!isCode(error, 'EEXIST')) throw new MemoryLockError(`Cannot acquire shard barrier: ${scopeKey}`);
-      // A stale lock is stolen only when its writer is provably gone. A live
-      // same-host PID keeps the lock, so long synchronous operations cannot
-      // be interrupted mid-write by another local process.
       if (isAbandoned(lockPath, staleMs)) {
         rmSync(lockPath, { recursive: true, force: true });
         continue;
@@ -67,12 +59,7 @@ export function withShardBarrier<T>(
   }
 
   activeLocks.add(lockPath);
-  try {
-    writeFileSync(join(lockPath, 'owner'), JSON.stringify({ pid: process.pid, acquiredAt: new Date().toISOString() }), {
-      mode: 0o600,
-    });
-    return operation({ lockPath });
-  } finally {
+  const release = (): void => {
     activeLocks.delete(lockPath);
     try {
       rmSync(lockPath, { recursive: true, force: true });
@@ -80,9 +67,83 @@ export function withShardBarrier<T>(
       // Fail closed: a release failure intentionally leaves the lock behind
       // so the next acquirer can detect and steal it once stale.
     }
+  };
+  try {
+    writeFileSync(join(lockPath, 'owner'), JSON.stringify({ pid: process.pid, acquiredAt: new Date().toISOString() }), {
+      mode: 0o600,
+    });
+    return { lease: { lockPath }, release };
+  } catch (error: unknown) {
+    release();
+    throw error;
   }
 }
 
+function runOperation<T>(
+  operation: (lease: ShardLease) => T | Promise<T>,
+  lease: ShardLease,
+  release: () => void,
+): T | Promise<T> {
+  try {
+    const result = operation(lease);
+    if (result instanceof Promise) {
+      return result.then(
+        (value) => {
+          release();
+          return value;
+        },
+        (error: unknown) => {
+          release();
+          throw error;
+        },
+      );
+    }
+    release();
+    return result;
+  } catch (error: unknown) {
+    release();
+    throw error;
+  }
+}
+
+/**
+ * Runs `operation` while holding the exclusive lock for one memory shard.
+ * Synchronous operations complete before returning, so the lock always
+ * covers the whole mutation.
+ */
+export function withShardBarrier<T>(
+  memoryRoot: string,
+  scopeKey: string,
+  operation: (lease: ShardLease) => T,
+  options: ShardBarrierOptions = {},
+): T {
+  const { lease, release } = acquire(memoryRoot, scopeKey, options);
+  try {
+    return runOperation(operation, lease, release) as T;
+  } finally {
+    release();
+  }
+}
+
+/**
+ * Async variant for operations that await; the lock is held across awaits
+ * and released when the promise settles.
+ */
+export async function withShardBarrierAsync<T>(
+  memoryRoot: string,
+  scopeKey: string,
+  operation: (lease: ShardLease) => Promise<T>,
+  options: ShardBarrierOptions = {},
+): Promise<T> {
+  const { lease, release } = acquire(memoryRoot, scopeKey, options);
+  try {
+    return (await runOperation(operation, lease, release)) as T;
+  } finally {
+    release();
+  }
+}
+
+/** Stale AND provably ownerless: mtime aged out and the PID is not alive. */
 function isAbandoned(lockPath: string, staleMs: number): boolean {
   try {
     const stats = statSync(lockPath);
@@ -98,7 +159,7 @@ function isAbandoned(lockPath: string, staleMs: number): boolean {
       return false;
     }
     if (typeof owner.pid !== 'number') return false;
-    // Same-host liveness probe: signal 0 delivers no signal but fails on dead
+    // Same-host liveness probe: signal 0 delivers nothing but fails on dead
     // PIDs. Only ESRCH proves the writer is gone; EPERM means it EXISTS.
     try {
       process.kill(owner.pid, 0);
