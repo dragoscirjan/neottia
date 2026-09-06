@@ -197,7 +197,13 @@ export class SqliteIndex {
       setMeta.run('rebuilt_at', new Date().toISOString());
       this.database.exec('COMMIT;');
     } catch (error: unknown) {
-      this.database.exec('ROLLBACK;');
+      // BEGIN IMMEDIATE may itself fail (e.g. SQLITE_BUSY): guard the
+      // rollback so it cannot mask the original failure.
+      try {
+        this.database.exec('ROLLBACK;');
+      } catch {
+        // no active transaction; nothing to undo
+      }
       throw new MemoryError(`Memory index rebuild failed: ${describe(error)}`);
     }
   }
@@ -217,35 +223,42 @@ export class SqliteIndex {
     // Prefix phrases: "term"* keeps v1 substring-like recall while bm25 ranks.
     const match = terms.map((term) => `"${term}"*`).join(' AND ');
 
-    let ranked: Array<{ id: string }>;
-    try {
-      ranked = this.database
-        .prepare(
-          `SELECT id, bm25(memory_search) AS rank
-           FROM memory_search
-           WHERE memory_search MATCH ?
-           ORDER BY rank ASC, id ASC
-           LIMIT ?`,
-        )
-        .all(match, options.limit * 4) as Array<{ id: string }>;
-    } catch (error: unknown) {
-      throw new MemoryError(`Memory search failed: ${describe(error)}`);
-    }
-
     const byId = new Map(state.records.map((record) => [record.id, record]));
     const results: MemoryRecord[] = [];
     let used = 0;
-    for (const { id } of ranked) {
-      if (results.length >= options.limit) break;
-      const record = byId.get(id);
-      if (!record) continue;
-      if (!(options.includeSuperseded ?? false) && !options.activeIds.has(record.id)) continue;
-      if (options.topic && record.topic !== options.topic) continue;
-      if (options.memoryType && record.memory_type !== options.memoryType) continue;
-      const size = JSON.stringify(record).length;
-      if (used + size > options.maxChars) break;
-      results.push(record);
-      used += size;
+    // Candidate batches keep filtered searches correct: JS-side filters may
+    // reject rows, so we keep fetching ranked pages until the limit, the
+    // JSON-size budget, or the match set is exhausted.
+    const batchSize = Math.max(options.limit, 50);
+    for (let offset = 0; ; offset += batchSize) {
+      let ranked: Array<{ id: string }>;
+      try {
+        ranked = this.database
+          .prepare(
+            `SELECT id, bm25(memory_search) AS rank
+             FROM memory_search
+             WHERE memory_search MATCH ?
+             ORDER BY rank ASC, id ASC
+             LIMIT ? OFFSET ?`,
+          )
+          .all(match, batchSize, offset) as Array<{ id: string }>;
+      } catch (error: unknown) {
+        throw new MemoryError(`Memory search failed: ${describe(error)}`);
+      }
+      if (!ranked.length) break;
+
+      for (const { id } of ranked) {
+        if (results.length >= options.limit) return results;
+        const record = byId.get(id);
+        if (!record) continue;
+        if (!(options.includeSuperseded ?? false) && !options.activeIds.has(record.id)) continue;
+        if (options.topic && record.topic !== options.topic) continue;
+        if (options.memoryType && record.memory_type !== options.memoryType) continue;
+        const size = JSON.stringify(record).length;
+        if (used + size > options.maxChars) return results;
+        results.push(record);
+        used += size;
+      }
     }
     // FTS rank order is authoritative; do not reorder results here.
     return results;

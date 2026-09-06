@@ -75,6 +75,8 @@ export class MemoryStore {
   private readonly now: () => Date;
 
   public constructor(options: MemoryStoreOptions) {
+    if (options.config.backend !== 'filesystem')
+      throw new MemoryError(`Memory backend '${options.config.backend}' is not implemented yet; see neottia#6.`);
     this.config = options.config;
     this.now = options.now ?? (() => new Date());
     this.backend = new FilesystemBackend({ config: options.config, cwd: options.cwd });
@@ -191,20 +193,9 @@ export class MemoryStore {
     let index: SqliteIndex | undefined;
     try {
       this.assertEnabled();
-      const state = this.loadState();
-      const report = {
-        valid: true,
-        records: state.records.length,
-        tombstones: state.tombstones.length,
-        errors: [],
-      };
-      index = SqliteIndex.open(this.backend.memoryRoot);
-      const hash = canonicalHash(state);
-      const meta = index.meta();
-      if (meta.canonicalHash === hash)
-        return { ...report, cache: { outcome: 'checked', evidence: 'canonical_snapshot_match_verified' } };
-      index.rebuild(state);
-      return { ...report, cache: { outcome: 'rebuilt', evidence: 'canonical_snapshot_rebuild_verified' } };
+      // Barrier-protected: validation must not observe a concurrent batch
+      // mid-write, and its rebuild must not race a concurrent mutation.
+      return this.withBarrier(() => this.validateLocked());
     } catch (error: unknown) {
       return {
         valid: false,
@@ -215,6 +206,38 @@ export class MemoryStore {
       };
     } finally {
       index?.close();
+    }
+  }
+
+  private validateLocked(): MemoryValidationReport {
+    {
+      let index: SqliteIndex | undefined;
+      try {
+        const state = this.loadState();
+        const report = {
+          valid: true,
+          records: state.records.length,
+          tombstones: state.tombstones.length,
+          errors: [],
+        };
+        index = SqliteIndex.open(this.backend.memoryRoot);
+        const hash = canonicalHash(state);
+        const meta = index.meta();
+        if (meta.canonicalHash === hash)
+          return { ...report, cache: { outcome: 'checked', evidence: 'canonical_snapshot_match_verified' } };
+        index.rebuild(state);
+        return { ...report, cache: { outcome: 'rebuilt', evidence: 'canonical_snapshot_rebuild_verified' } };
+      } catch (error: unknown) {
+        return {
+          valid: false,
+          records: 0,
+          tombstones: 0,
+          errors: [describe(error)],
+          cache: { outcome: 'skipped', evidence: 'memory_validation_failed' },
+        };
+      } finally {
+        index?.close();
+      }
     }
   }
 
@@ -235,28 +258,33 @@ export class MemoryStore {
 
     try {
       this.assertEnabled();
-      const candidates = parseImportCandidates(content);
-      this.loadState();
-      const validated = this.validateImportBatch(candidates);
-      if (preview)
-        return { valid: true, records: validated.records.length, tombstones: validated.tombstones.length, errors: [] };
+      // One barrier for validation AND mutation: preview and commit observe
+      // the same serialized canonical state.
+      return this.withBarrier(() => {
+        const candidates = parseImportCandidates(content);
+        const validated = this.validateImportBatch(candidates);
+        if (preview)
+          return {
+            valid: true,
+            records: validated.records.length,
+            tombstones: validated.tombstones.length,
+            errors: [],
+          };
 
-      return this.executeMutation(() => {
-        const current = this.validateImportBatch(parseImportCandidates(content));
         const replacements: StorageReplacement[] = [
-          ...current.records.map((record) => ({
+          ...validated.records.map((record) => ({
             path: this.backend.recordPath(record),
             bytes: this.backend.encode(record),
             exclusive: true,
           })),
-          ...current.tombstones.map((value) => ({
+          ...validated.tombstones.map((value) => ({
             path: this.backend.tombstonePath(value),
             bytes: this.backend.encode(value),
             exclusive: true,
           })),
         ];
         if (replacements.length) this.applyBatch(replacements);
-        return { valid: true, records: current.records.length, tombstones: current.tombstones.length, errors: [] };
+        return { valid: true, records: validated.records.length, tombstones: validated.tombstones.length, errors: [] };
       });
     } catch (error: unknown) {
       if (preview) return { valid: false, records: 0, tombstones: 0, errors: [describe(error)] };

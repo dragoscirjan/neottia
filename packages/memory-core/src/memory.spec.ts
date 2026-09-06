@@ -51,7 +51,8 @@ function fact(summary: string): StoreMemoryInput {
 }
 
 function storeFor(cwd: string, overrides: Partial<MemoryConfig> = {}): MemoryStore {
-  return MemoryStore.fromConfig(loadMemoryConfig(cwd, overrides), cwd);
+  // env: {} keeps ambient NEOTTIA_* variables out of assertions.
+  return MemoryStore.fromConfig(loadMemoryConfig(cwd, { env: {}, ...overrides }), cwd);
 }
 
 describe('memory store (filesystem + SQLite index)', () => {
@@ -255,6 +256,24 @@ describe('memory store (filesystem + SQLite index)', () => {
     expect(store.scopeKey).toBe('local--project--feat/memory-core');
     store.store(fact('Scoped fact'));
     expect(store.list()).toHaveLength(1);
+  });
+
+  it('rejects the unimplemented postgres backend with a pointer to the follow-up', () => {
+    const cwd = fixture();
+    expect(() => storeFor(cwd, { backend: 'postgres' })).toThrow(/not implemented.*neottia#6/u);
+  });
+
+  it('validates tool inputs at runtime before reaching the store', async () => {
+    const cwd = fixture();
+    const context = { cwd, interactive: true };
+    const { findMemoryTool } = await import('./tools.js');
+    const getTool = findMemoryTool('memory_get');
+    await expect(getTool?.run(context, { id: 'not-a-ulid' })).rejects.toThrow(/memory_get input/i);
+    const storeTool = findMemoryTool('memory_store');
+    await expect(storeTool?.run(context, { ...fact('Valid'), confidence: 'bogus' })).rejects.toThrow(
+      /memory_store input/i,
+    );
+    expect(storeFor(cwd).list()).toHaveLength(0);
   });
 
   it('keeps supersession semantics across the tools layer', async () => {

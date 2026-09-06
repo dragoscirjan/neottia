@@ -1,6 +1,6 @@
 # @neottia/memory-core
 
-Standalone agent memory for Neottia: filesystem-canonical YAML records with a SQLite FTS5 (BM25) index by default, and a Postgres backend behind the same interface when configured.
+Standalone agent memory for Neottia: filesystem-canonical YAML records with a SQLite FTS5 (BM25) index. A Postgres backend behind the same interface is planned ([neottia#6](https://github.com/dragoscirjan/neottia/issues/6)); `backend: postgres` is rejected until it ships.
 
 Part of the [Neottia](https://github.com/dragoscirjan/neottia) SDLC. See the [Sharded Module Configuration](https://github.com/dragoscirjan/neottia/wiki/Sharded-Module-Configuration) design for the configuration model.
 
@@ -31,6 +31,8 @@ store.store({
 ```
 
 `enabled` defaults to `false` — set `skills.memory.enabled: true` in `.neottia/config.yml` or `NEOTTIA_MEMORY_ENABLED=true`.
+
+Requires Node.js >= 22.16.0 (the first line shipping SQLite with FTS5 enabled).
 
 ## License
 

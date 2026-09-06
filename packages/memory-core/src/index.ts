@@ -49,5 +49,17 @@ export type {
   SearchMemoryInput,
   StoreMemoryInput,
 } from './store.js';
-export { MEMORY_TOOLS, findMemoryTool } from './tools.js';
+export {
+  MEMORY_TOOLS,
+  findMemoryTool,
+  deleteInputSchema,
+  exportInputSchema,
+  getInputSchema,
+  importInputSchema,
+  listInputSchema,
+  searchInputSchema,
+  storeInputSchema,
+  supersedeInputSchema,
+  validateInputSchema,
+} from './tools.js';
 export type { MemoryToolContext, MemoryToolDefinition } from './tools.js';

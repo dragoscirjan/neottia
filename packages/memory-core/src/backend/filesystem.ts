@@ -447,7 +447,7 @@ export function newestFirst(left: { created_at: string }, right: { created_at: s
 }
 
 export function searchableText(record: MemoryRecord): string {
-  return [record.summary, record.details ?? '', record.topic, ...record.tags].join('\n').toLocaleLowerCase();
+  return [record.summary, record.details ?? '', record.topic, ...record.tags].join('\n').toLowerCase();
 }
 
 function unicodeCharacters(value: string): number {

@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { MemoryLockError } from './errors.js';
 
@@ -41,7 +41,9 @@ export function withShardBarrier<T>(
   const staleMs = clampInteger(options.staleMs ?? DEFAULT_STALE_MS, 1, Number.MAX_SAFE_INTEGER, 'staleMs');
   const pollMs = clampInteger(options.pollMs ?? DEFAULT_POLL_MS, 1, 1_000, 'pollMs');
 
-  const lockPath = resolve(join(memoryRoot, '.locks'), `${scopeKey}.lock`);
+  // The lock file name is sanitized: namespace components come from config
+  // and must never turn into path traversal or nested directories.
+  const lockPath = resolve(join(memoryRoot, '.locks'), `${sanitizeLockName(scopeKey)}.lock`);
   if (activeLocks.has(lockPath)) throw new MemoryLockError(`Shard barrier is non-reentrant: ${scopeKey}`);
 
   mkdirSync(dirname(lockPath), { recursive: true, mode: 0o700 });
@@ -52,7 +54,10 @@ export function withShardBarrier<T>(
       break;
     } catch (error: unknown) {
       if (!isCode(error, 'EEXIST')) throw new MemoryLockError(`Cannot acquire shard barrier: ${scopeKey}`);
-      if (isStale(lockPath, staleMs)) {
+      // A stale lock is stolen only when its writer is provably gone. A live
+      // same-host PID keeps the lock, so long synchronous operations cannot
+      // be interrupted mid-write by another local process.
+      if (isAbandoned(lockPath, staleMs)) {
         rmSync(lockPath, { recursive: true, force: true });
         continue;
       }
@@ -78,13 +83,31 @@ export function withShardBarrier<T>(
   }
 }
 
-function isStale(lockPath: string, staleMs: number): boolean {
+function isAbandoned(lockPath: string, staleMs: number): boolean {
   try {
     const stats = statSync(lockPath);
-    return Date.now() - stats.mtimeMs >= staleMs;
+    if (Date.now() - stats.mtimeMs < staleMs) return false;
+    const ownerPath = join(lockPath, 'owner');
+    if (!existsSync(ownerPath)) return true;
+    const owner = JSON.parse(readFileSync(ownerPath, 'utf8')) as { pid?: number };
+    if (typeof owner.pid !== 'number') return true;
+    // Same-host liveness probe: signal 0 delivers no signal but fails on dead PIDs.
+    try {
+      process.kill(owner.pid, 0);
+      return false;
+    } catch {
+      return true;
+    }
   } catch {
     return false;
   }
+}
+
+function sanitizeLockName(value: string): string {
+  const sanitized = value.replace(/[^A-Za-z0-9._-]/gu, '_');
+  if (!sanitized || sanitized === '.' || sanitized === '..')
+    throw new MemoryLockError('Shard scope resolves to an unusable lock name.');
+  return sanitized;
 }
 
 function clampInteger(value: number, low: number, high: number, name: string): number {
