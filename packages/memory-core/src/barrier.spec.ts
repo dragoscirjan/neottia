@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MemoryLockError, withShardBarrier } from './index.js';
 
 const tempDirs: string[] = [];
@@ -27,6 +27,38 @@ describe('shard barrier', () => {
     writeFileSync(join(lockPath, 'owner'), JSON.stringify({ pid: process.pid }));
     utimesSync(lockPath, new Date(Date.now() - 120_000), new Date(Date.now() - 120_000));
     expect(() => withShardBarrier(root, 'shard', () => 1, { waitMs: 100, staleMs: 1000 })).toThrow(MemoryLockError);
+  });
+
+  it('preserves locks with unknown ownership (missing or malformed owner metadata)', () => {
+    const root = mkdtempSync(join(tmpdir(), 'neottia-barrier-'));
+    tempDirs.push(root);
+    for (const ownerContent of [null, '{not-json']) {
+      const lockPath = join(root, '.locks', 'shard.lock');
+      rmSync(lockPath, { recursive: true, force: true });
+      mkdirSync(lockPath, { recursive: true });
+      if (ownerContent !== null) writeFileSync(join(lockPath, 'owner'), ownerContent);
+      utimesSync(lockPath, new Date(Date.now() - 120_000), new Date(Date.now() - 120_000));
+      expect(() => withShardBarrier(root, 'shard', () => 1, { waitMs: 50, staleMs: 1000 })).toThrow(MemoryLockError);
+    }
+  });
+
+  it('preserves locks when the liveness probe is inconclusive (EPERM)', () => {
+    const root = mkdtempSync(join(tmpdir(), 'neottia-barrier-'));
+    tempDirs.push(root);
+    const lockPath = join(root, '.locks', 'shard.lock');
+    mkdirSync(lockPath, { recursive: true });
+    writeFileSync(join(lockPath, 'owner'), JSON.stringify({ pid: process.pid }));
+    utimesSync(lockPath, new Date(Date.now() - 120_000), new Date(Date.now() - 120_000));
+    const kill = process.kill.bind(process);
+    const spy = vi.spyOn(process, 'kill').mockImplementation(((pid: number, signal?: string | number) => {
+      if (signal === 0) throw Object.assign(new Error('operation not permitted'), { code: 'EPERM' });
+      return kill(pid, signal as NodeJS.Signup);
+    }) as typeof process.kill);
+    try {
+      expect(() => withShardBarrier(root, 'shard', () => 1, { waitMs: 50, staleMs: 1000 })).toThrow(MemoryLockError);
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it('steals an abandoned lock whose writer PID is gone', () => {
