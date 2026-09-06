@@ -1,6 +1,6 @@
 import { FilesystemBackend } from './backend/filesystem.js';
 import type { ShardState, StorageReplacement } from './backend/types.js';
-import { withShardBarrier } from './barrier.js';
+import { withShardBarrier, withShardBarrierAsync } from './barrier.js';
 import type { MemoryConfig } from './config.js';
 import { MemoryConflictError, MemoryError } from './errors.js';
 import { isUlid } from './identities.js';
@@ -64,6 +64,12 @@ export interface MemoryStoreOptions {
   readonly cwd: string;
   /** Injectable clock for deterministic tests. */
   readonly now?: () => Date;
+  /**
+   * Host hook for stale_policy 'prompt' (neottia#1 decision #5): called when
+   * the cache is stale; returning true rebuilds, false errors. When absent,
+   * 'prompt' degrades to a silent rebuild (non-interactive hosts).
+   */
+  readonly onStaleCache?: () => boolean | Promise<boolean>;
 }
 
 const MAX_QUERY_BYTES = 16 * 1024;
@@ -73,12 +79,14 @@ export class MemoryStore {
   private readonly backend: FilesystemBackend;
   private readonly config: MemoryConfig;
   private readonly now: () => Date;
+  private readonly onStaleCache?: () => boolean | Promise<boolean>;
 
   public constructor(options: MemoryStoreOptions) {
     if (options.config.backend !== 'filesystem')
       throw new MemoryError(`Memory backend '${options.config.backend}' is not implemented yet; see neottia#6.`);
     this.config = options.config;
     this.now = options.now ?? (() => new Date());
+    this.onStaleCache = options.onStaleCache;
     this.backend = new FilesystemBackend({ config: options.config, cwd: options.cwd });
   }
 
@@ -162,7 +170,7 @@ export class MemoryStore {
    * stale). Results stay bounded by both limit and the JSON-size budget
    * inherited from the v1 semantics.
    */
-  public search(input: SearchMemoryInput = {}): MemoryRecord[] {
+  public async search(input: SearchMemoryInput = {}): Promise<MemoryRecord[]> {
     const query = input.query;
     if (!query || !query.trim()) throw new MemoryError('query must contain searchable text.');
     if (Buffer.byteLength(query, 'utf8') > MAX_QUERY_BYTES)
@@ -170,22 +178,25 @@ export class MemoryStore {
     const limit = bounded(input.limit ?? this.config.retrieval.limit, 1, 100, 'limit');
     const maxChars = bounded(input.max_chars ?? this.config.retrieval.max_chars, 256, 100_000, 'max_chars');
 
-    return this.withBarrier(() => {
-      const state = this.loadState();
-      const index = this.ensureIndex(state);
+    const state = await this.withBarrierAsync(async () => {
+      const loaded = this.loadState();
+      const index = await this.ensureIndexAsync(loaded);
       try {
-        return index.search(query, state, {
-          limit,
-          maxChars,
-          topic: input.topic,
-          memoryType: input.memory_type,
-          includeSuperseded: input.include_superseded,
-          activeIds: state.activeIds,
-        });
+        return {
+          records: index.search(query, loaded, {
+            limit,
+            maxChars,
+            topic: input.topic,
+            memoryType: input.memory_type,
+            includeSuperseded: input.include_superseded,
+            activeIds: loaded.activeIds,
+          }),
+        };
       } finally {
         index.close();
       }
     });
+    return state.records;
   }
 
   /** Validates canonical records and verifies or rebuilds the cache. */
@@ -338,7 +349,9 @@ export class MemoryStore {
       this.loadState();
       const result = operation();
       const state = this.loadState();
-      const index = this.ensureIndex(state);
+      // Post-mutation resync bypasses stale_policy: the cache must track the
+      // write we just committed, whatever the read-time policy is.
+      const index = SqliteIndex.open(this.backend.memoryRoot);
       try {
         index.rebuild(state);
       } finally {
@@ -351,6 +364,11 @@ export class MemoryStore {
   private withBarrier<T>(operation: () => T): T {
     this.assertEnabled();
     return withShardBarrier(this.backend.memoryRoot, this.scopeKey, operation);
+  }
+
+  private async withBarrierAsync<T>(operation: () => Promise<T>): Promise<T> {
+    this.assertEnabled();
+    return withShardBarrierAsync(this.backend.memoryRoot, this.scopeKey, operation);
   }
 
   /** Mirrors the v1 contract: disabled memory blocks every operation. */
@@ -369,10 +387,23 @@ export class MemoryStore {
     this.backend.applyBatch(replacements);
   }
 
-  private ensureIndex(state: ShardState): SqliteIndex {
+  private async ensureIndexAsync(state: ShardState): Promise<SqliteIndex> {
     const index = SqliteIndex.open(this.backend.memoryRoot);
-    if (index.isStale(this.config.cache.max_age_ms, state)) index.rebuild(state);
-    return index;
+    if (!index.isStale(this.config.cache.max_age_ms, state)) return index;
+    switch (this.config.cache.stale_policy) {
+      case 'rebuild':
+        index.rebuild(state);
+        return index;
+      case 'fail':
+        throw new MemoryError('Memory cache is stale and cache.stale_policy is fail; run memory_validate.');
+      case 'prompt': {
+        if (this.onStaleCache === undefined || (await this.onStaleCache()) === true) {
+          index.rebuild(state);
+          return index;
+        }
+        throw new MemoryError('Memory cache is stale; rebuild declined by the host.');
+      }
+    }
   }
 
   private assertUniqueId(state: ShardState, id: string): void {
