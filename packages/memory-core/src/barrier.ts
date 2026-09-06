@@ -149,15 +149,23 @@ function isAbandoned(lockPath: string, staleMs: number): boolean {
     const stats = statSync(lockPath);
     if (Date.now() - stats.mtimeMs < staleMs) return false;
     const ownerPath = join(lockPath, 'owner');
-    if (!existsSync(ownerPath)) return true;
-    const owner = JSON.parse(readFileSync(ownerPath, 'utf8')) as { pid?: number };
-    if (typeof owner.pid !== 'number') return true;
-    // Same-host liveness probe: signal 0 delivers nothing but fails on dead PIDs.
+    // Missing or malformed owner metadata means ownership is UNKNOWN:
+    // preserve the lock (a live writer may exist between mkdir and write).
+    if (!existsSync(ownerPath)) return false;
+    let owner: { pid?: number };
+    try {
+      owner = JSON.parse(readFileSync(ownerPath, 'utf8')) as { pid?: number };
+    } catch {
+      return false;
+    }
+    if (typeof owner.pid !== 'number') return false;
+    // Same-host liveness probe: signal 0 delivers nothing but fails on dead
+    // PIDs. Only ESRCH proves the writer is gone; EPERM means it EXISTS.
     try {
       process.kill(owner.pid, 0);
       return false;
-    } catch {
-      return true;
+    } catch (error: unknown) {
+      return isCode(error, 'ESRCH');
     }
   } catch {
     return false;
