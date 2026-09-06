@@ -20,6 +20,7 @@ export default defineConfig({
             { text: 'Configuration', link: '/memory/configuration' },
             { text: 'Records and storage', link: '/memory/records' },
             { text: 'Tool contract', link: '/memory/tools' },
+            { text: 'Using memory over MCP', link: '/memory/mcp-server' },
             { text: 'Security and operations', link: '/memory/operations' },
           ],
         },

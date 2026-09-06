@@ -39,6 +39,8 @@ The server resolves configuration from the working directory of the harness (`.n
 | `memory_export`    | none                                                                                                                                          | JSONL text of every record and tombstone               |
 | `memory_import`    | `content` (JSONL), optional `preview: true`                                                                                                   | `{ valid, records, tombstones, errors }`               |
 
+> The packaged way to expose these tools to any harness is the [`@neottia/memory-mcp`](./mcp-server) server — with per-harness wiring examples for Claude Code, OpenCode, pi, Codex, Kiro, and VS Code.
+
 Errors are returned as tool errors with a human-readable message (for example `Memory record not found: …`, `summary has 241 Unicode characters; limit is 240`, `Suspected secret at $.summary`).
 
 ## Input validation

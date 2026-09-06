@@ -30,6 +30,7 @@ Memory is available in three shapes, all using the **same tool names and configu
 ## Pages
 
 - [Enabling and configuring memory](./configuration.md)
+- [Wiring the MCP server into any harness](./mcp-server.md)
 - [Records, lifecycle, and storage](./records.md)
 - [The tool contract](./tools.md)
 - [Security, limits, and concurrency](./operations.md)
