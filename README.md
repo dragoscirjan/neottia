@@ -1,2 +1,2 @@
-# -neottia
+# neottia
 Unifying AI Harnesses
