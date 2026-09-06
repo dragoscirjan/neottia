@@ -34,6 +34,10 @@ run = "pnpm run start:debug"
 description = "Run tests in all workspace modules"
 run = "pnpm run test"
 
+[tasks."test:harness"]
+description = "Run harness integration tests (needs OPENROUTER_API_KEY or opencode auth; uses free OpenRouter models)"
+run = "pnpm --filter @neottia/testkit run test:harness"
+
 [tasks."test:coverage"]
 description = "Run tests and generate aggregate coverage"
 run = "pnpm run test:coverage"
