@@ -7,7 +7,24 @@ export default defineConfig({
   cleanUrls: true,
   lastUpdated: true,
   themeConfig: {
-    nav: [{ text: 'Guide', link: '/' }],
+    nav: [
+      { text: 'Home', link: '/' },
+      { text: 'Memory', link: '/memory/' },
+    ],
+    sidebar: {
+      '/memory/': [
+        {
+          text: 'Memory',
+          items: [
+            { text: 'Overview', link: '/memory/' },
+            { text: 'Configuration', link: '/memory/configuration' },
+            { text: 'Records and storage', link: '/memory/records' },
+            { text: 'Tool contract', link: '/memory/tools' },
+            { text: 'Security and operations', link: '/memory/operations' },
+          ],
+        },
+      ],
+    },
     search: {
       provider: 'local',
     },
