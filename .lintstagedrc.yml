@@ -1,0 +1,3 @@
+'*.{cjs,js,json,jsx,md,mjs,ts,tsx,yaml,yml}':
+  - mise run eslint -- --fix
+  - mise run prettier -- --write

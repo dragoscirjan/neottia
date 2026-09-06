@@ -1,0 +1,6 @@
+mise run lint-staged
+mise run duplicate-check
+mise run license-check
+mise run audit-check
+
+git add .

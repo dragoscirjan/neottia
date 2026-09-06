@@ -1,0 +1,63 @@
+{
+  "name": "@neottia/core",
+  "version": "0.1.0",
+  "description": "Core APIs for Neottia",
+  "author": "Dragos Cirjan",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dragoscirjan/neottia.git",
+    "directory": "packages/core"
+  },
+  "bugs": {
+    "url": "https://github.com/dragoscirjan/neottia/issues"
+  },
+  "homepage": "https://github.com/dragoscirjan/neottia#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "types": "./dist/esm/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/esm/index.d.ts",
+      "browser": {
+        "import": "./dist/browser/index.js",
+        "default": "./dist/browser/index.js"
+      },
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.cjs",
+      "default": "./dist/esm/index.js"
+    }
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "main": "./dist/cjs/index.cjs",
+  "module": "./dist/esm/index.js",
+  "jsdelivr": "./dist/iife/neottia-core.min.js",
+  "unpkg": "./dist/iife/neottia-core.min.js",
+  "scripts": {
+    "build": "run-s build:*",
+    "build:browser": "tsc -p tsconfig.browser.json && esbuild dist/browser/index.js --bundle --format=esm --platform=browser --target=es2018 --outdir=dist/browser --splitting --minify --sourcemap --allow-overwrite",
+    "build:cjs": "tsc -p tsconfig.cjs.json && esbuild dist/cjs/index.js --bundle --format=cjs --platform=node --target=node16 --outfile=dist/cjs/index.cjs --sourcemap --allow-overwrite",
+    "build:esm": "tsc -p tsconfig.json && esbuild dist/esm/index.js --bundle --format=esm --platform=neutral --target=es2020 --outdir=dist/esm --splitting --sourcemap --allow-overwrite",
+    "build:iife": "tsc -p tsconfig.browser.json && esbuild dist/browser/index.js --bundle --format=iife --platform=browser --target=es2018 --outfile=dist/iife/neottia-core.min.js --global-name=NeottiaCore --minify --sourcemap",
+    "clean": "rimraf .nyc_output coverage dist",
+    "start": "tsx src/cli.ts",
+    "start:debug": "tsx --inspect-brk src/cli.ts",
+    "test": "vitest run --root ../.. packages/core/src",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@templ-project/tsconfig": "^0.2.2",
+    "esbuild": "^0.27.2",
+    "npm-run-all2": "^8.0.4",
+    "rimraf": "^6.1.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

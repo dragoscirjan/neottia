@@ -1,0 +1,9 @@
+packages:
+  - packages/*
+  - extensions/*
+
+# Shared dependency versions can be added here as the monorepo grows.
+catalog: {}
+
+onlyBuiltDependencies:
+  - esbuild

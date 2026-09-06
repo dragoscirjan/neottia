@@ -1,0 +1,19 @@
+# Generated files, external metadata, and local state
+*.lock
+*.log
+.editorconfig
+.gitattributes
+.github/
+.gitignore
+.husky/
+.jscpd/
+.prettierignore
+.web_stash.db
+CHANGELOG.md
+coverage/
+dist/
+docs/.vitepress/cache/
+docs/.vitepress/dist/
+LICENSE
+package-lock.json
+pnpm-lock.yaml

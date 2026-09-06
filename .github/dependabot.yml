@@ -1,0 +1,45 @@
+version: 2
+updates:
+  # GitHub Actions dependencies
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '06:00'
+    assignees:
+      - 'dragoscirjan'
+    commit-message:
+      include: 'scope'
+      prefix: 'chore'
+      prefix-development: 'chore'
+    groups:
+      github-actions-dependencies:
+        patterns:
+          - '*'
+    labels:
+      - 'dependencies'
+      - 'github-actions'
+    open-pull-requests-limit: 3
+
+  # pnpm dependencies (package.json and pnpm-lock.yaml)
+  - package-ecosystem: 'npm'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '06:00'
+    assignees:
+      - 'dragoscirjan'
+    commit-message:
+      include: 'scope'
+      prefix: 'chore'
+      prefix-development: 'chore'
+    groups:
+      pnpm-dependencies:
+        patterns:
+          - '*'
+    labels:
+      - 'dependencies'
+      - 'pnpm'
+    open-pull-requests-limit: 5

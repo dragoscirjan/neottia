@@ -1,0 +1,172 @@
+[settings]
+experimental = true
+lockfile = true
+
+############################################################################
+# Tools                                                                    #
+############################################################################
+
+[tools]
+node = "22"
+pnpm = "10.28.2"
+
+############################################################################
+# Development                                                              #
+############################################################################
+
+[tasks.build]
+description = "Build all workspace modules"
+run = "pnpm run build"
+
+[tasks.clean]
+description = "Remove generated artifacts"
+run = "pnpm run clean"
+
+[tasks.run]
+description = "Run the core module"
+run = "pnpm run start"
+
+[tasks.debug]
+description = "Run the core module with the Node.js inspector"
+run = "pnpm run start:debug"
+
+[tasks.test]
+description = "Run tests in all workspace modules"
+run = "pnpm run test"
+
+[tasks."test:coverage"]
+description = "Run tests and generate aggregate coverage"
+run = "pnpm run test:coverage"
+
+############################################################################
+# Documentation                                                            #
+############################################################################
+
+[tasks.docs]
+description = "Build the VitePress documentation site"
+run = "pnpm run docs"
+
+[tasks."docs:serve"]
+description = "Serve the VitePress documentation site locally"
+run = "pnpm run serve"
+
+[tasks."docs:preview"]
+description = "Preview the built VitePress documentation site"
+run = "pnpm run docs:preview"
+
+############################################################################
+# Quality                                                                  #
+############################################################################
+
+[tasks.format]
+description = "Format repository files"
+run = "mise run prettier -- --write ."
+
+[tasks."format:check"]
+description = "Check formatting without modifying files"
+run = "mise run prettier -- --check ."
+
+[tasks.lint]
+description = "Lint and fix repository files"
+run = "mise run eslint -- --fix ."
+
+[tasks."lint:check"]
+description = "Lint repository files without modifying them"
+run = "mise run eslint -- ."
+
+[tasks."lint-staged"]
+description = "Lint staged files"
+run = "pnpm exec lint-staged"
+raw_args = true
+
+[tasks.eslint]
+description = "Run ESLint with arguments"
+run = "pnpm exec eslint"
+raw_args = true
+
+[tasks.prettier]
+description = "Run Prettier with arguments"
+run = "pnpm exec prettier"
+raw_args = true
+
+[tasks."duplicate-check"]
+description = "Check workspace modules for duplicated source code"
+run = "pnpm run duplicate-check"
+
+[tasks."license-check"]
+description = "Check dependency license compliance"
+run = "pnpm run license-check"
+
+[tasks."audit-check"]
+description = "Check dependencies for known vulnerabilities"
+run = "pnpm run audit"
+
+[tasks.validate]
+description = "Run the complete local validation pipeline"
+run = [
+  "mise run format:check",
+  "mise run clean",
+  "mise run build",
+  "mise run lint:check",
+  "mise run duplicate-check",
+  "mise run test",
+  "mise run docs",
+]
+
+############################################################################
+# Releases                                                                 #
+############################################################################
+
+[tasks.changeset]
+description = "Describe independently versioned module changes"
+run = "pnpm changeset"
+raw_args = true
+
+[tasks."version:modules"]
+description = "Apply pending Changesets to module versions"
+run = "pnpm run version:modules"
+
+[tasks."release:modules"]
+description = "Publish independently versioned modules"
+run = "pnpm run release:modules"
+
+[tasks."release:global"]
+description = "Prepare a global release that pins every module version"
+run = "pnpm run release:global --"
+raw_args = true
+
+############################################################################
+# Dependencies                                                             #
+############################################################################
+
+[tasks."deps:sync"]
+description = "Install mise tools and pnpm dependencies"
+run = ["mise run deps:sync:mise", "mise run deps:sync:pnpm"]
+
+[tasks."deps:sync:mise"]
+description = "Install mise-managed tools"
+run = "mise install --yes"
+
+[tasks."deps:sync:pnpm"]
+description = "Install Node.js dependencies and Git hooks with pnpm"
+run = ["pnpm install", "pnpm exec husky"]
+
+[tasks."deps:refresh"]
+description = "Refresh mise and pnpm dependencies"
+run = ["mise run deps:refresh:mise", "mise run deps:refresh:pnpm"]
+
+[tasks."deps:refresh:mise"]
+description = "Upgrade mise-managed tools"
+run = "mise upgrade"
+
+[tasks."deps:refresh:pnpm"]
+description = "Update Node.js dependencies"
+run = "pnpm update --latest --recursive"
+
+[tasks."deps:clean"]
+description = "Remove locally installed dependencies"
+run = "pnpm exec rimraf node_modules packages/*/node_modules extensions/*/node_modules"
+
+[tasks."print:env"]
+description = "Print the mise-managed build environment"
+run = "mise exec -- env | sort"

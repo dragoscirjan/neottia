@@ -1,0 +1,23 @@
+{
+  "name": "@neottia/release",
+  "version": "0.1.0",
+  "description": "Immutable bill of materials for a Neottia global release",
+  "author": "Dragos Cirjan",
+  "license": "MIT",
+  "type": "module",
+  "files": ["release-manifest.json", "README.md", "LICENSE"],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dragoscirjan/neottia.git",
+    "directory": "packages/release"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@neottia/core": "workspace:0.1.0"
+  },
+  "scripts": {
+    "release:prepare": "node scripts/prepare-release.mjs"
+  }
+}
