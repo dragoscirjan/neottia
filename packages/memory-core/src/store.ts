@@ -104,13 +104,7 @@ export class MemoryStore {
   /** Stores a new active memory record. */
   public store(input: StoreMemoryInput): MemoryRecord {
     this.backend.validateCompactness(input.summary, input.details, 'memory_store');
-    return this.executeMutation(() => {
-      const state = this.loadState();
-      const record = this.backend.makeRecord(input, [], this.now);
-      this.assertUniqueId(state, record.id);
-      this.applyBatch([{ path: this.backend.recordPath(record), bytes: this.backend.encode(record), exclusive: true }]);
-      return record;
-    });
+    return this.executeMutation(() => this.writeRecord(this.backend.makeRecord(input, [], this.now)));
   }
 
   /** Stores a replacement record that supersedes an active target. */
@@ -118,13 +112,16 @@ export class MemoryStore {
     assertUlid(targetId, 'target_id');
     this.backend.validateCompactness(input.summary, input.details, 'memory_supersede');
     return this.executeMutation(() => {
-      const state = this.loadState();
-      this.requireActiveTarget(state, targetId);
-      const record = this.backend.makeRecord(input, [targetId], this.now);
-      this.assertUniqueId(state, record.id);
-      this.applyBatch([{ path: this.backend.recordPath(record), bytes: this.backend.encode(record), exclusive: true }]);
-      return record;
+      this.requireActiveTarget(this.loadState(), targetId);
+      return this.writeRecord(this.backend.makeRecord(input, [targetId], this.now));
     });
+  }
+
+  /** Exclusively writes one validated record; rejects duplicate identities. */
+  private writeRecord(record: MemoryRecord): MemoryRecord {
+    this.assertUniqueId(this.loadState(), record.id);
+    this.applyBatch([{ path: this.backend.recordPath(record), bytes: this.backend.encode(record), exclusive: true }]);
+    return record;
   }
 
   /** Tombstones an active record; canonical files are never deleted. */
@@ -208,47 +205,33 @@ export class MemoryStore {
       // mid-write, and its rebuild must not race a concurrent mutation.
       return this.withBarrier(() => this.validateLocked());
     } catch (error: unknown) {
-      return {
-        valid: false,
-        records: 0,
-        tombstones: 0,
-        errors: [describe(error)],
-        cache: { outcome: 'skipped', evidence: 'memory_validation_failed' },
-      };
+      return invalidMemoryValidationReport(error);
     } finally {
       index?.close();
     }
   }
 
   private validateLocked(): MemoryValidationReport {
-    {
+    try {
+      const state = this.loadState();
       let index: SqliteIndex | undefined;
       try {
-        const state = this.loadState();
         const report = {
           valid: true,
           records: state.records.length,
           tombstones: state.tombstones.length,
-          errors: [],
+          errors: [] as string[],
         };
         index = SqliteIndex.open(this.backend.memoryRoot);
-        const hash = canonicalHash(state);
-        const meta = index.meta();
-        if (meta.canonicalHash === hash)
+        if (index.meta().canonicalHash === canonicalHash(state))
           return { ...report, cache: { outcome: 'checked', evidence: 'canonical_snapshot_match_verified' } };
         index.rebuild(state);
         return { ...report, cache: { outcome: 'rebuilt', evidence: 'canonical_snapshot_rebuild_verified' } };
-      } catch (error: unknown) {
-        return {
-          valid: false,
-          records: 0,
-          tombstones: 0,
-          errors: [describe(error)],
-          cache: { outcome: 'skipped', evidence: 'memory_validation_failed' },
-        };
       } finally {
         index?.close();
       }
+    } catch (error: unknown) {
+      return invalidMemoryValidationReport(error);
     }
   }
 
@@ -467,6 +450,16 @@ function readStringOrNull(value: unknown, key: string): string | null | undefine
   if (value === null || typeof value !== 'object' || !(key in value)) return undefined;
   const field = (value as Record<string, unknown>)[key];
   return field === null || typeof field === 'string' ? field : undefined;
+}
+
+function invalidMemoryValidationReport(error: unknown): MemoryValidationReport {
+  return {
+    valid: false,
+    records: 0,
+    tombstones: 0,
+    errors: [describe(error)],
+    cache: { outcome: 'skipped', evidence: 'memory_validation_failed' },
+  };
 }
 
 function describe(error: unknown): string {
