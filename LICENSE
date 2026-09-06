@@ -1,0 +1,67 @@
+# Repository Licensing
+
+This repository is a monorepo. Each component may have a different license.
+Watch carefully which component you use and which license applies to it.
+
+Before using, copying, modifying, distributing, or incorporating any part of
+this repository into another project, identify the component and verify its
+applicable license in the table below, in that component's directory, and in
+any accompanying license or notice file.
+
+## Component and license list
+
+| Component or path | Applicable license | License text or notice |
+| --- | --- | --- |
+| `<component-or-path>` | `<license>` | `<path-to-license-or-notice>` |
+| `<component-or-path>` | `<license>` | `<path-to-license-or-notice>` |
+
+Add every separately licensed component to this table. Do not assume that the
+license of one component applies to another component.
+
+## Default license
+
+Unless a component, directory, file, or accompanying notice explicitly states
+that a different license applies, the original code in this repository is
+licensed under the MIT License below.
+
+This default does not relicense third-party code, dependencies, generated code,
+bundled assets, or other material that is identified as belonging to another
+copyright holder. Those materials remain subject to their respective licenses.
+
+## MIT License
+
+Copyright (c) [YEAR] [COPYRIGHT HOLDER]
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+## License identifiers
+
+Where practical, source files should identify their applicable license using
+an SPDX identifier, for example:
+
+```text
+SPDX-License-Identifier: MIT
+```
+
+For a separately licensed component, use that component's correct identifier,
+for example:
+
+```text
+SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+```
