@@ -21,7 +21,9 @@ import {
  * binary is available (NEOTTIA_TEST_OPENCODE_BIN overrides the lookup).
  */
 
-const enabled = opencodeReady();
+// Harness E2E runs are opt-in (mise run test:harness): they depend on live
+// free-model availability and must never gate `mise run validate`.
+const enabled = process.env.NEOTTIA_TEST_HARNESS === '1' && opencodeReady();
 
 let project: TempProject;
 
