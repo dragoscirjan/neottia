@@ -50,13 +50,13 @@ describe('temp project fixtures', () => {
     expect(loadMemoryConfig(project.cwd, { env: {} }).namespace.project_id).toBe('fixture');
   });
 
-  it('seeds canonical records deterministically through the library', () => {
+  it('seeds canonical records deterministically through the library', async () => {
     const project = createTempProject();
     projects.push(project);
-    seedMemory(project, [fact('The integration codename is LLAMA')]);
+    await seedMemory(project, [fact('The integration codename is LLAMA')]);
 
     const store = MemoryStore.fromConfig(loadMemoryConfig(project.cwd, { env: {} }), project.cwd);
-    const hits = store.list();
+    const hits = await store.list();
     expect(hits).toHaveLength(1);
     expect(hits[0]?.summary).toContain('LLAMA');
     expect(existsSync(join(project.memoryRoot, 'index.db'))).toBe(true);

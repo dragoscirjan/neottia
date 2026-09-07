@@ -14,18 +14,29 @@ import {
 } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { parseDocument, stringify } from 'yaml';
+import { withShardBarrier } from '../barrier.js';
 import type { MemoryConfig } from '../config.js';
-import { MemoryError, MemoryConflictError, formatSchemaError } from '../errors.js';
-import { createUlid, isUlid } from '../identities.js';
-import {
-  memoryRecordSchema,
-  memoryTombstoneSchema,
-  type MemoryRecord,
-  type MemoryTombstone,
-  type RecordType,
-} from '../schemas.js';
+import { MemoryConflictError, MemoryError } from '../errors.js';
+import { canonicalHash, SqliteIndex } from '../index-sqlite.js';
+import type { MemoryRecord, MemoryTombstone, RecordType } from '../schemas.js';
 import { createSecretScanner, type SecretScanner } from '../security.js';
-import type { NamespaceScope, ShardState, StorageBackend, StorageLimits, StorageReplacement } from './types.js';
+import {
+  makeRecord as makeRecordHelper,
+  makeTombstone as makeTombstoneHelper,
+  validateCompactness as validateCompactnessHelper,
+  validateRecord as validateRecordHelper,
+  validateTombstone as validateTombstoneHelper,
+  type RecordHelperDeps,
+} from './record-helpers.js';
+import type {
+  BackendSearchOptions,
+  CacheValidation,
+  NamespaceScope,
+  ShardState,
+  StorageBackend,
+  StorageLimits,
+  StorageReplacement,
+} from './types.js';
 
 /**
  * Filesystem backend, ported from the harnessctl-v2 memory implementation:
@@ -41,13 +52,11 @@ export const RECORD_FOLDERS: Readonly<Record<RecordType, string>> = {
   lesson: 'lessons',
 };
 
-const MUTATION_SUMMARY_CHARACTERS = 240;
-const MUTATION_DETAILS_CHARACTERS = 2_000;
-const MUTATION_DETAILS_LINES = 12;
-
 export interface FilesystemBackendOptions {
   readonly config: MemoryConfig;
   readonly cwd: string;
+  /** Host hook for stale_policy 'prompt' (see MemoryStoreOptions). */
+  readonly onStaleCache?: () => boolean | Promise<boolean>;
 }
 
 export class FilesystemBackend implements StorageBackend {
@@ -56,9 +65,16 @@ export class FilesystemBackend implements StorageBackend {
   private readonly scanner: SecretScanner;
   private readonly scope: NamespaceScope;
   private readonly defaultTopic: string;
+  private readonly helperDeps: RecordHelperDeps;
+  private readonly cacheMaxAgeMs: number;
+  private readonly stalePolicy: 'prompt' | 'rebuild' | 'fail';
+  private readonly onStaleCache?: () => boolean | Promise<boolean>;
 
   public constructor(options: FilesystemBackendOptions) {
     this.root = resolve(options.cwd, options.config.root);
+    this.cacheMaxAgeMs = options.config.cache.max_age_ms;
+    this.stalePolicy = options.config.cache.stale_policy;
+    this.onStaleCache = options.onStaleCache;
     this.limits = {
       maxFileBytes: options.config.security.limits.max_file_bytes,
       maxFiles: options.config.security.limits.max_files,
@@ -74,6 +90,7 @@ export class FilesystemBackend implements StorageBackend {
       scope: options.config.namespace.scope,
     };
     this.defaultTopic = options.config.namespace.default_topic;
+    this.helperDeps = { scope: this.scope, scanner: this.scanner, defaultTopic: this.defaultTopic };
   }
 
   public get memoryRoot(): string {
@@ -85,7 +102,7 @@ export class FilesystemBackend implements StorageBackend {
   }
 
   /** {@inheritdoc StorageBackend.loadState} */
-  public loadState(): ShardState {
+  public async loadState(): Promise<ShardState> {
     const records: MemoryRecord[] = [];
     const tombstones: MemoryTombstone[] = [];
     const ids = new Set<string>();
@@ -101,12 +118,12 @@ export class FilesystemBackend implements StorageBackend {
         ({ files, bytes } = this.trackUsage(path, files, bytes));
         track(path);
         const record = this.parseCanonical(path);
-        validateRecord(record, this.scope, this.scanner);
-        if (record.record_type !== recordType)
+        const validated = validateRecordHelper(record, this.helperDeps);
+        if (validated.record_type !== recordType)
           throw new MemoryError(`Record type does not match folder: ${relative(this.root, path)}`);
-        if (ids.has(record.id)) throw new MemoryError(`Duplicate memory ID: ${record.id}`);
-        ids.add(record.id);
-        records.push(record);
+        if (ids.has(validated.id)) throw new MemoryError(`Duplicate memory ID: ${validated.id}`);
+        ids.add(validated.id);
+        records.push(validated);
       }
     }
 
@@ -114,10 +131,10 @@ export class FilesystemBackend implements StorageBackend {
       ({ files, bytes } = this.trackUsage(path, files, bytes));
       track(path);
       const tombstone = this.parseCanonical(path);
-      validateTombstone(tombstone, this.scope, this.scanner);
-      if (ids.has(tombstone.id)) throw new MemoryError(`Duplicate memory ID: ${tombstone.id}`);
-      ids.add(tombstone.id);
-      tombstones.push(tombstone);
+      const validatedTombstone = validateTombstoneHelper(tombstone, this.helperDeps);
+      if (ids.has(validatedTombstone.id)) throw new MemoryError(`Duplicate memory ID: ${validatedTombstone.id}`);
+      ids.add(validatedTombstone.id);
+      tombstones.push(validatedTombstone);
     }
 
     const recordIds = new Set(records.map((record) => record.id));
@@ -143,7 +160,11 @@ export class FilesystemBackend implements StorageBackend {
   }
 
   /** {@inheritdoc StorageBackend.applyBatch} */
-  public applyBatch(replacements: readonly StorageReplacement[]): void {
+  public async applyBatch(replacements: readonly StorageReplacement[]): Promise<void> {
+    this.applyBatchSync(replacements);
+  }
+
+  private applyBatchSync(replacements: readonly StorageReplacement[]): void {
     if (replacements.length > this.limits.maxFiles) throw new MemoryError('Memory batch path limit exceeded.');
     const ordered = [...replacements].sort((left, right) => left.path.localeCompare(right.path));
     const before = new Map<string, Uint8Array | undefined>();
@@ -183,28 +204,79 @@ export class FilesystemBackend implements StorageBackend {
     }
   }
 
+  /** {@inheritdoc StorageBackend.search} — BM25 through the SQLite index. */
+  public async search(state: ShardState, query: string, options: BackendSearchOptions): Promise<MemoryRecord[]> {
+    const index = await this.ensureIndex(state);
+    try {
+      return index.search(query, state, options);
+    } finally {
+      index.close();
+    }
+  }
+
+  /** {@inheritdoc StorageBackend.withLock} — shard-scoped directory lock. */
+  public async withLock<T>(operation: () => Promise<T>): Promise<T> {
+    return withShardBarrier(this.root, this.scopeKey, operation);
+  }
+
+  /** {@inheritdoc StorageBackend.checkOrRebuildCache} */
+  public async checkOrRebuildCache(state: ShardState): Promise<CacheValidation> {
+    // Fresh connection per call: the index file can be replaced externally
+    // (tests, manual deletion), and an open handle would read stale pages.
+    const index = SqliteIndex.open(this.root);
+    try {
+      if (index.meta().canonicalHash === canonicalHash(state))
+        return { outcome: 'checked', evidence: 'canonical_snapshot_match_verified' };
+      index.rebuild(state);
+      return { outcome: 'rebuilt', evidence: 'canonical_snapshot_rebuild_verified' };
+    } finally {
+      index.close();
+    }
+  }
+
+  /** {@inheritdoc StorageBackend.resetCache} */
+  public async resetCache(): Promise<void> {
+    SqliteIndex.destroy(this.root);
+  }
+
+  /** {@inheritdoc StorageBackend.close} — the index opens per operation. */
+  public async close(): Promise<void> {
+    await Promise.resolve();
+  }
+
+  /** Opens a fresh index connection and resolves staleness per policy. */
+  private async ensureIndex(state: ShardState): Promise<SqliteIndex> {
+    const index = SqliteIndex.open(this.root);
+    if (!index.isStale(this.cacheMaxAgeMs, state)) return index;
+    await this.resolveStaleness(index, state);
+    return index;
+  }
+
+  private async resolveStaleness(index: SqliteIndex, state: ShardState): Promise<void> {
+    switch (this.stalePolicy) {
+      case 'rebuild':
+        index.rebuild(state);
+        return;
+      case 'fail':
+        throw new MemoryError('Memory cache is stale and cache.stale_policy is fail; run memory_validate.');
+      case 'prompt': {
+        if (this.onStaleCache === undefined || (await this.onStaleCache()) === true) {
+          index.rebuild(state);
+          return;
+        }
+        throw new MemoryError('Memory cache is stale; rebuild declined by the host.');
+      }
+    }
+  }
+
+  /** Shard lock identity derived from the namespace config. */
+  public get scopeKey(): string {
+    return `${this.scope.organizationId}--${this.scope.projectId}--${this.scope.scope}`;
+  }
+
   /** Creates a validated record object with a fresh ULID and scope from config. */
   public makeRecord(input: MemoryRecordInput, supersedes: string[], now: () => Date = () => new Date()): MemoryRecord {
-    const record: MemoryRecord = {
-      schema_version: 1,
-      id: createUlid(now().getTime()),
-      memory_type: input.memory_type,
-      record_type: input.record_type,
-      organization_id: this.scope.organizationId,
-      project_id: this.scope.projectId,
-      topic: input.topic ?? this.defaultTopic,
-      summary: input.summary,
-      details: input.details ?? null,
-      source: input.source,
-      created_at: now().toISOString(),
-      created_by: input.created_by,
-      confidence: input.confidence,
-      status: 'active',
-      supersedes,
-      tags: [...new Set(input.tags ?? [])].sort(),
-    };
-    validateRecord(record, this.scope, this.scanner);
-    return record;
+    return makeRecordHelper(this.helperDeps, input, supersedes, now);
   }
 
   /** Builds the canonical file path for a record from its record type. */
@@ -225,40 +297,12 @@ export class FilesystemBackend implements StorageBackend {
     createdBy: string,
     now: () => Date = () => new Date(),
   ): MemoryTombstone {
-    assertUlid(targetId, 'target_id');
-    const tombstone: MemoryTombstone = {
-      schema_version: 1,
-      id: createUlid(now().getTime()),
-      organization_id: this.scope.organizationId,
-      project_id: this.scope.projectId,
-      target_id: targetId,
-      reason,
-      source,
-      created_at: now().toISOString(),
-      created_by: createdBy,
-    };
-    validateTombstone(tombstone, this.scope, this.scanner);
-    return tombstone;
+    return makeTombstoneHelper(this.helperDeps, targetId, reason, source, createdBy, now);
   }
 
   /** Validates mutation compactness for store/supersede/import inputs. */
   public validateCompactness(summary: string, details: string | null | undefined, context: string): void {
-    const summaryCharacters = unicodeCharacters(summary);
-    if (summaryCharacters > MUTATION_SUMMARY_CHARACTERS)
-      throw new MemoryError(
-        `${context}: summary has ${summaryCharacters} Unicode characters; limit is ${MUTATION_SUMMARY_CHARACTERS}.`,
-      );
-    if (details === undefined || details === null) return;
-    const detailCharacters = unicodeCharacters(details);
-    if (detailCharacters > MUTATION_DETAILS_CHARACTERS)
-      throw new MemoryError(
-        `${context}: details has ${detailCharacters} Unicode characters; limit is ${MUTATION_DETAILS_CHARACTERS}.`,
-      );
-    const nonEmptyLines = details.split(/\r\n|[\n\r\u2028\u2029]/u).filter((line) => line.trim()).length;
-    if (nonEmptyLines > MUTATION_DETAILS_LINES)
-      throw new MemoryError(
-        `${context}: details has ${nonEmptyLines} non-empty lines; limit is ${MUTATION_DETAILS_LINES}.`,
-      );
+    validateCompactnessHelper(summary, details, context);
   }
 
   public encode(value: MemoryRecord | MemoryTombstone): Uint8Array {
@@ -388,29 +432,6 @@ export type MemoryRecordInput = Omit<
   tags?: string[];
 };
 
-function validateRecord(value: unknown, scope: NamespaceScope, scanner: SecretScanner): asserts value is MemoryRecord {
-  const result = memoryRecordSchema.safeParse(value);
-  if (!result.success) throw new MemoryError(`Invalid memory record:\n${formatSchemaError(result.error)}`);
-  assertScope(result.data, scope);
-  scanner(result.data);
-}
-
-function validateTombstone(
-  value: unknown,
-  scope: NamespaceScope,
-  scanner: SecretScanner,
-): asserts value is MemoryTombstone {
-  const result = memoryTombstoneSchema.safeParse(value);
-  if (!result.success) throw new MemoryError(`Invalid memory tombstone:\n${formatSchemaError(result.error)}`);
-  assertScope(result.data, scope);
-  scanner(result.data);
-}
-
-function assertScope(value: { organization_id: string; project_id: string }, scope: NamespaceScope): void {
-  if (value.organization_id !== scope.organizationId || value.project_id !== scope.projectId)
-    throw new MemoryError('Memory record scope does not match configured project namespace.');
-}
-
 function assertAcyclic(records: MemoryRecord[]): void {
   const edges = new Map(records.map((record) => [record.id, record.supersedes]));
   const visiting = new Set<string>();
@@ -426,10 +447,6 @@ function assertAcyclic(records: MemoryRecord[]): void {
   records.forEach((record) => visit(record.id));
 }
 
-function assertUlid(value: unknown, path: string): asserts value is string {
-  if (typeof value !== 'string' || !isUlid(value)) throw new MemoryError(`${path} must be a Crockford ULID.`);
-}
-
 export function safeProjectPath(value: string): string {
   if (
     !value ||
@@ -442,16 +459,10 @@ export function safeProjectPath(value: string): string {
   return value;
 }
 
+export { searchableText } from './record-helpers.js';
+
 export function newestFirst(left: { created_at: string }, right: { created_at: string }): number {
   return right.created_at.localeCompare(left.created_at);
-}
-
-export function searchableText(record: MemoryRecord): string {
-  return [record.summary, record.details ?? '', record.topic, ...record.tags].join('\n').toLowerCase();
-}
-
-function unicodeCharacters(value: string): number {
-  return Array.from(value).length;
 }
 
 function randomToken(): string {

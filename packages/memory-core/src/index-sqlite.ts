@@ -1,7 +1,18 @@
 import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { searchableText } from './backend/filesystem.js';
+import { collectSearchResults, searchableText } from './backend/record-helpers.js';
+
+/** FTS5 prefix-phrase query: every term must match, terms match by prefix. */
+function termsOf(query: string): string | undefined {
+  const terms = query
+    .trim()
+    .split(/\s+/u)
+    .filter(Boolean)
+    .map((term) => term.replace(/"/gu, '""'));
+  if (!terms.length) return undefined;
+  return terms.map((term) => `"${term}"*`).join(' AND ');
+}
 import type { ShardState } from './backend/types.js';
 import { MemoryError } from './errors.js';
 import type { MemoryRecord } from './schemas.js';
@@ -208,60 +219,23 @@ export class SqliteIndex {
     }
   }
 
-  /**
-   * BM25-ranked search over the FTS5 index. Ranked results are mapped back
-   * to canonical records, filtered, and bounded by both limit and the
-   * JSON-size budget inherited from the v1 semantics.
-   */
+  /** BM25-ranked search over the FTS5 index. */
   public search(query: string, state: ShardState, options: IndexSearchOptions): MemoryRecord[] {
-    const terms = query
-      .trim()
-      .split(/\s+/u)
-      .filter(Boolean)
-      .map((term) => term.replace(/"/gu, '""'));
-    if (!terms.length) return [];
-    // Prefix phrases: "term"* keeps v1 substring-like recall while bm25 ranks.
-    const match = terms.map((term) => `"${term}"*`).join(' AND ');
-
-    const byId = new Map(state.records.map((record) => [record.id, record]));
-    const results: MemoryRecord[] = [];
-    let used = 0;
-    // Candidate batches keep filtered searches correct: JS-side filters may
-    // reject rows, so we keep fetching ranked pages until the limit, the
-    // JSON-size budget, or the match set is exhausted.
-    const batchSize = Math.max(options.limit, 50);
-    for (let offset = 0; ; offset += batchSize) {
-      let ranked: Array<{ id: string }>;
-      try {
-        ranked = this.database
-          .prepare(
-            `SELECT id, bm25(memory_search) AS rank
-             FROM memory_search
-             WHERE memory_search MATCH ?
-             ORDER BY rank ASC, id ASC
-             LIMIT ? OFFSET ?`,
-          )
-          .all(match, batchSize, offset) as Array<{ id: string }>;
-      } catch (error: unknown) {
-        throw new MemoryError(`Memory search failed: ${describe(error)}`);
-      }
-      if (!ranked.length) break;
-
-      for (const { id } of ranked) {
-        if (results.length >= options.limit) return results;
-        const record = byId.get(id);
-        if (!record) continue;
-        if (!(options.includeSuperseded ?? false) && !options.activeIds.has(record.id)) continue;
-        if (options.topic && record.topic !== options.topic) continue;
-        if (options.memoryType && record.memory_type !== options.memoryType) continue;
-        const size = JSON.stringify(record).length;
-        if (used + size > options.maxChars) return results;
-        results.push(record);
-        used += size;
-      }
-    }
-    // FTS rank order is authoritative; do not reorder results here.
-    return results;
+    const match = termsOf(query);
+    if (!match) return [];
+    const ranked = this.database
+      .prepare(
+        `SELECT id, bm25(memory_search) AS rank
+         FROM memory_search
+         WHERE memory_search MATCH ?
+         ORDER BY rank ASC, id ASC`,
+      )
+      .all(match) as Array<{ id: string }>;
+    return collectSearchResults(
+      ranked.map((row) => row.id),
+      new Map(state.records.map((record) => [record.id, record])),
+      options,
+    );
   }
 
   /** Removes the index file; used by tests and manual cache invalidation. */

@@ -1,0 +1,31 @@
+# Test PostgreSQL for the Neottia memory Postgres backend.
+#
+#   docker compose up -d --build     # start (builds on first run)
+#   docker compose down -v           # stop and wipe data
+#
+# Connection: postgres://neottia:neottia@localhost:5433/neottia
+# Port 5433 avoids clashing with a local PostgreSQL on 5432.
+
+name: neottia-dependencies
+
+services:
+  postgres:
+    build:
+      context: .
+      args:
+        PG_TEXTSEARCH_VERSION: main
+    image: neottia/postgres-memory:latest
+    container_name: neottia-postgres
+    environment:
+      POSTGRES_USER: neottia
+      POSTGRES_PASSWORD: neottia
+      POSTGRES_DB: neottia
+    # pg_textsearch must be preloaded at server start.
+    command: ['postgres', '-c', 'shared_preload_libraries=pg_textsearch']
+    ports:
+      - '5433:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U neottia -d neottia']
+      interval: 2s
+      timeout: 3s
+      retries: 30

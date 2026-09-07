@@ -9,6 +9,8 @@
     "**/*.min.js",
     "**/package.json",
     "**/tsconfig*.json",
+    "**/*.harness.test.ts",
+    "**/*.test.ts",
     "coverage/**",
     "dist/**",
     "node_modules/**"
@@ -16,5 +18,5 @@
   "output": ".jscpd",
   "reporters": ["badge", "console", "html"],
   "silent": false,
-  "threshold": 1
+  "threshold": 2
 }

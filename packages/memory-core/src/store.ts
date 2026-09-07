@@ -1,10 +1,15 @@
 import { FilesystemBackend } from './backend/filesystem.js';
-import type { ShardState, StorageReplacement } from './backend/types.js';
-import { withShardBarrier, withShardBarrierAsync } from './barrier.js';
+import { PostgresBackend } from './backend/postgres.js';
+import type {
+  BackendSearchOptions,
+  CacheValidation,
+  ShardState,
+  StorageBackend,
+  StorageReplacement,
+} from './backend/types.js';
 import type { MemoryConfig } from './config.js';
 import { MemoryConflictError, MemoryError } from './errors.js';
 import { isUlid } from './identities.js';
-import { canonicalHash, SqliteIndex } from './index-sqlite.js';
 import {
   memoryRecordSchema,
   memoryTombstoneSchema,
@@ -15,9 +20,10 @@ import {
 
 /**
  * MemoryStore: the facade behind the memory_* tool surface. Operations run
- * inside a shard-scoped barrier; mutations re-validate canonical state and
- * resynchronize the disposable SQLite index afterwards. Ported from the
- * harnessctl-v2 memory implementation with the issue-graph coupling removed.
+ * inside a backend-scoped lock (file barrier for the filesystem backend,
+ * advisory locks for Postgres); mutations re-validate canonical state and
+ * resynchronize the backend search index afterwards. Ported from the
+ * harnessctl-v2 memory implementation; backends are pluggable (issue #6).
  */
 
 export interface StoreMemoryInput {
@@ -46,10 +52,7 @@ export interface MemoryValidationReport {
   records: number;
   tombstones: number;
   errors: string[];
-  cache:
-    | { outcome: 'checked'; evidence: 'canonical_snapshot_match_verified' }
-    | { outcome: 'rebuilt'; evidence: 'canonical_snapshot_rebuild_verified' }
-    | { outcome: 'skipped'; evidence: 'memory_validation_failed' };
+  cache: CacheValidation | { outcome: 'skipped'; evidence: 'memory_validation_failed' };
 }
 
 export interface ImportReport {
@@ -64,11 +67,7 @@ export interface MemoryStoreOptions {
   readonly cwd: string;
   /** Injectable clock for deterministic tests. */
   readonly now?: () => Date;
-  /**
-   * Host hook for stale_policy 'prompt' (neottia#1 decision #5): called when
-   * the cache is stale; returning true rebuilds, false errors. When absent,
-   * 'prompt' degrades to a silent rebuild (non-interactive hosts).
-   */
+  /** Host hook for stale_policy 'prompt' (extensions can prompt the user). */
   readonly onStaleCache?: () => boolean | Promise<boolean>;
 }
 
@@ -76,23 +75,19 @@ const MAX_QUERY_BYTES = 16 * 1024;
 const MAX_PAYLOAD_BYTES = 64 * 1024 * 1024;
 
 export class MemoryStore {
-  private readonly backend: FilesystemBackend;
+  private readonly backend: StorageBackend;
   private readonly config: MemoryConfig;
   private readonly now: () => Date;
-  private readonly onStaleCache?: () => boolean | Promise<boolean>;
 
   public constructor(options: MemoryStoreOptions) {
-    if (options.config.backend !== 'filesystem')
-      throw new MemoryError(`Memory backend '${options.config.backend}' is not implemented yet; see neottia#6.`);
     this.config = options.config;
     this.now = options.now ?? (() => new Date());
-    this.onStaleCache = options.onStaleCache;
-    this.backend = new FilesystemBackend({ config: options.config, cwd: options.cwd });
+    this.backend = createBackend(options);
   }
 
   /** Builds a store from a resolved config shard. */
-  public static fromConfig(config: MemoryConfig, cwd: string): MemoryStore {
-    return new MemoryStore({ config, cwd });
+  public static fromConfig(config: MemoryConfig, cwd: string, options: Partial<MemoryStoreOptions> = {}): MemoryStore {
+    return new MemoryStore({ ...options, config, cwd });
   }
 
   /** Lock identity of the namespace shard this store writes to. */
@@ -102,37 +97,35 @@ export class MemoryStore {
   }
 
   /** Stores a new active memory record. */
-  public store(input: StoreMemoryInput): MemoryRecord {
+  public async store(input: StoreMemoryInput): Promise<MemoryRecord> {
     this.backend.validateCompactness(input.summary, input.details, 'memory_store');
     return this.executeMutation(() => this.writeRecord(this.backend.makeRecord(input, [], this.now)));
   }
 
   /** Stores a replacement record that supersedes an active target. */
-  public supersede(targetId: string, input: StoreMemoryInput): MemoryRecord {
+  public async supersede(targetId: string, input: StoreMemoryInput): Promise<MemoryRecord> {
     assertUlid(targetId, 'target_id');
     this.backend.validateCompactness(input.summary, input.details, 'memory_supersede');
-    return this.executeMutation(() => {
-      this.requireActiveTarget(this.loadState(), targetId);
+    return this.executeMutation(async () => {
+      this.requireActiveTarget(await this.loadState(), targetId);
       return this.writeRecord(this.backend.makeRecord(input, [targetId], this.now));
     });
   }
 
-  /** Exclusively writes one validated record; rejects duplicate identities. */
-  private writeRecord(record: MemoryRecord): MemoryRecord {
-    this.assertUniqueId(this.loadState(), record.id);
-    this.applyBatch([{ path: this.backend.recordPath(record), bytes: this.backend.encode(record), exclusive: true }]);
-    return record;
-  }
-
-  /** Tombstones an active record; canonical files are never deleted. */
-  public delete(targetId: string, reason: string, source: MemorySource, createdBy: string): MemoryTombstone {
+  /** Tombstones an active record; canonical data is never deleted. */
+  public async delete(
+    targetId: string,
+    reason: string,
+    source: MemorySource,
+    createdBy: string,
+  ): Promise<MemoryTombstone> {
     assertUlid(targetId, 'target_id');
-    return this.executeMutation(() => {
-      const state = this.loadState();
+    return this.executeMutation(async () => {
+      const state = await this.loadState();
       this.requireActiveTarget(state, targetId);
       const tombstone = this.backend.makeTombstone(targetId, reason, source, createdBy, this.now);
       this.assertUniqueId(state, tombstone.id);
-      this.applyBatch([
+      await this.applyBatch([
         { path: this.backend.tombstonePath(tombstone), bytes: this.backend.encode(tombstone), exclusive: true },
       ]);
       return tombstone;
@@ -140,7 +133,7 @@ export class MemoryStore {
   }
 
   /** Fetches one record or tombstone by ULID. */
-  public get(id: string): MemoryRecord | MemoryTombstone {
+  public async get(id: string): Promise<MemoryRecord | MemoryTombstone> {
     assertUlid(id, 'id');
     return this.executeRead((state) => {
       const result = [...state.records, ...state.tombstones].find((item) => item.id === id);
@@ -150,7 +143,7 @@ export class MemoryStore {
   }
 
   /** Lists records, newest first, with optional topic/type filters. */
-  public list(input: SearchMemoryInput = {}): MemoryRecord[] {
+  public async list(input: SearchMemoryInput = {}): Promise<MemoryRecord[]> {
     return this.executeRead((state) => {
       const includeSuperseded = input.include_superseded ?? this.config.retrieval.include_superseded;
       const limit = bounded(input.limit ?? this.config.retrieval.limit, 1, 100, 'limit');
@@ -162,11 +155,7 @@ export class MemoryStore {
     });
   }
 
-  /**
-   * BM25-ranked search through the SQLite index (rebuilding it first when
-   * stale). Results stay bounded by both limit and the JSON-size budget
-   * inherited from the v1 semantics.
-   */
+  /** BM25-ranked search through the backend index. */
   public async search(input: SearchMemoryInput = {}): Promise<MemoryRecord[]> {
     const query = input.query;
     if (!query || !query.trim()) throw new MemoryError('query must contain searchable text.');
@@ -175,68 +164,42 @@ export class MemoryStore {
     const limit = bounded(input.limit ?? this.config.retrieval.limit, 1, 100, 'limit');
     const maxChars = bounded(input.max_chars ?? this.config.retrieval.max_chars, 256, 100_000, 'max_chars');
 
-    const state = await this.withBarrierAsync(async () => {
-      const loaded = this.loadState();
-      const index = await this.ensureIndexAsync(loaded);
-      try {
-        return {
-          records: index.search(query, loaded, {
-            limit,
-            maxChars,
-            topic: input.topic,
-            memoryType: input.memory_type,
-            includeSuperseded: input.include_superseded,
-            activeIds: loaded.activeIds,
-          }),
-        };
-      } finally {
-        index.close();
-      }
+    return this.withBarrier(async () => {
+      const state = await this.loadState();
+      const options: BackendSearchOptions = {
+        limit,
+        maxChars,
+        topic: input.topic,
+        memoryType: input.memory_type,
+        includeSuperseded: input.include_superseded,
+        activeIds: state.activeIds,
+      };
+      return this.backend.search(state, query, options);
     });
-    return state.records;
   }
 
-  /** Validates canonical records and verifies or rebuilds the cache. */
-  public validate(): MemoryValidationReport {
-    let index: SqliteIndex | undefined;
+  /** Validates canonical records and verifies or rebuilds the search index. */
+  public async validate(): Promise<MemoryValidationReport> {
     try {
       this.assertEnabled();
-      // Barrier-protected: validation must not observe a concurrent batch
-      // mid-write, and its rebuild must not race a concurrent mutation.
-      return this.withBarrier(() => this.validateLocked());
-    } catch (error: unknown) {
-      return invalidMemoryValidationReport(error);
-    } finally {
-      index?.close();
-    }
-  }
-
-  private validateLocked(): MemoryValidationReport {
-    try {
-      const state = this.loadState();
-      let index: SqliteIndex | undefined;
-      try {
+      return await this.withBarrier(async () => {
+        const state = await this.loadState();
         const report = {
           valid: true,
           records: state.records.length,
           tombstones: state.tombstones.length,
           errors: [] as string[],
         };
-        index = SqliteIndex.open(this.backend.memoryRoot);
-        if (index.meta().canonicalHash === canonicalHash(state))
-          return { ...report, cache: { outcome: 'checked', evidence: 'canonical_snapshot_match_verified' } };
-        index.rebuild(state);
-        return { ...report, cache: { outcome: 'rebuilt', evidence: 'canonical_snapshot_rebuild_verified' } };
-      } finally {
-        index?.close();
-      }
+        const cache = await this.backend.checkOrRebuildCache(state);
+        return { ...report, cache };
+      });
     } catch (error: unknown) {
       return invalidMemoryValidationReport(error);
     }
   }
 
   /** Exports all records and tombstones as JSONL (one document per line). */
-  public export(): string {
+  public async export(): Promise<string> {
     return this.executeRead((state) => {
       const result = `${[...state.records, ...state.tombstones].map((item) => JSON.stringify(item)).join('\n')}\n`;
       if (Buffer.byteLength(result, 'utf8') > MAX_PAYLOAD_BYTES)
@@ -246,17 +209,15 @@ export class MemoryStore {
   }
 
   /** Imports a JSONL payload; preview validates without writing. */
-  public import(content: string, preview = false): ImportReport {
+  public async import(content: string, preview = false): Promise<ImportReport> {
     if (Buffer.byteLength(content, 'utf8') > MAX_PAYLOAD_BYTES)
       throw new MemoryError('memory import exceeds the 64 MiB payload limit.');
 
     try {
       this.assertEnabled();
-      // One barrier for validation AND mutation: preview and commit observe
-      // the same serialized canonical state.
-      return this.withBarrier(() => {
+      return await this.withBarrier(async () => {
         const candidates = parseImportCandidates(content);
-        const validated = this.validateImportBatch(candidates);
+        const validated = this.validateImportBatch(candidates, await this.loadState());
         if (preview)
           return {
             valid: true,
@@ -277,7 +238,7 @@ export class MemoryStore {
             exclusive: true,
           })),
         ];
-        if (replacements.length) this.applyBatch(replacements);
+        if (replacements.length) await this.applyBatch(replacements);
         return { valid: true, records: validated.records.length, tombstones: validated.tombstones.length, errors: [] };
       });
     } catch (error: unknown) {
@@ -289,11 +250,19 @@ export class MemoryStore {
 
   // -- internals ------------------------------------------------------------
 
-  private validateImportBatch(candidates: Array<{ value: unknown; line: number }>): {
-    records: MemoryRecord[];
-    tombstones: MemoryTombstone[];
-  } {
-    const state = this.loadState();
+  /** Exclusively writes one validated record; rejects duplicate identities. */
+  private async writeRecord(record: MemoryRecord): Promise<MemoryRecord> {
+    this.assertUniqueId(await this.loadState(), record.id);
+    await this.applyBatch([
+      { path: this.backend.recordPath(record), bytes: this.backend.encode(record), exclusive: true },
+    ]);
+    return record;
+  }
+
+  private validateImportBatch(
+    candidates: Array<{ value: unknown; line: number }>,
+    state: ShardState,
+  ): { records: MemoryRecord[]; tombstones: MemoryTombstone[] } {
     const records: MemoryRecord[] = [];
     const tombstones: MemoryTombstone[] = [];
     const ids = new Set([...state.records, ...state.tombstones].map((item) => item.id));
@@ -308,9 +277,11 @@ export class MemoryStore {
         tombstones.push(result.data);
         continue;
       }
-      const recordId = readString(item, 'id');
-      const context = `memory_import line ${candidate.line}${recordId ? ` record ${recordId}` : ''}`;
-      this.backend.validateCompactness(readString(item, 'summary'), readStringOrNull(item, 'details'), context);
+      this.backend.validateCompactness(
+        readString(item, 'summary'),
+        readStringOrNull(item, 'details'),
+        `memory_import line ${candidate.line}${readString(item, 'id') ? ` record ${readString(item, 'id')}` : ''}`,
+      );
       const result = memoryRecordSchema.safeParse(item);
       if (!result.success) throw new MemoryError(`Invalid memory record at line ${candidate.line}.`);
       if (ids.has(result.data.id)) throw new MemoryConflictError(`Memory ID already exists: ${result.data.id}`);
@@ -321,72 +292,40 @@ export class MemoryStore {
     return { records, tombstones };
   }
 
-  private executeRead<T>(operation: (state: ShardState) => T): T {
-    return this.withBarrier(() => operation(this.loadState()));
+  private async executeRead<T>(operation: (state: ShardState) => T): Promise<T> {
+    return this.withBarrier(async () => operation(await this.loadState()));
   }
 
-  private executeMutation<T>(operation: () => T): T {
-    return this.withBarrier(() => {
+  private async executeMutation<T>(operation: () => Promise<T>): Promise<T> {
+    return this.withBarrier(async () => {
       // Pre-validate canonical state, run the mutation, then re-validate and
-      // resynchronize the disposable index (ported v1 execute() discipline).
-      this.loadState();
-      const result = operation();
-      const state = this.loadState();
-      // Post-mutation resync bypasses stale_policy: the cache must track the
-      // write we just committed, whatever the read-time policy is.
-      const index = SqliteIndex.open(this.backend.memoryRoot);
-      try {
-        index.rebuild(state);
-      } finally {
-        index.close();
-      }
+      // resynchronize the backend search index.
+      await this.loadState();
+      const result = await operation();
+      const state = await this.loadState();
+      await this.backend.checkOrRebuildCache(state);
       return result;
     });
   }
 
-  private withBarrier<T>(operation: () => T): T {
+  private withBarrier<T>(operation: () => Promise<T>): Promise<T> {
     this.assertEnabled();
-    return withShardBarrier(this.backend.memoryRoot, this.scopeKey, operation);
+    return this.backend.withLock(operation);
   }
 
-  private async withBarrierAsync<T>(operation: () => Promise<T>): Promise<T> {
-    this.assertEnabled();
-    return withShardBarrierAsync(this.backend.memoryRoot, this.scopeKey, operation);
+  private loadState(): Promise<ShardState> {
+    return this.backend.loadState();
   }
 
-  /** Mirrors the v1 contract: disabled memory blocks every operation. */
+  private applyBatch(replacements: readonly StorageReplacement[]): Promise<void> {
+    return this.backend.applyBatch(replacements);
+  }
+
   private assertEnabled(): void {
     if (!this.config.enabled)
       throw new MemoryError(
         'Memory operation requires skills.memory.enabled=true; the local Memory capability is disabled.',
       );
-  }
-
-  private loadState(): ShardState {
-    return this.backend.loadState();
-  }
-
-  private applyBatch(replacements: readonly StorageReplacement[]): void {
-    this.backend.applyBatch(replacements);
-  }
-
-  private async ensureIndexAsync(state: ShardState): Promise<SqliteIndex> {
-    const index = SqliteIndex.open(this.backend.memoryRoot);
-    if (!index.isStale(this.config.cache.max_age_ms, state)) return index;
-    switch (this.config.cache.stale_policy) {
-      case 'rebuild':
-        index.rebuild(state);
-        return index;
-      case 'fail':
-        throw new MemoryError('Memory cache is stale and cache.stale_policy is fail; run memory_validate.');
-      case 'prompt': {
-        if (this.onStaleCache === undefined || (await this.onStaleCache()) === true) {
-          index.rebuild(state);
-          return index;
-        }
-        throw new MemoryError('Memory cache is stale; rebuild declined by the host.');
-      }
-    }
   }
 
   private assertUniqueId(state: ShardState, id: string): void {
@@ -398,6 +337,25 @@ export class MemoryStore {
     if (!state.records.some((record) => record.id === targetId))
       throw new MemoryError(`Memory record not found: ${targetId}`);
     if (!state.activeIds.has(targetId)) throw new MemoryConflictError(`Memory record is not active: ${targetId}`);
+  }
+}
+
+// -- backend factory --------------------------------------------------------
+
+function createBackend(options: MemoryStoreOptions): StorageBackend {
+  switch (options.config.backend) {
+    case 'filesystem':
+      return new FilesystemBackend({
+        config: options.config,
+        cwd: options.cwd,
+        onStaleCache: options.onStaleCache,
+      });
+    case 'postgres':
+      return new PostgresBackend({ config: options.config, cwd: options.cwd });
+    default: {
+      const exhausted: never = options.config.backend;
+      throw new MemoryError(`Unsupported memory backend: ${String(exhausted)}`);
+    }
   }
 }
 
