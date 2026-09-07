@@ -12,11 +12,19 @@ export {
 
 export {
   assertHarnessSuccess,
+  binExists,
+  piBin,
+  piReady,
+  runPi,
   opencodeReady,
   opencodeModel,
   openrouterApiKey,
+  freeModelFallbackIds,
+  isTransientModelError,
   openrouterModelId,
   resolveFreeOpenRouterModel,
   runOpencode,
+  runOpencodeWithModelFallback,
+  runPiWithModelFallback,
   type HarnessRunResult,
 } from './runners.js';
