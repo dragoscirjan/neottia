@@ -1,0 +1,109 @@
+# Configuring memory
+
+Memory is configured through a **shard**: the `skills.memory` section of the project configuration file, with every value overridable by environment variables and, for library users, by code. You only need to configure what you want to change — everything else has a working default.
+
+## Where the configuration lives
+
+| What                     | Resolution                                                                             | Default                 |
+| ------------------------ | -------------------------------------------------------------------------------------- | ----------------------- |
+| Config file              | `NEOTTIA_CONFIG_FILE` → `NEOTTIA_MEMORY_CONFIG_FILE` → `<project>/.neottia/config.yml` | The project config file |
+| Memory section inside it | `NEOTTIA_CONFIG_MEMORY_PATH`                                                           | `skills.memory`         |
+
+The file must start with `version: 1`. Sections belonging to other modules are ignored by memory.
+
+## Minimal setup
+
+```yaml
+# .neottia/config.yml
+version: 1
+skills:
+  memory:
+    enabled: true
+```
+
+That is enough for an agent to store and search memories in `.neottia/memory/` with the namespace `local/project`.
+
+## Full reference
+
+```yaml
+version: 1
+skills:
+  memory:
+    enabled: true # master switch; every operation refuses to run while false
+    root: .neottia/memory # where memory files (and the index) are stored, relative to the project
+
+    backend: filesystem # 'postgres' is planned (neottia#6) and rejected for now
+
+    namespace: # identity of this memory shard
+      organization_id: acme # who owns the project
+      project_id: website # which project
+      default_topic: general # topic used when a record does not specify one
+      scope: global # optional third dimension: branch / workspace id
+
+    retrieval: # defaults for list and search
+      limit: 8 # maximum results returned (1–100)
+      max_chars: 12000 # search result budget in JSON characters (256–100000)
+      include_superseded: false # whether corrected records show up by default
+
+    cache: # the SQLite index is a disposable cache of the YAML files
+      max_age_ms: 300000 # index considered stale after this long (0 = always stale)
+      stale_policy: prompt # what to do when stale: prompt | rebuild | fail
+
+    security:
+      secret_patterns: [] # extra regexes; a match rejects the write
+      entropy_heuristic: true # reject high-entropy strings (likely tokens)
+      limits:
+        max_file_bytes: 16777216 # largest single memory file (16 MiB)
+        max_files: 10000 # maximum number of memory files
+        max_total_bytes: 268435456 # aggregate size cap (256 MiB)
+```
+
+## Resolution order
+
+Every value resolves independently, in this order:
+
+```text
+code override (library users)  >  environment variable  >  config file  >  default
+```
+
+## Environment variables
+
+All optional. Booleans accept `true/false/1/0`; integers accept plain digits. An invalid value fails with the variable name in the message.
+
+| Variable                                                              | Sets                                                 | Default                                   |
+| --------------------------------------------------------------------- | ---------------------------------------------------- | ----------------------------------------- |
+| `NEOTTIA_CONFIG_FILE`                                                 | Location of the config file                          | —                                         |
+| `NEOTTIA_MEMORY_CONFIG_FILE`                                          | Fallback location                                    | `.neottia/config.yml`                     |
+| `NEOTTIA_CONFIG_MEMORY_PATH`                                          | Section path inside the config object                | `skills.memory`                           |
+| `NEOTTIA_MEMORY_ENABLED`                                              | `enabled`                                            | `false`                                   |
+| `NEOTTIA_MEMORY_ROOT`                                                 | `root`                                               | `.neottia/memory`                         |
+| `NEOTTIA_MEMORY_BACKEND`                                              | `backend`                                            | `filesystem`                              |
+| `NEOTTIA_MEMORY_NAMESPACE_ORGANIZATION_ID`                            | `namespace.organization_id`                          | `local`                                   |
+| `NEOTTIA_MEMORY_NAMESPACE_PROJECT_ID`                                 | `namespace.project_id`                               | `project`                                 |
+| `NEOTTIA_MEMORY_NAMESPACE_DEFAULT_TOPIC`                              | `namespace.default_topic`                            | `general`                                 |
+| `NEOTTIA_MEMORY_NAMESPACE_SCOPE`                                      | `namespace.scope`                                    | `global`                                  |
+| `NEOTTIA_MEMORY_RETRIEVAL_LIMIT`                                      | `retrieval.limit`                                    | `8`                                       |
+| `NEOTTIA_MEMORY_RETRIEVAL_MAX_CHARS`                                  | `retrieval.max_chars`                                | `12000`                                   |
+| `NEOTTIA_MEMORY_RETRIEVAL_INCLUDE_SUPERSEDED`                         | `retrieval.include_superseded`                       | `false`                                   |
+| `NEOTTIA_MEMORY_CACHE_MAX_AGE_MS`                                     | `cache.max_age_ms`                                   | `300000`                                  |
+| `NEOTTIA_MEMORY_CACHE_STALE_POLICY`                                   | `cache.stale_policy`                                 | `prompt`                                  |
+| `NEOTTIA_MEMORY_SECURITY_ENTROPY_HEURISTIC`                           | `security.entropy_heuristic`                         | `true`                                    |
+| `NEOTTIA_MEMORY_DB_PG_USER`                                           | Postgres user fallback                               | —                                         |
+| `NEOTTIA_MEMORY_DB_PG_PASSWORD`                                       | Postgres password fallback                           | —                                         |
+| `NEOTTIA_MEMORY_DB_PG_HOST` / `..._PORT` / `..._DATABASE` / `..._SSL` | Postgres connection (unused until the backend ships) | `localhost` / `5432` / `neottia` / `true` |
+
+## Cache policy
+
+The search index is rebuilt automatically from the YAML files when its content hash no longer matches, or when it is older than `max_age_ms`. `stale_policy` decides what _stale_ means for reads:
+
+| Policy    | Behavior                                                                                                        | Best for                  |
+| --------- | --------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| `prompt`  | The host asks you before rebuilding; in-process extensions can prompt, MCP servers and scripts silently rebuild | Interactive use (default) |
+| `rebuild` | Rebuild immediately, no questions                                                                               | MCP servers, automation   |
+| `fail`    | Refuse the read with a clear error until `memory_validate` runs                                                 | CI, strict environments   |
+
+Deleting `index.db` manually is always safe; it is rebuilt from the YAML files.
+
+## Workspaces and branches
+
+Each git worktree has its own `root` directory, so two branches never overwrite each other's memories. For a shared, cross-machine memory, set an explicit absolute `root` or wait for the Postgres backend — either way the `scope` namespace key separates branches that share storage.
