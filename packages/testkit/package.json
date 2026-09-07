@@ -1,0 +1,33 @@
+{
+  "name": "@neottia/testkit",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Test infrastructure for Neottia: temp-project fixtures, MCP config writers, harness runners (unit + integration tests)",
+  "author": "Dragos Cirjan",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dragoscirjan/neottia.git",
+    "directory": "packages/testkit"
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run --root ../.. packages/testkit/src",
+    "test:harness": "NEOTTIA_TEST_HARNESS=1 vitest run --root ../.. packages/testkit/src",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@neottia/memory-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@templ-project/tsconfig": "^0.2.2",
+    "@types/node": "^25.0.3",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7"
+  }
+}

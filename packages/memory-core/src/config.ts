@@ -29,13 +29,20 @@ export const DEFAULT_CONFIG_FILE = '.neottia/config.yml';
 
 const nonemptyString = z.string().min(1).regex(/\S/, 'must not be blank');
 
-const safeRelativePath = nonemptyString
+/**
+ * Memory root accepts a safe relative path (resolved against the working
+ * directory) or an absolute path (shared or workspace-independent roots,
+ * commonly provided through NEOTTIA_MEMORY_ROOT).
+ */
+const memoryRootPath = z
+  .string()
+  .min(1)
   .max(1024)
-  .refine((value) => !isAbsolute(value) && !/^[A-Za-z]:/u.test(value), 'must be a relative path')
-  .refine(
-    (value) => value.split(/[\\/]/u).every((part) => part && part !== '.' && part !== '..'),
-    'must not traverse outside the project root',
-  );
+  .refine((value) => {
+    if (value.includes('\0')) return false;
+    if (isAbsolute(value) || /^[A-Za-z]:[\\/]/u.test(value)) return true; // absolute: used as-is
+    return value !== '.' && value.split(/[\\/]/u).every((part) => part && part !== '.' && part !== '..');
+  }, 'must be a safe relative path or an absolute path');
 
 const envVarReference = z
   .string()
@@ -44,7 +51,7 @@ const envVarReference = z
 export const memoryConfigSchema = z
   .object({
     enabled: z.boolean().default(false),
-    root: safeRelativePath.default('.neottia/memory'),
+    root: memoryRootPath.default('.neottia/memory'),
     backend: z.enum(['filesystem', 'postgres']).default('filesystem'),
     namespace: z
       .object({
