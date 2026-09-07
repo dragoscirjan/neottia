@@ -1,6 +1,19 @@
+import { resolve } from 'node:path';
 import { defineConfig } from 'vitest/config';
 
+// Workspace packages resolve to SOURCE in tests: dist builds must never be a
+// precondition for running the suite. (The harness E2E tests still build dist
+// explicitly — they spawn the compiled MCP server.)
+const workspaceSourceAliases = {
+  '@neottia/memory-core': resolve(__dirname, 'packages/memory-core/src/index.ts'),
+  '@neottia/memory-mcp': resolve(__dirname, 'packages/memory-mcp/src/index.ts'),
+  '@neottia/testkit': resolve(__dirname, 'packages/testkit/src/index.ts'),
+};
+
 export default defineConfig({
+  resolve: {
+    alias: workspaceSourceAliases,
+  },
   server: {
     fs: {
       deny: ['.install', '.jscpd'],
