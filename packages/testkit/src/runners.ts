@@ -23,12 +23,12 @@ export function openrouterModelId(): string {
   return process.env.NEOTTIA_TEST_OPENROUTER_MODEL || resolveFreeOpenRouterModel();
 }
 
-const FREE_MODEL_CANDIDATES = [
+const FREE_MODEL_CANDIDATES: string[] = [
   'minimax/minimax-m2.7:free',
   'google/gemma-4-31b-it:free',
   'nvidia/nemotron-3-super-120b-a12b:free',
   'cohere/north-mini-code:free',
-] as const;
+];
 
 /** Picks the first available ':free' model; deterministic between candidates. */
 export function resolveFreeOpenRouterModel(catalog: Array<{ id: string }> = fetchCatalog()): string {
@@ -104,6 +104,58 @@ export interface HarnessRunResult {
   readonly status: number | null;
 }
 
+/** True when a file exists (PATH hits and absolute paths both work). */
+export function binExists(bin: string | undefined): bin is string {
+  return typeof bin === 'string' && bin.length > 0 && existsSync(bin);
+}
+
+/** Locates an executable on PATH. */
+function findOnPath(name: string): string | undefined {
+  // Windows separates with ';' and entries may be drive-rooted ('C:\bin').
+  const separator = process.platform === 'win32' ? ';' : ':';
+  const exts = process.platform === 'win32' ? (process.env.PATHEXT ?? '').split(';').filter(Boolean) : [''];
+  for (const dir of (process.env.PATH ?? '').split(separator).filter(Boolean)) {
+    for (const ext of exts.length ? exts : ['']) {
+      const candidate = join(dir, `${name}${ext}`);
+      if (existsSync(candidate)) return candidate;
+    }
+  }
+  return undefined;
+}
+
+/** pi binary; overridable via NEOTTIA_TEST_PI_BIN. */
+export function piBin(): string | undefined {
+  return process.env.NEOTTIA_TEST_PI_BIN || findOnPath('pi');
+}
+
+/** True when pi can call OpenRouter: explicit env key or stored credentials. */
+export function piReady(piPath?: string): boolean {
+  if (!binExists(piPath)) return false;
+  if (openrouterApiKey()) return true;
+  const check = spawnSync(piPath as string, ['auth', 'check', '--provider', 'openrouter'], {
+    encoding: 'utf8',
+    timeout: 30_000,
+  });
+  return check.status === 0;
+}
+
+/** Runs `pi -p` with project-local extensions trusted. */
+export function runPi(options: HarnessRunOptions & { piPath: string }): HarnessRunResult {
+  const { cwd, prompt, piPath } = options;
+  const modelId = options.modelId ?? openrouterModelId();
+  const result = spawnSync(
+    piPath,
+    ['-p', '--no-session', '--mode', 'text', '-a', '--provider', 'openrouter', '--model', modelId, prompt],
+    {
+      cwd,
+      encoding: 'utf8',
+      timeout: options.timeoutMs ?? 240_000,
+      env: withApiKey(options.apiKey),
+    },
+  );
+  return { stdout: result.stdout ?? '', stderr: result.stderr ?? '', status: result.status };
+}
+
 /** Runs `opencode run` inside the temp project (opencode.json already present). */
 export function runOpencode(options: HarnessRunOptions): HarnessRunResult {
   const { cwd, prompt } = options;
@@ -139,6 +191,53 @@ export function runOpencode(options: HarnessRunOptions): HarnessRunResult {
 function withApiKey(key?: string): NodeJS.ProcessEnv {
   const explicit = key ?? openrouterApiKey();
   return explicit ? { ...process.env, OPENROUTER_API_KEY: explicit } : { ...process.env };
+}
+
+/** Ordered ':free' model ids: preferred candidates first, then the catalog. */
+export function freeModelFallbackIds(): string[] {
+  const catalog = fetchCatalog()
+    .map((model) => model.id)
+    .filter((id) => id.endsWith(':free'));
+  const preferred = FREE_MODEL_CANDIDATES.filter((candidate) => catalog.includes(candidate));
+  return [...preferred, ...catalog.filter((id) => !preferred.includes(id)).sort()];
+}
+
+export function isTransientModelError(result: HarnessRunResult): boolean {
+  return /429|rate.?limit|temporarily rate-limited/iu.test(result.stderr + result.stdout);
+}
+
+/**
+ * Runs opencode, falling back through up to five free models when the
+ * upstream free pool is rate-limited (429). Non-transient failures return
+ * immediately.
+ */
+export function runOpencodeWithModelFallback(
+  options: HarnessRunOptions,
+  attempts = 5,
+): { result: HarnessRunResult; modelId: string } {
+  const ids = freeModelFallbackIds().slice(0, attempts);
+  if (ids.length === 0) throw new Error('No free OpenRouter models available for the harness fallback.');
+  let last: HarnessRunResult = runOpencode({ ...options, modelId: ids[0] as string });
+  for (const modelId of ids.slice(1)) {
+    if (last.status === 0 || !isTransientModelError(last)) return { result: last, modelId };
+    last = runOpencode({ ...options, modelId });
+  }
+  return { result: last, modelId: ids.at(-1) as string };
+}
+
+/** pi variant of {@link runOpencodeWithModelFallback}. */
+export function runPiWithModelFallback(
+  options: HarnessRunOptions & { piPath: string },
+  attempts = 5,
+): { result: HarnessRunResult; modelId: string } {
+  const ids = freeModelFallbackIds().slice(0, attempts);
+  if (ids.length === 0) throw new Error('No free OpenRouter models available for the harness fallback.');
+  let last: HarnessRunResult = runPi({ ...options, modelId: ids[0] as string });
+  for (const modelId of ids.slice(1)) {
+    if (last.status === 0 || !isTransientModelError(last)) return { result: last, modelId };
+    last = runPi({ ...options, modelId });
+  }
+  return { result: last, modelId: ids.at(-1) as string };
 }
 
 /** Throws with a tail of stderr when a harness run failed. */
