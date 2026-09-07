@@ -111,8 +111,10 @@ export function binExists(bin: string | undefined): bin is string {
 
 /** Locates an executable on PATH. */
 function findOnPath(name: string): string | undefined {
+  // Windows separates with ';' and entries may be drive-rooted ('C:\bin').
+  const separator = process.platform === 'win32' ? ';' : ':';
   const exts = process.platform === 'win32' ? (process.env.PATHEXT ?? '').split(';').filter(Boolean) : [''];
-  for (const dir of (process.env.PATH ?? '').split(':').filter(Boolean)) {
+  for (const dir of (process.env.PATH ?? '').split(separator).filter(Boolean)) {
     for (const ext of exts.length ? exts : ['']) {
       const candidate = join(dir, `${name}${ext}`);
       if (existsSync(candidate)) return candidate;
@@ -214,13 +216,13 @@ export function runOpencodeWithModelFallback(
   attempts = 5,
 ): { result: HarnessRunResult; modelId: string } {
   const ids = freeModelFallbackIds().slice(0, attempts);
-  let last: HarnessRunResult | undefined;
-  for (const modelId of ids) {
-    const result = runOpencode({ ...options, modelId });
-    if (result.status === 0 || !isTransientModelError(result)) return { result, modelId };
-    last = result;
+  if (ids.length === 0) throw new Error('No free OpenRouter models available for the harness fallback.');
+  let last: HarnessRunResult = runOpencode({ ...options, modelId: ids[0] as string });
+  for (const modelId of ids.slice(1)) {
+    if (last.status === 0 || !isTransientModelError(last)) return { result: last, modelId };
+    last = runOpencode({ ...options, modelId });
   }
-  return { result: last as HarnessRunResult, modelId: ids.at(-1) as string };
+  return { result: last, modelId: ids.at(-1) as string };
 }
 
 /** pi variant of {@link runOpencodeWithModelFallback}. */
@@ -229,13 +231,13 @@ export function runPiWithModelFallback(
   attempts = 5,
 ): { result: HarnessRunResult; modelId: string } {
   const ids = freeModelFallbackIds().slice(0, attempts);
-  let last: HarnessRunResult | undefined;
-  for (const modelId of ids) {
-    const result = runPi({ ...options, modelId });
-    if (result.status === 0 || !isTransientModelError(result)) return { result, modelId };
-    last = result;
+  if (ids.length === 0) throw new Error('No free OpenRouter models available for the harness fallback.');
+  let last: HarnessRunResult = runPi({ ...options, modelId: ids[0] as string });
+  for (const modelId of ids.slice(1)) {
+    if (last.status === 0 || !isTransientModelError(last)) return { result: last, modelId };
+    last = runPi({ ...options, modelId });
   }
-  return { result: last as HarnessRunResult, modelId: ids.at(-1) as string };
+  return { result: last, modelId: ids.at(-1) as string };
 }
 
 /** Throws with a tail of stderr when a harness run failed. */

@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import {
   assertHarnessSuccess,
   createTempProject,
+  ensureMemoryDistBuilt,
   openrouterApiKey,
   repoRoot,
   isTransientModelError,

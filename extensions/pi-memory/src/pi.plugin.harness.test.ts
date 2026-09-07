@@ -1,3 +1,5 @@
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   assertHarnessSuccess,
   createTempProject,
