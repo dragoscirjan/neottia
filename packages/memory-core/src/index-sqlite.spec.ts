@@ -2,6 +2,8 @@ import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { MemoryError } from './errors.js';
+import { captureDirectoryIdentities } from './filesystem-safety.js';
 import { SqliteIndex } from './index-sqlite.js';
 
 const tempDirs: string[] = [];
@@ -18,6 +20,12 @@ describe('SQLite cache filesystem safety', () => {
     symlinkSync(outside, join(root, `index.db${suffix}`));
 
     expect(() => SqliteIndex.open(root)).toThrow(/Unsafe memory cache artifact/u);
+  });
+
+  it('normalizes missing directory identity errors', () => {
+    const missing = join(temporaryDirectory(), 'missing');
+    expect(() => captureDirectoryIdentities(missing, 'test directory')).toThrow(MemoryError);
+    expect(() => captureDirectoryIdentities(missing, 'test directory')).toThrow(/ENOENT/u);
   });
 
   it('rejects a symbolic-link cache root', () => {

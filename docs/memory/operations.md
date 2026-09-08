@@ -7,7 +7,7 @@ Agents routinely see credentials. Memory **refuses to store** anything that look
 - PEM private key blocks (`-----BEGIN … PRIVATE KEY-----`)
 - AWS access keys (`AKIA…`, `ASIA…`)
 - GitHub tokens (`ghp_`, `gho_`, `ghu_`, `ghs_`, `ghr_`, `ghp_…`)
-- OpenAI-style keys (`sk-live-…`, `rk-live-…`, `sk-test-…`)
+- OpenAI-style keys (`sk-…`, `sk-proj-…`, `sk-live-…`, `rk-live-…`, `sk-test-…`)
 - Generic assignments: `password=…`, `api_key: …`, `token=…`
 - **Entropy heuristic**: any string of 32+ characters without spaces, mixing letters and digits, with Shannon entropy ≥ 4.2, is treated as a likely token even if its format is unknown
 

@@ -19,7 +19,12 @@ export function captureDirectoryIdentities(directory: string, label: string): Di
     current = parent;
   }
   return paths.map((path) => {
-    const stat = lstatSync(path);
+    let stat: Stats;
+    try {
+      stat = lstatSync(path);
+    } catch (error: unknown) {
+      throw new MemoryError(`Unsafe ${label}: ${path}: ${describe(error)}`);
+    }
     if (stat.isSymbolicLink() || !stat.isDirectory()) throw new MemoryError(`Unsafe ${label}: ${path}`);
     return { path, stat };
   });

@@ -200,7 +200,7 @@ export class FilesystemBackend implements StorageBackend {
     for (const folder of [...Object.values(RECORD_FOLDERS), 'tombstones']) {
       for (const path of this.yamlFiles(join(this.root, folder))) {
         resultingFiles += 1;
-        resultingBytes += this.readRegular(path).byteLength;
+        resultingBytes += this.regularSize(path);
       }
     }
 
@@ -247,10 +247,14 @@ export class FilesystemBackend implements StorageBackend {
   /** {@inheritdoc StorageBackend.search} — BM25 through the SQLite index. */
   public async search(state: ShardState, query: string, options: BackendSearchOptions): Promise<MemoryRecord[]> {
     const index = await this.ensureIndex(state);
+    let operationFailed = false;
     try {
       return index.search(query, state, options);
+    } catch (error: unknown) {
+      operationFailed = true;
+      throw error;
     } finally {
-      index.close();
+      closeIndexPreservingError(index, operationFailed);
     }
   }
 
@@ -264,13 +268,17 @@ export class FilesystemBackend implements StorageBackend {
     // Fresh connection per call: the index file can be replaced externally
     // (tests, manual deletion), and an open handle would read stale pages.
     const index = SqliteIndex.open(this.root);
+    let operationFailed = false;
     try {
       if (!index.isStale(this.cacheMaxAgeMs, state))
         return { outcome: 'checked', evidence: 'canonical_snapshot_match_verified' };
       index.rebuild(state);
       return { outcome: 'rebuilt', evidence: 'canonical_snapshot_rebuild_verified' };
+    } catch (error: unknown) {
+      operationFailed = true;
+      throw error;
     } finally {
-      index.close();
+      closeIndexPreservingError(index, operationFailed);
     }
   }
 
@@ -293,8 +301,8 @@ export class FilesystemBackend implements StorageBackend {
       return index;
     } catch (error: unknown) {
       // A failed staleness resolution (fail policy, declined prompt) must not
-      // leak the opened handle.
-      index.close();
+      // leak the opened handle or be hidden by a cleanup safety error.
+      closeIndexPreservingError(index, true);
       throw error;
     }
   }
@@ -524,6 +532,28 @@ export class FilesystemBackend implements StorageBackend {
     }
   }
 
+  /** Reads only verified file metadata for pre-batch resource accounting. */
+  private regularSize(path: string): number {
+    let descriptor: number | undefined;
+    try {
+      const parentIdentities = captureDirectoryIdentities(dirname(path));
+      descriptor = openSync(path, fsConstants.O_RDONLY | noFollowFlag());
+      const openedStat = fstatSync(descriptor);
+      if (!openedStat.isFile()) throw new MemoryError('Managed memory path is not a regular file.');
+      const pathStat = lstatSync(path);
+      if (pathStat.isSymbolicLink() || !sameIdentity(openedStat, pathStat))
+        throw new MemoryError('Managed memory path changed while it was opened.');
+      revalidateDirectoryIdentities(parentIdentities);
+      return openedStat.size;
+    } catch (error: unknown) {
+      if (error instanceof MemoryError) throw error;
+      if (isCode(error, 'ENOENT')) throw new MissingMemoryPathError(path);
+      throw new MemoryError(`Cannot safely inspect managed memory path: ${path}: ${describe(error)}`);
+    } finally {
+      if (descriptor !== undefined) closeSync(descriptor);
+    }
+  }
+
   private readRegular(path: string): Uint8Array {
     let descriptor: number | undefined;
     try {
@@ -653,6 +683,15 @@ function assertRegularDestinationIfPresent(path: string): boolean {
   } catch (error: unknown) {
     if (isCode(error, 'ENOENT')) return false;
     throw error;
+  }
+}
+
+/** Closes the cache without replacing an error from the primary operation. */
+function closeIndexPreservingError(index: SqliteIndex, operationFailed: boolean): void {
+  try {
+    index.close();
+  } catch (error: unknown) {
+    if (!operationFailed) throw error;
   }
 }
 

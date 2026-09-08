@@ -237,6 +237,7 @@ describe('memory config shard', () => {
         backend: 'postgres',
       });
       expect(withDefaults.provider.db.pg.user).toBe('fallback-user');
+      expect(resolvePgSettings(withDefaults).user).toBe('fallback-user');
 
       expect(() =>
         loadMemoryConfig(cwd, {
@@ -257,8 +258,16 @@ describe('memory config shard', () => {
       writeConfig(cwd, { version: 1, skills: { memory: { enabled: true, nonsense: true } } });
       expect(() => loadMemoryConfig(cwd)).toThrow(/nonsense/u);
 
-      writeConfig(cwd, { version: 1, skills: { memory: { enabled: true, root: '../escape' } } });
-      expect(() => loadMemoryConfig(cwd)).toThrow(ConfigError);
+      for (const root of [
+        '../escape',
+        'a\n/../../outside',
+        'a\r/../outside',
+        'a\u2028/../outside',
+        'a\u2029/../outside',
+      ]) {
+        writeConfig(cwd, { version: 1, skills: { memory: { enabled: true, root } } });
+        expect(() => loadMemoryConfig(cwd)).toThrow(ConfigError);
+      }
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }

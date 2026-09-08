@@ -75,7 +75,13 @@ function byteBoundedText(maxBytes: number, label: string): z.ZodString {
     .meta({ 'x-neottia-max-utf8-bytes': maxBytes });
 }
 
-const summaryInput = compactText(MEMORY_TOOL_LIMITS.summaryCharacters, 'Summary').min(1);
+const summaryInput = compactText(MEMORY_TOOL_LIMITS.summaryCharacters, 'Summary')
+  .min(1)
+  .regex(/\S/u, 'must not be blank')
+  .meta({
+    maxLength: MEMORY_TOOL_LIMITS.summaryCharacters,
+    'x-neottia-length-unit': 'unicode-code-points',
+  });
 const detailsInput = compactText(MEMORY_TOOL_LIMITS.detailsCharacters, 'Details')
   .superRefine((value, context) => {
     const lines = countNonEmptyLines(value, MEMORY_TOOL_LIMITS.detailsLines);
@@ -125,7 +131,7 @@ export const storeInputSchema = z
 
 export const supersedeInputSchema = storeInputSchema.extend({ target_id: ulid }).strict();
 export const deleteInputSchema = z
-  .object({ target_id: ulid, reason: z.string().min(1).max(1000), source: sourceSchema, created_by: nonempty })
+  .object({ target_id: ulid, reason: nonempty.max(1000), source: sourceSchema, created_by: nonempty })
   .strict();
 export const getInputSchema = z.object({ id: ulid }).strict();
 export const listInputSchema = z

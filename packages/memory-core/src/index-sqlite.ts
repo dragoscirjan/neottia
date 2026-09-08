@@ -272,15 +272,23 @@ export class SqliteIndex {
   }
 
   public close(): void {
-    let safetyError: unknown;
+    let cleanupError: unknown;
     try {
       this.assertSafe();
     } catch (error: unknown) {
-      safetyError = error;
+      cleanupError = error;
     }
-    this.database.close();
-    if (safetyError !== undefined) throw safetyError;
-    this.assertSafe();
+    try {
+      this.database.close();
+    } catch (error: unknown) {
+      cleanupError ??= error;
+    }
+    try {
+      this.assertSafe();
+    } catch (error: unknown) {
+      cleanupError ??= error;
+    }
+    if (cleanupError !== undefined) throw cleanupError;
   }
 
   private assertSafe(): void {

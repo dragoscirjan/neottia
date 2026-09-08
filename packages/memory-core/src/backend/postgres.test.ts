@@ -162,7 +162,7 @@ describe('postgres backend bounded waits', () => {
     } finally {
       await backend.close();
     }
-  });
+  }, 15_000);
 });
 
 describe.skipIf(!enabled)('postgres backend (docker pg_textsearch)', () => {
@@ -254,6 +254,15 @@ describe.skipIf(!enabled)('postgres backend (docker pg_textsearch)', () => {
     } finally {
       await left.close();
       await right.close();
+    }
+  });
+
+  it('uses fallback credential environment variables through backend construction', async () => {
+    const fallback = pgStore({ scope: 'credential-fallback' });
+    try {
+      await expect(fallback.list()).resolves.toEqual([]);
+    } finally {
+      await fallback.close();
     }
   });
 

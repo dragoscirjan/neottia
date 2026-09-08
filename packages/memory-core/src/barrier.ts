@@ -1,5 +1,15 @@
 import { randomUUID } from 'node:crypto';
-import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, rmSync, rmdirSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  linkSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  rmdirSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { MemoryLockError } from './errors.js';
 
@@ -260,7 +270,7 @@ function releaseOwnedLock(lockPath: string, token: string): void {
   if (!ownerFileTokenMatches(releasePath, token)) {
     // Restore a replacement owner's metadata when possible. Never recursively
     // remove a directory whose ownership differs from this lease.
-    if (!existsSync(ownerPath)) renameSync(releasePath, ownerPath);
+    if (!restoreReleaseOwner(releasePath, ownerPath)) rmSync(releasePath, { force: true });
     return;
   }
 
@@ -268,10 +278,23 @@ function releaseOwnedLock(lockPath: string, token: string): void {
     // A non-recursive removal fails closed if another entry appeared.
     rmdirSync(lockPath);
   } catch (error: unknown) {
-    if (existsSync(lockPath) && !existsSync(ownerPath)) renameSync(releasePath, ownerPath);
+    const restored = existsSync(lockPath) && restoreReleaseOwner(releasePath, ownerPath);
+    if (!restored) rmSync(releasePath, { force: true });
     throw error;
   }
   rmSync(releasePath, { force: true });
+}
+
+/** Restores moved metadata without overwriting a concurrently created owner. */
+function restoreReleaseOwner(releasePath: string, ownerPath: string): boolean {
+  try {
+    // A hard link is an atomic create-if-absent operation on the same volume.
+    linkSync(releasePath, ownerPath);
+    rmSync(releasePath, { force: true });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function ownerTokenMatches(ownerDirectory: string, token: string): boolean {

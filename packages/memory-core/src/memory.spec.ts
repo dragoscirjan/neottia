@@ -118,6 +118,16 @@ describe('memory store (filesystem + SQLite index)', () => {
     expect(await store.list()).toHaveLength(0);
   });
 
+  it('rejects blank summaries and deletion reasons without corrupting state', async () => {
+    const store = storeFor(fixture());
+    await expect(store.store(fact('   '))).rejects.toThrow(/must not be blank/u);
+    const record = await store.store(fact('Readable summary'));
+    await expect(
+      store.delete(record.id, ' \t ', { kind: 'user-confirmed', ref: null, revision: null }, 'test-user'),
+    ).rejects.toThrow(/must not be blank/u);
+    expect(await store.list()).toEqual([record]);
+  });
+
   it('enforces compact mutation boundaries using Unicode characters', async () => {
     const store = storeFor(fixture());
     const boundaryDetails = [...Array.from({ length: 11 }, () => 'x'), 'x'.repeat(1978)].join('\n');
@@ -475,6 +485,28 @@ describe('memory store (filesystem + SQLite index)', () => {
     await expect(accepted.search({ query: 'accepted' })).resolves.toHaveLength(1);
   });
 
+  it('preserves a primary cache error when cleanup also detects an unsafe artifact', async () => {
+    const cwd = fixture();
+    const seed = storeFor(cwd);
+    await seed.store(fact('Primary cache failure'));
+    await new Promise((resolveDelay) => setTimeout(resolveDelay, 2));
+    const cachePath = join(cwd, '.neottia', 'memory', 'index.db');
+    const outside = join(cwd, 'outside.db');
+    writeFileSync(outside, 'outside remains unchanged');
+    const store = new MemoryStore({
+      config: loadMemoryConfig(cwd, { env: {}, cache: { max_age_ms: 0, stale_policy: 'prompt' } }),
+      cwd,
+      onStaleCache: () => {
+        rmSync(cachePath);
+        symlinkSync(outside, cachePath);
+        throw new Error('primary cache policy failure');
+      },
+    });
+
+    await expect(store.search({ query: 'Primary' })).rejects.toThrow('primary cache policy failure');
+    expect(readFileSync(outside, 'utf8')).toBe('outside remains unchanged');
+  });
+
   it('passes interactive stale-cache decisions through the tool context', async () => {
     const cwd = fixture();
     let prompted = false;
@@ -511,6 +543,7 @@ describe('memory store (filesystem + SQLite index)', () => {
       /memory_store input/i,
     );
     await expect(storeTool?.run(context, { ...fact('x'.repeat(241)) })).rejects.toThrow(/memory_store input/i);
+    await expect(storeTool?.run(context, { ...fact('   ') })).rejects.toThrow(/memory_store input/i);
     await expect(storeTool?.run(context, { ...fact('😀'.repeat(240)) })).resolves.toMatchObject({
       summary: '😀'.repeat(240),
     });

@@ -29,7 +29,7 @@ export const DEFAULT_CONFIG_FILE = '.neottia/config.yml';
 
 const CREDENTIAL_REFERENCE_PATTERN = /^\$\{[A-Za-z_][A-Za-z0-9_]*\}$/u;
 const MEMORY_ROOT_PATTERN =
-  /^(?:\/[^\0]*|[A-Za-z]:[\\/][^\0]*|(?!\.{1,2}(?:[\\/]|$))(?!.*(?:^|[\\/])\.{1,2}(?:[\\/]|$))[^\\/\0]+(?:[\\/][^\\/\0]+)*)$/u;
+  /^(?![\s\S]*[\r\n\u2028\u2029])(?:\/[^\0]*|[A-Za-z]:[\\/][^\0]*|(?!\.{1,2}(?:[\\/]|$))(?!.*(?:^|[\\/])\.{1,2}(?:[\\/]|$))[^\\/\0]+(?:[\\/][^\\/\0]+)*)$/u;
 const nonemptyString = z.string().min(1).regex(/\S/, 'must not be blank');
 
 /**
