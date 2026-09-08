@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { existsSync, lstatSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { MemoryLockError } from './errors.js';
@@ -44,6 +45,7 @@ function acquire(memoryRoot: string, scopeKey: string, options: ShardBarrierOpti
       mkdirSync(lockPath, { mode: 0o700 });
       if (hasActiveClaim(lockPath, staleMs)) {
         rmSync(lockPath, { recursive: true, force: true });
+        sleep(pollMs);
         continue;
       }
       break;
@@ -56,6 +58,7 @@ function acquire(memoryRoot: string, scopeKey: string, options: ShardBarrierOpti
         continue;
       }
       if (Date.now() >= deadline) throw new MemoryLockError(`Shard barrier is busy: ${scopeKey}`);
+      sleep(pollMs);
     }
   }
 
@@ -111,6 +114,7 @@ async function acquireAsync(memoryRoot: string, scopeKey: string, options: Shard
       mkdirSync(lockPath, { mode: 0o700 });
       if (hasActiveClaim(lockPath, staleMs)) {
         rmSync(lockPath, { recursive: true, force: true });
+        await delay(pollMs);
         continue;
       }
       break;
@@ -123,6 +127,7 @@ async function acquireAsync(memoryRoot: string, scopeKey: string, options: Shard
         continue;
       }
       if (Date.now() >= deadline) throw new MemoryLockError(`Shard barrier is busy: ${scopeKey}`);
+      await delay(pollMs);
     }
   }
 
@@ -183,37 +188,62 @@ function delay(ms: number): Promise<void> {
 /** Atomically claims and removes a stale lock directory without a TOCTOU delete. */
 function claimAbandoned(lockPath: string, staleMs: number): boolean {
   const claimPath = `${lockPath}.claim`;
+  const token = `${process.pid}-${randomUUID()}`;
   try {
     mkdirSync(claimPath, { mode: 0o700 });
+    writeFileSync(join(claimPath, 'owner'), JSON.stringify({ pid: process.pid, token }), { mode: 0o600 });
   } catch (error: unknown) {
     if (!isCode(error, 'EEXIST')) throw error;
     return false;
   }
   try {
     // The claim directory blocks new owners while the stale owner is checked
-    // and removed. Contenders honor this marker before creating lockPath.
+    // and removed. Its live owner is never removed by age alone.
     if (!isAbandoned(lockPath, staleMs)) return false;
     rmSync(lockPath, { recursive: true, force: true });
     return true;
   } finally {
-    rmSync(claimPath, { recursive: true, force: true });
+    if (claimOwnerMatches(claimPath, token)) rmSync(claimPath, { recursive: true, force: true });
   }
 }
 
-function hasActiveClaim(lockPath: string, staleMs: number): boolean {
+function hasActiveClaim(lockPath: string, _staleMs: number): boolean {
   const claimPath = `${lockPath}.claim`;
   if (!existsSync(claimPath)) return false;
   try {
     const stats = lstatSync(claimPath);
     if (stats.isSymbolicLink() || !stats.isDirectory()) throw new MemoryLockError(`Unsafe shard claim: ${claimPath}`);
-    if (Date.now() - stats.mtimeMs >= staleMs) {
-      rmSync(claimPath, { recursive: true, force: true });
-      return false;
+    const ownerPath = join(claimPath, 'owner');
+    if (!existsSync(ownerPath)) return true;
+    let owner: { pid?: number };
+    try {
+      owner = JSON.parse(readFileSync(ownerPath, 'utf8')) as { pid?: number };
+    } catch {
+      return true;
     }
-    return true;
+    if (typeof owner.pid !== 'number') return true;
+    try {
+      process.kill(owner.pid, 0);
+      return true;
+    } catch (error: unknown) {
+      if (isCode(error, 'ESRCH')) {
+        rmSync(claimPath, { recursive: true, force: true });
+        return false;
+      }
+      return true;
+    }
   } catch (error: unknown) {
     if (isCode(error, 'ENOENT')) return false;
     throw error;
+  }
+}
+
+function claimOwnerMatches(claimPath: string, token: string): boolean {
+  try {
+    const owner = JSON.parse(readFileSync(join(claimPath, 'owner'), 'utf8')) as { token?: string };
+    return owner.token === token;
+  } catch {
+    return false;
   }
 }
 

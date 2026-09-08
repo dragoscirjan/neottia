@@ -49,8 +49,19 @@ export function createMemoryServer(options: CreateMemoryServerOptions = {}): Ser
   const context: MemoryToolContext = { cwd, interactive, configOverrides };
   const closeServer = server.close.bind(server);
   server.close = async () => {
-    await closeMemoryToolContext(context);
-    await closeServer();
+    let cleanupError: unknown;
+    try {
+      await closeMemoryToolContext(context);
+    } catch (error: unknown) {
+      cleanupError = error;
+    }
+    try {
+      await closeServer();
+    } catch (error: unknown) {
+      if (cleanupError !== undefined) throw new AggregateError([cleanupError, error], 'MCP server shutdown failed.');
+      throw error;
+    }
+    if (cleanupError !== undefined) throw cleanupError;
   };
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({

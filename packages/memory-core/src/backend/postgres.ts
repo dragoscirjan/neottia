@@ -491,15 +491,22 @@ export class PostgresBackend implements StorageBackend {
     const mismatched = result.rows.filter((row) => expected.get(row.id as string) !== row.search_text);
     if (mismatched.length > 0) {
       const updater = this.currentClient() ?? this.pool;
+      const ids: string[] = [];
+      const searchTexts: string[] = [];
       for (const row of mismatched) {
         const searchText = expected.get(row.id as string);
         if (searchText === undefined) continue;
-        await updater.query(
-          `UPDATE memory_records SET search_text = $1
-           WHERE id = $2 AND organization_id = $3 AND project_id = $4 AND scope = $5`,
-          [searchText, row.id, this.scope.organizationId, this.scope.projectId, this.scope.scope],
-        );
+        ids.push(row.id as string);
+        searchTexts.push(searchText);
       }
+      if (ids.length > 0)
+        await updater.query(
+          `UPDATE memory_records AS records SET search_text = updates.search_text
+           FROM unnest($1::text[], $2::text[]) AS updates(id, search_text)
+           WHERE records.id = updates.id
+             AND records.organization_id = $3 AND records.project_id = $4 AND records.scope = $5`,
+          [ids, searchTexts, this.scope.organizationId, this.scope.projectId, this.scope.scope],
+        );
       return { outcome: 'rebuilt', evidence: 'canonical_snapshot_rebuild_verified' };
     }
     return { outcome: 'checked', evidence: 'canonical_snapshot_match_verified' };
@@ -572,13 +579,13 @@ export class PostgresBackend implements StorageBackend {
     const safe = safeProjectPath(path);
     if (safe.startsWith('tombstones/')) {
       const id = safe.slice('tombstones/'.length).replace(/\.yaml$/u, '');
-      if (!isUlid(id)) throw new MemoryError(`Invalid tombstone path: ${path}`);
+      if (!isUlid(id) || safe !== `tombstones/${id}.yaml`) throw new MemoryError(`Invalid tombstone path: ${path}`);
       return { table: 'memory_tombstones', id };
     }
     for (const [recordType, folder] of Object.entries(RECORD_FOLDERS) as Array<[RecordType, string]>) {
       if (safe.startsWith(`${folder}/`)) {
         const id = safe.slice(folder.length + 1).replace(/\.yaml$/u, '');
-        if (!isUlid(id)) throw new MemoryError(`Invalid record path: ${path}`);
+        if (!isUlid(id) || safe !== `${folder}/${id}.yaml`) throw new MemoryError(`Invalid record path: ${path}`);
         return { table: 'memory_records', id, recordType };
       }
     }

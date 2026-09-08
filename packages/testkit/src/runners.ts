@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 /**
  * Gating + binary resolution for harness integration tests. Tests skip
@@ -70,7 +70,8 @@ export function opencodeModel(): string {
  * explicit OPENROUTER_API_KEY. Set NEOTTIA_TEST_OPENCODE_BIN to override PATH.
  */
 export function opencodeBin(): string | undefined {
-  return process.env.NEOTTIA_TEST_OPENCODE_BIN || findOnPath('opencode');
+  const configured = process.env.NEOTTIA_TEST_OPENCODE_BIN;
+  return configured ? resolve(configured) : findOnPath('opencode');
 }
 
 export function opencodeReady(opencodePath = opencodeBin()): boolean {
@@ -131,7 +132,7 @@ function findOnPath(name: string): string | undefined {
   for (const dir of (process.env.PATH ?? '').split(separator).filter(Boolean)) {
     for (const ext of exts.length ? exts : ['']) {
       const candidate = join(dir, `${name}${ext}`);
-      if (existsSync(candidate)) return candidate;
+      if (existsSync(candidate)) return resolve(candidate);
     }
   }
   return undefined;
@@ -139,7 +140,8 @@ function findOnPath(name: string): string | undefined {
 
 /** pi binary; overridable via NEOTTIA_TEST_PI_BIN. */
 export function piBin(): string | undefined {
-  return process.env.NEOTTIA_TEST_PI_BIN || findOnPath('pi');
+  const configured = process.env.NEOTTIA_TEST_PI_BIN;
+  return configured ? resolve(configured) : findOnPath('pi');
 }
 
 /** True when pi can call OpenRouter: explicit env key or stored credentials. */

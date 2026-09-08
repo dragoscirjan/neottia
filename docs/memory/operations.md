@@ -59,7 +59,7 @@ Because agents write autonomously, hard ceilings protect the store from runaway 
 | `Memory backend 'postgres' connection failed`          | PostgreSQL is unavailable or credentials are invalid | Verify host, port, database, and credentials; retry when the database is reachable         |
 | `summary has N Unicode characters; limit is 240`       | Compactness violation                                | Shorten the summary (details: 2000 chars / 12 lines)                                       |
 | `Suspected secret at …`                                | Secret scanner match                                 | Remove the secret; tune `security.secret_patterns` / `entropy_heuristic` if false-positive |
-| `Invalid memory record: record_type …`                 | Type pairing violated                                | Pair `semantic/fact`, `episodic/decision                                                   | event`, `procedural/lesson` |
+| `Invalid memory record: record_type …`                 | Type pairing violated                                | Pair `semantic/fact`, `episodic/decision` or `event`, `procedural/lesson`                  |
 | `Shard barrier is busy`                                | Concurrent writer held the lock > 10 s               | Retry; investigate stuck processes (live owners are never stolen)                          |
 | `Memory cache is stale and cache.stale_policy is fail` | Read refused on a stale index                        | Run `memory_validate`, or change `stale_policy`                                            |
 | `Memory path already exists`                           | Duplicate identity on store/import                   | List first; supersede instead of re-storing                                                |

@@ -115,14 +115,12 @@ export type MemoryToolName = keyof typeof memoryToolParameters;
  * Exported separately from `default` so tests can drive it with a fake API.
  */
 export function registerMemoryTools(pi: PiExtensionApi, options: MemoryExtensionOptions = {}): () => Promise<void> {
-  let activeToolContext: { ui?: { confirm: (title: string, message: string) => Promise<boolean> } } | undefined;
+  const storeKey = {};
   const context: MemoryToolContext = {
     cwd: options.cwd ?? process.cwd(),
     interactive: true,
     configOverrides: options.configOverrides,
-    onStaleCache:
-      options.onStaleCache ??
-      (() => activeToolContext?.ui?.confirm('Memory cache is stale', 'Rebuild the memory search cache now?') ?? true),
+    storeKey,
   };
 
   for (const tool of MEMORY_TOOLS) {
@@ -136,8 +134,14 @@ export function registerMemoryTools(pi: PiExtensionApi, options: MemoryExtension
       description: tool.description,
       parameters,
       async execute(_toolCallId, params, _signal, _onUpdate, toolContext) {
-        activeToolContext = toolContext as { ui?: { confirm: (title: string, message: string) => Promise<boolean> } };
-        const result = await tool.run(context, params);
+        const uiContext = toolContext as { ui?: { confirm: (title: string, message: string) => Promise<boolean> } };
+        const callContext: MemoryToolContext = {
+          ...context,
+          onStaleCache:
+            options.onStaleCache ??
+            (() => uiContext.ui?.confirm('Memory cache is stale', 'Rebuild the memory search cache now?') ?? true),
+        };
+        const result = await tool.run(callContext, params);
         return {
           content: [{ type: 'text', text: typeof result === 'string' ? result : JSON.stringify(result, null, 2) }],
           details: {},

@@ -61,6 +61,8 @@ export interface ImportReport {
   records: number;
   tombstones: number;
   errors: string[];
+  /** Present when canonical publication succeeded but cache maintenance failed. */
+  warnings?: string[];
 }
 
 export interface MemoryStoreOptions {
@@ -247,7 +249,24 @@ export class MemoryStore {
         if (replacements.length) await this.applyBatch(replacements);
         // Imports bypass executeMutation because preview shares this path;
         // synchronize the disposable cache only after canonical publication.
-        if (replacements.length) await this.backend.checkOrRebuildCache(await this.loadState());
+        if (!replacements.length)
+          return {
+            valid: true,
+            records: validated.records.length,
+            tombstones: validated.tombstones.length,
+            errors: [],
+          };
+        try {
+          await this.backend.checkOrRebuildCache(await this.loadState());
+        } catch (error: unknown) {
+          return {
+            valid: true,
+            records: validated.records.length,
+            tombstones: validated.tombstones.length,
+            errors: [],
+            warnings: [`Import committed; cache maintenance failed: ${describe(error)}`],
+          };
+        }
         return { valid: true, records: validated.records.length, tombstones: validated.tombstones.length, errors: [] };
       });
     } catch (error: unknown) {

@@ -3,6 +3,7 @@ import { loadMemoryConfig } from './config.js';
 import type { MemoryConfigInput } from './config.js';
 import { MemoryError } from './errors.js';
 import { ULID_PATTERN } from './identities.js';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { MemoryStore, type SearchMemoryInput, type StoreMemoryInput } from './store.js';
 
 /**
@@ -28,16 +29,50 @@ function compactText(maxCharacters: number, label: string): z.ZodString {
   return z
     .string()
     .superRefine((value, context) => {
-      if (Array.from(value).length > maxCharacters)
+      if (countUnicodeCharacters(value, maxCharacters) > maxCharacters)
         context.addIssue({ code: 'custom', message: `${label} must be at most ${maxCharacters} Unicode characters.` });
     })
     .describe(`${label}; at most ${maxCharacters} Unicode characters.`);
 }
 
+function countUnicodeCharacters(value: string, limit: number): number {
+  let count = 0;
+  for (const _character of value) {
+    count++;
+    if (count > limit) return count;
+  }
+  return count;
+}
+
+function countNonEmptyLines(value: string, limit: number): number {
+  let count = 0;
+  let lineHasContent = false;
+  let previousWasCarriageReturn = false;
+  for (const character of value) {
+    if (character === '\n' || character === '\r' || character === '\u2028' || character === '\u2029') {
+      if (character === '\n' && previousWasCarriageReturn) {
+        previousWasCarriageReturn = false;
+        continue;
+      }
+      if (lineHasContent) {
+        count++;
+        if (count > limit) return count;
+      }
+      lineHasContent = false;
+      previousWasCarriageReturn = character === '\r';
+      continue;
+    }
+    previousWasCarriageReturn = false;
+    if (!/^\s$/u.test(character)) lineHasContent = true;
+  }
+  if (lineHasContent) count++;
+  return count;
+}
+
 const summaryInput = compactText(MEMORY_TOOL_LIMITS.summaryCharacters, 'Summary').min(1);
 const detailsInput = compactText(MEMORY_TOOL_LIMITS.detailsCharacters, 'Details')
   .superRefine((value, context) => {
-    const lines = value.split(/\r\n|[\n\r\u2028\u2029]/u).filter((line) => line.trim()).length;
+    const lines = countNonEmptyLines(value, MEMORY_TOOL_LIMITS.detailsLines);
     if (lines > MEMORY_TOOL_LIMITS.detailsLines)
       context.addIssue({
         code: 'custom',
@@ -119,6 +154,8 @@ export interface MemoryToolContext {
   readonly configOverrides?: Partial<MemoryConfigInput>;
   /** Interactive host callback for stale cache rebuild confirmation. */
   readonly onStaleCache?: () => boolean | Promise<boolean>;
+  /** Internal stable identity used when a host supplies call-local callbacks. */
+  readonly storeKey?: object;
 }
 
 export interface MemoryToolDefinition<S extends z.ZodObject<z.ZodRawShape> = z.ZodObject<z.ZodRawShape>> {
@@ -129,25 +166,32 @@ export interface MemoryToolDefinition<S extends z.ZodObject<z.ZodRawShape> = z.Z
   readonly run: (context: MemoryToolContext, input: z.output<S>) => Promise<unknown>;
 }
 
-const contextStores = new WeakMap<MemoryToolContext, MemoryStore>();
+const contextStores = new WeakMap<object, MemoryStore>();
+const staleCacheCallbacks = new AsyncLocalStorage<MemoryToolContext['onStaleCache']>();
 
 function storeFor(context: MemoryToolContext): MemoryStore {
-  const existing = contextStores.get(context);
+  const key = context.storeKey ?? context;
+  const existing = contextStores.get(key);
   if (existing) return existing;
   // Reuse one store per host context so remote backends do not create a new
-  // PostgreSQL pool for every tool invocation.
+  // PostgreSQL pool for every tool invocation. The callback is resolved from
+  // async-local state so overlapping host calls keep their own UI context.
   const store = MemoryStore.fromConfig(loadMemoryConfig(context.cwd, context.configOverrides), context.cwd, {
-    onStaleCache: context.onStaleCache,
+    onStaleCache: () => {
+      const callback = staleCacheCallbacks.getStore() ?? context.onStaleCache;
+      return callback ? callback() : true;
+    },
   });
-  contextStores.set(context, store);
+  contextStores.set(key, store);
   return store;
 }
 
 /** Closes and forgets the backend associated with one host context. */
 export async function closeMemoryToolContext(context: MemoryToolContext): Promise<void> {
-  const store = contextStores.get(context);
+  const key = context.storeKey ?? context;
+  const store = contextStores.get(key);
   if (!store) return;
-  contextStores.delete(context);
+  contextStores.delete(key);
   await store.close();
 }
 
@@ -167,7 +211,7 @@ function makeTool<S extends z.ZodObject<z.ZodRawShape>>(
         throw new MemoryError(
           `Invalid ${name} input:\n${parsed.error.issues.map((issue) => `  - ${issue.path.join('.') || '<root>'}: ${issue.message}`).join('\n')}`,
         );
-      return handler(context, parsed.data);
+      return staleCacheCallbacks.run(context.onStaleCache, () => handler(context, parsed.data));
     },
   };
 }

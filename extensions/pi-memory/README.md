@@ -9,7 +9,7 @@ Install the package in a Pi project and load `@neottia/pi-memory` as an extensio
 
 ## Configuration
 
-Use `backend: filesystem` for repository-local memory or `backend: postgres` for a shared PostgreSQL store. Pass `onStaleCache` when embedding the registration helper to confirm `cache.stale_policy: prompt` decisions; declining leaves the cache unchanged.
+Use `backend: filesystem` for repository-local memory or `backend: postgres` for a shared PostgreSQL store. Pass `onStaleCache` when embedding the registration helper to confirm `cache.stale_policy: prompt` decisions; declining leaves the cache unchanged. Retain and await the cleanup function returned by `registerMemoryTools(...)` during host shutdown.
 
 See the [memory configuration guide](../../docs/memory/configuration.md) for the complete contract.
 

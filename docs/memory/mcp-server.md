@@ -30,7 +30,7 @@ All examples enable memory with namespace `acme/website`. Replace the namespace 
   "mcpServers": {
     "memory": {
       "command": "pnpm",
-      "args": ["-y", "@neottia/memory-mcp"],
+      "args": ["dlx", "@neottia/memory-mcp"],
       "env": {
         "NEOTTIA_MEMORY_ENABLED": "true",
         "NEOTTIA_MEMORY_NAMESPACE_PROJECT_ID": "website"
@@ -69,7 +69,7 @@ All examples enable memory with namespace `acme/website`. Replace the namespace 
   "mcpServers": {
     "memory": {
       "command": "pnpm",
-      "args": ["-y", "@neottia/memory-mcp"],
+      "args": ["dlx", "@neottia/memory-mcp"],
       "env": {
         "NEOTTIA_MEMORY_ENABLED": "true",
         "NEOTTIA_MEMORY_NAMESPACE_PROJECT_ID": "website"
@@ -102,7 +102,7 @@ NEOTTIA_MEMORY_NAMESPACE_PROJECT_ID = "website"
   "mcpServers": {
     "memory": {
       "command": "pnpm",
-      "args": ["-y", "@neottia/memory-mcp"],
+      "args": ["dlx", "@neottia/memory-mcp"],
       "env": {
         "NEOTTIA_MEMORY_ENABLED": "true",
         "NEOTTIA_MEMORY_NAMESPACE_PROJECT_ID": "website"
@@ -122,7 +122,7 @@ NEOTTIA_MEMORY_NAMESPACE_PROJECT_ID = "website"
   "servers": {
     "memory": {
       "command": "pnpm",
-      "args": ["-y", "@neottia/memory-mcp"],
+      "args": ["dlx", "@neottia/memory-mcp"],
       "env": {
         "NEOTTIA_MEMORY_ENABLED": "true",
         "NEOTTIA_MEMORY_NAMESPACE_PROJECT_ID": "website"

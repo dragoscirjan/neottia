@@ -23,7 +23,7 @@ Memory itself is stored as reviewable YAML files inside your project (git-diffab
 
 ## Requirements
 
-- **Node.js >= 22.16.0** on the machine (and CI) where the server runs — the first Node release whose built-in `node:sqlite` ships with FTS5.
+- **Node.js >= 22.16.0** and **pnpm >= 10.0.0** on the machine (and CI) where the server runs — the first Node release whose built-in `node:sqlite` ships with FTS5.
 - A project directory where memory files may be written.
 
 ## Quick start
@@ -53,7 +53,7 @@ Project scope — `.mcp.json` at the repository root (shared with the team throu
   "mcpServers": {
     "memory": {
       "command": "pnpm",
-      "args": ["-y", "@neottia/memory-mcp"],
+      "args": ["dlx", "@neottia/memory-mcp"],
       "env": {
         "NEOTTIA_MEMORY_ENABLED": "true",
         "NEOTTIA_MEMORY_NAMESPACE_ORGANIZATION_ID": "acme",
@@ -94,7 +94,7 @@ Project scope — `.mcp.json` at the repository root (shared with the team throu
   "mcpServers": {
     "memory": {
       "command": "pnpm",
-      "args": ["-y", "@neottia/memory-mcp"],
+      "args": ["dlx", "@neottia/memory-mcp"],
       "env": {
         "NEOTTIA_MEMORY_ENABLED": "true",
         "NEOTTIA_MEMORY_NAMESPACE_PROJECT_ID": "website"
@@ -127,7 +127,7 @@ NEOTTIA_MEMORY_NAMESPACE_PROJECT_ID = "website"
   "mcpServers": {
     "memory": {
       "command": "pnpm",
-      "args": ["-y", "@neottia/memory-mcp"],
+      "args": ["dlx", "@neottia/memory-mcp"],
       "env": {
         "NEOTTIA_MEMORY_ENABLED": "true",
         "NEOTTIA_MEMORY_NAMESPACE_PROJECT_ID": "website"
@@ -147,7 +147,7 @@ NEOTTIA_MEMORY_NAMESPACE_PROJECT_ID = "website"
   "servers": {
     "memory": {
       "command": "pnpm",
-      "args": ["-y", "@neottia/memory-mcp"],
+      "args": ["dlx", "@neottia/memory-mcp"],
       "env": {
         "NEOTTIA_MEMORY_ENABLED": "true",
         "NEOTTIA_MEMORY_NAMESPACE_PROJECT_ID": "website"

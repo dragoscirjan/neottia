@@ -382,13 +382,13 @@ export class FilesystemBackend implements StorageBackend {
     const filenameId = basename(safe).replace(/\.yaml$/u, '');
     if (!isUlid(filenameId)) throw new MemoryError(`Invalid memory filename: ${path}`);
     const document = parseYamlBytes(bytes, path);
-    if (safe.startsWith('tombstones/')) {
+    if (safe === `tombstones/${filenameId}.yaml`) {
       const tombstone = validateTombstoneHelper(document, this.helperDeps);
       if (tombstone.id !== filenameId) throw new MemoryError(`Memory filename does not match document ID: ${path}`);
       return;
     }
     for (const [recordType, folder] of Object.entries(RECORD_FOLDERS) as Array<[RecordType, string]>) {
-      if (!safe.startsWith(`${folder}/`)) continue;
+      if (safe !== `${folder}/${filenameId}.yaml`) continue;
       const record = validateRecordHelper(document, this.helperDeps);
       if (record.id !== filenameId || record.record_type !== recordType)
         throw new MemoryError(`Memory filename does not match document identity: ${path}`);

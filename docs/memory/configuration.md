@@ -109,3 +109,5 @@ Deleting `index.db` manually is always safe; it is rebuilt from the YAML files.
 ## Workspaces and branches
 
 Each git worktree has its own `root` directory, so two branches never overwrite each other's filesystem memories. For a shared, cross-machine memory, select `backend: postgres`; PostgreSQL separates records by organization, project, and scope.
+
+When upgrading an existing PostgreSQL database, rows created before scoped storage are intentionally retained in the `global` scope. The backend cannot infer a branch or workspace from those rows. Keep the deployment on `scope: global` to use them, or perform an explicit, reviewed SQL migration that assigns known rows to a new scope before switching deployments; never bulk-assign legacy rows automatically when multiple scopes share the database.
