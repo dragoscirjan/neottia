@@ -8,8 +8,8 @@ MCP stdio server exposing the Neottia memory tools. Tool names, descriptions, an
 {
   "mcpServers": {
     "memory": {
-      "command": "npx",
-      "args": ["-y", "@neottia/memory-mcp"],
+      "command": "pnpm",
+      "args": ["dlx", "@neottia/memory-mcp"],
       "env": {
         "NEOTTIA_MEMORY_ENABLED": "true",
         "NEOTTIA_MEMORY_NAMESPACE_PROJECT_ID": "my-project"

@@ -1,6 +1,12 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import { findMemoryTool, loadMemoryConfig, MEMORY_TOOLS, type MemoryToolContext } from '@neottia/memory-core';
+import {
+  closeMemoryToolContext,
+  findMemoryTool,
+  loadMemoryConfig,
+  MEMORY_TOOLS,
+  type MemoryToolContext,
+} from '@neottia/memory-core';
 import { z } from 'zod';
 
 /**
@@ -41,6 +47,22 @@ export function createMemoryServer(options: CreateMemoryServerOptions = {}): Ser
   const configOverrides: { cache?: { stale_policy: 'rebuild' } } = {};
   if (effectiveStalePolicy(cwd) === 'rebuild') configOverrides.cache = { stale_policy: 'rebuild' };
   const context: MemoryToolContext = { cwd, interactive, configOverrides };
+  const closeServer = server.close.bind(server);
+  server.close = async () => {
+    let cleanupError: unknown;
+    try {
+      await closeMemoryToolContext(context);
+    } catch (error: unknown) {
+      cleanupError = error;
+    }
+    try {
+      await closeServer();
+    } catch (error: unknown) {
+      if (cleanupError !== undefined) throw new AggregateError([cleanupError, error], 'MCP server shutdown failed.');
+      throw error;
+    }
+    if (cleanupError !== undefined) throw cleanupError;
+  };
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
     tools: MEMORY_TOOLS.map((tool) => ({

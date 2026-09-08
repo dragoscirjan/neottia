@@ -75,7 +75,7 @@ describe.skipIf(!enabled)('opencode drives the memory MCP server', () => {
         NEOTTIA_MEMORY_CACHE_STALE_POLICY: 'rebuild',
       },
     });
-    seedMemory(project, [
+    await seedMemory(project, [
       {
         memory_type: 'semantic',
         record_type: 'fact',

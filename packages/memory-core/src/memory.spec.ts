@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -7,6 +7,7 @@ import {
   MemoryConflictError,
   MemoryError,
   MemoryStore,
+  SqliteIndex,
   loadMemoryConfig,
   type MemoryConfig,
   type StoreMemoryInput,
@@ -125,11 +126,15 @@ describe('memory store (filesystem + SQLite index)', () => {
   });
 
   it('supersedes and tombstones without overwriting history', async () => {
-    const store = storeFor(fixture());
+    const cwd = fixture();
+    const store = storeFor(cwd);
     const first = await store.store(fact('Old fact'));
     const second = await store.supersede(first.id, fact('Corrected fact'));
     expect(await store.list()).toEqual([second]);
     expect(await store.list({ include_superseded: true })).toHaveLength(2);
+    await expect(store.search({ query: 'Old fact' })).resolves.toEqual([]);
+    const configured = storeFor(cwd, { retrieval: { include_superseded: true } });
+    await expect(configured.search({ query: 'Old fact' })).resolves.toEqual([first]);
     await expect(store.supersede(first.id, fact('Competing correction'))).rejects.toThrow(MemoryConflictError);
     const tombstone = await store.delete(
       second.id,
@@ -161,7 +166,84 @@ describe('memory store (filesystem + SQLite index)', () => {
     expect(await store.validate()).toMatchObject({ valid: true, records: 1 });
   });
 
-  it('exports portable JSONL and validates imports without mutation in preview', async () => {
+  it('rejects foreign namespaces and secrets before import mutation', async () => {
+    const source = storeFor(fixture(), { namespace: { organization_id: 'source-org' } });
+    const destination = storeFor(fixture());
+    const stored = await source.store(fact('Portable fact'));
+    const foreign = await destination.import(await source.export(), true);
+    expect(foreign.valid).toBe(false);
+    expect(foreign.errors[0]).toMatch(/scope|namespace/u);
+    await expect(destination.import(await source.export())).rejects.toThrow(/scope|namespace/u);
+    expect(await destination.list()).toEqual([]);
+
+    const secret = { ...stored, organization_id: 'local', summary: 'token=ghp_012345678901234567890123456789' };
+    const secretResult = await destination.import(`${JSON.stringify(secret)}\n`, true);
+    expect(secretResult.valid).toBe(false);
+    expect(secretResult.errors[0]).toMatch(/secret/u);
+    await expect(destination.import(`${JSON.stringify(secret)}\n`)).rejects.toThrow(/secret/u);
+    expect(await destination.list()).toEqual([]);
+  });
+
+  it('rejects supersession cycles before preview or persistence', async () => {
+    const source = storeFor(fixture());
+    const destination = storeFor(fixture());
+    const first = await source.store(fact('Cycle first'));
+    const second = await source.store(fact('Cycle second'));
+    const firstCycle = { ...first, supersedes: [second.id] };
+    const secondCycle = { ...second, supersedes: [first.id] };
+    const content = `${JSON.stringify(firstCycle)}\n${JSON.stringify(secondCycle)}\n`;
+
+    const preview = await destination.import(content, true);
+    expect(preview.valid).toBe(false);
+    expect(preview.errors[0]).toMatch(/Cyclic supersession/u);
+    await expect(destination.import(content)).rejects.toThrow(/Cyclic supersession/u);
+    expect(await destination.list()).toEqual([]);
+  });
+
+  it('preflights resulting filesystem limits before publishing an import batch', async () => {
+    const source = storeFor(fixture());
+    const destinationCwd = fixture();
+    const destination = storeFor(destinationCwd, { security: { limits: { max_files: 1 } } });
+    await source.store(fact('First limited record'));
+    const exported = await source.export();
+    const second = await source.store(fact('Second limited record'));
+    const batch = `${exported}${JSON.stringify(second)}\n`;
+    await expect(destination.import(batch)).rejects.toThrow(/limit/u);
+    expect(await destination.list()).toEqual([]);
+
+    const one = await destination.store(fact('Byte boundary record'));
+    const path = join(destinationCwd, '.neottia', 'memory', 'facts', `${one.id}.yaml`);
+    const bytes = readFileSync(path).byteLength;
+    const byteLimited = storeFor(destinationCwd, { security: { limits: { max_total_bytes: bytes } } });
+    await expect(byteLimited.store(fact('Would exceed bytes'))).rejects.toThrow(/byte limit/u);
+    expect(await byteLimited.list()).toEqual([one]);
+  });
+
+  it('rejects symlinked roots and SQLite cache artifacts', async () => {
+    const cwd = fixture();
+    const target = mkdtempSync(join(tmpdir(), 'neottia-memory-target-'));
+    tempDirs.push(target);
+    const linkedRoot = join(cwd, 'linked-memory');
+    symlinkSync(target, linkedRoot, 'dir');
+    expect(() => storeFor(cwd, { root: linkedRoot })).toThrow(/Unsafe memory root/u);
+
+    const cacheCwd = fixture();
+    const store = storeFor(cacheCwd);
+    await store.store(fact('Cache artifact safety'));
+    const actualCachePath = join(cacheCwd, '.neottia', 'memory', 'index.db');
+    const cacheTarget = join(cacheCwd, 'cache-target.db');
+    writeFileSync(cacheTarget, 'not-a-cache');
+    rmSync(actualCachePath, { force: true });
+    symlinkSync(cacheTarget, actualCachePath);
+    await expect(store.search({ query: 'artifact' })).rejects.toThrow(/cache artifact/u);
+
+    rmSync(actualCachePath, { force: true });
+    symlinkSync(join(cacheCwd, 'missing-cache.db'), actualCachePath);
+    await expect(store.search({ query: 'artifact' })).rejects.toThrow(/cache artifact/u);
+    expect(() => SqliteIndex.open(join(cacheCwd, 'memory'), '../outside.db')).toThrow(/cache filename/u);
+  });
+
+  it('exports portable JSONL and validates imports without mutation in preview, then synchronizes the cache', async () => {
     const source = storeFor(fixture());
     const destination = storeFor(fixture());
     const stored = await source.store(fact('Portable fact'));
@@ -172,6 +254,19 @@ describe('memory store (filesystem + SQLite index)', () => {
     expect(await destination.import(exported)).toMatchObject({ valid: true, records: 1 });
     expect(await destination.list()).toHaveLength(1);
     await expect(destination.import(exported)).rejects.toThrow(MemoryConflictError);
+    expect(await destination.validate()).toMatchObject({
+      valid: true,
+      cache: { outcome: 'checked', evidence: 'canonical_snapshot_match_verified' },
+    });
+  });
+
+  it('synchronizes imported records under stale_policy fail', async () => {
+    const source = storeFor(fixture());
+    const destination = storeFor(fixture(), { cache: { max_age_ms: 300_000, stale_policy: 'fail' } });
+    const stored = await source.store(fact('Imported cache synchronization'));
+    await expect(destination.import(await source.export())).resolves.toMatchObject({ valid: true, records: 1 });
+    expect(await destination.list()).toEqual([stored]);
+    await expect(destination.search({ query: 'synchronization' })).resolves.toEqual([stored]);
   });
 
   it('returns identical compactness diagnostics for preview and mutating import', async () => {
@@ -222,6 +317,17 @@ describe('memory store (filesystem + SQLite index)', () => {
     expect(readFileSync(path, 'utf8')).toContain('duplicate');
   });
 
+  it('rejects canonical files whose filename ID differs from the document ID', async () => {
+    const cwd = fixture();
+    const store = storeFor(cwd);
+    const record = await store.store(fact('Filename identity'));
+    const originalPath = join(cwd, '.neottia', 'memory', 'facts', `${record.id}.yaml`);
+    const wrongPath = join(cwd, '.neottia', 'memory', 'facts', '01ARZ3NDEKTSV4RRFFQ69G5FAV.yaml');
+    writeFileSync(wrongPath, readFileSync(originalPath));
+    expect((await store.validate()).valid).toBe(false);
+    await expect(store.list()).rejects.toThrow(/filename does not match document ID/u);
+  });
+
   it('returns verified rebuild evidence only after validation repairs the cache', async () => {
     const cwd = fixture();
     const store = storeFor(cwd);
@@ -257,11 +363,10 @@ describe('memory store (filesystem + SQLite index)', () => {
     expect(readFileSync(cachePath, 'utf8')).toBe('corrupt-cache');
   });
 
-  it('honors the configured namespace scope in the lock identity', async () => {
+  it('shares the filesystem lock across ignored namespace scopes', async () => {
     const cwd = fixture();
     const config = loadMemoryConfig(cwd, { namespace: { scope: 'feat/memory-core' } });
     const store = MemoryStore.fromConfig(config, cwd);
-    expect(store.scopeKey).toBe('local--project--feat/memory-core');
     await store.store(fact('Scoped fact'));
     expect(await store.list()).toHaveLength(1);
   });
@@ -294,6 +399,26 @@ describe('memory store (filesystem + SQLite index)', () => {
     await expect(accepted.search({ query: 'accepted' })).resolves.toHaveLength(1);
   });
 
+  it('passes interactive stale-cache decisions through the tool context', async () => {
+    const cwd = fixture();
+    let prompted = false;
+    const context = {
+      cwd,
+      interactive: true,
+      configOverrides: { cache: { max_age_ms: 0, stale_policy: 'prompt' as const } },
+      onStaleCache: () => {
+        prompted = true;
+        return false;
+      },
+    };
+    const { findMemoryTool } = await import('./tools.js');
+    await findMemoryTool('memory_store')?.run(context, fact('Tool prompt'));
+    await expect(findMemoryTool('memory_search')?.run(context, { query: 'Tool prompt' })).rejects.toThrow(
+      /rebuild declined/u,
+    );
+    expect(prompted).toBe(true);
+  });
+
   it('constructs a postgres-backed store (connects lazily)', () => {
     const cwd = fixture();
     expect(() => storeFor(cwd, { backend: 'postgres' })).not.toThrow();
@@ -309,7 +434,11 @@ describe('memory store (filesystem + SQLite index)', () => {
     await expect(storeTool?.run(context, { ...fact('Valid'), confidence: 'bogus' })).rejects.toThrow(
       /memory_store input/i,
     );
-    expect(await storeFor(cwd).list()).toHaveLength(0);
+    await expect(storeTool?.run(context, { ...fact('x'.repeat(241)) })).rejects.toThrow(/memory_store input/i);
+    await expect(storeTool?.run(context, { ...fact('😀'.repeat(240)) })).resolves.toMatchObject({
+      summary: '😀'.repeat(240),
+    });
+    expect(await storeFor(cwd).list()).toHaveLength(1);
   });
 
   it('keeps supersession semantics across the tools layer', async () => {

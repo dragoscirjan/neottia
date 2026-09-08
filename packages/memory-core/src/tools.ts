@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { z } from 'zod';
 import { loadMemoryConfig } from './config.js';
 import type { MemoryConfigInput } from './config.js';
@@ -13,8 +14,81 @@ import { MemoryStore, type SearchMemoryInput, type StoreMemoryInput } from './st
  * double as the published tool contract for MCP clients.
  */
 
+export const MEMORY_TOOL_LIMITS = {
+  summaryCharacters: 240,
+  detailsCharacters: 2_000,
+  detailsLines: 12,
+  queryBytes: 16 * 1024,
+  importBytes: 64 * 1024 * 1024,
+} as const;
+
 const ulid = z.string().regex(ULID_PATTERN, 'must be a Crockford ULID');
 const nonempty = z.string().min(1).regex(/\S/, 'must not be blank');
+
+function compactText(maxCharacters: number, label: string): z.ZodString {
+  return z
+    .string()
+    .superRefine((value, context) => {
+      if (countUnicodeCharacters(value, maxCharacters) > maxCharacters)
+        context.addIssue({ code: 'custom', message: `${label} must be at most ${maxCharacters} Unicode characters.` });
+    })
+    .describe(`${label}; at most ${maxCharacters} Unicode characters.`);
+}
+
+function countUnicodeCharacters(value: string, limit: number): number {
+  let count = 0;
+  for (const _character of value) {
+    count++;
+    if (count > limit) return count;
+  }
+  return count;
+}
+
+function countNonEmptyLines(value: string, limit: number): number {
+  let count = 0;
+  let lineHasContent = false;
+  let previousWasCarriageReturn = false;
+  for (const character of value) {
+    if (character === '\n' || character === '\r' || character === '\u2028' || character === '\u2029') {
+      if (character === '\n' && previousWasCarriageReturn) {
+        previousWasCarriageReturn = false;
+        continue;
+      }
+      if (lineHasContent) {
+        count++;
+        if (count > limit) return count;
+      }
+      lineHasContent = false;
+      previousWasCarriageReturn = character === '\r';
+      continue;
+    }
+    previousWasCarriageReturn = false;
+    if (!/^\s$/u.test(character)) lineHasContent = true;
+  }
+  if (lineHasContent) count++;
+  return count;
+}
+
+const summaryInput = compactText(MEMORY_TOOL_LIMITS.summaryCharacters, 'Summary').min(1);
+const detailsInput = compactText(MEMORY_TOOL_LIMITS.detailsCharacters, 'Details')
+  .superRefine((value, context) => {
+    const lines = countNonEmptyLines(value, MEMORY_TOOL_LIMITS.detailsLines);
+    if (lines > MEMORY_TOOL_LIMITS.detailsLines)
+      context.addIssue({
+        code: 'custom',
+        message: `Details must have at most ${MEMORY_TOOL_LIMITS.detailsLines} non-empty lines.`,
+      });
+  })
+  .describe(
+    `Details; at most ${MEMORY_TOOL_LIMITS.detailsCharacters} Unicode characters and ${MEMORY_TOOL_LIMITS.detailsLines} non-empty lines.`,
+  );
+
+function byteBoundedText(maxBytes: number, label: string): z.ZodString {
+  return z
+    .string()
+    .refine((value) => Buffer.byteLength(value, 'utf8') <= maxBytes, `${label} exceeds ${maxBytes} UTF-8 bytes.`)
+    .describe(`${label}; at most ${maxBytes} UTF-8 bytes.`);
+}
 
 const sourceSchema = z
   .object({
@@ -29,12 +103,18 @@ const storeInputSchema = z
     memory_type: z.enum(['semantic', 'episodic', 'procedural']),
     record_type: z.enum(['fact', 'decision', 'event', 'lesson']),
     topic: nonempty.optional(),
-    summary: z.string().min(1).max(1000),
-    details: z.string().max(12_000).nullable().optional(),
+    summary: summaryInput,
+    details: detailsInput.nullable().optional(),
     source: sourceSchema,
     created_by: nonempty,
     confidence: z.enum(['confirmed', 'verified']),
-    tags: z.array(nonempty).optional(),
+    tags: z
+      .array(nonempty)
+      .superRefine((values, context) => {
+        if (new Set(values).size !== values.length)
+          context.addIssue({ code: 'custom', message: 'Tags must be unique.' });
+      })
+      .optional(),
   })
   .strict();
 
@@ -53,17 +133,17 @@ const listInputSchema = z
   .strict();
 const searchInputSchema = listInputSchema
   .extend({
-    query: z
-      .string()
-      .min(1)
-      .max(16 * 1024),
+    query: byteBoundedText(MEMORY_TOOL_LIMITS.queryBytes, 'Query').min(1),
     max_chars: z.number().int().min(256).max(100_000).optional(),
   })
   .strict();
 const validateInputSchema = z.object({}).strict();
 const exportInputSchema = z.object({}).strict();
 const importInputSchema = z
-  .object({ content: z.string().max(64 * 1024 * 1024), preview: z.boolean().optional() })
+  .object({
+    content: byteBoundedText(MEMORY_TOOL_LIMITS.importBytes, 'Import content'),
+    preview: z.boolean().optional(),
+  })
   .strict();
 
 export interface MemoryToolContext {
@@ -72,6 +152,10 @@ export interface MemoryToolContext {
   readonly interactive: boolean;
   /** Optional config overrides resolved by the host before calling core. */
   readonly configOverrides?: Partial<MemoryConfigInput>;
+  /** Interactive host callback for stale cache rebuild confirmation. */
+  readonly onStaleCache?: () => boolean | Promise<boolean>;
+  /** Internal stable identity used when a host supplies call-local callbacks. */
+  readonly storeKey?: object;
 }
 
 export interface MemoryToolDefinition<S extends z.ZodObject<z.ZodRawShape> = z.ZodObject<z.ZodRawShape>> {
@@ -82,10 +166,33 @@ export interface MemoryToolDefinition<S extends z.ZodObject<z.ZodRawShape> = z.Z
   readonly run: (context: MemoryToolContext, input: z.output<S>) => Promise<unknown>;
 }
 
+const contextStores = new WeakMap<object, MemoryStore>();
+const staleCacheCallbacks = new AsyncLocalStorage<MemoryToolContext['onStaleCache']>();
+
 function storeFor(context: MemoryToolContext): MemoryStore {
-  // The store enforces skills.memory.enabled itself so validate()/import
-  // preview can surface disabled state as reports instead of throws.
-  return MemoryStore.fromConfig(loadMemoryConfig(context.cwd, context.configOverrides), context.cwd);
+  const key = context.storeKey ?? context;
+  const existing = contextStores.get(key);
+  if (existing) return existing;
+  // Reuse one store per host context so remote backends do not create a new
+  // PostgreSQL pool for every tool invocation. The callback is resolved from
+  // async-local state so overlapping host calls keep their own UI context.
+  const store = MemoryStore.fromConfig(loadMemoryConfig(context.cwd, context.configOverrides), context.cwd, {
+    onStaleCache: () => {
+      const callback = staleCacheCallbacks.getStore() ?? context.onStaleCache;
+      return callback ? callback() : true;
+    },
+  });
+  contextStores.set(key, store);
+  return store;
+}
+
+/** Closes and forgets the backend associated with one host context. */
+export async function closeMemoryToolContext(context: MemoryToolContext): Promise<void> {
+  const key = context.storeKey ?? context;
+  const store = contextStores.get(key);
+  if (!store) return;
+  contextStores.delete(key);
+  await store.close();
 }
 
 function makeTool<S extends z.ZodObject<z.ZodRawShape>>(
@@ -104,7 +211,7 @@ function makeTool<S extends z.ZodObject<z.ZodRawShape>>(
         throw new MemoryError(
           `Invalid ${name} input:\n${parsed.error.issues.map((issue) => `  - ${issue.path.join('.') || '<root>'}: ${issue.message}`).join('\n')}`,
         );
-      return handler(context, parsed.data);
+      return staleCacheCallbacks.run(context.onStaleCache, () => handler(context, parsed.data));
     },
   };
 }
@@ -142,7 +249,7 @@ export const MEMORY_TOOLS: readonly MemoryToolDefinition<z.ZodObject<z.ZodRawSha
   ),
   makeTool(
     'memory_search',
-    'BM25-ranked full-text search over the memory shard (SQLite FTS5).',
+    'Backend-ranked full-text search over the memory shard (SQLite FTS5, pg_textsearch, or PostgreSQL tsvector).',
     searchInputSchema,
     async (context, input) => storeFor(context).search(input as SearchMemoryInput),
   ),

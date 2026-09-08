@@ -10,8 +10,8 @@ Add `@neottia/memory-mcp` to any harness that supports MCP:
 {
   "mcpServers": {
     "memory": {
-      "command": "npx",
-      "args": ["-y", "@neottia/memory-mcp"],
+      "command": "pnpm",
+      "args": ["dlx", "@neottia/memory-mcp"],
       "env": {
         "NEOTTIA_MEMORY_ENABLED": "true",
         "NEOTTIA_MEMORY_NAMESPACE_ORGANIZATION_ID": "acme",
@@ -27,17 +27,17 @@ The server resolves configuration from the working directory of the harness (`.n
 
 ## The tools
 
-| Tool               | Input (essentials)                                                                                                                            | Returns                                                |
-| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| `memory_store`     | `memory_type`, `record_type`, `summary`, `source {kind, ref, revision}`, `created_by`, `confidence`, plus optional `topic`, `details`, `tags` | The stored record, including its generated ID          |
-| `memory_supersede` | Everything `memory_store` takes, plus `target_id` (must be active)                                                                            | The replacement record                                 |
-| `memory_delete`    | `target_id`, `reason`, `source`, `created_by`                                                                                                 | The tombstone                                          |
-| `memory_get`       | `id` (ULID)                                                                                                                                   | The record or tombstone                                |
-| `memory_list`      | optional `topic`, `memory_type`, `limit`, `include_superseded`                                                                                | Records, newest first                                  |
-| `memory_search`    | `query` (required), optional `topic`, `memory_type`, `limit`, `max_chars`, `include_superseded`                                               | BM25-ranked records within the character budget        |
-| `memory_validate`  | none                                                                                                                                          | `{ valid, records, tombstones, errors, cache }` report |
-| `memory_export`    | none                                                                                                                                          | JSONL text of every record and tombstone               |
-| `memory_import`    | `content` (JSONL), optional `preview: true`                                                                                                   | `{ valid, records, tombstones, errors }`               |
+| Tool               | Input (essentials)                                                                                                                            | Returns                                                                                                           |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `memory_store`     | `memory_type`, `record_type`, `summary`, `source {kind, ref, revision}`, `created_by`, `confidence`, plus optional `topic`, `details`, `tags` | The stored record, including its generated ID                                                                     |
+| `memory_supersede` | Everything `memory_store` takes, plus `target_id` (must be active)                                                                            | The replacement record                                                                                            |
+| `memory_delete`    | `target_id`, `reason`, `source`, `created_by`                                                                                                 | The tombstone                                                                                                     |
+| `memory_get`       | `id` (ULID)                                                                                                                                   | The record or tombstone                                                                                           |
+| `memory_list`      | optional `topic`, `memory_type`, `limit`, `include_superseded`                                                                                | Records, newest first                                                                                             |
+| `memory_search`    | `query` (required), optional `topic`, `memory_type`, `limit`, `max_chars`, `include_superseded`                                               | BM25-ranked records within the character budget                                                                   |
+| `memory_validate`  | none                                                                                                                                          | `{ valid, records, tombstones, errors, cache }` report                                                            |
+| `memory_export`    | none                                                                                                                                          | JSONL text of every record and tombstone                                                                          |
+| `memory_import`    | `content` (JSONL), optional `preview: true`                                                                                                   | `{ valid, records, tombstones, errors }`; committed imports may also return `warnings` if cache maintenance fails |
 
 > The packaged way to expose these tools to any harness is the [`@neottia/memory-mcp`](./mcp-server) server — with per-harness wiring examples for Claude Code, OpenCode, pi, Codex, Kiro, and VS Code.
 
@@ -50,7 +50,9 @@ Every tool input is validated by a Zod schema before it reaches the store:
 - unknown keys are rejected,
 - IDs must be Crockford ULIDs,
 - enums are enforced (`memory_type`, `record_type`, `confidence`, `source.kind`),
-- numeric ranges are enforced (`limit` 1–100, `max_chars` 256–100000).
+- numeric ranges are enforced (`limit` 1–100, `max_chars` 256–100000),
+- mutation text is compact (`summary` max 240 Unicode characters; `details` max 2000 characters and 12 non-empty lines),
+- query and import payloads are bounded at 16 KiB and 64 MiB respectively.
 
 The same schemas generate the `tools/list` JSON Schema that MCP clients display, so what a client sees is exactly what the store accepts.
 

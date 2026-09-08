@@ -1,4 +1,4 @@
-import { MEMORY_TOOLS, type MemoryToolContext } from '@neottia/memory-core';
+import { closeMemoryToolContext, MEMORY_TOOLS, MEMORY_TOOL_LIMITS, type MemoryToolContext } from '@neottia/memory-core';
 import { Type } from 'typebox';
 
 /**
@@ -13,6 +13,7 @@ import { Type } from 'typebox';
 
 /** Minimal structural type of the pi ExtensionAPI surface we use. */
 export interface PiExtensionApi {
+  on: (event: 'session_shutdown', handler: () => Promise<void>) => unknown;
   registerTool: (tool: {
     name: string;
     label?: string;
@@ -33,6 +34,8 @@ export interface MemoryExtensionOptions {
   readonly cwd?: string;
   /** Overrides merged into the resolved memory config shard. */
   readonly configOverrides?: Record<string, unknown>;
+  /** Optional confirmation callback for stale-cache rebuilds. */
+  readonly onStaleCache?: () => boolean | Promise<boolean>;
 }
 
 const enumSchema = (values: [string, ...string[]]) => Type.Unsafe<string>({ type: 'string', enum: values });
@@ -45,18 +48,25 @@ const sourceSchema = Type.Object({
 const storeFields = {
   memory_type: enumSchema(['semantic', 'episodic', 'procedural']),
   record_type: enumSchema(['fact', 'decision', 'event', 'lesson']),
-  topic: Type.Optional(Type.String({ description: 'Topic grouping; defaults to the configured default topic' })),
-  summary: Type.String({ description: 'One-line memory summary (max 240 characters)' }),
+  topic: Type.Optional(
+    Type.String({ description: 'Topic grouping; defaults to the configured default topic', minLength: 1 }),
+  ),
+  summary: Type.String({
+    description: `One-line memory summary (max ${MEMORY_TOOL_LIMITS.summaryCharacters} Unicode characters)`,
+    minLength: 1,
+  }),
   details: Type.Optional(
     Type.Union([
-      Type.String({ description: 'Optional supporting details (max 2000 characters, 12 lines)' }),
+      Type.String({
+        description: `Optional supporting details (max ${MEMORY_TOOL_LIMITS.detailsCharacters} Unicode characters, ${MEMORY_TOOL_LIMITS.detailsLines} lines)`,
+      }),
       Type.Null(),
     ]),
   ),
   source: sourceSchema,
-  created_by: Type.String({ description: 'Who created this record (e.g. "agent:pi")' }),
+  created_by: Type.String({ description: 'Who created this record (e.g. "agent:pi")', minLength: 1 }),
   confidence: enumSchema(['confirmed', 'verified']),
-  tags: Type.Optional(Type.Array(Type.String(), { description: 'Unique tags' })),
+  tags: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { description: 'Unique tags', uniqueItems: true })),
 };
 
 /** TypeBox parameter schemas, mirroring the core tool input contracts. */
@@ -65,20 +75,23 @@ export const memoryToolParameters = {
   memory_supersede: Type.Object({ target_id: ulidSchema, ...storeFields }),
   memory_delete: Type.Object({
     target_id: ulidSchema,
-    reason: Type.String({ description: 'Why the record is being retired' }),
+    reason: Type.String({ description: 'Why the record is being retired', minLength: 1, maxLength: 1_000 }),
     source: sourceSchema,
-    created_by: Type.String(),
+    created_by: Type.String({ minLength: 1 }),
   }),
   memory_get: Type.Object({ id: ulidSchema }),
   memory_list: Type.Object({
-    topic: Type.Optional(Type.String()),
+    topic: Type.Optional(Type.String({ minLength: 1 })),
     memory_type: Type.Optional(enumSchema(['semantic', 'episodic', 'procedural'])),
     limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 })),
     include_superseded: Type.Optional(Type.Boolean()),
   }),
   memory_search: Type.Object({
-    query: Type.String({ description: 'Full-text query; every term must match' }),
-    topic: Type.Optional(Type.String()),
+    query: Type.String({
+      description: `Full-text query; every term must match (max ${MEMORY_TOOL_LIMITS.queryBytes} UTF-8 bytes)`,
+      minLength: 1,
+    }),
+    topic: Type.Optional(Type.String({ minLength: 1 })),
     memory_type: Type.Optional(enumSchema(['semantic', 'episodic', 'procedural'])),
     limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 })),
     max_chars: Type.Optional(Type.Integer({ minimum: 256, maximum: 100_000 })),
@@ -87,7 +100,10 @@ export const memoryToolParameters = {
   memory_validate: Type.Object({}),
   memory_export: Type.Object({}),
   memory_import: Type.Object({
-    content: Type.String({ description: 'JSONL payload from memory_export' }),
+    content: Type.String({
+      description: `JSONL payload from memory_export (max ${MEMORY_TOOL_LIMITS.importBytes} UTF-8 bytes)`,
+      minLength: 1,
+    }),
     preview: Type.Optional(Type.Boolean({ description: 'Validate only; do not write' })),
   }),
 } as const;
@@ -98,11 +114,13 @@ export type MemoryToolName = keyof typeof memoryToolParameters;
  * Registers the memory tools on a pi extension API instance.
  * Exported separately from `default` so tests can drive it with a fake API.
  */
-export function registerMemoryTools(pi: PiExtensionApi, options: MemoryExtensionOptions = {}): void {
+export function registerMemoryTools(pi: PiExtensionApi, options: MemoryExtensionOptions = {}): () => Promise<void> {
+  const storeKey = {};
   const context: MemoryToolContext = {
     cwd: options.cwd ?? process.cwd(),
     interactive: true,
     configOverrides: options.configOverrides,
+    storeKey,
   };
 
   for (const tool of MEMORY_TOOLS) {
@@ -115,8 +133,15 @@ export function registerMemoryTools(pi: PiExtensionApi, options: MemoryExtension
         .replace(/(^|_)([a-z])/gu, (_, __, character: string) => character.toUpperCase()),
       description: tool.description,
       parameters,
-      async execute(_toolCallId, params) {
-        const result = await tool.run(context, params);
+      async execute(_toolCallId, params, _signal, _onUpdate, toolContext) {
+        const uiContext = toolContext as { ui?: { confirm: (title: string, message: string) => Promise<boolean> } };
+        const callContext: MemoryToolContext = {
+          ...context,
+          onStaleCache:
+            options.onStaleCache ??
+            (() => uiContext.ui?.confirm('Memory cache is stale', 'Rebuild the memory search cache now?') ?? true),
+        };
+        const result = await tool.run(callContext, params);
         return {
           content: [{ type: 'text', text: typeof result === 'string' ? result : JSON.stringify(result, null, 2) }],
           details: {},
@@ -124,9 +149,11 @@ export function registerMemoryTools(pi: PiExtensionApi, options: MemoryExtension
       },
     });
   }
+  return () => closeMemoryToolContext(context);
 }
 
 /** pi extension entry point. */
 export default function (pi: PiExtensionApi): void {
-  registerMemoryTools(pi);
+  const close = registerMemoryTools(pi);
+  pi.on('session_shutdown', close);
 }

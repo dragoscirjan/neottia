@@ -52,16 +52,16 @@ Because agents write autonomously, hard ceilings protect the store from runaway 
 
 ## Troubleshooting
 
-| Symptom                                                | Cause                                  | Fix                                                                                        |
-| ------------------------------------------------------ | -------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `Memory operation requires skills.memory.enabled=true` | Memory is disabled                     | `skills.memory.enabled: true` or `NEOTTIA_MEMORY_ENABLED=true`                             |
-| `Config requires an explicit 'version: 1'`             | Missing version key in the config file | Add `version: 1` at the top                                                                |
-| `Memory backend 'postgres' is not implemented yet`     | Postgres backend not shipped           | Use `filesystem`; track [neottia#6](https://github.com/dragoscirjan/neottia/issues/6)      |
-| `summary has N Unicode characters; limit is 240`       | Compactness violation                  | Shorten the summary (details: 2000 chars / 12 lines)                                       |
-| `Suspected secret at …`                                | Secret scanner match                   | Remove the secret; tune `security.secret_patterns` / `entropy_heuristic` if false-positive |
-| `Invalid memory record: record_type …`                 | Type pairing violated                  | Pair `semantic/fact`, `episodic/decision                                                   | event`, `procedural/lesson` |
-| `Shard barrier is busy`                                | Concurrent writer held the lock > 10 s | Retry; investigate stuck processes (live owners are never stolen)                          |
-| `Memory cache is stale and cache.stale_policy is fail` | Read refused on a stale index          | Run `memory_validate`, or change `stale_policy`                                            |
-| `Memory path already exists`                           | Duplicate identity on store/import     | List first; supersede instead of re-storing                                                |
-| Search returns nothing for known content               | Index stale or corrupt                 | `memory_validate` (rebuilds), or delete `index.db`                                         |
-| `Duplicate memory ID` on validate                      | The same ULID exists twice on disk     | Remove the duplicate file; IDs are unique by construction when written through the tools   |
+| Symptom                                                | Cause                                                | Fix                                                                                        |
+| ------------------------------------------------------ | ---------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `Memory operation requires skills.memory.enabled=true` | Memory is disabled                                   | `skills.memory.enabled: true` or `NEOTTIA_MEMORY_ENABLED=true`                             |
+| `Config requires an explicit 'version: 1'`             | Missing version key in the config file               | Add `version: 1` at the top                                                                |
+| `Memory backend 'postgres' connection failed`          | PostgreSQL is unavailable or credentials are invalid | Verify host, port, database, and credentials; retry when the database is reachable         |
+| `summary has N Unicode characters; limit is 240`       | Compactness violation                                | Shorten the summary (details: 2000 chars / 12 lines)                                       |
+| `Suspected secret at …`                                | Secret scanner match                                 | Remove the secret; tune `security.secret_patterns` / `entropy_heuristic` if false-positive |
+| `Invalid memory record: record_type …`                 | Type pairing violated                                | Pair `semantic/fact`, `episodic/decision` or `event`, `procedural/lesson`                  |
+| `Shard barrier is busy`                                | Concurrent writer held the lock > 10 s               | Retry; investigate stuck processes (live owners are never stolen)                          |
+| `Memory cache is stale and cache.stale_policy is fail` | Read refused on a stale index                        | Run `memory_validate`, or change `stale_policy`                                            |
+| `Memory path already exists`                           | Duplicate identity on store/import                   | List first; supersede instead of re-storing                                                |
+| Search returns nothing for known content               | Index stale or corrupt                               | `memory_validate` (rebuilds), or delete `index.db`                                         |
+| `Duplicate memory ID` on validate                      | The same ULID exists twice on disk                   | Remove the duplicate file; IDs are unique by construction when written through the tools   |

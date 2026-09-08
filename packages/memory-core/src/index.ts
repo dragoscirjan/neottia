@@ -37,7 +37,7 @@ export {
 
 export { createUlid, isUlid, ULID_PATTERN } from './identities.js';
 export { createSecretScanner, looksHighEntropy, scannerOptionsFromConfig } from './security.js';
-export { withShardBarrier } from './barrier.js';
+export { withShardBarrier, withShardBarrierAsync } from './barrier.js';
 export { SqliteIndex, canonicalHash } from './index-sqlite.js';
 export { FilesystemBackend, RECORD_FOLDERS } from './backend/filesystem.js';
 export { PostgresBackend, resolvePgSettings, type PgConnectionSettings } from './backend/postgres.js';
@@ -52,6 +52,8 @@ export type {
 } from './store.js';
 export {
   MEMORY_TOOLS,
+  MEMORY_TOOL_LIMITS,
+  closeMemoryToolContext,
   findMemoryTool,
   deleteInputSchema,
   exportInputSchema,

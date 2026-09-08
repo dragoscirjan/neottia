@@ -1,0 +1,181 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "enabled": {
+      "default": false,
+      "type": "boolean"
+    },
+    "root": {
+      "default": ".neottia/memory",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024
+    },
+    "backend": {
+      "default": "filesystem",
+      "type": "string",
+      "enum": ["filesystem", "postgres"]
+    },
+    "namespace": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "organization_id": {
+          "default": "local",
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "project_id": {
+          "default": "project",
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "default_topic": {
+          "default": "general",
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "scope": {
+          "default": "global",
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        }
+      }
+    },
+    "provider": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "db": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "pg": {
+              "default": {},
+              "type": "object",
+              "properties": {
+                "host": {
+                  "default": "localhost",
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "\\S"
+                },
+                "port": {
+                  "default": 5432,
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 65535
+                },
+                "database": {
+                  "default": "neottia",
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "\\S"
+                },
+                "ssl": {
+                  "default": true,
+                  "type": "boolean"
+                },
+                "user": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "password": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "retrieval": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "limit": {
+          "default": 8,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "max_chars": {
+          "default": 12000,
+          "type": "integer",
+          "minimum": 256,
+          "maximum": 100000
+        },
+        "include_superseded": {
+          "default": false,
+          "type": "boolean"
+        }
+      }
+    },
+    "cache": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "max_age_ms": {
+          "default": 300000,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "stale_policy": {
+          "default": "prompt",
+          "type": "string",
+          "enum": ["prompt", "rebuild", "fail"]
+        }
+      }
+    },
+    "security": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "secret_patterns": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "entropy_heuristic": {
+          "default": true,
+          "type": "boolean"
+        },
+        "limits": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "max_file_bytes": {
+              "default": 16777216,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "max_files": {
+              "default": 10000,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "max_total_bytes": {
+              "default": 268435456,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,10 +1,11 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   assertHarnessSuccess,
   createTempProject,
   ensureMemoryDistBuilt,
   openrouterApiKey,
+  opencodeReady,
   repoRoot,
   isTransientModelError,
   runOpencodeWithModelFallback,
@@ -25,12 +26,7 @@ function randomSuffix(): string {
 }
 
 const apiKey = openrouterApiKey();
-const enabled = process.env.NEOTTIA_TEST_HARNESS === '1' && (Boolean(apiKey) || existsSync(authJsonPath()));
-
-function authJsonPath(): string {
-  const dataHome = process.env.XDG_DATA_HOME ?? join(process.env.HOME ?? '~', '.local', 'share');
-  return join(dataHome, 'opencode', 'auth.json');
-}
+const enabled = process.env.NEOTTIA_TEST_HARNESS === '1' && opencodeReady();
 
 let project: TempProject;
 
@@ -75,7 +71,7 @@ describe.skipIf(!enabled)('opencode uses the memory plugin in-process', () => {
   }, 300_000);
 
   it('recalls a seeded memory via memory_search', async (ctx) => {
-    seedMemory(project, [
+    await seedMemory(project, [
       {
         memory_type: 'semantic',
         record_type: 'fact',

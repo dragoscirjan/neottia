@@ -44,9 +44,7 @@ const memoryRootPath = z
     return value !== '.' && value.split(/[\\/]/u).every((part) => part && part !== '.' && part !== '..');
   }, 'must be a safe relative path or an absolute path');
 
-const envVarReference = z
-  .string()
-  .regex(/^\$\{[A-Za-z_][A-Za-z0-9_]*\}$/u, 'must be a "${ENV_VAR}" reference; literal credentials are rejected');
+const credentialValue = z.string().min(1, 'must not be empty');
 
 export const memoryConfigSchema = z
   .object({
@@ -71,9 +69,9 @@ export const memoryConfigSchema = z
                 port: z.number().int().min(1).max(65_535).default(5432),
                 database: nonemptyString.default('neottia'),
                 ssl: z.boolean().default(true),
-                // Credentials are ${VAR} references only; literal values are rejected.
-                user: envVarReference.optional(),
-                password: envVarReference.optional(),
+                // Credentials may be literal values or ${VAR} environment references.
+                user: credentialValue.optional(),
+                password: credentialValue.optional(),
               })
               .prefault({}),
           })
@@ -289,8 +287,8 @@ function coerceEnvValue(name: string, path: string, value: string): unknown {
 
 /**
  * Expands ${VAR} credential references from the environment. Absent
- * credentials fall back to their default env vars. Literal credentials are
- * impossible here because the schema rejects them.
+ * credentials fall back to their default env vars; literal credentials pass
+ * through unchanged.
  */
 function expandCredentials(config: MemoryConfig, env: NodeJS.ProcessEnv, configFile: string): void {
   const pg = config.provider.db.pg;
@@ -302,6 +300,7 @@ function expandCredentials(config: MemoryConfig, env: NodeJS.ProcessEnv, configF
       if (fallback !== undefined && fallback !== '') pg[key] = fallback;
       continue;
     }
+    if (!/^\$\{[A-Za-z_][A-Za-z0-9_]*\}$/u.test(reference)) continue;
     const varName = reference.slice(2, -1);
     const value = env[varName];
     if (value === undefined || value === '')

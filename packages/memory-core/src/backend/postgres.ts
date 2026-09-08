@@ -3,9 +3,9 @@ import { createHash } from 'node:crypto';
 import pg from 'pg';
 import { parseDocument, stringify } from 'yaml';
 import type { MemoryConfig } from '../config.js';
-import { MemoryError } from '../errors.js';
+import { MemoryConflictError, MemoryError } from '../errors.js';
 import { isUlid } from '../identities.js';
-import type { MemoryRecord, MemoryTombstone } from '../schemas.js';
+import type { MemoryRecord, MemoryTombstone, RecordType } from '../schemas.js';
 import { createSecretScanner, type SecretScanner } from '../security.js';
 import { RECORD_FOLDERS, safeProjectPath, type MemoryRecordInput } from './filesystem.js';
 import {
@@ -16,6 +16,7 @@ import {
   validateCompactness as validateCompactnessHelper,
   validateRecord as validateRecordHelper,
   validateTombstone as validateTombstoneHelper,
+  assertAcyclic,
   type RecordHelperDeps,
 } from './record-helpers.js';
 import type {
@@ -65,6 +66,7 @@ export function resolvePgSettings(config: MemoryConfig, env: NodeJS.ProcessEnv =
       if (fallback === undefined || fallback === '') return undefined;
       return fallback;
     }
+    if (!/^\$\{[A-Za-z_][A-Za-z0-9_]*\}$/u.test(value)) return value;
     const varName = value.slice(2, -1);
     const expanded = env[varName];
     if (expanded === undefined || expanded === '')
@@ -131,6 +133,7 @@ export class PostgresBackend implements StorageBackend {
         id TEXT PRIMARY KEY,
         organization_id TEXT NOT NULL,
         project_id TEXT NOT NULL,
+        scope TEXT NOT NULL DEFAULT 'global',
         memory_type TEXT NOT NULL,
         record_type TEXT NOT NULL,
         topic TEXT NOT NULL,
@@ -150,18 +153,22 @@ export class PostgresBackend implements StorageBackend {
         id TEXT PRIMARY KEY,
         organization_id TEXT NOT NULL,
         project_id TEXT NOT NULL,
+        scope TEXT NOT NULL DEFAULT 'global',
         target_id TEXT NOT NULL,
         created_at TIMESTAMPTZ NOT NULL,
         document JSONB NOT NULL
       );
     `);
+    await this.pool.query(`ALTER TABLE memory_records ADD COLUMN IF NOT EXISTS scope TEXT NOT NULL DEFAULT 'global'`);
+    await this.pool.query(
+      `ALTER TABLE memory_tombstones ADD COLUMN IF NOT EXISTS scope TEXT NOT NULL DEFAULT 'global'`,
+    );
+    await this.pool.query(
+      `CREATE INDEX IF NOT EXISTS memory_records_shard ON memory_records (organization_id, project_id, scope, created_at DESC);`,
+    );
     await this.pool.query(`CREATE INDEX IF NOT EXISTS memory_tombstones_target ON memory_tombstones (target_id);`);
     await this.pool.query(
-      `ALTER TABLE memory_tombstones ADD COLUMN IF NOT EXISTS organization_id TEXT NOT NULL DEFAULT ''`,
-    );
-    await this.pool.query(`ALTER TABLE memory_tombstones ADD COLUMN IF NOT EXISTS project_id TEXT NOT NULL DEFAULT ''`);
-    await this.pool.query(
-      `CREATE INDEX IF NOT EXISTS memory_tombstones_shard ON memory_tombstones (organization_id, project_id);`,
+      `CREATE INDEX IF NOT EXISTS memory_tombstones_shard ON memory_tombstones (organization_id, project_id, scope);`,
     );
 
     // Search column for the tsvector baseline; pg_textsearch indexes the
@@ -177,21 +184,16 @@ export class PostgresBackend implements StorageBackend {
 
     // Feature detection: pg_textsearch (BM25) outranks the tsvector baseline.
     const extension = await this.pool.query(`SELECT 1 FROM pg_extension WHERE extname = 'pg_textsearch'`);
-    if (extension.rowCount === 0) {
-      try {
-        await this.pool.query(`CREATE EXTENSION IF NOT EXISTS pg_textsearch;`);
-        await this.pool.query(
-          `CREATE INDEX IF NOT EXISTS memory_records_bm25 ON memory_records USING bm25 (search_text) WITH (text_config = 'english');`,
-        );
-        this.textSearchKind = 'pg_textsearch';
-      } catch {
-        this.textSearchKind = 'tsvector';
-      }
-    } else {
+    try {
+      if (extension.rowCount === 0) await this.pool.query(`CREATE EXTENSION IF NOT EXISTS pg_textsearch;`);
       await this.pool.query(
         `CREATE INDEX IF NOT EXISTS memory_records_bm25 ON memory_records USING bm25 (search_text) WITH (text_config = 'english');`,
       );
       this.textSearchKind = 'pg_textsearch';
+    } catch {
+      // An installed but incompatible extension must not prevent the
+      // tsvector-ranked fallback from serving the memory tools.
+      this.textSearchKind = 'tsvector';
     }
     this.schemaReady = true;
   }
@@ -203,10 +205,17 @@ export class PostgresBackend implements StorageBackend {
     await this.ensureSchema();
     const executor = this.currentClient() ?? this.pool;
     const recordsResult = await executor.query(
-      `SELECT document FROM memory_records WHERE organization_id = $1 AND project_id = $2 ORDER BY created_at DESC`,
-      [this.scope.organizationId, this.scope.projectId],
+      `SELECT document FROM memory_records
+       WHERE organization_id = $1 AND project_id = $2 AND scope = $3
+       ORDER BY created_at DESC`,
+      [this.scope.organizationId, this.scope.projectId, this.scope.scope],
     );
-    const tombstoneResult = await executor.query(`SELECT document FROM memory_tombstones ORDER BY created_at DESC`);
+    const tombstoneResult = await executor.query(
+      `SELECT document FROM memory_tombstones
+       WHERE organization_id = $1 AND project_id = $2 AND scope = $3
+       ORDER BY created_at DESC`,
+      [this.scope.organizationId, this.scope.projectId, this.scope.scope],
+    );
 
     const records = recordsResult.rows.map((row) => validateRecordHelper(row.document, this.helperDeps));
     const tombstones = tombstoneResult.rows.map((row) => validateTombstoneHelper(row.document, this.helperDeps));
@@ -218,6 +227,7 @@ export class PostgresBackend implements StorageBackend {
     for (const tombstone of tombstones)
       if (!recordIds.has(tombstone.target_id))
         throw new MemoryError(`Broken tombstone reference: ${tombstone.target_id}`);
+    assertAcyclic(records);
 
     const inactive = new Set(records.flatMap((record) => record.supersedes));
     tombstones.forEach((item) => inactive.add(item.target_id));
@@ -270,65 +280,103 @@ export class PostgresBackend implements StorageBackend {
       // Shard-scoped delete: the advisory lock does not enforce row ownership.
       await client.query(
         `DELETE FROM ${parsed.table}
-         WHERE id = $1 AND organization_id = $2 AND project_id = $3`,
-        [parsed.id, this.scope.organizationId, this.scope.projectId],
+         WHERE id = $1 AND organization_id = $2 AND project_id = $3 AND scope = $4`,
+        [parsed.id, this.scope.organizationId, this.scope.projectId, this.scope.scope],
       );
       return;
     }
     const document = parseDocumentBytes(replacement.bytes, replacement.path);
     if (parsed.table === 'memory_tombstones') {
       const tombstone = validateTombstoneHelper(document, this.helperDeps);
+      if (tombstone.id !== parsed.id)
+        throw new MemoryError(`Memory path does not match tombstone ID: ${replacement.path}`);
       if (replacement.exclusive)
         await client.query(`SELECT pg_advisory_xact_lock(hashtext($1 || ':' || $2))`, [this.shardKey(), tombstone.id]);
-      await client.query(
-        `INSERT INTO memory_tombstones (id, organization_id, project_id, target_id, created_at, document)
-         VALUES ($1, $2, $3, $4, $5, $6)
-         ON CONFLICT (id) DO UPDATE SET target_id = EXCLUDED.target_id, document = EXCLUDED.document`,
-        [
-          tombstone.id,
-          tombstone.organization_id,
-          tombstone.project_id,
-          tombstone.target_id,
-          tombstone.created_at,
-          JSON.stringify(tombstone),
-        ],
-      );
+      const tombstoneValues = [
+        tombstone.id,
+        tombstone.organization_id,
+        tombstone.project_id,
+        this.scope.scope,
+        tombstone.target_id,
+        tombstone.created_at,
+        JSON.stringify(tombstone),
+      ];
+      const tombstoneInsert = replacement.exclusive
+        ? `INSERT INTO memory_tombstones (id, organization_id, project_id, scope, target_id, created_at, document)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`
+        : `INSERT INTO memory_tombstones (id, organization_id, project_id, scope, target_id, created_at, document)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
+           ON CONFLICT (id) DO UPDATE SET target_id = EXCLUDED.target_id, created_at = EXCLUDED.created_at, document = EXCLUDED.document
+           WHERE memory_tombstones.organization_id = EXCLUDED.organization_id
+             AND memory_tombstones.project_id = EXCLUDED.project_id
+             AND memory_tombstones.scope = EXCLUDED.scope`;
+      try {
+        const result = await client.query(tombstoneInsert, tombstoneValues);
+        if (!replacement.exclusive && result.rowCount === 0)
+          throw new MemoryConflictError(`Memory ID belongs to another namespace: ${replacement.path}`);
+      } catch (error: unknown) {
+        if (replacement.exclusive && isUniqueViolation(error))
+          throw new MemoryConflictError(`Memory path already exists: ${replacement.path}`);
+        throw error;
+      }
       return;
     }
     const record = validateRecordHelper(document, this.helperDeps);
-    if (replacement.exclusive) {
-      const existing = await client.query(`SELECT 1 FROM memory_records WHERE id = $1`, [record.id]);
-      if (existing.rowCount !== 0) throw new MemoryError(`Memory path already exists: ${replacement.path}`);
+    if (record.id !== parsed.id || parsed.recordType !== record.record_type)
+      throw new MemoryError(`Memory path does not match record identity: ${replacement.path}`);
+    const recordValues = [
+      record.id,
+      record.organization_id,
+      record.project_id,
+      this.scope.scope,
+      record.memory_type,
+      record.record_type,
+      record.topic,
+      record.summary,
+      record.details,
+      record.created_at,
+      record.created_by,
+      JSON.stringify(record.supersedes),
+      JSON.stringify(record.tags),
+      searchableText(record),
+      JSON.stringify(record),
+    ];
+    const recordInsert = replacement.exclusive
+      ? `INSERT INTO memory_records
+           (id, organization_id, project_id, scope, memory_type, record_type, topic, summary, details,
+            created_at, created_by, supersedes, tags, search_text, document)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`
+      : `INSERT INTO memory_records
+           (id, organization_id, project_id, scope, memory_type, record_type, topic, summary, details,
+            created_at, created_by, supersedes, tags, search_text, document)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+         ON CONFLICT (id) DO UPDATE SET
+           organization_id = EXCLUDED.organization_id,
+           project_id = EXCLUDED.project_id,
+           memory_type = EXCLUDED.memory_type,
+           record_type = EXCLUDED.record_type,
+           topic = EXCLUDED.topic,
+           summary = EXCLUDED.summary,
+           details = EXCLUDED.details,
+           created_at = EXCLUDED.created_at,
+           created_by = EXCLUDED.created_by,
+           supersedes = EXCLUDED.supersedes,
+           tags = EXCLUDED.tags,
+           search_text = EXCLUDED.search_text,
+           document = EXCLUDED.document,
+           scope = EXCLUDED.scope
+         WHERE memory_records.organization_id = EXCLUDED.organization_id
+           AND memory_records.project_id = EXCLUDED.project_id
+           AND memory_records.scope = EXCLUDED.scope`;
+    try {
+      const result = await client.query(recordInsert, recordValues);
+      if (!replacement.exclusive && result.rowCount === 0)
+        throw new MemoryConflictError(`Memory ID belongs to another namespace: ${replacement.path}`);
+    } catch (error: unknown) {
+      if (replacement.exclusive && isUniqueViolation(error))
+        throw new MemoryConflictError(`Memory path already exists: ${replacement.path}`);
+      throw error;
     }
-    await client.query(
-      `INSERT INTO memory_records
-         (id, organization_id, project_id, memory_type, record_type, topic, summary, details,
-          created_at, created_by, supersedes, tags, search_text, document)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-       ON CONFLICT (id) DO UPDATE SET
-         summary = EXCLUDED.summary,
-         details = EXCLUDED.details,
-         supersedes = EXCLUDED.supersedes,
-         tags = EXCLUDED.tags,
-         search_text = EXCLUDED.search_text,
-         document = EXCLUDED.document`,
-      [
-        record.id,
-        record.organization_id,
-        record.project_id,
-        record.memory_type,
-        record.record_type,
-        record.topic,
-        record.summary,
-        record.details,
-        record.created_at,
-        record.created_by,
-        JSON.stringify(record.supersedes),
-        JSON.stringify(record.tags),
-        searchableText(record),
-        JSON.stringify(record),
-      ],
-    );
   }
 
   // -- search ---------------------------------------------------------------
@@ -337,17 +385,25 @@ export class PostgresBackend implements StorageBackend {
   public async search(state: ShardState, query: string, options: BackendSearchOptions): Promise<MemoryRecord[]> {
     await this.ensureSchema();
     if (!query.trim()) return [];
+    await this.checkOrRebuildCache(state);
     const byId = new Map(state.records.map((record) => [record.id, record]));
     const batchSize = Math.max(options.limit, 50);
     const results: MemoryRecord[] = [];
+    let usedChars = 0;
     for (let offset = 0; results.length < options.limit; offset += batchSize) {
       const ranked = await this.rankQuery(query, batchSize, offset);
       if (!ranked.length) break;
-      const page = collectSearchResults(ranked, byId, options);
-      // The budget check inside the collector stops at page boundaries too.
-      if (page.length === 0) break;
+      const remaining = options.limit - results.length;
+      const page = collectSearchResults(ranked, byId, {
+        ...options,
+        limit: remaining,
+        maxChars: options.maxChars - usedChars,
+      });
       results.push(...page);
-      if (page.length < ranked.length) break;
+      usedChars += page.reduce((total, record) => total + JSON.stringify(record).length, 0);
+      if (usedChars >= options.maxChars || ranked.length < batchSize) break;
+      // A full database page can contain filtered-out rows, so continue
+      // paging even when this page contributed fewer accepted records.
     }
     return results;
   }
@@ -360,29 +416,31 @@ export class PostgresBackend implements StorageBackend {
    */
   private async rankQuery(query: string, limit: number, offset: number): Promise<string[]> {
     const executor = this.currentClient() ?? this.pool;
-    const shardClause = `organization_id = $1 AND project_id = $2`;
-    const filter = `to_tsvector('english', search_text) @@ websearch_to_tsquery('english', $3)`;
+    const shardClause = `organization_id = $1 AND project_id = $2 AND scope = $3`;
+    const prefixQuery = postgresPrefixQuery(query);
+    if (!prefixQuery) return [];
+    const filter = `to_tsvector('english', search_text) @@ to_tsquery('english', $4)`;
     if (this.textSearchKind === 'pg_textsearch') {
       // <@> is an ORDER BY operator: pg_textsearch 1.5.0 has no bindable
       // query form (to_bm25query arrives in a later API), so the ranked
-      // literal must be inlined. quoteLiteral escapes single quotes, and the
-      // matching filter is fully parameterized via websearch_to_tsquery.
+      // literal must be inlined. quoteLiteral emits a fully escaped E-string;
+      // the matching filter is parameterized via a safe prefix tsquery.
       const ranked = PostgresBackend.quoteLiteral(query);
       const result = await executor.query(
         `SELECT id FROM memory_records
          WHERE ${shardClause} AND ${filter}
          ORDER BY search_text <@> ${ranked}
-         LIMIT $4 OFFSET $5`,
-        [this.scope.organizationId, this.scope.projectId, query, limit, offset],
+         LIMIT $5 OFFSET $6`,
+        [this.scope.organizationId, this.scope.projectId, this.scope.scope, prefixQuery, limit, offset],
       );
       return result.rows.map((row) => row.id as string);
     }
     const result = await executor.query(
       `SELECT id FROM memory_records
        WHERE ${shardClause} AND ${filter}
-       ORDER BY ts_rank(to_tsvector('english', search_text), websearch_to_tsquery('english', $3)) DESC, id ASC
-       LIMIT ${limit} OFFSET ${offset}`,
-      [this.scope.organizationId, this.scope.projectId, query],
+       ORDER BY ts_rank(to_tsvector('english', search_text), to_tsquery('english', $4)) DESC, id ASC
+       LIMIT $5 OFFSET $6`,
+      [this.scope.organizationId, this.scope.projectId, this.scope.scope, prefixQuery, limit, offset],
     );
     return result.rows.map((row) => row.id as string);
   }
@@ -412,7 +470,7 @@ export class PostgresBackend implements StorageBackend {
 
   /** Escapes literal strings used inside pg_textsearch <@> queries. */
   private static quoteLiteral(value: string): string {
-    return `'${value.replace(/'/gu, "''")}'`;
+    return `E'${value.replace(/\\/gu, '\\\\').replace(/'/gu, "''")}'`;
   }
 
   /** The bound transaction client inside withLock; undefined outside. */
@@ -421,34 +479,34 @@ export class PostgresBackend implements StorageBackend {
   }
 
   /** {@inheritdoc StorageBackend.checkOrRebuildCache} — the DB is the index. */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- interface parameter; the database owns its index
-  public async checkOrRebuildCache(_state: ShardState): Promise<CacheValidation> {
+  public async checkOrRebuildCache(state: ShardState): Promise<CacheValidation> {
     await this.ensureSchema();
-    // Data integrity check: the search column always mirrors the documents.
     const executor = this.currentClient() ?? this.pool;
     const result = await executor.query(
-      `SELECT count(*)::int AS mismatched FROM memory_records
-       WHERE organization_id = $1 AND project_id = $2 AND search_text = ''`,
-      [this.scope.organizationId, this.scope.projectId],
+      `SELECT id, search_text FROM memory_records
+       WHERE organization_id = $1 AND project_id = $2 AND scope = $3`,
+      [this.scope.organizationId, this.scope.projectId, this.scope.scope],
     );
-    if ((result.rows[0]?.mismatched ?? 0) > 0) {
-      // Resync the search column from the stored documents, matching the
-      // searchableText format exactly (newline-joined, lowercased).
+    const expected = new Map(state.records.map((record) => [record.id, searchableText(record)]));
+    const mismatched = result.rows.filter((row) => expected.get(row.id as string) !== row.search_text);
+    if (mismatched.length > 0) {
       const updater = this.currentClient() ?? this.pool;
-      await updater.query(
-        `
-        UPDATE memory_records
-        SET search_text = lower(concat_ws(
-          E'\\n',
-          summary,
-          coalesce(details, ''),
-          topic,
-          (SELECT string_agg(tag, E'\\n') FROM jsonb_array_elements_text(tags) AS tag)
-        ))
-        WHERE organization_id = $1 AND project_id = $2 AND search_text = '';
-      `,
-        [this.scope.organizationId, this.scope.projectId],
-      );
+      const ids: string[] = [];
+      const searchTexts: string[] = [];
+      for (const row of mismatched) {
+        const searchText = expected.get(row.id as string);
+        if (searchText === undefined) continue;
+        ids.push(row.id as string);
+        searchTexts.push(searchText);
+      }
+      if (ids.length > 0)
+        await updater.query(
+          `UPDATE memory_records AS records SET search_text = updates.search_text
+           FROM unnest($1::text[], $2::text[]) AS updates(id, search_text)
+           WHERE records.id = updates.id
+             AND records.organization_id = $3 AND records.project_id = $4 AND records.scope = $5`,
+          [ids, searchTexts, this.scope.organizationId, this.scope.projectId, this.scope.scope],
+        );
       return { outcome: 'rebuilt', evidence: 'canonical_snapshot_rebuild_verified' };
     }
     return { outcome: 'checked', evidence: 'canonical_snapshot_match_verified' };
@@ -486,6 +544,14 @@ export class PostgresBackend implements StorageBackend {
     validateCompactnessHelper(summary, details, context);
   }
 
+  public validateRecord(value: unknown, label = 'memory record'): MemoryRecord {
+    return validateRecordHelper(value, this.helperDeps, label);
+  }
+
+  public validateTombstone(value: unknown, label = 'memory tombstone'): MemoryTombstone {
+    return validateTombstoneHelper(value, this.helperDeps, label);
+  }
+
   /** Row identity: folder + ULID map onto the record/tombstone tables. */
   public recordPath(record: MemoryRecord): string {
     return `${RECORD_FOLDERS[record.record_type]}/${record.id}.yaml`;
@@ -505,18 +571,22 @@ export class PostgresBackend implements StorageBackend {
     return `${this.scope.organizationId}:${this.scope.projectId}:${this.scope.scope}`;
   }
 
-  private parsePath(path: string): { table: 'memory_records' | 'memory_tombstones'; id: string } {
+  private parsePath(path: string): {
+    table: 'memory_records' | 'memory_tombstones';
+    id: string;
+    recordType?: RecordType;
+  } {
     const safe = safeProjectPath(path);
     if (safe.startsWith('tombstones/')) {
       const id = safe.slice('tombstones/'.length).replace(/\.yaml$/u, '');
-      if (!isUlid(id)) throw new MemoryError(`Invalid tombstone path: ${path}`);
+      if (!isUlid(id) || safe !== `tombstones/${id}.yaml`) throw new MemoryError(`Invalid tombstone path: ${path}`);
       return { table: 'memory_tombstones', id };
     }
-    for (const folder of Object.values(RECORD_FOLDERS)) {
+    for (const [recordType, folder] of Object.entries(RECORD_FOLDERS) as Array<[RecordType, string]>) {
       if (safe.startsWith(`${folder}/`)) {
         const id = safe.slice(folder.length + 1).replace(/\.yaml$/u, '');
-        if (!isUlid(id)) throw new MemoryError(`Invalid record path: ${path}`);
-        return { table: 'memory_records', id };
+        if (!isUlid(id) || safe !== `${folder}/${id}.yaml`) throw new MemoryError(`Invalid record path: ${path}`);
+        return { table: 'memory_records', id, recordType };
       }
     }
     throw new MemoryError(`Memory path does not map to a Postgres table: ${path}`);
@@ -526,13 +596,38 @@ export class PostgresBackend implements StorageBackend {
 // -- helpers ---------------------------------------------------------------
 
 function parseDocumentBytes(bytes: Uint8Array, path: string): unknown {
-  const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  let text: string;
+  try {
+    text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    throw new MemoryError(`Malformed UTF-8 memory YAML: ${path}`);
+  }
   const document = parseDocument(text, { uniqueKeys: true });
   if (document.errors.length || document.warnings.length)
     throw new MemoryError(
       `Malformed memory YAML ${path}: ${document.errors[0]?.message ?? document.warnings[0]?.message}`,
     );
-  return document.toJS();
+  try {
+    return document.toJS({ maxAliasCount: 0 });
+  } catch (error: unknown) {
+    throw new MemoryError(`Unsafe memory YAML ${path}: ${describe(error)}`);
+  }
+}
+
+function postgresPrefixQuery(query: string): string {
+  return query
+    .trim()
+    .split(/\s+/u)
+    .map((term) => term.replace(/[^\p{L}\p{N}_]+/gu, ''))
+    .filter(Boolean)
+    .map((term) => `${term}:*`)
+    .join(' & ');
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    error !== null && typeof error === 'object' && 'code' in error && (error as { code?: string }).code === '23505'
+  );
 }
 
 function describe(error: unknown): string {

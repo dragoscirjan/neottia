@@ -8,11 +8,11 @@ Everything an agent remembers is stored as small YAML files inside the project r
 
 Memory is available in three shapes, all using the **same tool names and configuration**:
 
-| Shape                                  | For                                                                          | How it is configured                      |
-| -------------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------- |
-| **MCP server** (`@neottia/memory-mcp`) | Any harness that speaks MCP: Claude Code, Codex, Copilot, Kiro, pi, OpenCode | `mcpServers` entry + `NEOTTIA_*` env vars |
-| **In-process extensions** (planned)    | pi and OpenCode, with interactive prompts                                    | project `.neottia/config.yml`             |
-| **Library** (`@neottia/memory-core`)   | Your own tools and scripts                                                   | Config file, env vars, or code            |
+| Shape                                                                        | For                                                                          | How it is configured                      |
+| ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------- |
+| **MCP server** (`@neottia/memory-mcp`)                                       | Any harness that speaks MCP: Claude Code, Codex, Copilot, Kiro, pi, OpenCode | `mcpServers` entry + `NEOTTIA_*` env vars |
+| **In-process extensions** (`@neottia/pi-memory`, `@neottia/opencode-memory`) | pi and OpenCode, with host-provided prompts                                  | project `.neottia/config.yml`             |
+| **Library** (`@neottia/memory-core`)                                         | Your own tools and scripts                                                   | Config file, env vars, or code            |
 
 ## The tools
 

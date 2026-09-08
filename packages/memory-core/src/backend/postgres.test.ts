@@ -1,8 +1,16 @@
 import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { MemoryConflictError, MemoryError, MemoryStore, PostgresBackend, loadMemoryConfig } from '../index.js';
+import {
+  MemoryConflictError,
+  MemoryError,
+  MemoryStore,
+  PostgresBackend,
+  createUlid,
+  loadMemoryConfig,
+} from '../index.js';
 import type { StoreMemoryInput } from '../store.js';
 
 /**
@@ -15,7 +23,15 @@ import type { StoreMemoryInput } from '../store.js';
  */
 
 const enabled = process.env.NEOTTIA_TEST_PG === '1';
-const dependenciesDir = resolve(__dirname, '..', '..', '..', '..', 'dependencies', 'postgres');
+const dependenciesDir = resolve(
+  fileURLToPath(new URL('.', import.meta.url)),
+  '..',
+  '..',
+  '..',
+  '..',
+  'dependencies',
+  'postgres',
+);
 const connectionString = 'postgres://neottia:neottia@localhost:5433/neottia';
 
 function compose(args: readonly string[]): { status: number; stdout: string; stderr: string } {
@@ -85,7 +101,10 @@ async function wipeShard(namespace: { organization_id: string; project_id: strin
       namespace.organization_id,
       namespace.project_id,
     ]);
-    await client.query(`DELETE FROM memory_tombstones`);
+    await client.query(`DELETE FROM memory_tombstones WHERE organization_id = $1 AND project_id = $2`, [
+      namespace.organization_id,
+      namespace.project_id,
+    ]);
   } catch (error: unknown) {
     // 42P01 (undefined_table): the backend has not created its schema yet.
     if ((error as { code?: string }).code !== '42P01') throw error;
@@ -103,6 +122,19 @@ describe.skipIf(!enabled)('postgres backend (docker pg_textsearch)', () => {
     await wipeShard(shard);
   });
 
+  it('isolates records by namespace scope', async () => {
+    const feature = pgStore({ scope: 'feature-a' });
+    const other = pgStore({ scope: 'feature-b' });
+    try {
+      const stored = await feature.store(fact('Scoped PostgreSQL fact'));
+      expect(await other.list()).toEqual([]);
+      expect(await feature.list()).toEqual([stored]);
+    } finally {
+      await feature.close();
+      await other.close();
+    }
+  });
+
   it('stores canonical records in PostgreSQL and retrieves them by ID', async () => {
     const stored = await store.store(fact('Postgres keeps the memory shard'));
     expect(stored.id).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/);
@@ -117,7 +149,15 @@ describe.skipIf(!enabled)('postgres backend (docker pg_textsearch)', () => {
     await store.store(fact('The testing convention prefers WATERFALL fixtures'));
     const hits = await store.search({ query: 'PAPYRUS deployment' });
     expect(hits[0]?.id).toBe(alpha.id);
+    expect(await store.search({ query: 'PAPYRUS OR WATERFALL' })).toHaveLength(0);
     expect(await store.search({ query: 'nonexistent' })).toHaveLength(0);
+  });
+
+  it('keeps the search character budget cumulative across filtered pages', async () => {
+    for (let index = 0; index < 55; index += 1) await store.store(fact(`Shared paging token ${index}`));
+    const hits = await store.search({ query: 'paging token', limit: 100, max_chars: 512 });
+    expect(hits.length).toBeGreaterThan(0);
+    expect(hits.reduce((total, record) => total + JSON.stringify(record).length, 0)).toBeLessThanOrEqual(512);
   });
 
   it('supersedes and tombstones without overwriting history', async () => {
@@ -129,6 +169,33 @@ describe.skipIf(!enabled)('postgres backend (docker pg_textsearch)', () => {
     const tombstone = await store.delete(second.id, 'obsolete', second.source, 'pg-test');
     expect(await store.get(tombstone.id)).toEqual(tombstone);
     expect(await store.list()).toHaveLength(0);
+  });
+
+  it('rejects replacement documents whose identity disagrees with the path', async () => {
+    const record = await store.store(fact('Path identity'));
+    const backend = new PostgresBackend({
+      config: loadMemoryConfig(process.cwd(), {
+        env: {},
+        enabled: true,
+        backend: 'postgres',
+        namespace: { organization_id: 'pgtest', project_id: 'shard', scope: 'global' },
+        provider: { db: { pg: { ssl: false, port: 5433 } } },
+      }),
+      cwd: process.cwd(),
+    });
+    try {
+      await expect(
+        backend.applyBatch([
+          {
+            path: `facts/${record.id}.yaml`,
+            bytes: backend.encode({ ...record, id: createUlid() }),
+            exclusive: false,
+          },
+        ]),
+      ).rejects.toThrow(/does not match record identity/u);
+    } finally {
+      await backend.close();
+    }
   });
 
   it('enforces compactness and secret scanning before mutation', async () => {
@@ -152,6 +219,35 @@ describe.skipIf(!enabled)('postgres backend (docker pg_textsearch)', () => {
     expect(await destination.import(exported)).toMatchObject({ valid: true, records: 1 });
     expect(await destination.list()).toHaveLength(1);
     await expect(destination.import(exported)).rejects.toThrow(MemoryConflictError);
+  });
+
+  it('validates and rebuilds a stale non-empty search cache', async () => {
+    const record = await store.store(fact('Validate me'));
+    const client = new pg.Client({ connectionString });
+    await client.connect();
+    try {
+      await client.query(`UPDATE memory_records SET search_text = $1 WHERE id = $2`, ['stale text', record.id]);
+    } finally {
+      await client.end();
+    }
+    expect(await store.validate()).toMatchObject({
+      valid: true,
+      records: 1,
+      cache: { outcome: 'rebuilt', evidence: 'canonical_snapshot_rebuild_verified' },
+    });
+    expect(await store.search({ query: 'Validate me' })).toHaveLength(1);
+  });
+
+  it('repairs stale search text before ranking', async () => {
+    const record = await store.store(fact('Search repair'));
+    const client = new pg.Client({ connectionString });
+    await client.connect();
+    try {
+      await client.query(`UPDATE memory_records SET search_text = $1 WHERE id = $2`, ['stale text', record.id]);
+    } finally {
+      await client.end();
+    }
+    expect(await store.search({ query: 'Search repair' })).toHaveLength(1);
   });
 
   it('validates integrity and reports the cache checked', async () => {

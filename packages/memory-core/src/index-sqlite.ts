@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, lstatSync, mkdirSync, rmSync } from 'node:fs';
+import { basename, join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { collectSearchResults, searchableText } from './backend/record-helpers.js';
 
@@ -80,7 +80,9 @@ export class SqliteIndex {
 
   /** Opens (creating if needed) the index database inside the memory root. */
   public static open(memoryRoot: string, fileName = 'index.db'): SqliteIndex {
+    assertSafeCacheFileName(fileName);
     const dbPath = join(memoryRoot, fileName);
+    assertCacheArtifactsAreRegular(dbPath);
     let retried = false;
     for (;;) {
       try {
@@ -160,7 +162,8 @@ export class SqliteIndex {
   public isStale(maxAgeMs: number, state: ShardState, filePaths?: readonly string[]): boolean {
     const { canonicalHash: stored, rebuiltAt } = this.meta();
     if (stored === undefined || rebuiltAt === undefined) return true;
-    if (Date.now() - Date.parse(rebuiltAt) > maxAgeMs) return true;
+    const rebuiltAtMs = Date.parse(rebuiltAt);
+    if (!Number.isFinite(rebuiltAtMs) || Date.now() - rebuiltAtMs > maxAgeMs) return true;
     return stored !== canonicalHash(state, filePaths);
   }
 
@@ -240,14 +243,36 @@ export class SqliteIndex {
 
   /** Removes the index file; used by tests and manual cache invalidation. */
   public static destroy(memoryRoot: string, fileName = 'index.db'): void {
+    assertSafeCacheFileName(fileName);
+    const dbPath = join(memoryRoot, fileName);
+    assertCacheArtifactsAreRegular(dbPath);
     for (const suffix of ['', '-wal', '-shm']) {
-      const path = join(memoryRoot, `${fileName}${suffix}`);
+      const path = `${dbPath}${suffix}`;
       if (existsSync(path)) rmSync(path);
     }
   }
 
   public close(): void {
     this.database.close();
+  }
+}
+
+function assertSafeCacheFileName(fileName: string): void {
+  if (!fileName || fileName === '.' || fileName === '..' || fileName !== basename(fileName) || fileName.includes('\\'))
+    throw new MemoryError(`Unsafe memory cache filename: ${fileName}`);
+}
+
+function assertCacheArtifactsAreRegular(dbPath: string): void {
+  for (const suffix of ['', '-wal', '-shm']) {
+    const path = `${dbPath}${suffix}`;
+    let stat;
+    try {
+      stat = lstatSync(path);
+    } catch (error: unknown) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue;
+      throw error;
+    }
+    if (stat.isSymbolicLink() || !stat.isFile()) throw new MemoryError(`Unsafe memory cache artifact: ${path}`);
   }
 }
 
