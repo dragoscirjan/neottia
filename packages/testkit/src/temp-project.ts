@@ -63,10 +63,10 @@ export function createTempProject(options: CreateTempProjectOptions = {}): TempP
  * Seeds canonical memory records directly through the library — deterministic
  * filesystem state that does not depend on an LLM behaving.
  */
-export function seedMemory(project: TempProject, inputs: StoreMemoryInput[]): void {
+export async function seedMemory(project: TempProject, inputs: StoreMemoryInput[]): Promise<void> {
   const config = loadMemoryConfig(project.cwd, { env: {} });
   const store = MemoryStore.fromConfig(config, project.cwd);
-  for (const input of inputs) store.store(input);
+  for (const input of inputs) await store.store(input);
 }
 
 /** Renders a flat config shard as YAML with two-space indentation. */

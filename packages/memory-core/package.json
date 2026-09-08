@@ -36,12 +36,14 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "pg": "^8.23.0",
     "yaml": "^2.9.0",
     "zod": "^4.5.4"
   },
   "devDependencies": {
     "@templ-project/tsconfig": "^0.2.2",
     "@types/node": "^25.0.3",
+    "@types/pg": "^8.23.1",
     "typescript": "^5.9.3",
     "vitest": "^3.2.7"
   }

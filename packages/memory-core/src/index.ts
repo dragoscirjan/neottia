@@ -40,6 +40,7 @@ export { createSecretScanner, looksHighEntropy, scannerOptionsFromConfig } from 
 export { withShardBarrier } from './barrier.js';
 export { SqliteIndex, canonicalHash } from './index-sqlite.js';
 export { FilesystemBackend, RECORD_FOLDERS } from './backend/filesystem.js';
+export { PostgresBackend, resolvePgSettings, type PgConnectionSettings } from './backend/postgres.js';
 export type { NamespaceScope, ShardState, StorageBackend, StorageLimits, StorageReplacement } from './backend/types.js';
 export { MemoryStore } from './store.js';
 export type {

@@ -72,7 +72,7 @@ describe('opencode memory plugin', () => {
 
   it('resolves the store from the plugin context directory', async () => {
     const cwd = fixture();
-    const seeded = MemoryStore.fromConfig(loadMemoryConfig(cwd, { env: {} }), cwd).store({
+    const seeded = await MemoryStore.fromConfig(loadMemoryConfig(cwd, { env: {} }), cwd).store({
       ...FACT,
       summary: 'Seeded before list',
     });
