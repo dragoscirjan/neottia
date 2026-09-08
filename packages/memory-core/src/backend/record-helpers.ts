@@ -117,6 +117,22 @@ export function searchableText(record: MemoryRecord): string {
   return [record.summary, record.details ?? '', record.topic, ...record.tags].join('\n').toLowerCase();
 }
 
+/** Rejects cycles in a supersession graph before it can become canonical. */
+export function assertAcyclic(records: readonly MemoryRecord[]): void {
+  const edges = new Map(records.map((record) => [record.id, record.supersedes]));
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+  const visit = (id: string): void => {
+    if (visiting.has(id)) throw new MemoryError(`Cyclic supersession at ${id}`);
+    if (visited.has(id)) return;
+    visiting.add(id);
+    for (const target of edges.get(id) ?? []) visit(target);
+    visiting.delete(id);
+    visited.add(id);
+  };
+  records.forEach((record) => visit(record.id));
+}
+
 function assertScope(value: { organization_id: string; project_id: string }, scope: NamespaceScope): void {
   if (value.organization_id !== scope.organizationId || value.project_id !== scope.projectId)
     throw new MemoryError('Memory record scope does not match configured project namespace.');

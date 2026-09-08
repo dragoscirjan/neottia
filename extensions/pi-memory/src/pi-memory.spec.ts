@@ -61,6 +61,15 @@ describe('pi memory extension', () => {
       expect(tool.parameters).toBeDefined();
       expect(Object.keys(memoryToolParameters)).toContain(tool.name);
     }
+    const storeSchema = memoryToolParameters.memory_store as {
+      properties: Record<string, { description?: string; minLength?: number }>;
+    };
+    expect(storeSchema.properties.summary.description).toContain('240 Unicode characters');
+    expect(storeSchema.properties.summary.minLength).toBe(1);
+    expect(
+      (memoryToolParameters.memory_search as { properties: Record<string, { description?: string }> }).properties.query
+        .description,
+    ).toContain('UTF-8 bytes');
   });
 
   it('stores a memory in-process through the tool handler', async () => {

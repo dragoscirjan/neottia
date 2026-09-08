@@ -1,4 +1,4 @@
-import { MEMORY_TOOLS, type MemoryToolContext } from '@neottia/memory-core';
+import { closeMemoryToolContext, MEMORY_TOOLS, type MemoryToolContext } from '@neottia/memory-core';
 import { tool, type Plugin } from '@opencode-ai/plugin';
 
 /**
@@ -44,9 +44,14 @@ export function buildMemoryTools(
 export const NeottiaMemoryPlugin: Plugin = async (ctx) => {
   const context: MemoryToolContext = {
     cwd: ctx.directory,
-    interactive: true,
+    // OpenCode has no stable confirmation API in the plugin contract; the
+    // default plugin therefore follows the non-interactive rebuild behavior.
+    interactive: false,
   };
-  return { tool: buildMemoryTools(context, tool) };
+  return {
+    tool: buildMemoryTools(context, tool),
+    dispose: () => closeMemoryToolContext(context),
+  };
 };
 
 export default NeottiaMemoryPlugin;

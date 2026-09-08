@@ -66,21 +66,35 @@ export function opencodeModel(): string {
 }
 
 /**
- * Runs opencode through `npx -y opencode-ai`, so tests never depend on a
- * locally installed binary or version. Auth comes from the user's stored
- * OpenCode credentials or an explicit OPENROUTER_API_KEY.
+ * Uses the configured OpenCode binary and the user's stored credentials or
+ * explicit OPENROUTER_API_KEY. Set NEOTTIA_TEST_OPENCODE_BIN to override PATH.
  */
-export function opencodeReady(): boolean {
-  return openrouterApiKey() !== undefined || hasStoredOpenrouterAuth();
+export function opencodeBin(): string | undefined {
+  return process.env.NEOTTIA_TEST_OPENCODE_BIN || findOnPath('opencode');
+}
+
+export function opencodeReady(opencodePath = opencodeBin()): boolean {
+  return binExists(opencodePath) && (openrouterApiKey() !== undefined || hasStoredOpenrouterAuth());
+}
+
+function storedOpenrouterAuthPath(): string {
+  const dataHome = process.env.XDG_DATA_HOME ?? join(homedir(), '.local', 'share');
+  return join(dataHome, 'opencode', 'auth.json');
 }
 
 function hasStoredOpenrouterAuth(): boolean {
-  const dataHome = process.env.XDG_DATA_HOME ?? join(homedir(), '.local', 'share');
-  const authPath = join(dataHome, 'opencode', 'auth.json');
+  const authPath = storedOpenrouterAuthPath();
   if (!existsSync(authPath)) return false;
   try {
     const auth = JSON.parse(readFileSync(authPath, 'utf8')) as Record<string, unknown>;
-    return 'openrouter' in auth;
+    const provider = auth.openrouter;
+    return (
+      provider !== null &&
+      typeof provider === 'object' &&
+      'key' in provider &&
+      typeof (provider as { key?: unknown }).key === 'string' &&
+      (provider as { key: string }).key.trim().length > 0
+    );
   } catch {
     return false;
   }
@@ -161,21 +175,24 @@ export function runOpencode(options: HarnessRunOptions): HarnessRunResult {
   const { cwd, prompt } = options;
   const model = `openrouter/${options.modelId ?? openrouterModelId()}`;
   const env = withApiKey(options.apiKey);
+  const opencodePath = opencodeBin();
+  if (!opencodePath) return { stdout: '', stderr: 'OpenCode binary not found.', status: 127 };
   if (options.xdgDataDir) {
     // Isolated auth: a fresh auth.json built from the effective key, so a
     // stale stored credential on the host cannot break the run.
     const key = env.OPENROUTER_API_KEY;
+    const authDir = join(options.xdgDataDir, 'opencode');
+    mkdirSync(authDir, { recursive: true, mode: 0o700 });
+    const authPath = join(authDir, 'auth.json');
     if (key) {
-      const authDir = join(options.xdgDataDir, 'opencode');
-      mkdirSync(authDir, { recursive: true, mode: 0o700 });
-      writeFileSync(join(authDir, 'auth.json'), JSON.stringify({ openrouter: { type: 'api', key } }), {
-        mode: 0o600,
-      });
+      writeFileSync(authPath, JSON.stringify({ openrouter: { type: 'api', key } }), { mode: 0o600 });
+    } else if (hasStoredOpenrouterAuth()) {
+      writeFileSync(authPath, readFileSync(storedOpenrouterAuthPath()), { mode: 0o600 });
     }
     env.XDG_DATA_HOME = options.xdgDataDir;
-    if (options.xdgConfigDir) env.XDG_CONFIG_HOME = options.xdgConfigDir;
   }
-  const result = spawnSync('npx', ['-y', 'opencode-ai', 'run', '--model', model, prompt], {
+  if (options.xdgConfigDir) env.XDG_CONFIG_HOME = options.xdgConfigDir;
+  const result = spawnSync(opencodePath, ['run', '--model', model, prompt], {
     cwd,
     encoding: 'utf8',
     timeout: options.timeoutMs ?? 240_000,
@@ -195,6 +212,8 @@ function withApiKey(key?: string): NodeJS.ProcessEnv {
 
 /** Ordered ':free' model ids: preferred candidates first, then the catalog. */
 export function freeModelFallbackIds(): string[] {
+  const override = process.env.NEOTTIA_TEST_OPENROUTER_MODEL;
+  if (override) return [override];
   const catalog = fetchCatalog()
     .map((model) => model.id)
     .filter((id) => id.endsWith(':free'));
@@ -203,7 +222,9 @@ export function freeModelFallbackIds(): string[] {
 }
 
 export function isTransientModelError(result: HarnessRunResult): boolean {
-  return /429|rate.?limit|temporarily rate-limited/iu.test(result.stderr + result.stdout);
+  return /429|rate.?limit|temporarily|overloaded|upstream error|EHOSTUNREACH|connection refused/iu.test(
+    result.stderr + result.stdout,
+  );
 }
 
 /**
@@ -217,12 +238,14 @@ export function runOpencodeWithModelFallback(
 ): { result: HarnessRunResult; modelId: string } {
   const ids = freeModelFallbackIds().slice(0, attempts);
   if (ids.length === 0) throw new Error('No free OpenRouter models available for the harness fallback.');
-  let last: HarnessRunResult = runOpencode({ ...options, modelId: ids[0] as string });
-  for (const modelId of ids.slice(1)) {
+  let modelId = ids[0] as string;
+  let last: HarnessRunResult = runOpencode({ ...options, modelId });
+  for (const candidate of ids.slice(1)) {
     if (last.status === 0 || !isTransientModelError(last)) return { result: last, modelId };
+    modelId = candidate;
     last = runOpencode({ ...options, modelId });
   }
-  return { result: last, modelId: ids.at(-1) as string };
+  return { result: last, modelId };
 }
 
 /** pi variant of {@link runOpencodeWithModelFallback}. */
@@ -232,12 +255,14 @@ export function runPiWithModelFallback(
 ): { result: HarnessRunResult; modelId: string } {
   const ids = freeModelFallbackIds().slice(0, attempts);
   if (ids.length === 0) throw new Error('No free OpenRouter models available for the harness fallback.');
-  let last: HarnessRunResult = runPi({ ...options, modelId: ids[0] as string });
-  for (const modelId of ids.slice(1)) {
+  let modelId = ids[0] as string;
+  let last: HarnessRunResult = runPi({ ...options, modelId });
+  for (const candidate of ids.slice(1)) {
     if (last.status === 0 || !isTransientModelError(last)) return { result: last, modelId };
+    modelId = candidate;
     last = runPi({ ...options, modelId });
   }
-  return { result: last, modelId: ids.at(-1) as string };
+  return { result: last, modelId };
 }
 
 /** Throws with a tail of stderr when a harness run failed. */

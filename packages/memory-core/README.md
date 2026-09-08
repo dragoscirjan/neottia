@@ -41,7 +41,7 @@ Part of the [Neottia](https://github.com/dragoscirjan/neottia) SDLC. The configu
 
 ```bash
 pnpm add @neottia/memory-core
-# or: npm install @neottia/memory-core
+# Install with pnpm; this project standardizes on pnpm.
 ```
 
 ## Quick start
@@ -60,7 +60,7 @@ const config = loadMemoryConfig(process.cwd(), {
 const store = MemoryStore.fromConfig(config, process.cwd());
 
 // 3. Remember something.
-const record = store.store({
+const record = await store.store({
   memory_type: "semantic", // what kind of knowledge
   record_type: "fact", // must pair with memory_type (see below)
   summary: "The site is deployed with pnpm, never npm",
@@ -73,18 +73,18 @@ const record = store.store({
 });
 
 // 4. Retrieve it.
-store.get(record.id); // by ULID
-store.list({ topic: "tooling" }); // newest first
+await store.get(record.id); // by ULID
+await store.list({ topic: "tooling" }); // newest first
 await store.search({ query: "deploy packaging" }); // BM25-ranked
 
 // 5. Correct it later (the old record stays, referenced and inactive).
-store.supersede(record.id, {
+await store.supersede(record.id, {
   ...fact,
   summary: "The site is deployed with pnpm; npm is blocked via packageManager",
 });
 
 // 6. Or retire it entirely (a tombstone is written; nothing is deleted).
-store.delete(record.id, "No longer applicable", record.source, "agent:pi");
+await store.delete(record.id, "No longer applicable", record.source, "agent:pi");
 ```
 
 Without any configuration file this works because the overrides above enable it. Without overrides, memory is **disabled by default** — see [Configuration](#configuration).
@@ -199,7 +199,7 @@ skills:
   memory:
     enabled: true
     root: .neottia/memory
-    backend: filesystem # 'postgres' is planned (neottia#6) and rejected for now
+    backend: filesystem # or postgres for a shared PostgreSQL memory store
     namespace:
       organization_id: acme
       project_id: website
@@ -246,16 +246,15 @@ All environment variables are optional. Booleans accept `true/false/1/0`; intege
 | `NEOTTIA_MEMORY_DB_PG_USER`                   | `memory.provider.db.pg.user` fallback     | —                     |
 | `NEOTTIA_MEMORY_DB_PG_PASSWORD`               | `memory.provider.db.pg.password` fallback | —                     |
 
-Postgres connection settings (`NEOTTIA_MEMORY_DB_PG_HOST`, `..._PORT`, `..._DATABASE`, `..._SSL`) are accepted but unused until the Postgres backend ships; `backend: postgres` is rejected with a clear error meanwhile.
+Postgres connection settings (`NEOTTIA_MEMORY_DB_PG_HOST`, `..._PORT`, `..._DATABASE`, `..._SSL`) configure the PostgreSQL backend. The backend creates or migrates its scoped tables on first use; run the PostgreSQL integration checks against a disposable database before production rollout.
 
 ### Credentials
 
-`provider.db.pg.user` and `provider.db.pg.password` may **never** be literal in the config file. They are either:
+`provider.db.pg.user` and `provider.db.pg.password` may be literal values or `${ENV_VAR}` references:
 
 - omitted — then the default env vars above are used, or
 - a reference: `user: "${PG_USER}"` — expanded from the environment at load time; a missing variable fails with a named error.
-
-Literal credentials are rejected by the schema before anything else runs.
+- a literal: `user: memory_user` — passed through unchanged.
 
 ## API
 
@@ -299,15 +298,15 @@ The store enforces `enabled: true` itself: with memory disabled, every operation
 
 | Operation   | Signature                                                                                                                 | Notes                                                                                                                                                                  |
 | ----------- | ------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `store`     | `store(input: StoreMemoryInput): MemoryRecord`                                                                            | Creates an active record; fails on duplicate identity, invalid type pairing, secrets, or compactness violations                                                        |
-| `supersede` | `supersede(targetId: string, input: StoreMemoryInput): MemoryRecord`                                                      | Target must be active; new record references it via `supersedes`                                                                                                       |
-| `delete`    | `delete(targetId: string, reason: string, source: MemorySource, createdBy: string): MemoryTombstone`                      | Writes a tombstone; the target becomes inactive                                                                                                                        |
-| `get`       | `get(id: string): MemoryRecord \| MemoryTombstone`                                                                        | Exact ULID; throws when not found                                                                                                                                      |
-| `list`      | `list(input?: { topic?, memory_type?, limit?, include_superseded? }): MemoryRecord[]`                                     | Newest first; bounded by `limit` (1–100)                                                                                                                               |
+| `store`     | `async store(input: StoreMemoryInput): Promise<MemoryRecord>`                                                             | Creates an active record; fails on duplicate identity, invalid type pairing, secrets, or compactness violations                                                        |
+| `supersede` | `async supersede(targetId: string, input: StoreMemoryInput): Promise<MemoryRecord>`                                       | Target must be active; new record references it via `supersedes`                                                                                                       |
+| `delete`    | `async delete(targetId: string, reason: string, source: MemorySource, createdBy: string): Promise<MemoryTombstone>`       | Writes a tombstone; the target becomes inactive                                                                                                                        |
+| `get`       | `async get(id: string): Promise<MemoryRecord \| MemoryTombstone>`                                                         | Exact ULID; throws when not found                                                                                                                                      |
+| `list`      | `async list(input?: { topic?, memory_type?, limit?, include_superseded? }): Promise<MemoryRecord[]>`                      | Newest first; bounded by `limit` (1–100)                                                                                                                               |
 | `search`    | `async search(input?: { query, topic?, memory_type?, limit?, max_chars?, include_superseded? }): Promise<MemoryRecord[]>` | BM25-ranked (see below)                                                                                                                                                |
-| `validate`  | `validate(): MemoryValidationReport`                                                                                      | Re-reads and validates every canonical file; checks or rebuilds the cache. Never throws; returns `{ valid, records, tombstones, errors, cache }`                       |
-| `export`    | `export(): string`                                                                                                        | All records + tombstones as JSONL (one document per line)                                                                                                              |
-| `import`    | `import(content: string, preview?: boolean): ImportReport`                                                                | JSONL in. `preview: true` validates only — no writes, no lock contention on failure. Duplicate IDs, broken references, cycles, and compactness violations are rejected |
+| `validate`  | `async validate(): Promise<MemoryValidationReport>`                                                                       | Re-reads and validates every canonical file; checks or rebuilds the cache. Never throws; returns `{ valid, records, tombstones, errors, cache }`                       |
+| `export`    | `async export(): Promise<string>`                                                                                         | All records + tombstones as JSONL (one document per line)                                                                                                              |
+| `import`    | `async import(content: string, preview?: boolean): Promise<ImportReport>`                                                 | JSONL in. `preview: true` validates only — no writes, no lock contention on failure. Duplicate IDs, broken references, cycles, and compactness violations are rejected |
 
 `StoreMemoryInput`:
 
@@ -347,8 +346,8 @@ Each tool has a Zod input schema (`MEMORY_TOOLS` / `findMemoryTool(name)` / the 
 {
   "mcpServers": {
     "memory": {
-      "command": "npx",
-      "args": ["-y", "@neottia/memory-mcp"],
+      "command": "pnpm",
+      "args": ["dlx", "@neottia/memory-mcp"],
       "env": { "NEOTTIA_MEMORY_ENABLED": "true", "NEOTTIA_MEMORY_NAMESPACE_PROJECT_ID": "my-project" }
     }
   }
@@ -382,16 +381,16 @@ Each tool has a Zod input schema (`MEMORY_TOOLS` / `findMemoryTool(name)` / the 
 
 ## Troubleshooting
 
-| Symptom                                                | Cause                                  | Fix                                                                                                |
-| ------------------------------------------------------ | -------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `Memory operation requires skills.memory.enabled=true` | Memory is off                          | Set `skills.memory.enabled: true` or `NEOTTIA_MEMORY_ENABLED=true`                                 |
-| `Config requires an explicit 'version: 1'`             | Config file missing the version key    | Add `version: 1` at the top                                                                        |
-| `Memory backend 'postgres' is not implemented yet`     | Postgres backend not shipped           | Use `filesystem` (track [neottia#6](https://github.com/dragoscirjan/neottia/issues/6))             |
-| `summary has N Unicode characters; limit is 240`       | Compactness violation                  | Shorten `summary` (or `details`: 2000 chars / 12 lines)                                            |
-| `Suspected secret at …`                                | Secret scanner match                   | Remove the secret; adjust `security.secret_patterns` / entropy heuristic if it is a false positive |
-| `Shard barrier is busy`                                | Concurrent writer held the lock > 10 s | Retry; check for stuck processes (a live owner is never stolen)                                    |
-| `Memory cache is stale and cache.stale_policy is fail` | Read refused on stale index            | Run `memory_validate`, or change the policy                                                        |
-| Search returns nothing for known content               | Index stale or corrupt                 | `memory_validate` (it rebuilds), or delete `index.db`                                              |
+| Symptom                                                | Cause                                                | Fix                                                                                                |
+| ------------------------------------------------------ | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `Memory operation requires skills.memory.enabled=true` | Memory is off                                        | Set `skills.memory.enabled: true` or `NEOTTIA_MEMORY_ENABLED=true`                                 |
+| `Config requires an explicit 'version: 1'`             | Config file missing the version key                  | Add `version: 1` at the top                                                                        |
+| `Memory backend 'postgres' connection failed`          | PostgreSQL is unavailable or credentials are invalid | Verify host, port, database, and credentials; retry when the database is reachable                 |
+| `summary has N Unicode characters; limit is 240`       | Compactness violation                                | Shorten `summary` (or `details`: 2000 chars / 12 lines)                                            |
+| `Suspected secret at …`                                | Secret scanner match                                 | Remove the secret; adjust `security.secret_patterns` / entropy heuristic if it is a false positive |
+| `Shard barrier is busy`                                | Concurrent writer held the lock > 10 s               | Retry; check for stuck processes (a live owner is never stolen)                                    |
+| `Memory cache is stale and cache.stale_policy is fail` | Read refused on stale index                          | Run `memory_validate`, or change the policy                                                        |
+| Search returns nothing for known content               | Index stale or corrupt                               | `memory_validate` (it rebuilds), or delete `index.db`                                              |
 
 ## License
 

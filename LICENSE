@@ -8,6 +8,10 @@ license files are authoritative for distributed package contents:
 | Package | License |
 | --- | --- |
 | `@neottia/core` | MIT (`packages/core/LICENSE`) |
+| `@neottia/memory-core` | MIT (`packages/memory-core/LICENSE`) |
+| `@neottia/memory-mcp` | MIT (`packages/memory-mcp/LICENSE`) |
+| `@neottia/opencode-memory` | MIT (`extensions/opencode-memory/LICENSE`) |
+| `@neottia/pi-memory` | MIT (`extensions/pi-memory/LICENSE`) |
 | `@neottia/release` | MIT (`packages/release/LICENSE`) |
 
 Copyright (c) 2025 Templ Project applies to portions bootstrapped from the

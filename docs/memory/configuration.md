@@ -9,7 +9,7 @@ Memory is configured through a **shard**: the `skills.memory` section of the pro
 | Config file              | `NEOTTIA_CONFIG_FILE` → `NEOTTIA_MEMORY_CONFIG_FILE` → `<project>/.neottia/config.yml` | The project config file |
 | Memory section inside it | `NEOTTIA_CONFIG_MEMORY_PATH`                                                           | `skills.memory`         |
 
-The file must start with `version: 1`. Sections belonging to other modules are ignored by memory.
+The file must start with `version: 1`. Sections belonging to other modules are ignored by memory. A generated [JSON Schema](https://github.com/dragoscirjan/neottia/blob/main/packages/memory-core/config.schema.json) is included with `@neottia/memory-core` for editor completion and CI validation.
 
 ## Minimal setup
 
@@ -32,7 +32,7 @@ skills:
     enabled: true # master switch; every operation refuses to run while false
     root: .neottia/memory # where memory files (and the index) are stored, relative to the project
 
-    backend: filesystem # 'postgres' is planned (neottia#6) and rejected for now
+    backend: filesystem # or postgres for a shared PostgreSQL memory store
 
     namespace: # identity of this memory shard
       organization_id: acme # who owns the project
@@ -70,40 +70,42 @@ code override (library users)  >  environment variable  >  config file  >  defau
 
 All optional. Booleans accept `true/false/1/0`; integers accept plain digits. An invalid value fails with the variable name in the message.
 
-| Variable                                                              | Sets                                                 | Default                                   |
-| --------------------------------------------------------------------- | ---------------------------------------------------- | ----------------------------------------- |
-| `NEOTTIA_CONFIG_FILE`                                                 | Location of the config file                          | —                                         |
-| `NEOTTIA_MEMORY_CONFIG_FILE`                                          | Fallback location                                    | `.neottia/config.yml`                     |
-| `NEOTTIA_CONFIG_MEMORY_PATH`                                          | Section path inside the config object                | `skills.memory`                           |
-| `NEOTTIA_MEMORY_ENABLED`                                              | `enabled`                                            | `false`                                   |
-| `NEOTTIA_MEMORY_ROOT`                                                 | `root`                                               | `.neottia/memory`                         |
-| `NEOTTIA_MEMORY_BACKEND`                                              | `backend`                                            | `filesystem`                              |
-| `NEOTTIA_MEMORY_NAMESPACE_ORGANIZATION_ID`                            | `namespace.organization_id`                          | `local`                                   |
-| `NEOTTIA_MEMORY_NAMESPACE_PROJECT_ID`                                 | `namespace.project_id`                               | `project`                                 |
-| `NEOTTIA_MEMORY_NAMESPACE_DEFAULT_TOPIC`                              | `namespace.default_topic`                            | `general`                                 |
-| `NEOTTIA_MEMORY_NAMESPACE_SCOPE`                                      | `namespace.scope`                                    | `global`                                  |
-| `NEOTTIA_MEMORY_RETRIEVAL_LIMIT`                                      | `retrieval.limit`                                    | `8`                                       |
-| `NEOTTIA_MEMORY_RETRIEVAL_MAX_CHARS`                                  | `retrieval.max_chars`                                | `12000`                                   |
-| `NEOTTIA_MEMORY_RETRIEVAL_INCLUDE_SUPERSEDED`                         | `retrieval.include_superseded`                       | `false`                                   |
-| `NEOTTIA_MEMORY_CACHE_MAX_AGE_MS`                                     | `cache.max_age_ms`                                   | `300000`                                  |
-| `NEOTTIA_MEMORY_CACHE_STALE_POLICY`                                   | `cache.stale_policy`                                 | `prompt`                                  |
-| `NEOTTIA_MEMORY_SECURITY_ENTROPY_HEURISTIC`                           | `security.entropy_heuristic`                         | `true`                                    |
-| `NEOTTIA_MEMORY_DB_PG_USER`                                           | Postgres user fallback                               | —                                         |
-| `NEOTTIA_MEMORY_DB_PG_PASSWORD`                                       | Postgres password fallback                           | —                                         |
-| `NEOTTIA_MEMORY_DB_PG_HOST` / `..._PORT` / `..._DATABASE` / `..._SSL` | Postgres connection (unused until the backend ships) | `localhost` / `5432` / `neottia` / `true` |
+| Variable                                                              | Sets                                  | Default                                   |
+| --------------------------------------------------------------------- | ------------------------------------- | ----------------------------------------- |
+| `NEOTTIA_CONFIG_FILE`                                                 | Location of the config file           | —                                         |
+| `NEOTTIA_MEMORY_CONFIG_FILE`                                          | Fallback location                     | `.neottia/config.yml`                     |
+| `NEOTTIA_CONFIG_MEMORY_PATH`                                          | Section path inside the config object | `skills.memory`                           |
+| `NEOTTIA_MEMORY_ENABLED`                                              | `enabled`                             | `false`                                   |
+| `NEOTTIA_MEMORY_ROOT`                                                 | `root`                                | `.neottia/memory`                         |
+| `NEOTTIA_MEMORY_BACKEND`                                              | `backend`                             | `filesystem`                              |
+| `NEOTTIA_MEMORY_NAMESPACE_ORGANIZATION_ID`                            | `namespace.organization_id`           | `local`                                   |
+| `NEOTTIA_MEMORY_NAMESPACE_PROJECT_ID`                                 | `namespace.project_id`                | `project`                                 |
+| `NEOTTIA_MEMORY_NAMESPACE_DEFAULT_TOPIC`                              | `namespace.default_topic`             | `general`                                 |
+| `NEOTTIA_MEMORY_NAMESPACE_SCOPE`                                      | `namespace.scope`                     | `global`                                  |
+| `NEOTTIA_MEMORY_RETRIEVAL_LIMIT`                                      | `retrieval.limit`                     | `8`                                       |
+| `NEOTTIA_MEMORY_RETRIEVAL_MAX_CHARS`                                  | `retrieval.max_chars`                 | `12000`                                   |
+| `NEOTTIA_MEMORY_RETRIEVAL_INCLUDE_SUPERSEDED`                         | `retrieval.include_superseded`        | `false`                                   |
+| `NEOTTIA_MEMORY_CACHE_MAX_AGE_MS`                                     | `cache.max_age_ms`                    | `300000`                                  |
+| `NEOTTIA_MEMORY_CACHE_STALE_POLICY`                                   | `cache.stale_policy`                  | `prompt`                                  |
+| `NEOTTIA_MEMORY_SECURITY_ENTROPY_HEURISTIC`                           | `security.entropy_heuristic`          | `true`                                    |
+| `NEOTTIA_MEMORY_DB_PG_USER`                                           | Postgres user fallback                | —                                         |
+| `NEOTTIA_MEMORY_DB_PG_PASSWORD`                                       | Postgres password fallback            | —                                         |
+| `NEOTTIA_MEMORY_DB_PG_HOST` / `..._PORT` / `..._DATABASE` / `..._SSL` | Postgres connection settings          | `localhost` / `5432` / `neottia` / `true` |
+
+Environment bindings intentionally cover scalar leaves only. Configure `security.secret_patterns` and all `security.limits` in YAML or through code overrides because arrays and structured values are not safely represented by one environment variable.
 
 ## Cache policy
 
 The search index is rebuilt automatically from the YAML files when its content hash no longer matches, or when it is older than `max_age_ms`. `stale_policy` decides what _stale_ means for reads:
 
-| Policy    | Behavior                                                                                                        | Best for                  |
-| --------- | --------------------------------------------------------------------------------------------------------------- | ------------------------- |
-| `prompt`  | The host asks you before rebuilding; in-process extensions can prompt, MCP servers and scripts silently rebuild | Interactive use (default) |
-| `rebuild` | Rebuild immediately, no questions                                                                               | MCP servers, automation   |
-| `fail`    | Refuse the read with a clear error until `memory_validate` runs                                                 | CI, strict environments   |
+| Policy    | Behavior                                                                                                             | Best for                         |
+| --------- | -------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
+| `prompt`  | A host-provided callback decides before rebuilding; without one, in-process plugins and MCP servers silently rebuild | Interactive embeddings (default) |
+| `rebuild` | Rebuild immediately, no questions                                                                                    | MCP servers, automation          |
+| `fail`    | Refuse the read with a clear error until `memory_validate` runs                                                      | CI, strict environments          |
 
 Deleting `index.db` manually is always safe; it is rebuilt from the YAML files.
 
 ## Workspaces and branches
 
-Each git worktree has its own `root` directory, so two branches never overwrite each other's memories. For a shared, cross-machine memory, set an explicit absolute `root` or wait for the Postgres backend — either way the `scope` namespace key separates branches that share storage.
+Each git worktree has its own `root` directory, so two branches never overwrite each other's filesystem memories. For a shared, cross-machine memory, select `backend: postgres`; PostgreSQL separates records by organization, project, and scope.

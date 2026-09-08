@@ -12,7 +12,7 @@ Internal test infrastructure for Neottia: temp-project fixtures, MCP config writ
 | `seedMemory(project, inputs)`                                                  | Seed canonical memory records deterministically through `@neottia/memory-core` (no LLM involved)                           |
 | `writeOpencodeMcpConfig` / `writeMcpServersJsonFile` / `writeServersMcpConfig` | MCP server declarations in each harness's verified format                                                                  |
 | `ensureMemoryDistBuilt()`                                                      | Builds `@neottia/memory-core` and `@neottia/memory-mcp` dist output on demand (harnesses spawn the compiled `dist/cli.js`) |
-| `runOpencode(options)`                                                         | Runs `npx -y opencode-ai run` against a temp project with an isolated XDG environment and a free OpenRouter model          |
+| `runOpencode(options)`                                                         | Runs the configured OpenCode binary against a temp project with an isolated XDG environment and a free OpenRouter model    |
 | `opencodeReady()` / `openrouterModelId()`                                      | Test gating (stored OpenCode auth or `OPENROUTER_API_KEY`) and free-model selection                                        |
 
 ## Running the harness integration tests
@@ -34,7 +34,7 @@ Harness tests spawn real AI harnesses, which write state everywhere. The fixture
 | `XDG_DATA_HOME` → `<project>/.xdg-data`     | OpenCode auth.json and logs; a fresh `auth.json` is written from the effective key so a stale stored credential cannot break the run                                                                                         |
 | `XDG_CONFIG_HOME` → `<project>/.xdg-config` | A minimal global config — otherwise the user's global plugins and MCP servers leak in and can **shadow our tool names** (this exact failure mode: a global `memory_search` from another MCP server answered instead of ours) |
 | `cwd` → `<project>`                         | Memory files and harness session data land in the temp tree                                                                                                                                                                  |
-| `opencode.json` in the project              | Registers the memory MCP server via `node <repo>/packages/memory-mcp/dist/cli.js` (never `npx`, so unpublished local code is tested)                                                                                         |
+| `opencode.json` in the project              | Registers the memory MCP server via `node <repo>/packages/memory-mcp/dist/cli.js` (so unpublished local code is tested)                                                                                                      |
 
 ## Gotchas learned the hard way
 

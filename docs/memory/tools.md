@@ -10,8 +10,8 @@ Add `@neottia/memory-mcp` to any harness that supports MCP:
 {
   "mcpServers": {
     "memory": {
-      "command": "npx",
-      "args": ["-y", "@neottia/memory-mcp"],
+      "command": "pnpm",
+      "args": ["dlx", "@neottia/memory-mcp"],
       "env": {
         "NEOTTIA_MEMORY_ENABLED": "true",
         "NEOTTIA_MEMORY_NAMESPACE_ORGANIZATION_ID": "acme",
@@ -50,7 +50,9 @@ Every tool input is validated by a Zod schema before it reaches the store:
 - unknown keys are rejected,
 - IDs must be Crockford ULIDs,
 - enums are enforced (`memory_type`, `record_type`, `confidence`, `source.kind`),
-- numeric ranges are enforced (`limit` 1–100, `max_chars` 256–100000).
+- numeric ranges are enforced (`limit` 1–100, `max_chars` 256–100000),
+- mutation text is compact (`summary` max 240 Unicode characters; `details` max 2000 characters and 12 non-empty lines),
+- query and import payloads are bounded at 16 KiB and 64 MiB respectively.
 
 The same schemas generate the `tools/list` JSON Schema that MCP clients display, so what a client sees is exactly what the store accepts.
 

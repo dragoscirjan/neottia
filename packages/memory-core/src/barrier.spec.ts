@@ -1,8 +1,8 @@
-import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { MemoryLockError, withShardBarrier } from './index.js';
+import { MemoryLockError, withShardBarrier, withShardBarrierAsync } from './index.js';
 
 const tempDirs: string[] = [];
 
@@ -16,6 +16,54 @@ describe('shard barrier', () => {
     tempDirs.push(root);
     const result = withShardBarrier(root, 'local--project--global', () => 42);
     expect(result).toBe(42);
+  });
+
+  it('holds an async lock until the operation settles and releases it once', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'neottia-barrier-'));
+    tempDirs.push(root);
+    let releaseOperation!: () => void;
+    const operation = withShardBarrierAsync(
+      root,
+      'shard',
+      () =>
+        new Promise<void>((resolve) => {
+          releaseOperation = resolve;
+        }),
+    );
+    await new Promise((resolve) => setImmediate(resolve));
+    await expect(withShardBarrierAsync(root, 'shard', async () => 'blocked', { waitMs: 20 })).rejects.toThrow(
+      MemoryLockError,
+    );
+    releaseOperation();
+    await expect(operation).resolves.toBeUndefined();
+    await expect(withShardBarrierAsync(root, 'shard', async () => 'available')).resolves.toBe('available');
+  });
+
+  it('does not block the event loop while asynchronously waiting for a lock', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'neottia-barrier-'));
+    tempDirs.push(root);
+    const lockPath = join(root, '.locks', 'shard.lock');
+    mkdirSync(lockPath, { recursive: true });
+    writeFileSync(join(lockPath, 'owner'), JSON.stringify({ pid: process.pid }));
+    let timerRan = false;
+    const timer = setTimeout(() => {
+      timerRan = true;
+    }, 0);
+    await expect(withShardBarrierAsync(root, 'shard', async () => 'blocked', { waitMs: 50 })).rejects.toThrow(
+      MemoryLockError,
+    );
+    await new Promise<void>((resolveImmediate) => setImmediate(resolveImmediate));
+    clearTimeout(timer);
+    expect(timerRan).toBe(true);
+  });
+
+  it('rejects a symlinked lock directory', () => {
+    const root = mkdtempSync(join(tmpdir(), 'neottia-barrier-'));
+    tempDirs.push(root);
+    const target = mkdtempSync(join(tmpdir(), 'neottia-barrier-target-'));
+    tempDirs.push(target);
+    symlinkSync(target, join(root, '.locks'), 'dir');
+    expect(() => withShardBarrier(root, 'shard', () => 1)).toThrow(/Unsafe shard barrier directory/u);
   });
 
   it('fails busy when another live process holds the lock, even past the stale window', () => {

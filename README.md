@@ -8,6 +8,8 @@ Neottia provides a shared SDLC that can be understood and used by multiple AI co
 ├── extensions/          # Independently versioned harness extensions
 ├── packages/
 │   ├── core/            # Independently versioned core package
+│   ├── memory-core/     # Canonical memory library and config schema
+│   ├── memory-mcp/      # MCP memory server
 │   └── release/         # Global release bill of materials
 ├── docs/                # User documentation for VitePress
 ├── .changeset/          # Module release declarations
@@ -59,6 +61,10 @@ mise run release:global -- 1.0.0
 ```
 
 This updates `packages/release/package.json` and `packages/release/release-manifest.json`. The published `@neottia/release` package converts exact `workspace:` references into exact registry versions, making the global release reproducible.
+
+## Memory
+
+Install `@neottia/memory-core` for the library, `@neottia/memory-mcp` for an MCP server, or the `@neottia/pi-memory` / `@neottia/opencode-memory` extensions for in-process harness tools. Configure the `skills.memory` shard in `.neottia/config.yml`; the user-facing setup and operations guide is [here](docs/memory/).
 
 ## Documentation
 

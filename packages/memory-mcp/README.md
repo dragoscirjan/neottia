@@ -31,7 +31,7 @@ Memory itself is stored as reviewable YAML files inside your project (git-diffab
 The fastest test with no project configuration at all:
 
 ```bash
-NEOTTIA_MEMORY_ENABLED=true npx -y @neottia/memory-mcp
+NEOTTIA_MEMORY_ENABLED=true pnpm dlx @neottia/memory-mcp
 ```
 
 The server speaks MCP over stdio. Point your harness at it (examples below), then ask your agent:
@@ -52,7 +52,7 @@ Project scope — `.mcp.json` at the repository root (shared with the team throu
 {
   "mcpServers": {
     "memory": {
-      "command": "npx",
+      "command": "pnpm",
       "args": ["-y", "@neottia/memory-mcp"],
       "env": {
         "NEOTTIA_MEMORY_ENABLED": "true",
@@ -74,7 +74,7 @@ Project scope — `.mcp.json` at the repository root (shared with the team throu
   "mcp": {
     "memory": {
       "type": "local",
-      "command": ["npx", "-y", "@neottia/memory-mcp"],
+      "command": ["pnpm", "dlx", "@neottia/memory-mcp"],
       "environment": {
         "NEOTTIA_MEMORY_ENABLED": "true",
         "NEOTTIA_MEMORY_NAMESPACE_PROJECT_ID": "website"
@@ -93,7 +93,7 @@ Project scope — `.mcp.json` at the repository root (shared with the team throu
 {
   "mcpServers": {
     "memory": {
-      "command": "npx",
+      "command": "pnpm",
       "args": ["-y", "@neottia/memory-mcp"],
       "env": {
         "NEOTTIA_MEMORY_ENABLED": "true",
@@ -110,8 +110,8 @@ Project scope — `.mcp.json` at the repository root (shared with the team throu
 
 ```toml
 [mcp_servers.memory]
-command = "npx"
-args = ["-y", "@neottia/memory-mcp"]
+command = "pnpm"
+args = ["dlx", "@neottia/memory-mcp"]
 
 [mcp_servers.memory.env]
 NEOTTIA_MEMORY_ENABLED = "true"
@@ -126,7 +126,7 @@ NEOTTIA_MEMORY_NAMESPACE_PROJECT_ID = "website"
 {
   "mcpServers": {
     "memory": {
-      "command": "npx",
+      "command": "pnpm",
       "args": ["-y", "@neottia/memory-mcp"],
       "env": {
         "NEOTTIA_MEMORY_ENABLED": "true",
@@ -146,7 +146,7 @@ NEOTTIA_MEMORY_NAMESPACE_PROJECT_ID = "website"
 {
   "servers": {
     "memory": {
-      "command": "npx",
+      "command": "pnpm",
       "args": ["-y", "@neottia/memory-mcp"],
       "env": {
         "NEOTTIA_MEMORY_ENABLED": "true",

@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -10,8 +10,10 @@ import {
   MEMORY_CONFIG_FILE_ENV,
   MEMORY_SHARD_PATH_ENV,
   ConfigError,
+  memoryConfigSchema,
   loadMemoryConfig,
   resolveConfigFile,
+  resolvePgSettings,
   resolveShardPath,
 } from './index.js';
 
@@ -141,7 +143,7 @@ describe('memory config shard', () => {
     }
   });
 
-  it('accepts ${VAR} credential references but rejects literal credentials', () => {
+  it('expands ${VAR} credential references and preserves literal credentials', () => {
     const cwd = fixture();
     try {
       const referenced = loadMemoryConfig(cwd, {
@@ -152,15 +154,33 @@ describe('memory config shard', () => {
       expect(referenced.provider.db.pg.user).toBe('memory_user');
       expect(referenced.provider.db.pg.password).toBe('memory_password');
 
-      expect(() =>
-        loadMemoryConfig(cwd, {
-          backend: 'postgres',
-          provider: { db: { pg: { user: 'literal-user' } } },
-        }),
-      ).toThrow(ConfigError);
+      const literal = loadMemoryConfig(cwd, {
+        backend: 'postgres',
+        provider: { db: { pg: { user: 'literal-user' } } },
+      });
+      expect(literal.provider.db.pg.user).toBe('literal-user');
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
+  });
+
+  it('passes resolved credential values to the PostgreSQL backend exactly once', () => {
+    const cwd = fixture();
+    const config = loadMemoryConfig(cwd, {
+      env: { PG_USER: 'memory-user', PG_PASSWORD: 'memory-password' } as NodeJS.ProcessEnv,
+      backend: 'postgres',
+      provider: { db: { pg: { user: '${PG_USER}', password: '${PG_PASSWORD}' } } },
+    });
+    expect(resolvePgSettings(config, {} as NodeJS.ProcessEnv)).toMatchObject({
+      user: 'memory-user',
+      password: 'memory-password',
+    });
+    rmSync(cwd, { recursive: true, force: true });
+  });
+
+  it('publishes a configuration schema generated from the runtime schema', () => {
+    const published = JSON.parse(readFileSync(new URL('../config.schema.json', import.meta.url), 'utf8')) as unknown;
+    expect(published).toEqual(memoryConfigSchema.toJSONSchema({ io: 'input' }));
   });
 
   it('falls back to credential default env vars and fails on unset ${VAR} references', () => {

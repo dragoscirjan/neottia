@@ -88,6 +88,9 @@ export interface StorageBackend {
   ): MemoryTombstone;
   /** Enforces write-time summary/details compactness. */
   validateCompactness(summary: string, details: string | null | undefined, context: string): void;
+  /** Validates imported documents against this backend's namespace and security policy. */
+  validateRecord(value: unknown, label?: string): MemoryRecord;
+  validateTombstone(value: unknown, label?: string): MemoryTombstone;
   /** Canonical path for a record (backend namespace). */
   recordPath(record: MemoryRecord): string;
   /** Canonical path for a tombstone (backend namespace). */

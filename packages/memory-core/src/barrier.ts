@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { MemoryLockError } from './errors.js';
 
@@ -32,94 +32,49 @@ interface AcquiredLock {
 }
 
 function acquire(memoryRoot: string, scopeKey: string, options: ShardBarrierOptions): AcquiredLock {
-  const waitMs = clampInteger(options.waitMs ?? DEFAULT_WAIT_MS, 0, MAX_WAIT_MS, 'waitMs');
-  const staleMs = clampInteger(options.staleMs ?? DEFAULT_STALE_MS, 1, Number.MAX_SAFE_INTEGER, 'staleMs');
-  const pollMs = clampInteger(options.pollMs ?? DEFAULT_POLL_MS, 1, 1_000, 'pollMs');
+  const { lockPath, waitMs, staleMs, pollMs } = prepareAcquire(memoryRoot, scopeKey, options);
+  const lockDirectory = dirname(lockPath);
+  mkdirSync(lockDirectory, { recursive: true, mode: 0o700 });
+  assertSafeDirectory(lockDirectory);
 
-  // The lock file name is sanitized: namespace components come from config
-  // and must never turn into path traversal or nested directories.
-  const lockPath = resolve(join(memoryRoot, '.locks'), `${sanitizeLockName(scopeKey)}.lock`);
   if (activeLocks.has(lockPath)) throw new MemoryLockError(`Shard barrier is non-reentrant: ${scopeKey}`);
-
-  mkdirSync(dirname(lockPath), { recursive: true, mode: 0o700 });
   const deadline = Date.now() + waitMs;
   for (;;) {
     try {
       mkdirSync(lockPath, { mode: 0o700 });
-      break;
-    } catch (error: unknown) {
-      if (!isCode(error, 'EEXIST')) throw new MemoryLockError(`Cannot acquire shard barrier: ${scopeKey}`);
-      if (isAbandoned(lockPath, staleMs)) {
+      if (hasActiveClaim(lockPath, staleMs)) {
         rmSync(lockPath, { recursive: true, force: true });
         continue;
       }
+      break;
+    } catch (error: unknown) {
+      if (!isCode(error, 'EEXIST')) throw new MemoryLockError(`Cannot acquire shard barrier: ${scopeKey}`);
+      if (claimAbandoned(lockPath, staleMs)) continue;
+      if (hasActiveClaim(lockPath, staleMs)) {
+        if (Date.now() >= deadline) throw new MemoryLockError(`Shard barrier is busy: ${scopeKey}`);
+        sleep(pollMs);
+        continue;
+      }
       if (Date.now() >= deadline) throw new MemoryLockError(`Shard barrier is busy: ${scopeKey}`);
-      sleep(pollMs);
     }
   }
 
-  activeLocks.add(lockPath);
-  const release = (): void => {
-    activeLocks.delete(lockPath);
-    try {
-      rmSync(lockPath, { recursive: true, force: true });
-    } catch {
-      // Fail closed: a release failure intentionally leaves the lock behind
-      // so the next acquirer can detect and steal it once stale.
-    }
-  };
-  try {
-    writeFileSync(join(lockPath, 'owner'), JSON.stringify({ pid: process.pid, acquiredAt: new Date().toISOString() }), {
-      mode: 0o600,
-    });
-    return { lease: { lockPath }, release };
-  } catch (error: unknown) {
-    release();
-    throw error;
-  }
-}
-
-function runOperation<T>(
-  operation: (lease: ShardLease) => T | Promise<T>,
-  lease: ShardLease,
-  release: () => void,
-): T | Promise<T> {
-  try {
-    const result = operation(lease);
-    if (result instanceof Promise) {
-      return result.then(
-        (value) => {
-          release();
-          return value;
-        },
-        (error: unknown) => {
-          release();
-          throw error;
-        },
-      );
-    }
-    release();
-    return result;
-  } catch (error: unknown) {
-    release();
-    throw error;
-  }
+  return finishAcquire(lockPath, scopeKey);
 }
 
 /**
  * Runs `operation` while holding the exclusive lock for one memory shard.
- * Synchronous operations complete before returning, so the lock always
- * covers the whole mutation.
+ * Promise-returning callbacks must use withShardBarrierAsync instead.
  */
 export function withShardBarrier<T>(
   memoryRoot: string,
   scopeKey: string,
-  operation: (lease: ShardLease) => T,
+  operation: (lease: ShardLease) => T extends PromiseLike<unknown> ? never : T,
   options: ShardBarrierOptions = {},
 ): T {
   const { lease, release } = acquire(memoryRoot, scopeKey, options);
   try {
-    return runOperation(operation, lease, release) as T;
+    return operation(lease) as T;
   } finally {
     release();
   }
@@ -135,18 +90,137 @@ export async function withShardBarrierAsync<T>(
   operation: (lease: ShardLease) => Promise<T>,
   options: ShardBarrierOptions = {},
 ): Promise<T> {
-  const { lease, release } = acquire(memoryRoot, scopeKey, options);
+  const { lease, release } = await acquireAsync(memoryRoot, scopeKey, options);
   try {
-    return (await runOperation(operation, lease, release)) as T;
+    return await operation(lease);
   } finally {
     release();
   }
 }
 
+async function acquireAsync(memoryRoot: string, scopeKey: string, options: ShardBarrierOptions): Promise<AcquiredLock> {
+  const { lockPath, waitMs, staleMs, pollMs } = prepareAcquire(memoryRoot, scopeKey, options);
+  const lockDirectory = dirname(lockPath);
+  mkdirSync(lockDirectory, { recursive: true, mode: 0o700 });
+  assertSafeDirectory(lockDirectory);
+  if (activeLocks.has(lockPath)) throw new MemoryLockError(`Shard barrier is non-reentrant: ${scopeKey}`);
+
+  const deadline = Date.now() + waitMs;
+  for (;;) {
+    try {
+      mkdirSync(lockPath, { mode: 0o700 });
+      if (hasActiveClaim(lockPath, staleMs)) {
+        rmSync(lockPath, { recursive: true, force: true });
+        continue;
+      }
+      break;
+    } catch (error: unknown) {
+      if (!isCode(error, 'EEXIST')) throw new MemoryLockError(`Cannot acquire shard barrier: ${scopeKey}`);
+      if (claimAbandoned(lockPath, staleMs)) continue;
+      if (hasActiveClaim(lockPath, staleMs)) {
+        if (Date.now() >= deadline) throw new MemoryLockError(`Shard barrier is busy: ${scopeKey}`);
+        await delay(pollMs);
+        continue;
+      }
+      if (Date.now() >= deadline) throw new MemoryLockError(`Shard barrier is busy: ${scopeKey}`);
+    }
+  }
+
+  return finishAcquire(lockPath, scopeKey);
+}
+
 /** Stale AND provably ownerless: mtime aged out and the PID is not alive. */
+function prepareAcquire(
+  memoryRoot: string,
+  scopeKey: string,
+  options: ShardBarrierOptions,
+): { lockPath: string; waitMs: number; staleMs: number; pollMs: number } {
+  const waitMs = clampInteger(options.waitMs ?? DEFAULT_WAIT_MS, 0, MAX_WAIT_MS, 'waitMs');
+  const staleMs = clampInteger(options.staleMs ?? DEFAULT_STALE_MS, 1, Number.MAX_SAFE_INTEGER, 'staleMs');
+  const pollMs = clampInteger(options.pollMs ?? DEFAULT_POLL_MS, 1, 1_000, 'pollMs');
+  const root = resolve(memoryRoot);
+  assertSafeDirectory(root);
+  const lockPath = resolve(join(root, '.locks'), `${sanitizeLockName(scopeKey)}.lock`);
+  return { lockPath, waitMs, staleMs, pollMs };
+}
+
+function finishAcquire(lockPath: string, scopeKey: string): AcquiredLock {
+  activeLocks.add(lockPath);
+  let released = false;
+  const release = (): void => {
+    if (released) return;
+    released = true;
+    activeLocks.delete(lockPath);
+    try {
+      rmSync(lockPath, { recursive: true, force: true });
+    } catch {
+      // Fail closed: a release failure intentionally leaves the lock behind
+      // so the next acquirer can detect and steal it once stale.
+    }
+  };
+  try {
+    writeFileSync(join(lockPath, 'owner'), JSON.stringify({ pid: process.pid, acquiredAt: new Date().toISOString() }), {
+      mode: 0o600,
+    });
+    return { lease: { lockPath }, release };
+  } catch (error: unknown) {
+    release();
+    throw new MemoryLockError(`Cannot initialize shard barrier: ${scopeKey}`);
+  }
+}
+
+function assertSafeDirectory(path: string): void {
+  if (!existsSync(path)) return;
+  const stat = lstatSync(path);
+  if (stat.isSymbolicLink() || !stat.isDirectory())
+    throw new MemoryLockError(`Unsafe shard barrier directory: ${path}`);
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolveDelay) => setTimeout(resolveDelay, ms));
+}
+
+/** Atomically claims and removes a stale lock directory without a TOCTOU delete. */
+function claimAbandoned(lockPath: string, staleMs: number): boolean {
+  const claimPath = `${lockPath}.claim`;
+  try {
+    mkdirSync(claimPath, { mode: 0o700 });
+  } catch (error: unknown) {
+    if (!isCode(error, 'EEXIST')) throw error;
+    return false;
+  }
+  try {
+    // The claim directory blocks new owners while the stale owner is checked
+    // and removed. Contenders honor this marker before creating lockPath.
+    if (!isAbandoned(lockPath, staleMs)) return false;
+    rmSync(lockPath, { recursive: true, force: true });
+    return true;
+  } finally {
+    rmSync(claimPath, { recursive: true, force: true });
+  }
+}
+
+function hasActiveClaim(lockPath: string, staleMs: number): boolean {
+  const claimPath = `${lockPath}.claim`;
+  if (!existsSync(claimPath)) return false;
+  try {
+    const stats = lstatSync(claimPath);
+    if (stats.isSymbolicLink() || !stats.isDirectory()) throw new MemoryLockError(`Unsafe shard claim: ${claimPath}`);
+    if (Date.now() - stats.mtimeMs >= staleMs) {
+      rmSync(claimPath, { recursive: true, force: true });
+      return false;
+    }
+    return true;
+  } catch (error: unknown) {
+    if (isCode(error, 'ENOENT')) return false;
+    throw error;
+  }
+}
+
 function isAbandoned(lockPath: string, staleMs: number): boolean {
   try {
-    const stats = statSync(lockPath);
+    const stats = lstatSync(lockPath);
+    if (stats.isSymbolicLink() || !stats.isDirectory()) return false;
     if (Date.now() - stats.mtimeMs < staleMs) return false;
     const ownerPath = join(lockPath, 'owner');
     // Missing or malformed owner metadata means ownership is UNKNOWN:

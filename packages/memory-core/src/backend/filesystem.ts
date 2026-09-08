@@ -12,12 +12,13 @@ import {
   closeSync,
   fsyncSync,
 } from 'node:fs';
-import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { parseDocument, stringify } from 'yaml';
-import { withShardBarrier } from '../barrier.js';
+import { withShardBarrierAsync } from '../barrier.js';
 import type { MemoryConfig } from '../config.js';
 import { MemoryConflictError, MemoryError } from '../errors.js';
-import { canonicalHash, SqliteIndex } from '../index-sqlite.js';
+import { isUlid } from '../identities.js';
+import { SqliteIndex } from '../index-sqlite.js';
 import type { MemoryRecord, MemoryTombstone, RecordType } from '../schemas.js';
 import { createSecretScanner, type SecretScanner } from '../security.js';
 import {
@@ -26,6 +27,7 @@ import {
   validateCompactness as validateCompactnessHelper,
   validateRecord as validateRecordHelper,
   validateTombstone as validateTombstoneHelper,
+  assertAcyclic,
   type RecordHelperDeps,
 } from './record-helpers.js';
 import type {
@@ -72,6 +74,7 @@ export class FilesystemBackend implements StorageBackend {
 
   public constructor(options: FilesystemBackendOptions) {
     this.root = resolve(options.cwd, options.config.root);
+    assertSafeMemoryRoot(this.root);
     this.cacheMaxAgeMs = options.config.cache.max_age_ms;
     this.stalePolicy = options.config.cache.stale_policy;
     this.onStaleCache = options.onStaleCache;
@@ -119,6 +122,7 @@ export class FilesystemBackend implements StorageBackend {
         track(path);
         const record = this.parseCanonical(path);
         const validated = validateRecordHelper(record, this.helperDeps);
+        this.assertFilenameIdentity(path, validated.id);
         if (validated.record_type !== recordType)
           throw new MemoryError(`Record type does not match folder: ${relative(this.root, path)}`);
         if (ids.has(validated.id)) throw new MemoryError(`Duplicate memory ID: ${validated.id}`);
@@ -132,6 +136,7 @@ export class FilesystemBackend implements StorageBackend {
       track(path);
       const tombstone = this.parseCanonical(path);
       const validatedTombstone = validateTombstoneHelper(tombstone, this.helperDeps);
+      this.assertFilenameIdentity(path, validatedTombstone.id);
       if (ids.has(validatedTombstone.id)) throw new MemoryError(`Duplicate memory ID: ${validatedTombstone.id}`);
       ids.add(validatedTombstone.id);
       tombstones.push(validatedTombstone);
@@ -169,20 +174,32 @@ export class FilesystemBackend implements StorageBackend {
     const ordered = [...replacements].sort((left, right) => left.path.localeCompare(right.path));
     const before = new Map<string, Uint8Array | undefined>();
     const seen = new Set<string>();
-    let retained = 0;
+    let resultingFiles = 0;
+    let resultingBytes = 0;
+    for (const folder of [...Object.values(RECORD_FOLDERS), 'tombstones']) {
+      for (const path of this.yamlFiles(join(this.root, folder))) {
+        resultingFiles += 1;
+        resultingBytes += lstatSync(path).size;
+      }
+    }
 
     for (const replacement of ordered) {
       const absolute = this.managedPath(replacement.path);
+      if (replacement.bytes) this.validateReplacementIdentity(replacement.path, replacement.bytes);
       const key = replacement.path.normalize('NFKC').toLowerCase();
       if (seen.has(key)) throw new MemoryError('Memory batch contains duplicate paths.');
       seen.add(key);
       const previous = existsSync(absolute) ? this.readRegular(absolute) : undefined;
       if (replacement.exclusive && previous)
         throw new MemoryConflictError(`Memory path already exists: ${replacement.path}`);
-      retained += previous?.byteLength ?? 0;
-      if (retained > this.limits.maxTotalBytes) throw new MemoryError('Memory batch before-image limit exceeded.');
+      const nextBytes = replacement.bytes?.byteLength ?? 0;
+      if (nextBytes > this.limits.maxFileBytes) throw new MemoryError(`Memory file exceeds limit: ${replacement.path}`);
+      resultingFiles += previous ? (replacement.bytes ? 0 : -1) : replacement.bytes ? 1 : 0;
+      resultingBytes += nextBytes - (previous?.byteLength ?? 0);
       before.set(replacement.path, previous);
     }
+    if (resultingFiles > this.limits.maxFiles) throw new MemoryError('Memory file limit exceeded.');
+    if (resultingBytes > this.limits.maxTotalBytes) throw new MemoryError('Aggregate memory byte limit exceeded.');
 
     const applied: StorageReplacement[] = [];
     try {
@@ -216,7 +233,7 @@ export class FilesystemBackend implements StorageBackend {
 
   /** {@inheritdoc StorageBackend.withLock} — shard-scoped directory lock. */
   public async withLock<T>(operation: () => Promise<T>): Promise<T> {
-    return withShardBarrier(this.root, this.scopeKey, operation);
+    return withShardBarrierAsync(this.root, this.scopeKey, operation);
   }
 
   /** {@inheritdoc StorageBackend.checkOrRebuildCache} */
@@ -225,7 +242,7 @@ export class FilesystemBackend implements StorageBackend {
     // (tests, manual deletion), and an open handle would read stale pages.
     const index = SqliteIndex.open(this.root);
     try {
-      if (index.meta().canonicalHash === canonicalHash(state))
+      if (!index.isStale(this.cacheMaxAgeMs, state))
         return { outcome: 'checked', evidence: 'canonical_snapshot_match_verified' };
       index.rebuild(state);
       return { outcome: 'rebuilt', evidence: 'canonical_snapshot_rebuild_verified' };
@@ -276,9 +293,12 @@ export class FilesystemBackend implements StorageBackend {
     }
   }
 
-  /** Shard lock identity derived from the namespace config. */
+  /**
+   * Filesystem mode intentionally ignores the optional scope in canonical
+   * storage, so all scopes sharing a root must also share one lock.
+   */
   public get scopeKey(): string {
-    return `${this.scope.organizationId}--${this.scope.projectId}--${this.scope.scope}`;
+    return `${this.scope.organizationId}--${this.scope.projectId}`;
   }
 
   /** Creates a validated record object with a fresh ULID and scope from config. */
@@ -312,6 +332,14 @@ export class FilesystemBackend implements StorageBackend {
     validateCompactnessHelper(summary, details, context);
   }
 
+  public validateRecord(value: unknown, label = 'memory record'): MemoryRecord {
+    return validateRecordHelper(value, this.helperDeps, label);
+  }
+
+  public validateTombstone(value: unknown, label = 'memory tombstone'): MemoryTombstone {
+    return validateTombstoneHelper(value, this.helperDeps, label);
+  }
+
   public encode(value: MemoryRecord | MemoryTombstone): Uint8Array {
     return Buffer.from(stringify(value, { lineWidth: 0 }), 'utf8');
   }
@@ -340,23 +368,33 @@ export class FilesystemBackend implements StorageBackend {
   }
 
   private parseCanonical(path: string): unknown {
-    const bytes = readFileSync(path);
-    let text: string;
-    try {
-      text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-    } catch {
-      throw new MemoryError(`Malformed UTF-8 memory YAML: ${path}`);
+    return parseYamlBytes(readFileSync(path), path);
+  }
+
+  private assertFilenameIdentity(path: string, id: string): void {
+    const filenameId = basename(path).replace(/\.yaml$/u, '');
+    if (!isUlid(filenameId) || filenameId !== id)
+      throw new MemoryError(`Memory filename does not match document ID: ${relative(this.root, path)}`);
+  }
+
+  private validateReplacementIdentity(path: string, bytes: Uint8Array): void {
+    const safe = safeProjectPath(path);
+    const filenameId = basename(safe).replace(/\.yaml$/u, '');
+    if (!isUlid(filenameId)) throw new MemoryError(`Invalid memory filename: ${path}`);
+    const document = parseYamlBytes(bytes, path);
+    if (safe.startsWith('tombstones/')) {
+      const tombstone = validateTombstoneHelper(document, this.helperDeps);
+      if (tombstone.id !== filenameId) throw new MemoryError(`Memory filename does not match document ID: ${path}`);
+      return;
     }
-    const document = parseDocument(text, { uniqueKeys: true });
-    if (document.errors.length || document.warnings.length)
-      throw new MemoryError(
-        `Malformed memory YAML ${path}: ${document.errors[0]?.message ?? document.warnings[0]?.message}`,
-      );
-    try {
-      return document.toJS({ maxAliasCount: 0 });
-    } catch (error: unknown) {
-      throw new MemoryError(`Unsafe memory YAML ${path}: ${describe(error)}`);
+    for (const [recordType, folder] of Object.entries(RECORD_FOLDERS) as Array<[RecordType, string]>) {
+      if (!safe.startsWith(`${folder}/`)) continue;
+      const record = validateRecordHelper(document, this.helperDeps);
+      if (record.id !== filenameId || record.record_type !== recordType)
+        throw new MemoryError(`Memory filename does not match document identity: ${path}`);
+      return;
     }
+    throw new MemoryError(`Memory path does not map to a canonical document: ${path}`);
   }
 
   private publish(path: string, bytes: Uint8Array | undefined): void {
@@ -439,19 +477,19 @@ export type MemoryRecordInput = Omit<
   tags?: string[];
 };
 
-function assertAcyclic(records: MemoryRecord[]): void {
-  const edges = new Map(records.map((record) => [record.id, record.supersedes]));
-  const visiting = new Set<string>();
-  const visited = new Set<string>();
-  const visit = (id: string): void => {
-    if (visiting.has(id)) throw new MemoryError(`Cyclic supersession at ${id}`);
-    if (visited.has(id)) return;
-    visiting.add(id);
-    for (const target of edges.get(id) ?? []) visit(target);
-    visiting.delete(id);
-    visited.add(id);
-  };
-  records.forEach((record) => visit(record.id));
+function assertSafeMemoryRoot(root: string): void {
+  const components: string[] = [];
+  let current = root;
+  while (dirname(current) !== current) {
+    components.unshift(basename(current));
+    current = dirname(current);
+  }
+  for (const component of components) {
+    current = join(current, component);
+    if (!existsSync(current)) return;
+    const stat = lstatSync(current);
+    if (stat.isSymbolicLink() || !stat.isDirectory()) throw new MemoryError(`Unsafe memory root: ${root}`);
+  }
 }
 
 export function safeProjectPath(value: string): string {
@@ -470,6 +508,25 @@ export { searchableText } from './record-helpers.js';
 
 export function newestFirst(left: { created_at: string }, right: { created_at: string }): number {
   return right.created_at.localeCompare(left.created_at);
+}
+
+function parseYamlBytes(bytes: Uint8Array, path: string): unknown {
+  let text: string;
+  try {
+    text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    throw new MemoryError(`Malformed UTF-8 memory YAML: ${path}`);
+  }
+  const document = parseDocument(text, { uniqueKeys: true });
+  if (document.errors.length || document.warnings.length)
+    throw new MemoryError(
+      `Malformed memory YAML ${path}: ${document.errors[0]?.message ?? document.warnings[0]?.message}`,
+    );
+  try {
+    return document.toJS({ maxAliasCount: 0 });
+  } catch (error: unknown) {
+    throw new MemoryError(`Unsafe memory YAML ${path}: ${describe(error)}`);
+  }
 }
 
 function randomToken(): string {

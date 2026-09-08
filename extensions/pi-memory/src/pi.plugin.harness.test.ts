@@ -59,7 +59,7 @@ describe.skipIf(!enabled)('pi uses the memory extension in-process', () => {
   }, 300_000);
 
   it('recalls a seeded memory via memory_search', async (ctx) => {
-    seedMemory(project, [
+    await seedMemory(project, [
       {
         memory_type: 'semantic',
         record_type: 'fact',

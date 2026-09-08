@@ -9,6 +9,7 @@ import type {
 } from './backend/types.js';
 import type { MemoryConfig } from './config.js';
 import { MemoryConflictError, MemoryError } from './errors.js';
+import { assertAcyclic } from './backend/record-helpers.js';
 import { isUlid } from './identities.js';
 import {
   memoryRecordSchema,
@@ -176,7 +177,7 @@ export class MemoryStore {
         maxChars,
         topic: input.topic,
         memoryType: input.memory_type,
-        includeSuperseded: input.include_superseded,
+        includeSuperseded: input.include_superseded ?? this.config.retrieval.include_superseded,
         activeIds: state.activeIds,
       };
       return this.backend.search(state, query, options);
@@ -244,6 +245,9 @@ export class MemoryStore {
           })),
         ];
         if (replacements.length) await this.applyBatch(replacements);
+        // Imports bypass executeMutation because preview shares this path;
+        // synchronize the disposable cache only after canonical publication.
+        if (replacements.length) await this.backend.checkOrRebuildCache(await this.loadState());
         return { valid: true, records: validated.records.length, tombstones: validated.tombstones.length, errors: [] };
       });
     } catch (error: unknown) {
@@ -277,9 +281,10 @@ export class MemoryStore {
       if (isTombstone(item)) {
         const result = memoryTombstoneSchema.safeParse(item);
         if (!result.success) throw new MemoryError(`Invalid memory tombstone at line ${candidate.line}.`);
-        if (ids.has(result.data.id)) throw new MemoryConflictError(`Memory ID already exists: ${result.data.id}`);
-        ids.add(result.data.id);
-        tombstones.push(result.data);
+        const tombstone = this.backend.validateTombstone(result.data, `memory tombstone at line ${candidate.line}`);
+        if (ids.has(tombstone.id)) throw new MemoryConflictError(`Memory ID already exists: ${tombstone.id}`);
+        ids.add(tombstone.id);
+        tombstones.push(tombstone);
         continue;
       }
       this.backend.validateCompactness(
@@ -289,11 +294,13 @@ export class MemoryStore {
       );
       const result = memoryRecordSchema.safeParse(item);
       if (!result.success) throw new MemoryError(`Invalid memory record at line ${candidate.line}.`);
-      if (ids.has(result.data.id)) throw new MemoryConflictError(`Memory ID already exists: ${result.data.id}`);
-      ids.add(result.data.id);
-      records.push(result.data);
+      const record = this.backend.validateRecord(result.data, `memory record at line ${candidate.line}`);
+      if (ids.has(record.id)) throw new MemoryConflictError(`Memory ID already exists: ${record.id}`);
+      ids.add(record.id);
+      records.push(record);
     }
     assertImportRelationships(state, records, tombstones);
+    assertAcyclic([...state.records, ...records]);
     return { records, tombstones };
   }
 
