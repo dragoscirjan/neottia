@@ -4,10 +4,11 @@ import {
   closeMemoryToolContext,
   findMemoryTool,
   loadMemoryConfig,
+  memoryToolJsonSchema,
   MEMORY_TOOLS,
   type MemoryToolContext,
+  type MemoryToolName,
 } from '@neottia/memory-core';
-import { z } from 'zod';
 
 /**
  * MCP stdio server for the Neottia memory tools. Tool names, descriptions,
@@ -65,11 +66,19 @@ export function createMemoryServer(options: CreateMemoryServerOptions = {}): Ser
   };
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: MEMORY_TOOLS.map((tool) => ({
-      name: tool.name,
-      description: tool.description,
-      inputSchema: z.toJSONSchema(tool.inputSchema),
-    })),
+    tools: MEMORY_TOOLS.map((tool) => {
+      const outputSchema = objectOutputSchema(tool.name);
+      return {
+        name: tool.name,
+        description: tool.description,
+        inputSchema: memoryToolJsonSchema(tool.name, 'input') as {
+          type: 'object';
+          properties?: Record<string, object>;
+          required?: string[];
+        },
+        ...(outputSchema ? { outputSchema } : {}),
+      };
+    }),
   }));
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
@@ -81,8 +90,10 @@ export function createMemoryServer(options: CreateMemoryServerOptions = {}): Ser
       };
     try {
       const result = await tool.run(context, (request.params.arguments ?? {}) as Record<string, unknown>);
+      const outputSchema = objectOutputSchema(tool.name);
       return {
         content: [{ type: 'text', text: typeof result === 'string' ? result : JSON.stringify(result, null, 2) }],
+        ...(outputSchema && isRecord(result) ? { structuredContent: result } : {}),
       };
     } catch (error: unknown) {
       return {
@@ -93,4 +104,33 @@ export function createMemoryServer(options: CreateMemoryServerOptions = {}): Ser
   });
 
   return server;
+}
+
+/** MCP currently permits only object-rooted structured output schemas. */
+function objectOutputSchema(
+  name: MemoryToolName,
+): { type: 'object'; properties?: Record<string, object>; required?: string[] } | undefined {
+  const schema = memoryToolJsonSchema(name, 'output');
+  if (schema['type'] === 'object')
+    return schema as { type: 'object'; properties?: Record<string, object>; required?: string[] };
+  const alternatives = schema['anyOf'];
+  if (
+    Array.isArray(alternatives) &&
+    alternatives.every(
+      (alternative) =>
+        alternative !== null &&
+        typeof alternative === 'object' &&
+        (alternative as Record<string, unknown>)['type'] === 'object',
+    )
+  )
+    return { ...schema, type: 'object' } as {
+      type: 'object';
+      properties?: Record<string, object>;
+      required?: string[];
+    };
+  return undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }

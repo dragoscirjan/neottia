@@ -27,6 +27,9 @@ export const DEFAULT_SHARD_PATH = 'skills.memory';
 /** Default config file location, relative to the working directory. */
 export const DEFAULT_CONFIG_FILE = '.neottia/config.yml';
 
+const CREDENTIAL_REFERENCE_PATTERN = /^\$\{[A-Za-z_][A-Za-z0-9_]*\}$/u;
+const MEMORY_ROOT_PATTERN =
+  /^(?![\s\S]*[\r\n\u2028\u2029])(?:\/[^\0]*|[A-Za-z]:[\\/][^\0]*|(?!\.{1,2}(?:[\\/]|$))(?!.*(?:^|[\\/])\.{1,2}(?:[\\/]|$))[^\\/\0]+(?:[\\/][^\\/\0]+)*)$/u;
 const nonemptyString = z.string().min(1).regex(/\S/, 'must not be blank');
 
 /**
@@ -38,82 +41,90 @@ const memoryRootPath = z
   .string()
   .min(1)
   .max(1024)
-  .refine((value) => {
-    if (value.includes('\0')) return false;
-    if (isAbsolute(value) || /^[A-Za-z]:[\\/]/u.test(value)) return true; // absolute: used as-is
-    return value !== '.' && value.split(/[\\/]/u).every((part) => part && part !== '.' && part !== '..');
-  }, 'must be a safe relative path or an absolute path');
+  // Keep the safety rule representable in the generated JSON Schema.
+  .regex(MEMORY_ROOT_PATTERN, 'must be a safe relative path or an absolute path')
+  .refine((value) => isAbsolute(value) || /^[A-Za-z]:[\\/]/u.test(value) || value !== '.');
 
 const credentialValue = z.string().min(1, 'must not be empty');
+const credentialReference = z.string().regex(CREDENTIAL_REFERENCE_PATTERN, 'must be an exact ${ENV_VAR} reference');
 
-export const memoryConfigSchema = z
-  .object({
-    enabled: z.boolean().default(false),
-    root: memoryRootPath.default('.neottia/memory'),
-    backend: z.enum(['filesystem', 'postgres']).default('filesystem'),
-    namespace: z
-      .object({
-        organization_id: nonemptyString.default('local'),
-        project_id: nonemptyString.default('project'),
-        default_topic: nonemptyString.default('general'),
-        scope: nonemptyString.default('global'),
-      })
-      .prefault({}),
-    provider: z
-      .object({
-        db: z
-          .object({
-            pg: z
-              .object({
-                host: nonemptyString.default('localhost'),
-                port: z.number().int().min(1).max(65_535).default(5432),
-                database: nonemptyString.default('neottia'),
-                ssl: z.boolean().default(true),
-                // Credentials may be literal values or ${VAR} environment references.
-                user: credentialValue.optional(),
-                password: credentialValue.optional(),
-              })
-              .prefault({}),
-          })
-          .prefault({}),
-      })
-      .prefault({}),
-    retrieval: z
-      .object({
-        limit: z.number().int().min(1).max(100).default(8),
-        max_chars: z.number().int().min(256).max(100_000).default(12_000),
-        include_superseded: z.boolean().default(false),
-      })
-      .prefault({}),
-    cache: z
-      .object({
-        max_age_ms: z.number().int().min(0).default(300_000),
-        stale_policy: z.enum(['prompt', 'rebuild', 'fail']).default('prompt'),
-      })
-      .prefault({}),
-    security: z
-      .object({
-        secret_patterns: z.array(z.string().min(1)).default([]),
-        entropy_heuristic: z.boolean().default(true),
-        limits: z
-          .object({
-            max_file_bytes: z
-              .number()
-              .int()
-              .positive()
-              .default(16 * 1024 * 1024),
-            max_files: z.number().int().positive().default(10_000),
-            max_total_bytes: z
-              .number()
-              .int()
-              .positive()
-              .default(256 * 1024 * 1024),
-          })
-          .prefault({}),
-      })
-      .prefault({}),
-  })
-  .strict();
+/** Runtime schema for resolved config and explicit library overrides. */
+export const memoryConfigSchema = createMemoryConfigSchema(credentialValue);
+
+/** File-facing schema: credentials in YAML must never contain literals. */
+export const memoryConfigFileSchema = createMemoryConfigSchema(credentialReference);
+
+/** Builds matching runtime and file schemas with source-specific credentials. */
+function createMemoryConfigSchema(credentialSchema: z.ZodString) {
+  return z
+    .object({
+      enabled: z.boolean().default(false),
+      root: memoryRootPath.default('.neottia/memory'),
+      backend: z.enum(['filesystem', 'postgres']).default('filesystem'),
+      namespace: z
+        .object({
+          organization_id: nonemptyString.default('local'),
+          project_id: nonemptyString.default('project'),
+          default_topic: nonemptyString.default('general'),
+          scope: nonemptyString.default('global'),
+        })
+        .prefault({}),
+      provider: z
+        .object({
+          db: z
+            .object({
+              pg: z
+                .object({
+                  host: nonemptyString.default('localhost'),
+                  port: z.number().int().min(1).max(65_535).default(5432),
+                  database: nonemptyString.default('neottia'),
+                  ssl: z.boolean().default(true),
+                  // YAML uses the strict reference schema; resolved code config may contain literals.
+                  user: credentialSchema.optional(),
+                  password: credentialSchema.optional(),
+                })
+                .prefault({}),
+            })
+            .prefault({}),
+        })
+        .prefault({}),
+      retrieval: z
+        .object({
+          limit: z.number().int().min(1).max(100).default(8),
+          max_chars: z.number().int().min(256).max(100_000).default(12_000),
+          include_superseded: z.boolean().default(false),
+        })
+        .prefault({}),
+      cache: z
+        .object({
+          max_age_ms: z.number().int().min(0).default(300_000),
+          stale_policy: z.enum(['prompt', 'rebuild', 'fail']).default('prompt'),
+        })
+        .prefault({}),
+      security: z
+        .object({
+          secret_patterns: z.array(z.string().min(1)).default([]),
+          entropy_heuristic: z.boolean().default(true),
+          limits: z
+            .object({
+              max_file_bytes: z
+                .number()
+                .int()
+                .positive()
+                .default(16 * 1024 * 1024),
+              max_files: z.number().int().positive().default(10_000),
+              max_total_bytes: z
+                .number()
+                .int()
+                .positive()
+                .default(256 * 1024 * 1024),
+            })
+            .prefault({}),
+        })
+        .prefault({}),
+    })
+    .strict();
+}
 
 export type MemoryConfig = z.infer<typeof memoryConfigSchema>;
 export type MemoryConfigInput = z.input<typeof memoryConfigSchema>;
@@ -181,9 +192,16 @@ export function loadMemoryConfig(cwd: string, options: LoadMemoryConfigOptions =
     shard = navigateShard(root, resolveShardPath(env), configFile);
   }
 
+  const fileResult = memoryConfigFileSchema.partial().safeParse(shard);
+  if (!fileResult.success)
+    throw new ConfigError(
+      `Invalid memory config shard:\n${formatSchemaError(fileResult.error)}`,
+      fileResult.error.issues.map((issue) => ['skills.memory', ...issue.path].join('.')),
+    );
+
   const { env: _envOption, ...overrides } = options;
   void _envOption;
-  const merged = deepMerge(shard as Record<string, unknown>, envOverlay(env), overrides as Record<string, unknown>);
+  const merged = deepMerge(fileResult.data, envOverlay(env), overrides as Record<string, unknown>);
 
   const result = memoryConfigSchema.safeParse(merged);
   if (!result.success)
@@ -286,9 +304,9 @@ function coerceEnvValue(name: string, path: string, value: string): unknown {
 }
 
 /**
- * Expands ${VAR} credential references from the environment. Absent
- * credentials fall back to their default env vars; literal credentials pass
- * through unchanged.
+ * Expands ${VAR} credential references from the environment exactly once.
+ * Absent credentials fall back to their default env vars; explicit library
+ * overrides may be literal values and pass through unchanged.
  */
 function expandCredentials(config: MemoryConfig, env: NodeJS.ProcessEnv, configFile: string): void {
   const pg = config.provider.db.pg;
@@ -300,7 +318,7 @@ function expandCredentials(config: MemoryConfig, env: NodeJS.ProcessEnv, configF
       if (fallback !== undefined && fallback !== '') pg[key] = fallback;
       continue;
     }
-    if (!/^\$\{[A-Za-z_][A-Za-z0-9_]*\}$/u.test(reference)) continue;
+    if (!CREDENTIAL_REFERENCE_PATTERN.test(reference)) continue;
     const varName = reference.slice(2, -1);
     const value = env[varName];
     if (value === undefined || value === '')

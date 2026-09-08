@@ -5,7 +5,8 @@ import { randomBytes } from 'node:crypto';
  * implementation so memory record IDs keep the same format across projects.
  */
 
-export const ULID_PATTERN = /^[0-9A-HJKMNP-TV-Z]{26}$/u;
+// A 128-bit ULID has only two significant bits in its first base32 digit.
+export const ULID_PATTERN = /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/u;
 const CROCKFORD = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 const MAX_ULID_TIMESTAMP = 0xffff_ffff_ffff;
 

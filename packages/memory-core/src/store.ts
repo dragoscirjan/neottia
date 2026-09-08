@@ -1,15 +1,9 @@
 import { FilesystemBackend } from './backend/filesystem.js';
 import { PostgresBackend } from './backend/postgres.js';
-import type {
-  BackendSearchOptions,
-  CacheValidation,
-  ShardState,
-  StorageBackend,
-  StorageReplacement,
-} from './backend/types.js';
+import { assertAcyclic } from './backend/record-helpers.js';
+import type { BackendSearchOptions, ShardState, StorageBackend, StorageReplacement } from './backend/types.js';
 import type { MemoryConfig } from './config.js';
 import { MemoryConflictError, MemoryError } from './errors.js';
-import { assertAcyclic } from './backend/record-helpers.js';
 import { isUlid } from './identities.js';
 import {
   memoryRecordSchema,
@@ -18,6 +12,14 @@ import {
   type MemorySource,
   type MemoryTombstone,
 } from './schemas.js';
+import {
+  MEMORY_TOOL_LIMITS,
+  type ImportReport,
+  type MemoryValidationReport,
+  type StoreMemoryInput,
+} from './tool-contracts.js';
+
+export type { ImportReport, MemoryValidationReport, StoreMemoryInput } from './tool-contracts.js';
 
 /**
  * MemoryStore: the facade behind the memory_* tool surface. Operations run
@@ -26,18 +28,6 @@ import {
  * resynchronize the backend search index afterwards. Ported from the
  * harnessctl-v2 memory implementation; backends are pluggable (issue #6).
  */
-
-export interface StoreMemoryInput {
-  memory_type: MemoryRecord['memory_type'];
-  record_type: MemoryRecord['record_type'];
-  topic?: string;
-  summary: string;
-  details?: string | null;
-  source: MemorySource;
-  created_by: string;
-  confidence: MemoryRecord['confidence'];
-  tags?: string[];
-}
 
 export interface SearchMemoryInput {
   query?: string;
@@ -48,23 +38,6 @@ export interface SearchMemoryInput {
   include_superseded?: boolean;
 }
 
-export interface MemoryValidationReport {
-  valid: boolean;
-  records: number;
-  tombstones: number;
-  errors: string[];
-  cache: CacheValidation | { outcome: 'skipped'; evidence: 'memory_validation_failed' };
-}
-
-export interface ImportReport {
-  valid: boolean;
-  records: number;
-  tombstones: number;
-  errors: string[];
-  /** Present when canonical publication succeeded but cache maintenance failed. */
-  warnings?: string[];
-}
-
 export interface MemoryStoreOptions {
   readonly config: MemoryConfig;
   readonly cwd: string;
@@ -73,9 +46,6 @@ export interface MemoryStoreOptions {
   /** Host hook for stale_policy 'prompt' (extensions can prompt the user). */
   readonly onStaleCache?: () => boolean | Promise<boolean>;
 }
-
-const MAX_QUERY_BYTES = 16 * 1024;
-const MAX_PAYLOAD_BYTES = 64 * 1024 * 1024;
 
 export class MemoryStore {
   private readonly backend: StorageBackend;
@@ -167,7 +137,7 @@ export class MemoryStore {
   public async search(input: SearchMemoryInput = {}): Promise<MemoryRecord[]> {
     const query = input.query;
     if (!query || !query.trim()) throw new MemoryError('query must contain searchable text.');
-    if (Buffer.byteLength(query, 'utf8') > MAX_QUERY_BYTES)
+    if (Buffer.byteLength(query, 'utf8') > MEMORY_TOOL_LIMITS.queryBytes)
       throw new MemoryError('query exceeds the 16 KiB memory search limit.');
     const limit = bounded(input.limit ?? this.config.retrieval.limit, 1, 100, 'limit');
     const maxChars = bounded(input.max_chars ?? this.config.retrieval.max_chars, 256, 100_000, 'max_chars');
@@ -210,7 +180,7 @@ export class MemoryStore {
   public async export(): Promise<string> {
     return this.executeRead((state) => {
       const result = `${[...state.records, ...state.tombstones].map((item) => JSON.stringify(item)).join('\n')}\n`;
-      if (Buffer.byteLength(result, 'utf8') > MAX_PAYLOAD_BYTES)
+      if (Buffer.byteLength(result, 'utf8') > MEMORY_TOOL_LIMITS.exportBytes)
         throw new MemoryError('memory export exceeds the 64 MiB payload limit.');
       return result;
     });
@@ -218,7 +188,7 @@ export class MemoryStore {
 
   /** Imports a JSONL payload; preview validates without writing. */
   public async import(content: string, preview = false): Promise<ImportReport> {
-    if (Buffer.byteLength(content, 'utf8') > MAX_PAYLOAD_BYTES)
+    if (Buffer.byteLength(content, 'utf8') > MEMORY_TOOL_LIMITS.importBytes)
       throw new MemoryError('memory import exceeds the 64 MiB payload limit.');
 
     try {
@@ -417,6 +387,37 @@ function assertImportRelationships(state: ShardState, records: MemoryRecord[], t
       if (!ids.has(target)) throw new MemoryError(`Broken supersedes reference: ${target}`);
   for (const tombstone of tombstones)
     if (!ids.has(tombstone.target_id)) throw new MemoryError(`Broken tombstone reference: ${tombstone.target_id}`);
+
+  assertSingleRetirement(state, records, tombstones);
+}
+
+/** Ensures every target has exactly one possible transition out of active state. */
+function assertSingleRetirement(
+  state: ShardState,
+  importedRecords: readonly MemoryRecord[],
+  importedTombstones: readonly MemoryTombstone[],
+): void {
+  type Retirement = { kind: 'supersession' | 'tombstone'; imported: boolean };
+  const retirements = new Map<string, Retirement>();
+  const retire = (target: string, retirement: Retirement): void => {
+    const previous = retirements.get(target);
+    if (!previous) {
+      retirements.set(target, retirement);
+      return;
+    }
+    if (previous.kind !== retirement.kind)
+      throw new MemoryConflictError(`Memory record cannot be both superseded and tombstoned: ${target}`);
+    if (retirement.imported && !previous.imported)
+      throw new MemoryConflictError(`Memory record is already inactive in canonical state: ${target}`);
+    throw new MemoryConflictError(`Memory record has multiple ${retirement.kind} retirements: ${target}`);
+  };
+
+  for (const record of state.records)
+    for (const target of record.supersedes) retire(target, { kind: 'supersession', imported: false });
+  for (const tombstone of state.tombstones) retire(tombstone.target_id, { kind: 'tombstone', imported: false });
+  for (const record of importedRecords)
+    for (const target of record.supersedes) retire(target, { kind: 'supersession', imported: true });
+  for (const tombstone of importedTombstones) retire(tombstone.target_id, { kind: 'tombstone', imported: true });
 }
 
 function assertUlid(value: unknown, path: string): asserts value is string {

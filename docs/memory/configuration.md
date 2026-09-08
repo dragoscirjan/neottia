@@ -1,6 +1,6 @@
 # Configuring memory
 
-Memory is configured through a **shard**: the `skills.memory` section of the project configuration file, with every value overridable by environment variables and, for library users, by code. You only need to configure what you want to change — everything else has a working default.
+Memory is configured through a **shard**: the `skills.memory` section of the project configuration file. Library users can override values in code, while environment variables override only the bindings explicitly listed below. You only need to configure what you want to change — everything else has a working default.
 
 ## Where the configuration lives
 
@@ -60,11 +60,13 @@ skills:
 
 ## Resolution order
 
-Every value resolves independently, in this order:
+Each explicitly environment-bound value resolves in this order:
 
 ```text
-code override (library users)  >  environment variable  >  config file  >  default
+code override (library users)  >  listed environment binding  >  config file  >  default
 ```
+
+Values without a listed binding resolve from code, the config file, and defaults; similarly named environment variables have no effect.
 
 ## Environment variables
 
@@ -92,7 +94,11 @@ All optional. Booleans accept `true/false/1/0`; integers accept plain digits. An
 | `NEOTTIA_MEMORY_DB_PG_PASSWORD`                                       | Postgres password fallback            | —                                         |
 | `NEOTTIA_MEMORY_DB_PG_HOST` / `..._PORT` / `..._DATABASE` / `..._SSL` | Postgres connection settings          | `localhost` / `5432` / `neottia` / `true` |
 
-Environment bindings intentionally cover scalar leaves only. Configure `security.secret_patterns` and all `security.limits` in YAML or through code overrides because arrays and structured values are not safely represented by one environment variable.
+This table is the complete environment-binding contract; names inferred from config paths are not supported. In particular, `security.secret_patterns` and every `security.limits` value are file/code-only. Secret patterns are an ordered array, and limits are a security-sensitive group that should remain reviewable in one configuration document; accepting invented scalar or encoded environment forms would make deployment behavior ambiguous.
+
+### PostgreSQL credentials
+
+YAML credential fields must be absent or contain one exact environment reference, such as `user: "${PG_USER}"`. `loadMemoryConfig` expands that reference once. If `PG_USER` itself contains text such as `${SECOND_VAR}`, that text is passed literally to PostgreSQL rather than expanded again. When the fields are absent, `NEOTTIA_MEMORY_DB_PG_USER` and `NEOTTIA_MEMORY_DB_PG_PASSWORD` remain the defaults. Literal credentials in YAML are rejected.
 
 ## Cache policy
 

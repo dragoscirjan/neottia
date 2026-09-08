@@ -1,6 +1,9 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import {
-  existsSync,
+  closeSync,
+  constants as fsConstants,
+  fstatSync,
+  fsyncSync,
   lstatSync,
   mkdirSync,
   openSync,
@@ -9,14 +12,21 @@ import {
   renameSync,
   rmSync,
   writeFileSync,
-  closeSync,
-  fsyncSync,
+  type Stats,
 } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { parseDocument, stringify } from 'yaml';
 import { withShardBarrierAsync } from '../barrier.js';
 import type { MemoryConfig } from '../config.js';
 import { MemoryConflictError, MemoryError } from '../errors.js';
+import {
+  captureDirectoryIdentities as captureDirectoryIdentityChain,
+  isFilesystemErrorCode as isCode,
+  noFollowFlag,
+  revalidateDirectoryIdentities as revalidateDirectoryIdentityChain,
+  sameFilesystemIdentity as sameIdentity,
+  type DirectoryIdentity,
+} from '../filesystem-safety.js';
 import { isUlid } from '../identities.js';
 import { SqliteIndex } from '../index-sqlite.js';
 import type { MemoryRecord, MemoryTombstone, RecordType } from '../schemas.js';
@@ -54,11 +64,18 @@ export const RECORD_FOLDERS: Readonly<Record<RecordType, string>> = {
   lesson: 'lessons',
 };
 
+export interface FilesystemOperations {
+  readonly renameSync: typeof renameSync;
+  readonly syncDirectory: (path: string) => void;
+}
+
 export interface FilesystemBackendOptions {
   readonly config: MemoryConfig;
   readonly cwd: string;
   /** Host hook for stale_policy 'prompt' (see MemoryStoreOptions). */
   readonly onStaleCache?: () => boolean | Promise<boolean>;
+  /** Advanced injection hook for testing atomic publication failures. */
+  readonly filesystemOps?: Partial<FilesystemOperations>;
 }
 
 export class FilesystemBackend implements StorageBackend {
@@ -71,6 +88,7 @@ export class FilesystemBackend implements StorageBackend {
   private readonly cacheMaxAgeMs: number;
   private readonly stalePolicy: 'prompt' | 'rebuild' | 'fail';
   private readonly onStaleCache?: () => boolean | Promise<boolean>;
+  private readonly filesystemOps: FilesystemOperations;
 
   public constructor(options: FilesystemBackendOptions) {
     this.root = resolve(options.cwd, options.config.root);
@@ -78,6 +96,7 @@ export class FilesystemBackend implements StorageBackend {
     this.cacheMaxAgeMs = options.config.cache.max_age_ms;
     this.stalePolicy = options.config.cache.stale_policy;
     this.onStaleCache = options.onStaleCache;
+    this.filesystemOps = { ...DEFAULT_FILESYSTEM_OPERATIONS, ...options.filesystemOps };
     this.limits = {
       maxFileBytes: options.config.security.limits.max_file_bytes,
       maxFiles: options.config.security.limits.max_files,
@@ -112,15 +131,16 @@ export class FilesystemBackend implements StorageBackend {
     const digests: string[] = [];
     let files = 0;
     let bytes = 0;
-    const track = (path: string): void => {
-      digests.push(`${relative(this.root, path)}:${createHash('sha256').update(readFileSync(path)).digest('hex')}`);
+    const track = (path: string, content: Uint8Array): void => {
+      digests.push(`${relative(this.root, path)}:${createHash('sha256').update(content).digest('hex')}`);
     };
 
     for (const [recordType, folder] of Object.entries(RECORD_FOLDERS) as Array<[RecordType, string]>) {
       for (const path of this.yamlFiles(join(this.root, folder))) {
-        ({ files, bytes } = this.trackUsage(path, files, bytes));
-        track(path);
-        const record = this.parseCanonical(path);
+        const content = this.readRegular(path);
+        ({ files, bytes } = this.trackUsage(path, content.byteLength, files, bytes));
+        track(path, content);
+        const record = this.parseCanonical(content, path);
         const validated = validateRecordHelper(record, this.helperDeps);
         this.assertFilenameIdentity(path, validated.id);
         if (validated.record_type !== recordType)
@@ -132,9 +152,10 @@ export class FilesystemBackend implements StorageBackend {
     }
 
     for (const path of this.yamlFiles(join(this.root, 'tombstones'))) {
-      ({ files, bytes } = this.trackUsage(path, files, bytes));
-      track(path);
-      const tombstone = this.parseCanonical(path);
+      const content = this.readRegular(path);
+      ({ files, bytes } = this.trackUsage(path, content.byteLength, files, bytes));
+      track(path, content);
+      const tombstone = this.parseCanonical(content, path);
       const validatedTombstone = validateTombstoneHelper(tombstone, this.helperDeps);
       this.assertFilenameIdentity(path, validatedTombstone.id);
       if (ids.has(validatedTombstone.id)) throw new MemoryError(`Duplicate memory ID: ${validatedTombstone.id}`);
@@ -179,7 +200,7 @@ export class FilesystemBackend implements StorageBackend {
     for (const folder of [...Object.values(RECORD_FOLDERS), 'tombstones']) {
       for (const path of this.yamlFiles(join(this.root, folder))) {
         resultingFiles += 1;
-        resultingBytes += lstatSync(path).size;
+        resultingBytes += this.regularSize(path);
       }
     }
 
@@ -189,7 +210,7 @@ export class FilesystemBackend implements StorageBackend {
       const key = replacement.path.normalize('NFKC').toLowerCase();
       if (seen.has(key)) throw new MemoryError('Memory batch contains duplicate paths.');
       seen.add(key);
-      const previous = existsSync(absolute) ? this.readRegular(absolute) : undefined;
+      const previous = this.readRegularIfExists(absolute);
       if (replacement.exclusive && previous)
         throw new MemoryConflictError(`Memory path already exists: ${replacement.path}`);
       const nextBytes = replacement.bytes?.byteLength ?? 0;
@@ -203,15 +224,17 @@ export class FilesystemBackend implements StorageBackend {
 
     const applied: StorageReplacement[] = [];
     try {
-      for (const replacement of ordered) {
-        this.publish(replacement.path, replacement.bytes);
-        applied.push(replacement);
-      }
+      for (const replacement of ordered)
+        this.publish(replacement.path, replacement.bytes, () => {
+          // Rename/remove is the publication point. Track it before directory
+          // fsync so a durability failure still rolls back the visible file.
+          applied.push(replacement);
+        });
     } catch (error: unknown) {
       let rollbackFailed = false;
       for (const replacement of applied.reverse()) {
         try {
-          this.publish(replacement.path, before.get(replacement.path));
+          this.publish(replacement.path, before.get(replacement.path), () => undefined);
         } catch {
           rollbackFailed = true;
         }
@@ -224,10 +247,14 @@ export class FilesystemBackend implements StorageBackend {
   /** {@inheritdoc StorageBackend.search} — BM25 through the SQLite index. */
   public async search(state: ShardState, query: string, options: BackendSearchOptions): Promise<MemoryRecord[]> {
     const index = await this.ensureIndex(state);
+    let operationFailed = false;
     try {
       return index.search(query, state, options);
+    } catch (error: unknown) {
+      operationFailed = true;
+      throw error;
     } finally {
-      index.close();
+      closeIndexPreservingError(index, operationFailed);
     }
   }
 
@@ -241,13 +268,17 @@ export class FilesystemBackend implements StorageBackend {
     // Fresh connection per call: the index file can be replaced externally
     // (tests, manual deletion), and an open handle would read stale pages.
     const index = SqliteIndex.open(this.root);
+    let operationFailed = false;
     try {
       if (!index.isStale(this.cacheMaxAgeMs, state))
         return { outcome: 'checked', evidence: 'canonical_snapshot_match_verified' };
       index.rebuild(state);
       return { outcome: 'rebuilt', evidence: 'canonical_snapshot_rebuild_verified' };
+    } catch (error: unknown) {
+      operationFailed = true;
+      throw error;
     } finally {
-      index.close();
+      closeIndexPreservingError(index, operationFailed);
     }
   }
 
@@ -270,8 +301,8 @@ export class FilesystemBackend implements StorageBackend {
       return index;
     } catch (error: unknown) {
       // A failed staleness resolution (fail policy, declined prompt) must not
-      // leak the opened handle.
-      index.close();
+      // leak the opened handle or be hidden by a cleanup safety error.
+      closeIndexPreservingError(index, true);
       throw error;
     }
   }
@@ -345,10 +376,17 @@ export class FilesystemBackend implements StorageBackend {
   }
 
   private yamlFiles(directory: string): string[] {
-    if (!existsSync(directory)) return [];
-    const stat = lstatSync(directory);
-    if (!stat.isDirectory() || stat.isSymbolicLink()) throw new MemoryError(`Unsafe memory directory: ${directory}`);
-    return readdirSync(directory, { withFileTypes: true })
+    try {
+      const stat = lstatSync(directory);
+      if (stat.isSymbolicLink() || !stat.isDirectory()) throw new MemoryError(`Unsafe memory directory: ${directory}`);
+    } catch (error: unknown) {
+      if (isCode(error, 'ENOENT')) return [];
+      throw error;
+    }
+    const identities = captureDirectoryIdentities(directory);
+    const entries = readdirSync(directory, { withFileTypes: true });
+    revalidateDirectoryIdentities(identities);
+    return entries
       .filter((entry) => entry.name.endsWith('.yaml'))
       .map((entry) => {
         if (!entry.isFile() || entry.isSymbolicLink())
@@ -358,8 +396,7 @@ export class FilesystemBackend implements StorageBackend {
       .sort();
   }
 
-  private trackUsage(path: string, files: number, bytes: number): { files: number; bytes: number } {
-    const size = lstatSync(path).size;
+  private trackUsage(path: string, size: number, files: number, bytes: number): { files: number; bytes: number } {
     if (size > this.limits.maxFileBytes) throw new MemoryError(`Memory file exceeds limit: ${path}`);
     const result = { files: files + 1, bytes: bytes + size };
     if (result.files > this.limits.maxFiles) throw new MemoryError('Memory file limit exceeded.');
@@ -367,8 +404,8 @@ export class FilesystemBackend implements StorageBackend {
     return result;
   }
 
-  private parseCanonical(path: string): unknown {
-    return parseYamlBytes(readFileSync(path), path);
+  private parseCanonical(bytes: Uint8Array, path: string): unknown {
+    return parseYamlBytes(bytes, path);
   }
 
   private assertFilenameIdentity(path: string, id: string): void {
@@ -397,27 +434,55 @@ export class FilesystemBackend implements StorageBackend {
     throw new MemoryError(`Memory path does not map to a canonical document: ${path}`);
   }
 
-  private publish(path: string, bytes: Uint8Array | undefined): void {
+  private publish(path: string, bytes: Uint8Array | undefined, published: () => void): void {
     const absolute = this.managedPath(path);
+    const parent = dirname(absolute);
     this.ensureSafeDirectories(dirname(relative(this.root, absolute)).split(sep).join('/'));
+    const parentIdentities = captureDirectoryIdentities(parent);
     if (!bytes) {
-      if (existsSync(absolute)) rmSync(absolute);
-      syncDirectory(dirname(absolute));
+      if (assertRegularDestinationIfPresent(absolute)) {
+        revalidateDirectoryIdentities(parentIdentities);
+        rmSync(absolute);
+        published();
+        revalidateDirectoryIdentities(parentIdentities);
+      }
+      this.filesystemOps.syncDirectory(parent);
       return;
     }
-    const temporary = join(dirname(absolute), `.${randomToken()}.tmp`);
+    const temporary = join(parent, `.${randomUUID()}.tmp`);
     let descriptor: number | undefined;
+    let temporaryIdentity: Stats | undefined;
+    let parentIsCurrent = true;
     try {
-      descriptor = openSync(temporary, 'wx', 0o600);
+      descriptor = openSync(
+        temporary,
+        fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL | noFollowFlag(),
+        0o600,
+      );
+      temporaryIdentity = fstatSync(descriptor);
+      if (!temporaryIdentity.isFile()) throw new MemoryError(`Unsafe temporary memory file: ${temporary}`);
       writeFileSync(descriptor, bytes);
       fsyncSync(descriptor);
       closeSync(descriptor);
       descriptor = undefined;
-      renameSync(temporary, absolute);
-      syncDirectory(dirname(absolute));
+      assertRegularDestinationIfPresent(absolute);
+      revalidateDirectoryIdentities(parentIdentities);
+      this.filesystemOps.renameSync(temporary, absolute);
+      published();
+      const destinationStat = lstatSync(absolute);
+      if (destinationStat.isSymbolicLink() || !sameIdentity(temporaryIdentity, destinationStat))
+        throw new MemoryError(`Memory destination changed during publication: ${absolute}`);
+      try {
+        revalidateDirectoryIdentities(parentIdentities);
+      } catch (error: unknown) {
+        parentIsCurrent = false;
+        throw error;
+      }
+      this.filesystemOps.syncDirectory(parent);
     } finally {
       if (descriptor !== undefined) closeSync(descriptor);
-      rmSync(temporary, { force: true });
+      // Never clean up through a parent path that was rebound concurrently.
+      if (parentIsCurrent) rmSync(temporary, { force: true });
     }
   }
 
@@ -435,27 +500,91 @@ export class FilesystemBackend implements StorageBackend {
     let current = resolve(this.root);
     for (const component of path.split(/[\\/]/u).filter(Boolean)) {
       current = join(current, component);
-      if (!existsSync(current)) return;
-      const stat = lstatSync(current);
-      if (!stat.isDirectory() || stat.isSymbolicLink()) throw new MemoryError(`Unsafe memory path ancestor: ${path}`);
+      try {
+        const stat = lstatSync(current);
+        if (!stat.isDirectory() || stat.isSymbolicLink()) throw new MemoryError(`Unsafe memory path ancestor: ${path}`);
+      } catch (error: unknown) {
+        if (isCode(error, 'ENOENT')) return;
+        throw error;
+      }
     }
   }
 
   private ensureSafeDirectories(path: string): void {
-    let current = resolve(this.root);
-    for (const component of path.split('/').filter(Boolean)) {
+    const target = resolve(this.root, path);
+    const components: string[] = [];
+    let current = target;
+    while (dirname(current) !== current) {
+      components.unshift(basename(current));
+      current = dirname(current);
+    }
+    for (const component of components) {
       current = join(current, component);
-      if (existsSync(current)) {
+      try {
         const stat = lstatSync(current);
         if (!stat.isDirectory() || stat.isSymbolicLink()) throw new MemoryError('Unsafe memory directory ancestor.');
-      } else mkdirSync(current, { mode: 0o700 });
+      } catch (error: unknown) {
+        if (!isCode(error, 'ENOENT')) throw error;
+        mkdirSync(current, { mode: 0o700 });
+        const stat = lstatSync(current);
+        if (!stat.isDirectory() || stat.isSymbolicLink()) throw new MemoryError('Unsafe memory directory ancestor.');
+      }
+    }
+  }
+
+  /** Reads only verified file metadata for pre-batch resource accounting. */
+  private regularSize(path: string): number {
+    let descriptor: number | undefined;
+    try {
+      const parentIdentities = captureDirectoryIdentities(dirname(path));
+      descriptor = openSync(path, fsConstants.O_RDONLY | noFollowFlag());
+      const openedStat = fstatSync(descriptor);
+      if (!openedStat.isFile()) throw new MemoryError('Managed memory path is not a regular file.');
+      const pathStat = lstatSync(path);
+      if (pathStat.isSymbolicLink() || !sameIdentity(openedStat, pathStat))
+        throw new MemoryError('Managed memory path changed while it was opened.');
+      revalidateDirectoryIdentities(parentIdentities);
+      return openedStat.size;
+    } catch (error: unknown) {
+      if (error instanceof MemoryError) throw error;
+      if (isCode(error, 'ENOENT')) throw new MissingMemoryPathError(path);
+      throw new MemoryError(`Cannot safely inspect managed memory path: ${path}: ${describe(error)}`);
+    } finally {
+      if (descriptor !== undefined) closeSync(descriptor);
     }
   }
 
   private readRegular(path: string): Uint8Array {
-    const stat = lstatSync(path);
-    if (!stat.isFile() || stat.isSymbolicLink()) throw new MemoryError('Managed memory path is not a regular file.');
-    return readFileSync(path);
+    let descriptor: number | undefined;
+    try {
+      const parentIdentities = captureDirectoryIdentities(dirname(path));
+      descriptor = openSync(path, fsConstants.O_RDONLY | noFollowFlag());
+      const openedStat = fstatSync(descriptor);
+      if (!openedStat.isFile()) throw new MemoryError('Managed memory path is not a regular file.');
+      const pathStat = lstatSync(path);
+      if (pathStat.isSymbolicLink() || !sameIdentity(openedStat, pathStat))
+        throw new MemoryError('Managed memory path changed while it was opened.');
+      const bytes = readFileSync(descriptor);
+      revalidateDirectoryIdentities(parentIdentities);
+      return bytes;
+    } catch (error: unknown) {
+      if (error instanceof MemoryError) throw error;
+      if (isCode(error, 'ENOENT')) throw new MissingMemoryPathError(path);
+      throw new MemoryError(`Cannot safely read managed memory path: ${path}: ${describe(error)}`);
+    } finally {
+      if (descriptor !== undefined) closeSync(descriptor);
+    }
+  }
+
+  private readRegularIfExists(path: string): Uint8Array | undefined {
+    try {
+      const stat = lstatSync(path);
+      if (stat.isSymbolicLink() || !stat.isFile()) throw new MemoryError('Managed memory path is not a regular file.');
+    } catch (error: unknown) {
+      if (isCode(error, 'ENOENT')) return undefined;
+      throw error;
+    }
+    return this.readRegular(path);
   }
 }
 
@@ -486,9 +615,13 @@ function assertSafeMemoryRoot(root: string): void {
   }
   for (const component of components) {
     current = join(current, component);
-    if (!existsSync(current)) return;
-    const stat = lstatSync(current);
-    if (stat.isSymbolicLink() || !stat.isDirectory()) throw new MemoryError(`Unsafe memory root: ${root}`);
+    try {
+      const stat = lstatSync(current);
+      if (stat.isSymbolicLink() || !stat.isDirectory()) throw new MemoryError(`Unsafe memory root: ${root}`);
+    } catch (error: unknown) {
+      if (isCode(error, 'ENOENT')) return;
+      throw error;
+    }
   }
 }
 
@@ -529,21 +662,58 @@ function parseYamlBytes(bytes: Uint8Array, path: string): unknown {
   }
 }
 
-function randomToken(): string {
-  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+const DEFAULT_FILESYSTEM_OPERATIONS: FilesystemOperations = {
+  renameSync,
+  syncDirectory,
+};
+
+function captureDirectoryIdentities(directory: string): DirectoryIdentity[] {
+  return captureDirectoryIdentityChain(directory, 'memory directory');
+}
+
+function revalidateDirectoryIdentities(identities: readonly DirectoryIdentity[]): void {
+  revalidateDirectoryIdentityChain(identities, 'Memory directory');
+}
+
+function assertRegularDestinationIfPresent(path: string): boolean {
+  try {
+    const stat = lstatSync(path);
+    if (stat.isSymbolicLink() || !stat.isFile()) throw new MemoryError(`Unsafe memory destination: ${path}`);
+    return true;
+  } catch (error: unknown) {
+    if (isCode(error, 'ENOENT')) return false;
+    throw error;
+  }
+}
+
+/** Closes the cache without replacing an error from the primary operation. */
+function closeIndexPreservingError(index: SqliteIndex, operationFailed: boolean): void {
+  try {
+    index.close();
+  } catch (error: unknown) {
+    if (!operationFailed) throw error;
+  }
 }
 
 function syncDirectory(path: string): void {
   if (process.platform === 'win32') return;
   let descriptor: number | undefined;
   try {
-    descriptor = openSync(path, 'r');
+    descriptor = openSync(path, fsConstants.O_RDONLY | fsConstants.O_DIRECTORY | noFollowFlag());
+    if (!fstatSync(descriptor).isDirectory()) throw new MemoryError(`Unsafe memory directory: ${path}`);
     fsyncSync(descriptor);
   } catch (error: unknown) {
     const code = (error as NodeJS.ErrnoException).code;
     if (!['EINVAL', 'ENOTSUP', 'EISDIR'].includes(code ?? '')) throw error;
   } finally {
     if (descriptor !== undefined) closeSync(descriptor);
+  }
+}
+
+class MissingMemoryPathError extends MemoryError {
+  public constructor(path: string) {
+    super(`Managed memory path does not exist: ${path}`);
+    this.name = 'MissingMemoryPathError';
   }
 }
 

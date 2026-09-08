@@ -1,9 +1,9 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { memoryConfigSchema } from '../dist/config.js';
+import { fileURLToPath } from 'node:url';
+import { memoryConfigFileSchema } from '../dist/config.js';
 
-/** Writes the published configuration contract from the runtime Zod schema. */
+/** Writes the published YAML configuration contract from its Zod schema. */
 const output = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'config.schema.json');
 mkdirSync(dirname(output), { recursive: true });
-writeFileSync(output, `${JSON.stringify(memoryConfigSchema.toJSONSchema({ io: 'input' }), null, 2)}\n`, 'utf8');
+writeFileSync(output, `${JSON.stringify(memoryConfigFileSchema.toJSONSchema({ io: 'input' }), null, 2)}\n`, 'utf8');

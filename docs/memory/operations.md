@@ -7,7 +7,7 @@ Agents routinely see credentials. Memory **refuses to store** anything that look
 - PEM private key blocks (`-----BEGIN … PRIVATE KEY-----`)
 - AWS access keys (`AKIA…`, `ASIA…`)
 - GitHub tokens (`ghp_`, `gho_`, `ghu_`, `ghs_`, `ghr_`, `ghp_…`)
-- OpenAI-style keys (`sk-live-…`, `rk-live-…`, `sk-test-…`)
+- OpenAI-style keys (`sk-…`, `sk-proj-…`, `sk-live-…`, `rk-live-…`, `sk-test-…`)
 - Generic assignments: `password=…`, `api_key: …`, `token=…`
 - **Entropy heuristic**: any string of 32+ characters without spaces, mixing letters and digits, with Shannon entropy ≥ 4.2, is treated as a likely token even if its format is unknown
 
@@ -22,6 +22,12 @@ Tuning (in `skills.memory.security`):
 | `limits.*`                 | Resource ceilings (see below)                                          |
 
 Credentials belong in environment variables, never in memory — and never in the config file either (see [Configuration](./configuration.md)).
+
+## Filesystem safety boundaries
+
+Canonical YAML and SQLite cache artifacts are rejected when they are symbolic links. On platforms that provide `O_NOFOLLOW`, Neottia combines it with descriptor metadata checks; it also revalidates directory and destination identities around publication. SQLite is a disposable cache, so unsafe database, WAL, or shared-memory artifacts fail closed instead of being followed or automatically removed.
+
+Portable Node.js APIs do not provide descriptor-relative `openat`/`renameat` operations or a custom SQLite VFS. The checks therefore detect persistent path replacement but cannot promise immunity to an attacker who can continuously swap directories in the tiny intervals between path operations. Protect the memory root with operating-system permissions and do not place it in a directory writable by untrusted users. Windows also lacks portable directory `fsync`; atomic rename is used, but the same crash-durability guarantee available after POSIX directory `fsync` cannot be claimed there.
 
 ## Resource limits
 

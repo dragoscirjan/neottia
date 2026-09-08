@@ -1,4 +1,14 @@
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  symlinkSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -16,6 +26,7 @@ describe('shard barrier', () => {
     tempDirs.push(root);
     const result = withShardBarrier(root, 'local--project--global', () => 42);
     expect(result).toBe(42);
+    expect(readdirSync(join(root, '.locks'))).toEqual([]);
   });
 
   it('holds an async lock until the operation settles and releases it once', async () => {
@@ -37,6 +48,48 @@ describe('shard barrier', () => {
     releaseOperation();
     await expect(operation).resolves.toBeUndefined();
     await expect(withShardBarrierAsync(root, 'shard', async () => 'available')).resolves.toBe('available');
+  });
+
+  it('writes an unguessable owner token for every lease', () => {
+    const root = mkdtempSync(join(tmpdir(), 'neottia-barrier-'));
+    tempDirs.push(root);
+    const tokens: string[] = [];
+    for (let index = 0; index < 2; index += 1) {
+      withShardBarrier(root, 'shard', ({ lockPath }) => {
+        const owner = JSON.parse(readFileSync(join(lockPath, 'owner'), 'utf8')) as { token?: string };
+        tokens.push(owner.token ?? '');
+      });
+    }
+    expect(tokens[0]).toMatch(/^[0-9a-f-]{36}$/u);
+    expect(tokens[1]).not.toBe(tokens[0]);
+  });
+
+  it('does not let a delayed async release remove a replacement owner', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'neottia-barrier-'));
+    tempDirs.push(root);
+    const lockPath = join(root, '.locks', 'shard.lock');
+    let finish!: () => void;
+    const operation = withShardBarrierAsync(
+      root,
+      'shard',
+      async () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    await new Promise<void>((resolveImmediate) => setImmediate(resolveImmediate));
+
+    // Simulate another process replacing an externally removed stale lease
+    // while the original owner's asynchronous cleanup is delayed.
+    rmSync(lockPath, { recursive: true });
+    mkdirSync(lockPath);
+    writeFileSync(join(lockPath, 'owner'), JSON.stringify({ pid: process.pid, token: 'replacement-owner' }));
+    finish();
+    await operation;
+
+    expect(existsSync(lockPath)).toBe(true);
+    expect(readFileSync(join(lockPath, 'owner'), 'utf8')).toContain('replacement-owner');
+    expect(readdirSync(join(root, '.locks'))).toEqual(['shard.lock']);
   });
 
   it('does not block the event loop while asynchronously waiting for a lock', async () => {

@@ -1,4 +1,5 @@
 import type { MemoryConfig } from './config.js';
+import { ULID_PATTERN } from './identities.js';
 
 /**
  * Secret scanning with pluggable defaults (neottia#1 decision #3):
@@ -16,6 +17,8 @@ const BUILT_IN_SECRET_PATTERNS = [
   /\b(?:AKIA|ASIA)[A-Z0-9]{16}\b/u,
   /\bgh[pousr]_[A-Za-z0-9_]{20,}\b/u,
   /\b(?:sk|rk)-(?:live|test)-[A-Za-z0-9_-]{16,}\b/u,
+  // OpenAI legacy account keys and current project-scoped keys.
+  /\bsk-(?:proj-)?[A-Za-z0-9_-]{16,}/u,
   /\b(?:password|passwd|secret|token|api[_-]?key)\s*[:=]\s*\S+/iu,
 ] as const;
 
@@ -66,7 +69,7 @@ export class MemoryConfigPatternError extends Error {
 }
 
 /** Entropy gate for unknown token shapes; identical to the v1 heuristic. */
-export function looksHighEntropy(value: string, ulidPattern: RegExp = /^[0-9A-HJKMNP-TV-Z]{26}$/u): boolean {
+export function looksHighEntropy(value: string, ulidPattern: RegExp = ULID_PATTERN): boolean {
   if (
     value.length < 32 ||
     ulidPattern.test(value) ||

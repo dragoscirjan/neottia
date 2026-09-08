@@ -1,5 +1,5 @@
-import { existsSync, lstatSync, mkdirSync, rmSync } from 'node:fs';
-import { basename, join } from 'node:path';
+import { closeSync, constants as fsConstants, fstatSync, lstatSync, mkdirSync, openSync, rmSync } from 'node:fs';
+import { basename, dirname, join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { collectSearchResults, searchableText } from './backend/record-helpers.js';
 
@@ -15,6 +15,14 @@ function termsOf(query: string): string | undefined {
 }
 import type { ShardState } from './backend/types.js';
 import { MemoryError } from './errors.js';
+import {
+  captureDirectoryIdentities as captureDirectoryIdentityChain,
+  isFilesystemErrorCode as isCode,
+  noFollowFlag,
+  revalidateDirectoryIdentities as revalidateDirectoryIdentityChain,
+  sameFilesystemIdentity as sameIdentity,
+  type DirectoryIdentity,
+} from './filesystem-safety.js';
 import type { MemoryRecord } from './schemas.js';
 /**
  * SQLite index over the canonical YAML records (neottia#1 decision: the
@@ -67,10 +75,12 @@ export function canonicalHash(state: ShardState, filePaths?: readonly string[]):
 export class SqliteIndex {
   private readonly database: DatabaseSync;
   private readonly dbPath: string;
+  private readonly directoryIdentities: readonly DirectoryIdentity[];
 
-  private constructor(database: DatabaseSync, dbPath: string) {
+  private constructor(database: DatabaseSync, dbPath: string, directoryIdentities: readonly DirectoryIdentity[]) {
     this.database = database;
     this.dbPath = dbPath;
+    this.directoryIdentities = directoryIdentities;
   }
 
   /** Filesystem location of the index database. */
@@ -81,14 +91,18 @@ export class SqliteIndex {
   /** Opens (creating if needed) the index database inside the memory root. */
   public static open(memoryRoot: string, fileName = 'index.db'): SqliteIndex {
     assertSafeCacheFileName(fileName);
+    ensureSafeCacheRoot(memoryRoot);
     const dbPath = join(memoryRoot, fileName);
-    assertCacheArtifactsAreRegular(dbPath);
     let retried = false;
     for (;;) {
+      const directoryIdentities = captureDirectoryIdentities(memoryRoot);
+      assertSafeCacheState(dbPath, directoryIdentities);
       try {
-        mkdirSync(memoryRoot, { recursive: true, mode: 0o700 });
         const database = new DatabaseSync(dbPath);
         try {
+          // Node's SQLite API accepts paths rather than descriptors. Validate
+          // immediately before and after every path-opening SQLite phase.
+          assertSafeCacheState(dbPath, directoryIdentities);
           database.exec('PRAGMA journal_mode = WAL;');
           database.exec('PRAGMA synchronous = NORMAL;');
           database.exec(`
@@ -124,19 +138,19 @@ export class SqliteIndex {
               value TEXT NOT NULL
             );
           `);
-          return new SqliteIndex(database, dbPath);
+          assertSafeCacheState(dbPath, directoryIdentities);
+          return new SqliteIndex(database, dbPath, directoryIdentities);
         } catch (error: unknown) {
-          // The index is a disposable cache: corrupt or incompatible bytes
-          // are removed and rebuilt from canonical state on the next sync.
+          // The index is disposable, but unsafe artifacts are never removed:
+          // cleanup is allowed only after another no-follow validation.
           database.close();
-          if (!retried && existsSync(dbPath)) {
+          if (!retried && pathEntryExists(dbPath)) {
+            assertSafeCacheState(dbPath, directoryIdentities);
             retried = true;
-            for (const suffix of ['', '-wal', '-shm']) {
-              const stalePath = `${dbPath}${suffix}`;
-              if (existsSync(stalePath)) rmSync(stalePath);
-            }
+            removeCacheArtifacts(dbPath, directoryIdentities);
             continue;
           }
+          if (error instanceof MemoryError) throw error;
           throw new MemoryError(`Cannot open memory index at ${dbPath}: ${describe(error)}`);
         }
       } catch (error: unknown) {
@@ -148,12 +162,14 @@ export class SqliteIndex {
 
   /** Reads the stored canonical hash and rebuild timestamp, if any. */
   public meta(): { canonicalHash?: string; rebuiltAt?: string } {
+    this.assertSafe();
     const rows = this.database
       .prepare(`SELECT key, value FROM memory_meta WHERE key IN ('canonical_hash','rebuilt_at')`)
       .all() as Array<{
       key: string;
       value: string;
     }>;
+    this.assertSafe();
     const map = Object.fromEntries(rows.map((row) => [row.key, row.value]));
     return { canonicalHash: map.canonical_hash, rebuiltAt: map.rebuilt_at };
   }
@@ -169,6 +185,7 @@ export class SqliteIndex {
 
   /** Replaces the whole index contents inside one transaction. */
   public rebuild(state: ShardState): void {
+    this.assertSafe();
     const hash = canonicalHash(state);
     this.database.exec('BEGIN IMMEDIATE;');
     try {
@@ -210,6 +227,7 @@ export class SqliteIndex {
       setMeta.run('canonical_hash', hash);
       setMeta.run('rebuilt_at', new Date().toISOString());
       this.database.exec('COMMIT;');
+      this.assertSafe();
     } catch (error: unknown) {
       // BEGIN IMMEDIATE may itself fail (e.g. SQLITE_BUSY): guard the
       // rollback so it cannot mask the original failure.
@@ -224,6 +242,7 @@ export class SqliteIndex {
 
   /** BM25-ranked search over the FTS5 index. */
   public search(query: string, state: ShardState, options: IndexSearchOptions): MemoryRecord[] {
+    this.assertSafe();
     const match = termsOf(query);
     if (!match) return [];
     const ranked = this.database
@@ -234,6 +253,7 @@ export class SqliteIndex {
          ORDER BY rank ASC, id ASC`,
       )
       .all(match) as Array<{ id: string }>;
+    this.assertSafe();
     return collectSearchResults(
       ranked.map((row) => row.id),
       new Map(state.records.map((record) => [record.id, record])),
@@ -244,16 +264,35 @@ export class SqliteIndex {
   /** Removes the index file; used by tests and manual cache invalidation. */
   public static destroy(memoryRoot: string, fileName = 'index.db'): void {
     assertSafeCacheFileName(fileName);
+    if (!safeCacheRootExists(memoryRoot)) return;
     const dbPath = join(memoryRoot, fileName);
-    assertCacheArtifactsAreRegular(dbPath);
-    for (const suffix of ['', '-wal', '-shm']) {
-      const path = `${dbPath}${suffix}`;
-      if (existsSync(path)) rmSync(path);
-    }
+    const directoryIdentities = captureDirectoryIdentities(memoryRoot);
+    assertSafeCacheState(dbPath, directoryIdentities);
+    removeCacheArtifacts(dbPath, directoryIdentities);
   }
 
   public close(): void {
-    this.database.close();
+    let cleanupError: unknown;
+    try {
+      this.assertSafe();
+    } catch (error: unknown) {
+      cleanupError = error;
+    }
+    try {
+      this.database.close();
+    } catch (error: unknown) {
+      cleanupError ??= error;
+    }
+    try {
+      this.assertSafe();
+    } catch (error: unknown) {
+      cleanupError ??= error;
+    }
+    if (cleanupError !== undefined) throw cleanupError;
+  }
+
+  private assertSafe(): void {
+    assertSafeCacheState(this.dbPath, this.directoryIdentities);
   }
 }
 
@@ -262,17 +301,92 @@ function assertSafeCacheFileName(fileName: string): void {
     throw new MemoryError(`Unsafe memory cache filename: ${fileName}`);
 }
 
+function ensureSafeCacheRoot(memoryRoot: string): void {
+  const target = resolve(memoryRoot);
+  const missing: string[] = [];
+  let current = target;
+  while (!pathEntryExists(current)) {
+    missing.unshift(basename(current));
+    const parent = dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+  captureDirectoryIdentities(current);
+  for (const component of missing) {
+    current = join(current, component);
+    mkdirSync(current, { mode: 0o700 });
+  }
+  captureDirectoryIdentities(target);
+}
+
+function safeCacheRootExists(memoryRoot: string): boolean {
+  const target = resolve(memoryRoot);
+  let current = target;
+  while (!pathEntryExists(current)) {
+    const parent = dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+  captureDirectoryIdentities(current);
+  if (current !== target) return false;
+  captureDirectoryIdentities(target);
+  return true;
+}
+
+function captureDirectoryIdentities(directory: string): DirectoryIdentity[] {
+  return captureDirectoryIdentityChain(directory, 'memory cache directory');
+}
+
+function assertSafeCacheState(dbPath: string, directoryIdentities: readonly DirectoryIdentity[]): void {
+  revalidateDirectoryIdentities(directoryIdentities);
+  assertCacheArtifactsAreRegular(dbPath);
+  revalidateDirectoryIdentities(directoryIdentities);
+}
+
+function revalidateDirectoryIdentities(identities: readonly DirectoryIdentity[]): void {
+  revalidateDirectoryIdentityChain(identities, 'Memory cache directory');
+}
+
 function assertCacheArtifactsAreRegular(dbPath: string): void {
+  for (const suffix of ['', '-wal', '-shm']) assertCacheArtifactIsRegular(`${dbPath}${suffix}`);
+}
+
+function assertCacheArtifactIsRegular(path: string): boolean {
+  let descriptor: number | undefined;
+  try {
+    const pathStat = lstatSync(path);
+    if (pathStat.isSymbolicLink() || !pathStat.isFile()) throw new MemoryError(`Unsafe memory cache artifact: ${path}`);
+    descriptor = openSync(path, fsConstants.O_RDONLY | noFollowFlag());
+    const openedStat = fstatSync(descriptor);
+    if (!openedStat.isFile() || !sameIdentity(pathStat, openedStat))
+      throw new MemoryError(`Memory cache artifact changed during access: ${path}`);
+    return true;
+  } catch (error: unknown) {
+    if (isCode(error, 'ENOENT')) return false;
+    if (error instanceof MemoryError) throw error;
+    throw new MemoryError(`Cannot safely access memory cache artifact: ${path}: ${describe(error)}`);
+  } finally {
+    if (descriptor !== undefined) closeSync(descriptor);
+  }
+}
+
+function removeCacheArtifacts(dbPath: string, directoryIdentities: readonly DirectoryIdentity[]): void {
   for (const suffix of ['', '-wal', '-shm']) {
     const path = `${dbPath}${suffix}`;
-    let stat;
-    try {
-      stat = lstatSync(path);
-    } catch (error: unknown) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue;
-      throw error;
-    }
-    if (stat.isSymbolicLink() || !stat.isFile()) throw new MemoryError(`Unsafe memory cache artifact: ${path}`);
+    revalidateDirectoryIdentities(directoryIdentities);
+    if (!assertCacheArtifactIsRegular(path)) continue;
+    rmSync(path);
+    revalidateDirectoryIdentities(directoryIdentities);
+  }
+}
+
+function pathEntryExists(path: string): boolean {
+  try {
+    lstatSync(path);
+    return true;
+  } catch (error: unknown) {
+    if (isCode(error, 'ENOENT')) return false;
+    throw error;
   }
 }
 

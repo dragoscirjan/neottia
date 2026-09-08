@@ -27,6 +27,7 @@ export {
   MEMORY_SHARD_PATH_ENV,
   CREDENTIAL_DEFAULTS,
   loadMemoryConfig,
+  memoryConfigFileSchema,
   memoryConfigSchema,
   resolveConfigFile,
   resolveShardPath,
@@ -52,7 +53,6 @@ export type {
 } from './store.js';
 export {
   MEMORY_TOOLS,
-  MEMORY_TOOL_LIMITS,
   closeMemoryToolContext,
   findMemoryTool,
   deleteInputSchema,
@@ -66,3 +66,11 @@ export {
   validateInputSchema,
 } from './tools.js';
 export type { MemoryToolContext, MemoryToolDefinition } from './tools.js';
+export {
+  MEMORY_TOOL_LIMITS,
+  importReportSchema,
+  memoryToolJsonSchema,
+  memoryToolSchemas,
+  validationReportSchema,
+} from './tool-contracts.js';
+export type { MemoryToolInput, MemoryToolName, MemoryToolOutput } from './tool-contracts.js';

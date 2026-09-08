@@ -1,5 +1,11 @@
-import { closeMemoryToolContext, MEMORY_TOOLS, MEMORY_TOOL_LIMITS, type MemoryToolContext } from '@neottia/memory-core';
-import { Type } from 'typebox';
+import {
+  closeMemoryToolContext,
+  memoryToolJsonSchema,
+  MEMORY_TOOLS,
+  type MemoryToolContext,
+  type MemoryToolName,
+} from '@neottia/memory-core';
+import { Type, type TSchema } from 'typebox';
 
 /**
  * pi extension: registers the nine `memory_*` tools as first-class pi tools.
@@ -7,8 +13,8 @@ import { Type } from 'typebox';
  * MCP server and the library tool layer.
  *
  * pi loads extensions through jiti, so this TypeScript file ships as-is.
- * Tool argument schemas use TypeBox, pi's schema language; the authoritative
- * runtime validation stays inside @neottia/memory-core (Zod).
+ * Pi accepts JSON Schema parameters, generated from the authoritative Zod
+ * runtime contracts in @neottia/memory-core.
  */
 
 /** Minimal structural type of the pi ExtensionAPI surface we use. */
@@ -18,7 +24,7 @@ export interface PiExtensionApi {
     name: string;
     label?: string;
     description: string;
-    parameters: Record<string, unknown>;
+    parameters: TSchema;
     execute: (
       toolCallId: string,
       params: Record<string, unknown>,
@@ -38,77 +44,10 @@ export interface MemoryExtensionOptions {
   readonly onStaleCache?: () => boolean | Promise<boolean>;
 }
 
-const enumSchema = (values: [string, ...string[]]) => Type.Unsafe<string>({ type: 'string', enum: values });
-const ulidSchema = Type.String({ description: 'Crockford ULID', pattern: '^[0-9A-HJKMNP-TV-Z]{26}$' });
-const sourceSchema = Type.Object({
-  kind: enumSchema(['artifact', 'user-confirmed', 'discussion', 'tool-observation']),
-  ref: Type.Union([Type.String(), Type.Null()]),
-  revision: Type.Union([Type.String(), Type.Null()]),
-});
-const storeFields = {
-  memory_type: enumSchema(['semantic', 'episodic', 'procedural']),
-  record_type: enumSchema(['fact', 'decision', 'event', 'lesson']),
-  topic: Type.Optional(
-    Type.String({ description: 'Topic grouping; defaults to the configured default topic', minLength: 1 }),
-  ),
-  summary: Type.String({
-    description: `One-line memory summary (max ${MEMORY_TOOL_LIMITS.summaryCharacters} Unicode characters)`,
-    minLength: 1,
-  }),
-  details: Type.Optional(
-    Type.Union([
-      Type.String({
-        description: `Optional supporting details (max ${MEMORY_TOOL_LIMITS.detailsCharacters} Unicode characters, ${MEMORY_TOOL_LIMITS.detailsLines} lines)`,
-      }),
-      Type.Null(),
-    ]),
-  ),
-  source: sourceSchema,
-  created_by: Type.String({ description: 'Who created this record (e.g. "agent:pi")', minLength: 1 }),
-  confidence: enumSchema(['confirmed', 'verified']),
-  tags: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { description: 'Unique tags', uniqueItems: true })),
-};
-
-/** TypeBox parameter schemas, mirroring the core tool input contracts. */
-export const memoryToolParameters = {
-  memory_store: Type.Object(storeFields),
-  memory_supersede: Type.Object({ target_id: ulidSchema, ...storeFields }),
-  memory_delete: Type.Object({
-    target_id: ulidSchema,
-    reason: Type.String({ description: 'Why the record is being retired', minLength: 1, maxLength: 1_000 }),
-    source: sourceSchema,
-    created_by: Type.String({ minLength: 1 }),
-  }),
-  memory_get: Type.Object({ id: ulidSchema }),
-  memory_list: Type.Object({
-    topic: Type.Optional(Type.String({ minLength: 1 })),
-    memory_type: Type.Optional(enumSchema(['semantic', 'episodic', 'procedural'])),
-    limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 })),
-    include_superseded: Type.Optional(Type.Boolean()),
-  }),
-  memory_search: Type.Object({
-    query: Type.String({
-      description: `Full-text query; every term must match (max ${MEMORY_TOOL_LIMITS.queryBytes} UTF-8 bytes)`,
-      minLength: 1,
-    }),
-    topic: Type.Optional(Type.String({ minLength: 1 })),
-    memory_type: Type.Optional(enumSchema(['semantic', 'episodic', 'procedural'])),
-    limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 })),
-    max_chars: Type.Optional(Type.Integer({ minimum: 256, maximum: 100_000 })),
-    include_superseded: Type.Optional(Type.Boolean()),
-  }),
-  memory_validate: Type.Object({}),
-  memory_export: Type.Object({}),
-  memory_import: Type.Object({
-    content: Type.String({
-      description: `JSONL payload from memory_export (max ${MEMORY_TOOL_LIMITS.importBytes} UTF-8 bytes)`,
-      minLength: 1,
-    }),
-    preview: Type.Optional(Type.Boolean({ description: 'Validate only; do not write' })),
-  }),
-} as const;
-
-export type MemoryToolName = keyof typeof memoryToolParameters;
+/** Pi parameters generated losslessly from the core Zod contracts. */
+export const memoryToolParameters = Object.fromEntries(
+  MEMORY_TOOLS.map((tool) => [tool.name, Type.Unsafe(memoryToolJsonSchema(tool.name, 'input') as TSchema)]),
+) as unknown as Record<MemoryToolName, TSchema>;
 
 /**
  * Registers the memory tools on a pi extension API instance.
@@ -124,7 +63,7 @@ export function registerMemoryTools(pi: PiExtensionApi, options: MemoryExtension
   };
 
   for (const tool of MEMORY_TOOLS) {
-    const parameters = memoryToolParameters[tool.name as MemoryToolName] as unknown as Record<string, unknown>;
+    const parameters = memoryToolParameters[tool.name];
     if (!parameters) continue;
     pi.registerTool({
       name: tool.name,

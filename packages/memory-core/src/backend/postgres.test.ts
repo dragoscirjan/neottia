@@ -1,8 +1,8 @@
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import pg from 'pg';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   MemoryConflictError,
   MemoryError,
@@ -18,8 +18,8 @@ import type { StoreMemoryInput } from '../store.js';
  * Docker PostgreSQL from dependencies/postgres (pg_textsearch BM25 included).
  *
  * Gated by NEOTTIA_TEST_PG=1 so `mise run validate` never requires Docker.
- * The container lifecycle: started here when not healthy, left running for
- * faster re-runs (`docker compose down -v` in dependencies/postgres wipes).
+ * Each enabled run owns a unique Compose project, random host port, and
+ * disposable volume; teardown removes all of those resources.
  */
 
 const enabled = process.env.NEOTTIA_TEST_PG === '1';
@@ -32,15 +32,29 @@ const dependenciesDir = resolve(
   'dependencies',
   'postgres',
 );
-const connectionString = 'postgres://neottia:neottia@localhost:5433/neottia';
+const fixtureId = `${process.pid}-${Math.random().toString(36).slice(2, 10)}`;
+const composeProject = `neottia-pg-${fixtureId}`;
+const defaultNamespace = { organization_id: `pgtest-${fixtureId}`, project_id: 'shard', scope: 'global' };
+const credentialEnv = {
+  NEOTTIA_MEMORY_DB_PG_USER: 'neottia',
+  NEOTTIA_MEMORY_DB_PG_PASSWORD: 'neottia',
+} as NodeJS.ProcessEnv;
+let postgresPort = 0;
 
 function compose(args: readonly string[]): { status: number; stdout: string; stderr: string } {
-  const result = spawnSync('docker', ['compose', ...args], { cwd: dependenciesDir, encoding: 'utf8' });
+  const result = spawnSync('docker', ['compose', '--project-name', composeProject, ...args], {
+    cwd: dependenciesDir,
+    encoding: 'utf8',
+  });
   return { status: result.status ?? -1, stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
 }
 
 function containerHealthy(): boolean {
   return compose(['ps', '--format', 'json']).stdout.includes('"Health":"healthy"');
+}
+
+function connectionString(): string {
+  return `postgres://neottia:neottia@127.0.0.1:${postgresPort}/neottia`;
 }
 
 function fact(summary: string): StoreMemoryInput {
@@ -54,20 +68,29 @@ function fact(summary: string): StoreMemoryInput {
   };
 }
 
-function pgStore(namespace: Partial<{ organization_id: string; project_id: string; scope: string }> = {}): MemoryStore {
+function pgStore(
+  namespace: Partial<{ organization_id: string; project_id: string; scope: string }> = {},
+  limits: Partial<{ max_file_bytes: number; max_files: number; max_total_bytes: number }> = {},
+): MemoryStore {
   return MemoryStore.fromConfig(
     loadMemoryConfig(process.cwd(), {
-      env: {},
+      env: credentialEnv,
       enabled: true,
       backend: 'postgres',
       namespace: {
-        organization_id: 'pgtest',
-        project_id: 'shard',
+        ...defaultNamespace,
         default_topic: 'general',
-        scope: 'global',
         ...namespace,
       },
-      provider: { db: { pg: { ssl: false, port: 5433 } } },
+      provider: { db: { pg: { ssl: false, host: '127.0.0.1', port: postgresPort } } },
+      security: {
+        limits: {
+          max_file_bytes: 16 * 1024 * 1024,
+          max_files: 10_000,
+          max_total_bytes: 256 * 1024 * 1024,
+          ...limits,
+        },
+      },
     }),
     process.cwd(),
   );
@@ -75,35 +98,41 @@ function pgStore(namespace: Partial<{ organization_id: string; project_id: strin
 
 beforeAll(async () => {
   if (!enabled) return;
-  process.env.NEOTTIA_MEMORY_DB_PG_USER = 'neottia';
-  process.env.NEOTTIA_MEMORY_DB_PG_PASSWORD = 'neottia';
-  if (!containerHealthy()) {
-    const up = compose(['up', '-d', '--build']);
-    if (up.status !== 0) throw new Error(`Cannot start the test PostgreSQL:\n${up.stderr}`);
-  }
+  const up = compose(['up', '-d', '--build']);
+  if (up.status !== 0) throw new Error(`Cannot start the test PostgreSQL:\n${up.stderr}`);
   for (let attempt = 0; attempt < 60; attempt += 1) {
-    if (containerHealthy()) return;
+    if (containerHealthy()) {
+      const mapped = compose(['port', 'postgres', '5432']);
+      const match = /:(\d+)\s*$/u.exec(mapped.stdout);
+      if (!match) throw new Error(`Cannot discover the test PostgreSQL port: ${mapped.stderr || mapped.stdout}`);
+      postgresPort = Number(match[1]);
+      return;
+    }
     await new Promise((resolveTimeout) => setTimeout(resolveTimeout, 1_000));
   }
   throw new Error('The test PostgreSQL did not become healthy in time.');
 }, 600_000);
 
-afterAll(async () => {
-  // Container intentionally left running for faster subsequent runs.
+afterAll(() => {
+  if (!enabled) return;
+  const down = compose(['down', '--volumes', '--remove-orphans']);
+  if (down.status !== 0) throw new Error(`Cannot tear down the test PostgreSQL:\n${down.stderr}`);
 });
 
 /** Deletes every row (records + tombstones) of the given shard, directly. */
 async function wipeShard(namespace: { organization_id: string; project_id: string; scope: string }): Promise<void> {
-  const client = new pg.Client({ connectionString });
+  const client = new pg.Client({ connectionString: connectionString() });
   await client.connect();
   try {
-    await client.query(`DELETE FROM memory_records WHERE organization_id = $1 AND project_id = $2`, [
+    await client.query(`DELETE FROM memory_records WHERE organization_id = $1 AND project_id = $2 AND scope = $3`, [
       namespace.organization_id,
       namespace.project_id,
+      namespace.scope,
     ]);
-    await client.query(`DELETE FROM memory_tombstones WHERE organization_id = $1 AND project_id = $2`, [
+    await client.query(`DELETE FROM memory_tombstones WHERE organization_id = $1 AND project_id = $2 AND scope = $3`, [
       namespace.organization_id,
       namespace.project_id,
+      namespace.scope,
     ]);
   } catch (error: unknown) {
     // 42P01 (undefined_table): the backend has not created its schema yet.
@@ -113,13 +142,128 @@ async function wipeShard(namespace: { organization_id: string; project_id: strin
   }
 }
 
+describe('postgres backend bounded waits', () => {
+  it('reports an actionable connection failure without Docker', async () => {
+    const backend = new PostgresBackend({
+      config: loadMemoryConfig(process.cwd(), {
+        env: {},
+        enabled: true,
+        backend: 'postgres',
+        provider: {
+          db: {
+            pg: { host: '127.0.0.1', port: 1, ssl: false, user: 'unreachable', password: 'unreachable' },
+          },
+        },
+      }),
+      cwd: process.cwd(),
+    });
+    try {
+      await expect(backend.loadState()).rejects.toThrow(/connection failed within the 5 second wait/u);
+    } finally {
+      await backend.close();
+    }
+  }, 15_000);
+});
+
 describe.skipIf(!enabled)('postgres backend (docker pg_textsearch)', () => {
-  const shard = { organization_id: 'pgtest', project_id: 'shard', scope: 'global' };
+  const shard = defaultNamespace;
   let store: MemoryStore;
 
   beforeEach(async () => {
     store = pgStore();
     await wipeShard(shard);
+  });
+
+  afterEach(async () => {
+    await store.close();
+  });
+
+  it('migrates legacy global rows idempotently while initializers race', async () => {
+    const recordId = '01ARZ3NDEKTSV4RRFFQ69G5FAV';
+    const tombstoneId = '01ARZ3NDEKTSV4RRFFQ69G5FAW';
+    const createdAt = '2025-01-01T00:00:00.000Z';
+    const source = { kind: 'user-confirmed', ref: null, revision: null };
+    const document = {
+      schema_version: 1,
+      id: recordId,
+      memory_type: 'semantic',
+      record_type: 'fact',
+      organization_id: defaultNamespace.organization_id,
+      project_id: defaultNamespace.project_id,
+      topic: 'general',
+      summary: 'Legacy global record',
+      details: null,
+      source,
+      created_at: createdAt,
+      created_by: 'legacy-test',
+      confidence: 'confirmed',
+      status: 'active',
+      supersedes: [],
+      tags: [],
+    };
+    const tombstone = {
+      schema_version: 1,
+      id: tombstoneId,
+      organization_id: defaultNamespace.organization_id,
+      project_id: defaultNamespace.project_id,
+      target_id: recordId,
+      reason: 'Legacy global tombstone',
+      source,
+      created_at: createdAt,
+      created_by: 'legacy-test',
+    };
+    const client = new pg.Client({ connectionString: connectionString() });
+    await client.connect();
+    try {
+      await client.query(`
+        CREATE TABLE memory_records (
+          id TEXT PRIMARY KEY, organization_id TEXT NOT NULL, project_id TEXT NOT NULL,
+          memory_type TEXT NOT NULL, record_type TEXT NOT NULL, topic TEXT NOT NULL,
+          summary TEXT NOT NULL, details TEXT, created_at TIMESTAMPTZ NOT NULL,
+          created_by TEXT NOT NULL, supersedes JSONB NOT NULL DEFAULT '[]',
+          tags JSONB NOT NULL DEFAULT '[]', document JSONB NOT NULL
+        );
+        CREATE TABLE memory_tombstones (
+          id TEXT PRIMARY KEY, organization_id TEXT NOT NULL, project_id TEXT NOT NULL,
+          target_id TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL, document JSONB NOT NULL
+        );
+      `);
+      await client.query(
+        `INSERT INTO memory_records
+           (id, organization_id, project_id, memory_type, record_type, topic, summary, details,
+            created_at, created_by, supersedes, tags, document)
+         VALUES ($1, $2, $3, 'semantic', 'fact', 'general', 'Legacy global record', NULL,
+                 $4, 'legacy-test', '[]', '[]', $5)`,
+        [recordId, defaultNamespace.organization_id, defaultNamespace.project_id, createdAt, document],
+      );
+      await client.query(
+        `INSERT INTO memory_tombstones
+           (id, organization_id, project_id, target_id, created_at, document)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [tombstoneId, defaultNamespace.organization_id, defaultNamespace.project_id, recordId, createdAt, tombstone],
+      );
+    } finally {
+      await client.end();
+    }
+
+    const [left, right] = [pgStore(), pgStore()];
+    try {
+      const [leftRecord, rightTombstone] = await Promise.all([left.get(recordId), right.get(tombstoneId)]);
+      expect(leftRecord).toMatchObject({ id: recordId });
+      expect(rightTombstone).toMatchObject({ id: tombstoneId });
+    } finally {
+      await left.close();
+      await right.close();
+    }
+  });
+
+  it('uses fallback credential environment variables through backend construction', async () => {
+    const fallback = pgStore({ scope: 'credential-fallback' });
+    try {
+      await expect(fallback.list()).resolves.toEqual([]);
+    } finally {
+      await fallback.close();
+    }
   });
 
   it('isolates records by namespace scope', async () => {
@@ -132,6 +276,31 @@ describe.skipIf(!enabled)('postgres backend (docker pg_textsearch)', () => {
     } finally {
       await feature.close();
       await other.close();
+    }
+  });
+
+  it('allows the same imported record and tombstone IDs in different organizations and scopes', async () => {
+    const record = await store.store(fact('Composite record identity'));
+    const tombstone = await store.delete(record.id, 'composite tombstone identity', record.source, 'pg-test');
+    const exported = await store.export();
+    const scoped = pgStore({ scope: 'another-scope' });
+    const organization = `${defaultNamespace.organization_id}-other`;
+    const crossOrganizationPayload = `${exported
+      .trim()
+      .split('\n')
+      .map((line) => JSON.stringify({ ...(JSON.parse(line) as object), organization_id: organization }))
+      .join('\n')}\n`;
+    const otherOrganization = pgStore({ organization_id: organization });
+    try {
+      await scoped.import(exported);
+      await otherOrganization.import(crossOrganizationPayload);
+      expect(await scoped.get(record.id)).toMatchObject({ id: record.id });
+      expect(await scoped.get(tombstone.id)).toMatchObject({ id: tombstone.id });
+      expect(await otherOrganization.get(record.id)).toMatchObject({ id: record.id });
+      expect(await otherOrganization.get(tombstone.id)).toMatchObject({ id: tombstone.id });
+    } finally {
+      await scoped.close();
+      await otherOrganization.close();
     }
   });
 
@@ -151,6 +320,15 @@ describe.skipIf(!enabled)('postgres backend (docker pg_textsearch)', () => {
     expect(hits[0]?.id).toBe(alpha.id);
     expect(await store.search({ query: 'PAPYRUS OR WATERFALL' })).toHaveLength(0);
     expect(await store.search({ query: 'nonexistent' })).toHaveLength(0);
+  });
+
+  it('pages past more than 50 excluded ranked rows to find an eligible record', async () => {
+    for (let index = 0; index < 51; index += 1) {
+      const excluded = await store.store(fact(`${'needle '.repeat(20)}excluded ${index}`));
+      await store.delete(excluded.id, 'exclude ranked result', excluded.source, 'pg-test');
+    }
+    const eligible = await store.store(fact('needle eligible'));
+    expect(await store.search({ query: 'needle', limit: 1 })).toEqual([eligible]);
   });
 
   it('keeps the search character budget cumulative across filtered pages', async () => {
@@ -175,11 +353,11 @@ describe.skipIf(!enabled)('postgres backend (docker pg_textsearch)', () => {
     const record = await store.store(fact('Path identity'));
     const backend = new PostgresBackend({
       config: loadMemoryConfig(process.cwd(), {
-        env: {},
+        env: credentialEnv,
         enabled: true,
         backend: 'postgres',
-        namespace: { organization_id: 'pgtest', project_id: 'shard', scope: 'global' },
-        provider: { db: { pg: { ssl: false, port: 5433 } } },
+        namespace: defaultNamespace,
+        provider: { db: { pg: { ssl: false, host: '127.0.0.1', port: postgresPort } } },
       }),
       cwd: process.cwd(),
     });
@@ -195,6 +373,37 @@ describe.skipIf(!enabled)('postgres backend (docker pg_textsearch)', () => {
       ).rejects.toThrow(/does not match record identity/u);
     } finally {
       await backend.close();
+    }
+  });
+
+  it('enforces resulting shard file-count limits without partial mutation', async () => {
+    const limited = pgStore({}, { max_files: 1 });
+    try {
+      await limited.store(fact('First limited record'));
+      await expect(limited.store(fact('Rejected second record'))).rejects.toThrow(/max_files/u);
+      expect(await limited.list({ limit: 10 })).toHaveLength(1);
+    } finally {
+      await limited.close();
+    }
+  });
+
+  it('enforces per-item and total byte limits without mutation', async () => {
+    const itemLimited = pgStore({ scope: 'item-limit' }, { max_file_bytes: 64 });
+    const totalLimited = pgStore({ scope: 'total-limit' }, { max_total_bytes: 2_200 });
+    try {
+      await expect(itemLimited.store(fact('This record exceeds a deliberately tiny item limit'))).rejects.toThrow(
+        /max_file_bytes/u,
+      );
+      expect(await itemLimited.list()).toEqual([]);
+
+      await totalLimited.store({ ...fact('First aggregate record'), details: 'a'.repeat(1_000) });
+      await expect(
+        totalLimited.store({ ...fact('Second aggregate record'), details: 'b'.repeat(1_000) }),
+      ).rejects.toThrow(/max_total_bytes/u);
+      expect(await totalLimited.list({ limit: 10 })).toHaveLength(1);
+    } finally {
+      await itemLimited.close();
+      await totalLimited.close();
     }
   });
 
@@ -214,19 +423,33 @@ describe.skipIf(!enabled)('postgres backend (docker pg_textsearch)', () => {
     expect(await store.list()).toHaveLength(0);
 
     const destination = pgStore();
-    expect(await destination.import(exported, true)).toMatchObject({ valid: true, records: 1 });
-    expect(await destination.list()).toHaveLength(0);
-    expect(await destination.import(exported)).toMatchObject({ valid: true, records: 1 });
-    expect(await destination.list()).toHaveLength(1);
-    await expect(destination.import(exported)).rejects.toThrow(MemoryConflictError);
+    try {
+      expect(await destination.import(exported, true)).toMatchObject({ valid: true, records: 1 });
+      expect(await destination.list()).toHaveLength(0);
+      expect(await destination.import(exported)).toMatchObject({ valid: true, records: 1 });
+      expect(await destination.list()).toHaveLength(1);
+      await expect(destination.import(exported)).rejects.toThrow(MemoryConflictError);
+    } finally {
+      await destination.close();
+    }
   });
 
   it('validates and rebuilds a stale non-empty search cache', async () => {
     const record = await store.store(fact('Validate me'));
-    const client = new pg.Client({ connectionString });
+    const client = new pg.Client({ connectionString: connectionString() });
     await client.connect();
     try {
-      await client.query(`UPDATE memory_records SET search_text = $1 WHERE id = $2`, ['stale text', record.id]);
+      await client.query(
+        `UPDATE memory_records SET search_text = $1
+         WHERE id = $2 AND organization_id = $3 AND project_id = $4 AND scope = $5`,
+        [
+          'stale text',
+          record.id,
+          defaultNamespace.organization_id,
+          defaultNamespace.project_id,
+          defaultNamespace.scope,
+        ],
+      );
     } finally {
       await client.end();
     }
@@ -240,10 +463,20 @@ describe.skipIf(!enabled)('postgres backend (docker pg_textsearch)', () => {
 
   it('repairs stale search text before ranking', async () => {
     const record = await store.store(fact('Search repair'));
-    const client = new pg.Client({ connectionString });
+    const client = new pg.Client({ connectionString: connectionString() });
     await client.connect();
     try {
-      await client.query(`UPDATE memory_records SET search_text = $1 WHERE id = $2`, ['stale text', record.id]);
+      await client.query(
+        `UPDATE memory_records SET search_text = $1
+         WHERE id = $2 AND organization_id = $3 AND project_id = $4 AND scope = $5`,
+        [
+          'stale text',
+          record.id,
+          defaultNamespace.organization_id,
+          defaultNamespace.project_id,
+          defaultNamespace.scope,
+        ],
+      );
     } finally {
       await client.end();
     }
@@ -259,29 +492,52 @@ describe.skipIf(!enabled)('postgres backend (docker pg_textsearch)', () => {
     });
   });
 
+  it('bounds advisory-lock waits with an actionable error', async () => {
+    await store.list();
+    const blocker = new pg.Client({ connectionString: connectionString() });
+    await blocker.connect();
+    try {
+      await blocker.query('BEGIN');
+      await blocker.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [
+        `${defaultNamespace.organization_id}:${defaultNamespace.project_id}:${defaultNamespace.scope}`,
+      ]);
+      await expect(store.list()).rejects.toThrow(/Timed out after 10 seconds.*advisory lock/u);
+    } finally {
+      await blocker.query('ROLLBACK').catch(() => undefined);
+      await blocker.end();
+    }
+  }, 20_000);
+
   it('serializes concurrent writers through the advisory lock', async () => {
     const [left, right] = [pgStore(), pgStore()];
-    const results = await Promise.all([
-      left.store(fact('Concurrent writer A')),
-      right.store(fact('Concurrent writer B')),
-    ]);
-    await left.close();
-    await right.close();
-    expect(new Set(results.map((record) => record.id)).size).toBe(2);
-    expect(await store.list()).toHaveLength(2);
+    try {
+      const results = await Promise.all([
+        left.store(fact('Concurrent writer A')),
+        right.store(fact('Concurrent writer B')),
+      ]);
+      expect(new Set(results.map((record) => record.id)).size).toBe(2);
+      expect(await store.list()).toHaveLength(2);
+    } finally {
+      await left.close();
+      await right.close();
+    }
   });
 
-  it('exposes the backend through the store facade', () => {
+  it('exposes the backend through the store facade', async () => {
     const backend = new PostgresBackend({
       config: loadMemoryConfig(process.cwd(), {
-        env: {},
+        env: credentialEnv,
         enabled: true,
         backend: 'postgres',
-        namespace: { organization_id: 'pgtest', project_id: 'shard', scope: 'global' },
-        provider: { db: { pg: { ssl: false, port: 5433 } } },
+        namespace: defaultNamespace,
+        provider: { db: { pg: { ssl: false, host: '127.0.0.1', port: postgresPort } } },
       }),
       cwd: process.cwd(),
     });
-    expect(backend).toBeInstanceOf(PostgresBackend);
+    try {
+      expect(backend).toBeInstanceOf(PostgresBackend);
+    } finally {
+      await backend.close();
+    }
   });
 });
