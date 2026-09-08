@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { existsSync, lstatSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, rmSync, rmdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { MemoryLockError } from './errors.js';
 
@@ -158,9 +158,7 @@ function finishAcquire(lockPath: string, scopeKey: string): AcquiredLock {
     released = true;
     activeLocks.delete(lockPath);
     try {
-      // A delayed owner must never remove a replacement lease that reused the
-      // same shard path after the original directory disappeared.
-      if (lockOwnerMatches(lockPath, token)) rmSync(lockPath, { recursive: true, force: true });
+      releaseOwnedLock(lockPath, token);
     } catch {
       // Fail closed: a release failure intentionally leaves the lock behind
       // so the next acquirer can detect and steal it once stale.
@@ -247,18 +245,42 @@ function claimOwnerMatches(claimPath: string, token: string): boolean {
   return ownerTokenMatches(claimPath, token);
 }
 
-function lockOwnerMatches(lockPath: string, token: string): boolean {
+function releaseOwnedLock(lockPath: string, token: string): void {
+  const ownerPath = join(lockPath, 'owner');
+  const releasePath = `${lockPath}.release-${token}`;
   try {
-    const stat = lstatSync(lockPath);
-    return stat.isDirectory() && !stat.isSymbolicLink() && ownerTokenMatches(lockPath, token);
+    // Moving the owner file is the release claim. While it is absent, other
+    // acquirers preserve the lock as having unknown ownership. If the path was
+    // replaced, the moved metadata exposes the mismatch before any deletion.
+    renameSync(ownerPath, releasePath);
   } catch {
-    return false;
+    return;
   }
+
+  if (!ownerFileTokenMatches(releasePath, token)) {
+    // Restore a replacement owner's metadata when possible. Never recursively
+    // remove a directory whose ownership differs from this lease.
+    if (!existsSync(ownerPath)) renameSync(releasePath, ownerPath);
+    return;
+  }
+
+  try {
+    // A non-recursive removal fails closed if another entry appeared.
+    rmdirSync(lockPath);
+  } catch (error: unknown) {
+    if (existsSync(lockPath) && !existsSync(ownerPath)) renameSync(releasePath, ownerPath);
+    throw error;
+  }
+  rmSync(releasePath, { force: true });
 }
 
 function ownerTokenMatches(ownerDirectory: string, token: string): boolean {
+  return ownerFileTokenMatches(join(ownerDirectory, 'owner'), token);
+}
+
+function ownerFileTokenMatches(ownerPath: string, token: string): boolean {
   try {
-    const owner = JSON.parse(readFileSync(join(ownerDirectory, 'owner'), 'utf8')) as { token?: string };
+    const owner = JSON.parse(readFileSync(ownerPath, 'utf8')) as { token?: string };
     return owner.token === token;
   } catch {
     return false;

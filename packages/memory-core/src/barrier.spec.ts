@@ -3,6 +3,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   rmSync,
   symlinkSync,
   utimesSync,
@@ -25,6 +26,7 @@ describe('shard barrier', () => {
     tempDirs.push(root);
     const result = withShardBarrier(root, 'local--project--global', () => 42);
     expect(result).toBe(42);
+    expect(readdirSync(join(root, '.locks'))).toEqual([]);
   });
 
   it('holds an async lock until the operation settles and releases it once', async () => {
@@ -87,6 +89,7 @@ describe('shard barrier', () => {
 
     expect(existsSync(lockPath)).toBe(true);
     expect(readFileSync(join(lockPath, 'owner'), 'utf8')).toContain('replacement-owner');
+    expect(readdirSync(join(root, '.locks'))).toEqual(['shard.lock']);
   });
 
   it('does not block the event loop while asynchronously waiting for a lock', async () => {

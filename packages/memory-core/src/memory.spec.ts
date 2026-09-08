@@ -200,6 +200,16 @@ describe('memory store (filesystem + SQLite index)', () => {
     expect(await destination.list()).toEqual([]);
   });
 
+  it('rejects overflow ULIDs on import without mutation', async () => {
+    expect.assertions(5);
+    const source = storeFor(fixture());
+    const destination = storeFor(fixture());
+    const record = await source.store(fact('Strict import identity'));
+    const overflow = { ...record, id: '80000000000000000000000000' };
+
+    await expectImportRejectionWithoutMutation(destination, `${JSON.stringify(overflow)}\n`, /Invalid memory record/u);
+  });
+
   it('rejects conflicting lifecycle retirements before preview or persistence', async () => {
     expect.assertions(15);
     const duplicateStore = storeFor(fixture());
@@ -543,7 +553,10 @@ describe('memory store (filesystem + SQLite index)', () => {
       properties: Record<string, Record<string, unknown>>;
     };
     expect(importSchema.properties['content']?.['x-neottia-max-utf8-bytes']).toBe(64 * 1024 * 1024);
-    expect(memoryToolJsonSchema('memory_export', 'output')).toMatchObject({ type: 'string' });
+    expect(memoryToolJsonSchema('memory_export', 'output')).toMatchObject({
+      type: 'string',
+      'x-neottia-max-utf8-bytes': 64 * 1024 * 1024,
+    });
   });
 
   it('keeps supersession semantics across the tools layer', async () => {

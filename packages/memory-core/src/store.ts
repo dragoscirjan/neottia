@@ -12,7 +12,12 @@ import {
   type MemorySource,
   type MemoryTombstone,
 } from './schemas.js';
-import type { ImportReport, MemoryValidationReport, StoreMemoryInput } from './tool-contracts.js';
+import {
+  MEMORY_TOOL_LIMITS,
+  type ImportReport,
+  type MemoryValidationReport,
+  type StoreMemoryInput,
+} from './tool-contracts.js';
 
 export type { ImportReport, MemoryValidationReport, StoreMemoryInput } from './tool-contracts.js';
 
@@ -41,9 +46,6 @@ export interface MemoryStoreOptions {
   /** Host hook for stale_policy 'prompt' (extensions can prompt the user). */
   readonly onStaleCache?: () => boolean | Promise<boolean>;
 }
-
-const MAX_QUERY_BYTES = 16 * 1024;
-const MAX_PAYLOAD_BYTES = 64 * 1024 * 1024;
 
 export class MemoryStore {
   private readonly backend: StorageBackend;
@@ -135,7 +137,7 @@ export class MemoryStore {
   public async search(input: SearchMemoryInput = {}): Promise<MemoryRecord[]> {
     const query = input.query;
     if (!query || !query.trim()) throw new MemoryError('query must contain searchable text.');
-    if (Buffer.byteLength(query, 'utf8') > MAX_QUERY_BYTES)
+    if (Buffer.byteLength(query, 'utf8') > MEMORY_TOOL_LIMITS.queryBytes)
       throw new MemoryError('query exceeds the 16 KiB memory search limit.');
     const limit = bounded(input.limit ?? this.config.retrieval.limit, 1, 100, 'limit');
     const maxChars = bounded(input.max_chars ?? this.config.retrieval.max_chars, 256, 100_000, 'max_chars');
@@ -178,7 +180,7 @@ export class MemoryStore {
   public async export(): Promise<string> {
     return this.executeRead((state) => {
       const result = `${[...state.records, ...state.tombstones].map((item) => JSON.stringify(item)).join('\n')}\n`;
-      if (Buffer.byteLength(result, 'utf8') > MAX_PAYLOAD_BYTES)
+      if (Buffer.byteLength(result, 'utf8') > MEMORY_TOOL_LIMITS.exportBytes)
         throw new MemoryError('memory export exceeds the 64 MiB payload limit.');
       return result;
     });
@@ -186,7 +188,7 @@ export class MemoryStore {
 
   /** Imports a JSONL payload; preview validates without writing. */
   public async import(content: string, preview = false): Promise<ImportReport> {
-    if (Buffer.byteLength(content, 'utf8') > MAX_PAYLOAD_BYTES)
+    if (Buffer.byteLength(content, 'utf8') > MEMORY_TOOL_LIMITS.importBytes)
       throw new MemoryError('memory import exceeds the 64 MiB payload limit.');
 
     try {

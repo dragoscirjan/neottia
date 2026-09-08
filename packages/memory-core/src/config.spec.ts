@@ -182,18 +182,28 @@ describe('memory config shard', () => {
     }
   });
 
-  it('passes resolved credential values to PostgreSQL exactly once', () => {
+  it('passes YAML credential values to PostgreSQL after exactly one expansion', () => {
     const cwd = fixture();
-    const config = loadMemoryConfig(cwd, {
-      env: { PG_USER: '${SECOND_USER}', PG_PASSWORD: '${SECOND_PASSWORD}' } as NodeJS.ProcessEnv,
-      backend: 'postgres',
-      provider: { db: { pg: { user: '${PG_USER}', password: '${PG_PASSWORD}' } } },
-    });
-    expect(resolvePgSettings(config)).toMatchObject({
-      user: '${SECOND_USER}',
-      password: '${SECOND_PASSWORD}',
-    });
-    rmSync(cwd, { recursive: true, force: true });
+    try {
+      writeConfig(cwd, {
+        version: 1,
+        skills: {
+          memory: {
+            backend: 'postgres',
+            provider: { db: { pg: { user: '${PG_USER}', password: '${PG_PASSWORD}' } } },
+          },
+        },
+      });
+      const config = loadMemoryConfig(cwd, {
+        env: { PG_USER: '${SECOND_USER}', PG_PASSWORD: '${SECOND_PASSWORD}' } as NodeJS.ProcessEnv,
+      });
+      expect(resolvePgSettings(config)).toMatchObject({
+        user: '${SECOND_USER}',
+        password: '${SECOND_PASSWORD}',
+      });
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
   });
 
   it('publishes a configuration schema generated from the YAML file schema', () => {

@@ -9,6 +9,7 @@ export const MEMORY_TOOL_LIMITS = {
   detailsLines: 12,
   queryBytes: 16 * 1024,
   importBytes: 64 * 1024 * 1024,
+  exportBytes: 64 * 1024 * 1024,
 } as const;
 
 const ulid = z.string().regex(ULID_PATTERN, 'must be a Crockford ULID');
@@ -188,7 +189,10 @@ export const memoryToolSchemas = {
   memory_list: { input: listInputSchema, output: z.array(memoryRecordSchema) },
   memory_search: { input: searchInputSchema, output: z.array(memoryRecordSchema) },
   memory_validate: { input: validateInputSchema, output: validationReportSchema },
-  memory_export: { input: exportInputSchema, output: z.string() },
+  memory_export: {
+    input: exportInputSchema,
+    output: byteBoundedText(MEMORY_TOOL_LIMITS.exportBytes, 'Export content'),
+  },
   memory_import: { input: importInputSchema, output: importReportSchema },
 } as const;
 

@@ -2,6 +2,7 @@ import { MemoryError } from '../errors.js';
 import { createUlid, isUlid } from '../identities.js';
 import { memoryRecordSchema, memoryTombstoneSchema, type MemoryRecord, type MemoryTombstone } from '../schemas.js';
 import type { SecretScanner } from '../security.js';
+import { MEMORY_TOOL_LIMITS } from '../tool-contracts.js';
 import type { MemoryRecordInput } from './filesystem.js';
 import type { NamespaceScope } from './types.js';
 
@@ -10,10 +11,6 @@ import type { NamespaceScope } from './types.js';
  * identical semantics (scope assertion, secret scanning, compactness) with
  * backend-specific storage concerns kept out of here.
  */
-
-const MUTATION_SUMMARY_CHARACTERS = 240;
-const MUTATION_DETAILS_CHARACTERS = 2_000;
-const MUTATION_DETAILS_LINES = 12;
 
 export interface RecordHelperDeps {
   readonly scope: NamespaceScope;
@@ -94,19 +91,19 @@ export function validateTombstone(value: unknown, deps: RecordHelperDeps, label 
 /** Enforces write-time summary/details compactness (v1 semantics). */
 export function validateCompactness(summary: string, details: string | null | undefined, context: string): void {
   const summaryCharacters = countUnicodeCharacters(summary);
-  if (summaryCharacters > MUTATION_SUMMARY_CHARACTERS)
+  if (summaryCharacters > MEMORY_TOOL_LIMITS.summaryCharacters)
     throw new MemoryError(
-      `${context}: summary has ${summaryCharacters} Unicode characters; limit is ${MUTATION_SUMMARY_CHARACTERS}.`,
+      `${context}: summary has ${summaryCharacters} Unicode characters; limit is ${MEMORY_TOOL_LIMITS.summaryCharacters}.`,
     );
   if (details === undefined || details === null) return;
-  const detailStats = inspectDetails(details, MUTATION_DETAILS_LINES);
-  if (detailStats.characters > MUTATION_DETAILS_CHARACTERS)
+  const detailStats = inspectDetails(details, MEMORY_TOOL_LIMITS.detailsLines);
+  if (detailStats.characters > MEMORY_TOOL_LIMITS.detailsCharacters)
     throw new MemoryError(
-      `${context}: details has ${detailStats.characters} Unicode characters; limit is ${MUTATION_DETAILS_CHARACTERS}.`,
+      `${context}: details has ${detailStats.characters} Unicode characters; limit is ${MEMORY_TOOL_LIMITS.detailsCharacters}.`,
     );
-  if (detailStats.nonEmptyLines > MUTATION_DETAILS_LINES)
+  if (detailStats.nonEmptyLines > MEMORY_TOOL_LIMITS.detailsLines)
     throw new MemoryError(
-      `${context}: details has ${detailStats.nonEmptyLines} non-empty lines; limit is ${MUTATION_DETAILS_LINES}.`,
+      `${context}: details has ${detailStats.nonEmptyLines} non-empty lines; limit is ${MEMORY_TOOL_LIMITS.detailsLines}.`,
     );
 }
 
