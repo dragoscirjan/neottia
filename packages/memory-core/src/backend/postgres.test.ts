@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { MemoryConflictError, MemoryError, MemoryStore, PostgresBackend, loadMemoryConfig } from '../index.js';
-import type { StoreMemoryInput } from './store.js';
+import type { StoreMemoryInput } from '../store.js';
 
 /**
  * Integration test for the Postgres backend (issue #6), executed against the
@@ -18,8 +18,8 @@ const enabled = process.env.NEOTTIA_TEST_PG === '1';
 const dependenciesDir = resolve(__dirname, '..', '..', '..', '..', 'dependencies', 'postgres');
 const connectionString = 'postgres://neottia:neottia@localhost:5433/neottia';
 
-function compose(...args: string[]): { status: number; stdout: string; stderr: string } {
-  const result = spawnSync('docker', ['compose', ...args.flat()], { cwd: dependenciesDir, encoding: 'utf8' });
+function compose(args: readonly string[]): { status: number; stdout: string; stderr: string } {
+  const result = spawnSync('docker', ['compose', ...args], { cwd: dependenciesDir, encoding: 'utf8' });
   return { status: result.status ?? -1, stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
 }
 
@@ -169,6 +169,8 @@ describe.skipIf(!enabled)('postgres backend (docker pg_textsearch)', () => {
       left.store(fact('Concurrent writer A')),
       right.store(fact('Concurrent writer B')),
     ]);
+    await left.close();
+    await right.close();
     expect(new Set(results.map((record) => record.id)).size).toBe(2);
     expect(await store.list()).toHaveLength(2);
   });

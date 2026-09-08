@@ -247,9 +247,16 @@ export class FilesystemBackend implements StorageBackend {
   /** Opens a fresh index connection and resolves staleness per policy. */
   private async ensureIndex(state: ShardState): Promise<SqliteIndex> {
     const index = SqliteIndex.open(this.root);
-    if (!index.isStale(this.cacheMaxAgeMs, state)) return index;
-    await this.resolveStaleness(index, state);
-    return index;
+    try {
+      if (!index.isStale(this.cacheMaxAgeMs, state)) return index;
+      await this.resolveStaleness(index, state);
+      return index;
+    } catch (error: unknown) {
+      // A failed staleness resolution (fail policy, declined prompt) must not
+      // leak the opened handle.
+      index.close();
+      throw error;
+    }
   }
 
   private async resolveStaleness(index: SqliteIndex, state: ShardState): Promise<void> {

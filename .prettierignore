@@ -19,4 +19,4 @@ package-lock.json
 pnpm-lock.yaml
 .cgcignore
 dependencies/postgres/Dockerfile
-docker-compose.yml
+dependencies/postgres/dependencies/postgres/docker-compose.yml

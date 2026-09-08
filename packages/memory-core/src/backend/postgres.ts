@@ -113,16 +113,13 @@ export class PostgresBackend implements StorageBackend {
       host: settings.host,
       port: settings.port,
       database: settings.database,
-      ssl: settings.ssl ? { rejectUnauthorized: false } : false,
+      // Certificate verification stays enabled; deployments with a private
+      // CA should mount it and configure sslrootcert in the connection.
+      ssl: settings.ssl,
       user: settings.user,
       password: settings.password,
       max: 4,
     });
-  }
-
-  /** Escapes literal strings used inside pg_textsearch <@> queries. */
-  private static quoteLiteral(value: string): string {
-    return `'${value.replace(/'/gu, "''")}'`;
   }
 
   // -- schema ---------------------------------------------------------------
@@ -151,12 +148,21 @@ export class PostgresBackend implements StorageBackend {
     await this.pool.query(`
       CREATE TABLE IF NOT EXISTS memory_tombstones (
         id TEXT PRIMARY KEY,
+        organization_id TEXT NOT NULL,
+        project_id TEXT NOT NULL,
         target_id TEXT NOT NULL,
         created_at TIMESTAMPTZ NOT NULL,
         document JSONB NOT NULL
       );
     `);
     await this.pool.query(`CREATE INDEX IF NOT EXISTS memory_tombstones_target ON memory_tombstones (target_id);`);
+    await this.pool.query(
+      `ALTER TABLE memory_tombstones ADD COLUMN IF NOT EXISTS organization_id TEXT NOT NULL DEFAULT ''`,
+    );
+    await this.pool.query(`ALTER TABLE memory_tombstones ADD COLUMN IF NOT EXISTS project_id TEXT NOT NULL DEFAULT ''`);
+    await this.pool.query(
+      `CREATE INDEX IF NOT EXISTS memory_tombstones_shard ON memory_tombstones (organization_id, project_id);`,
+    );
 
     // Search column for the tsvector baseline; pg_textsearch indexes the
     // same expression via a generated column below when available.
@@ -261,7 +267,12 @@ export class PostgresBackend implements StorageBackend {
   private async applyReplacement(client: pg.PoolClient, replacement: StorageReplacement): Promise<void> {
     const parsed = this.parsePath(replacement.path);
     if (replacement.bytes === undefined) {
-      await client.query(`DELETE FROM ${parsed.table} WHERE id = $1`, [parsed.id]);
+      // Shard-scoped delete: the advisory lock does not enforce row ownership.
+      await client.query(
+        `DELETE FROM ${parsed.table}
+         WHERE id = $1 AND organization_id = $2 AND project_id = $3`,
+        [parsed.id, this.scope.organizationId, this.scope.projectId],
+      );
       return;
     }
     const document = parseDocumentBytes(replacement.bytes, replacement.path);
@@ -270,10 +281,17 @@ export class PostgresBackend implements StorageBackend {
       if (replacement.exclusive)
         await client.query(`SELECT pg_advisory_xact_lock(hashtext($1 || ':' || $2))`, [this.shardKey(), tombstone.id]);
       await client.query(
-        `INSERT INTO memory_tombstones (id, target_id, created_at, document)
-         VALUES ($1, $2, $3, $4)
+        `INSERT INTO memory_tombstones (id, organization_id, project_id, target_id, created_at, document)
+         VALUES ($1, $2, $3, $4, $5, $6)
          ON CONFLICT (id) DO UPDATE SET target_id = EXCLUDED.target_id, document = EXCLUDED.document`,
-        [tombstone.id, tombstone.target_id, tombstone.created_at, JSON.stringify(tombstone)],
+        [
+          tombstone.id,
+          tombstone.organization_id,
+          tombstone.project_id,
+          tombstone.target_id,
+          tombstone.created_at,
+          JSON.stringify(tombstone),
+        ],
       );
       return;
     }
@@ -341,19 +359,25 @@ export class PostgresBackend implements StorageBackend {
    * planner's index choice.
    */
   private async rankQuery(query: string, limit: number, offset: number): Promise<string[]> {
+    const executor = this.currentClient() ?? this.pool;
     const shardClause = `organization_id = $1 AND project_id = $2`;
     const filter = `to_tsvector('english', search_text) @@ websearch_to_tsquery('english', $3)`;
     if (this.textSearchKind === 'pg_textsearch') {
-      const result = await this.pool.query(
+      // <@> is an ORDER BY operator: pg_textsearch 1.5.0 has no bindable
+      // query form (to_bm25query arrives in a later API), so the ranked
+      // literal must be inlined. quoteLiteral escapes single quotes, and the
+      // matching filter is fully parameterized via websearch_to_tsquery.
+      const ranked = PostgresBackend.quoteLiteral(query);
+      const result = await executor.query(
         `SELECT id FROM memory_records
          WHERE ${shardClause} AND ${filter}
-         ORDER BY search_text <@> ${PostgresBackend.quoteLiteral(query)}
-         LIMIT ${limit} OFFSET ${offset}`,
-        [this.scope.organizationId, this.scope.projectId, query],
+         ORDER BY search_text <@> ${ranked}
+         LIMIT $4 OFFSET $5`,
+        [this.scope.organizationId, this.scope.projectId, query, limit, offset],
       );
       return result.rows.map((row) => row.id as string);
     }
-    const result = await this.pool.query(
+    const result = await executor.query(
       `SELECT id FROM memory_records
        WHERE ${shardClause} AND ${filter}
        ORDER BY ts_rank(to_tsvector('english', search_text), websearch_to_tsquery('english', $3)) DESC, id ASC
@@ -386,6 +410,11 @@ export class PostgresBackend implements StorageBackend {
     }
   }
 
+  /** Escapes literal strings used inside pg_textsearch <@> queries. */
+  private static quoteLiteral(value: string): string {
+    return `'${value.replace(/'/gu, "''")}'`;
+  }
+
   /** The bound transaction client inside withLock; undefined outside. */
   private currentClient(): pg.PoolClient | undefined {
     return this.txContext.getStore();
@@ -396,22 +425,30 @@ export class PostgresBackend implements StorageBackend {
   public async checkOrRebuildCache(_state: ShardState): Promise<CacheValidation> {
     await this.ensureSchema();
     // Data integrity check: the search column always mirrors the documents.
-    const result = await this.pool.query(
-      `SELECT count(*)::int AS mismatched FROM memory_records WHERE search_text = ''`,
+    const executor = this.currentClient() ?? this.pool;
+    const result = await executor.query(
+      `SELECT count(*)::int AS mismatched FROM memory_records
+       WHERE organization_id = $1 AND project_id = $2 AND search_text = ''`,
+      [this.scope.organizationId, this.scope.projectId],
     );
     if ((result.rows[0]?.mismatched ?? 0) > 0) {
-      // Resync the search column from the stored documents.
-      await this.pool.query(`
+      // Resync the search column from the stored documents, matching the
+      // searchableText format exactly (newline-joined, lowercased).
+      const updater = this.currentClient() ?? this.pool;
+      await updater.query(
+        `
         UPDATE memory_records
-        SET search_text = concat_ws(
+        SET search_text = lower(concat_ws(
           E'\\n',
           summary,
           coalesce(details, ''),
           topic,
-          replace(tags::text, '"', '')
-        )
-        WHERE search_text = '';
-      `);
+          (SELECT string_agg(tag, E'\\n') FROM jsonb_array_elements_text(tags) AS tag)
+        ))
+        WHERE organization_id = $1 AND project_id = $2 AND search_text = '';
+      `,
+        [this.scope.organizationId, this.scope.projectId],
+      );
       return { outcome: 'rebuilt', evidence: 'canonical_snapshot_rebuild_verified' };
     }
     return { outcome: 'checked', evidence: 'canonical_snapshot_match_verified' };

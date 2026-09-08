@@ -90,6 +90,11 @@ export class MemoryStore {
     return new MemoryStore({ ...options, config, cwd });
   }
 
+  /** Releases backend resources (e.g. Postgres pool connections). */
+  public async close(): Promise<void> {
+    await this.backend.close();
+  }
+
   /** Lock identity of the namespace shard this store writes to. */
   public get scopeKey(): string {
     const namespace = this.config.namespace;
