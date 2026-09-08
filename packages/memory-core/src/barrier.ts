@@ -43,7 +43,7 @@ function acquire(memoryRoot: string, scopeKey: string, options: ShardBarrierOpti
   for (;;) {
     try {
       mkdirSync(lockPath, { mode: 0o700 });
-      if (hasActiveClaim(lockPath, staleMs)) {
+      if (hasActiveClaim(lockPath)) {
         rmSync(lockPath, { recursive: true, force: true });
         sleep(pollMs);
         continue;
@@ -52,7 +52,7 @@ function acquire(memoryRoot: string, scopeKey: string, options: ShardBarrierOpti
     } catch (error: unknown) {
       if (!isCode(error, 'EEXIST')) throw new MemoryLockError(`Cannot acquire shard barrier: ${scopeKey}`);
       if (claimAbandoned(lockPath, staleMs)) continue;
-      if (hasActiveClaim(lockPath, staleMs)) {
+      if (hasActiveClaim(lockPath)) {
         if (Date.now() >= deadline) throw new MemoryLockError(`Shard barrier is busy: ${scopeKey}`);
         sleep(pollMs);
         continue;
@@ -112,7 +112,7 @@ async function acquireAsync(memoryRoot: string, scopeKey: string, options: Shard
   for (;;) {
     try {
       mkdirSync(lockPath, { mode: 0o700 });
-      if (hasActiveClaim(lockPath, staleMs)) {
+      if (hasActiveClaim(lockPath)) {
         rmSync(lockPath, { recursive: true, force: true });
         await delay(pollMs);
         continue;
@@ -121,7 +121,7 @@ async function acquireAsync(memoryRoot: string, scopeKey: string, options: Shard
     } catch (error: unknown) {
       if (!isCode(error, 'EEXIST')) throw new MemoryLockError(`Cannot acquire shard barrier: ${scopeKey}`);
       if (claimAbandoned(lockPath, staleMs)) continue;
-      if (hasActiveClaim(lockPath, staleMs)) {
+      if (hasActiveClaim(lockPath)) {
         if (Date.now() >= deadline) throw new MemoryLockError(`Shard barrier is busy: ${scopeKey}`);
         await delay(pollMs);
         continue;
@@ -150,6 +150,7 @@ function prepareAcquire(
 }
 
 function finishAcquire(lockPath: string, scopeKey: string): AcquiredLock {
+  const token = randomUUID();
   activeLocks.add(lockPath);
   let released = false;
   const release = (): void => {
@@ -157,18 +158,22 @@ function finishAcquire(lockPath: string, scopeKey: string): AcquiredLock {
     released = true;
     activeLocks.delete(lockPath);
     try {
-      rmSync(lockPath, { recursive: true, force: true });
+      // A delayed owner must never remove a replacement lease that reused the
+      // same shard path after the original directory disappeared.
+      if (lockOwnerMatches(lockPath, token)) rmSync(lockPath, { recursive: true, force: true });
     } catch {
       // Fail closed: a release failure intentionally leaves the lock behind
       // so the next acquirer can detect and steal it once stale.
     }
   };
   try {
-    writeFileSync(join(lockPath, 'owner'), JSON.stringify({ pid: process.pid, acquiredAt: new Date().toISOString() }), {
-      mode: 0o600,
-    });
+    writeFileSync(
+      join(lockPath, 'owner'),
+      JSON.stringify({ pid: process.pid, token, acquiredAt: new Date().toISOString() }),
+      { mode: 0o600 },
+    );
     return { lease: { lockPath }, release };
-  } catch (error: unknown) {
+  } catch {
     release();
     throw new MemoryLockError(`Cannot initialize shard barrier: ${scopeKey}`);
   }
@@ -207,7 +212,7 @@ function claimAbandoned(lockPath: string, staleMs: number): boolean {
   }
 }
 
-function hasActiveClaim(lockPath: string, _staleMs: number): boolean {
+function hasActiveClaim(lockPath: string): boolean {
   const claimPath = `${lockPath}.claim`;
   if (!existsSync(claimPath)) return false;
   try {
@@ -239,8 +244,21 @@ function hasActiveClaim(lockPath: string, _staleMs: number): boolean {
 }
 
 function claimOwnerMatches(claimPath: string, token: string): boolean {
+  return ownerTokenMatches(claimPath, token);
+}
+
+function lockOwnerMatches(lockPath: string, token: string): boolean {
   try {
-    const owner = JSON.parse(readFileSync(join(claimPath, 'owner'), 'utf8')) as { token?: string };
+    const stat = lstatSync(lockPath);
+    return stat.isDirectory() && !stat.isSymbolicLink() && ownerTokenMatches(lockPath, token);
+  } catch {
+    return false;
+  }
+}
+
+function ownerTokenMatches(ownerDirectory: string, token: string): boolean {
+  try {
+    const owner = JSON.parse(readFileSync(join(ownerDirectory, 'owner'), 'utf8')) as { token?: string };
     return owner.token === token;
   } catch {
     return false;

@@ -1,5 +1,5 @@
 import { MemoryError } from '../errors.js';
-import { createUlid } from '../identities.js';
+import { createUlid, isUlid } from '../identities.js';
 import { memoryRecordSchema, memoryTombstoneSchema, type MemoryRecord, type MemoryTombstone } from '../schemas.js';
 import type { SecretScanner } from '../security.js';
 import type { MemoryRecordInput } from './filesystem.js';
@@ -58,8 +58,7 @@ export function makeTombstone(
   createdBy: string,
   now: () => Date = () => new Date(),
 ): MemoryTombstone {
-  if (typeof targetId !== 'string' || !/^[0-9A-HJKMNP-TV-Z]{26}$/u.test(targetId))
-    throw new MemoryError('target_id must be a Crockford ULID.');
+  if (typeof targetId !== 'string' || !isUlid(targetId)) throw new MemoryError('target_id must be a Crockford ULID.');
   const tombstone: MemoryTombstone = {
     schema_version: 1,
     id: createUlid(now().getTime()),
@@ -112,9 +111,7 @@ export function validateCompactness(summary: string, details: string | null | un
 }
 
 function countUnicodeCharacters(value: string): number {
-  let count = 0;
-  for (const _character of value) count++;
-  return count;
+  return [...value].length;
 }
 
 function inspectDetails(

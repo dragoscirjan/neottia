@@ -23,6 +23,12 @@ Tuning (in `skills.memory.security`):
 
 Credentials belong in environment variables, never in memory — and never in the config file either (see [Configuration](./configuration.md)).
 
+## Filesystem safety boundaries
+
+Canonical YAML and SQLite cache artifacts are rejected when they are symbolic links. On platforms that provide `O_NOFOLLOW`, Neottia combines it with descriptor metadata checks; it also revalidates directory and destination identities around publication. SQLite is a disposable cache, so unsafe database, WAL, or shared-memory artifacts fail closed instead of being followed or automatically removed.
+
+Portable Node.js APIs do not provide descriptor-relative `openat`/`renameat` operations or a custom SQLite VFS. The checks therefore detect persistent path replacement but cannot promise immunity to an attacker who can continuously swap directories in the tiny intervals between path operations. Protect the memory root with operating-system permissions and do not place it in a directory writable by untrusted users. Windows also lacks portable directory `fsync`; atomic rename is used, but the same crash-durability guarantee available after POSIX directory `fsync` cannot be claimed there.
+
 ## Resource limits
 
 Because agents write autonomously, hard ceilings protect the store from runaway loops. All are configurable under `skills.memory.security.limits`:
