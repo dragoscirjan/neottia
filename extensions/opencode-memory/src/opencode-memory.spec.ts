@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { loadMemoryConfig, MemoryStore } from '@neottia/memory-core';
+import { loadMemoryConfig, MemoryStore, MEMORY_TOOLS } from '@neottia/memory-core';
 import { afterEach, describe, expect, it } from 'vitest';
 import { buildMemoryTools, NeottiaMemoryPlugin, type OpenCodeToolFactory } from './index.js';
 
@@ -65,6 +65,9 @@ describe('opencode memory plugin', () => {
     const text = await hooks.tool['memory_store'].execute(FACT);
     const record = JSON.parse(text);
     expect(record.id).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/);
+    expect(MEMORY_TOOLS.find((tool) => tool.name === 'memory_store')?.outputSchema.safeParse(record).success).toBe(
+      true,
+    );
 
     const yaml = readFileSync(join(cwd, '.neottia', 'memory', 'facts', `${record.id}.yaml`), 'utf8');
     expect(yaml).toContain('in process');
@@ -94,8 +97,10 @@ describe('opencode memory plugin', () => {
 
     const tools = buildMemoryTools({ cwd, interactive: true }, factory);
     expect(seen).toHaveLength(9);
-    expect(Object.keys(tools)).toHaveLength(9);
-    // args arrive as the Zod raw shape the host expects
-    expect(seen[0]?.args).toMatchObject({ summary: expect.anything() });
+    expect(Object.keys(tools)).toEqual(MEMORY_TOOLS.map((tool) => tool.name));
+    // Every args object is the canonical core Zod shape the host expects.
+    MEMORY_TOOLS.forEach((tool, index) => {
+      expect(seen[index]?.args).toBe((tool.inputSchema as { shape: unknown }).shape);
+    });
   });
 });

@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { memoryToolJsonSchema, MEMORY_TOOLS } from '@neottia/memory-core';
 import { afterEach, describe, expect, it } from 'vitest';
 import { registerMemoryTools, memoryToolParameters, type PiExtensionApi } from './index.js';
 
@@ -42,7 +43,7 @@ const FACT = {
 };
 
 describe('pi memory extension', () => {
-  it('registers exactly the nine memory tools with TypeBox parameters', () => {
+  it('registers exactly the nine memory tools with core-derived parameters', () => {
     const cwd = fixture();
     const { api, registered } = fakePi();
     registerMemoryTools(api, { cwd });
@@ -61,10 +62,16 @@ describe('pi memory extension', () => {
       expect(tool.parameters).toBeDefined();
       expect(Object.keys(memoryToolParameters)).toContain(tool.name);
     }
+    // Ignore TypeBox's host metadata; every JSON Schema keyword stays lossless.
+    for (const tool of MEMORY_TOOLS) {
+      const normalized = { ...memoryToolParameters[tool.name] } as Record<string, unknown>;
+      delete normalized['~standard'];
+      expect(normalized).toEqual(memoryToolJsonSchema(tool.name, 'input'));
+    }
     const storeSchema = memoryToolParameters.memory_store as {
       properties: Record<string, { description?: string; minLength?: number }>;
     };
-    expect(storeSchema.properties.summary.description).toContain('240 Unicode characters');
+    expect(storeSchema.properties.summary.description).toContain('240 Unicode code points');
     expect(storeSchema.properties.summary.minLength).toBe(1);
     expect(
       (memoryToolParameters.memory_search as { properties: Record<string, { description?: string }> }).properties.query

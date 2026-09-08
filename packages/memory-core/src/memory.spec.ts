@@ -7,8 +7,10 @@ import {
   MemoryConflictError,
   MemoryError,
   MemoryStore,
+  MEMORY_TOOLS,
   SqliteIndex,
   loadMemoryConfig,
+  memoryToolJsonSchema,
   type MemoryConfig,
   type StoreMemoryInput,
 } from './index.js';
@@ -54,6 +56,20 @@ function fact(summary: string): StoreMemoryInput {
 function storeFor(cwd: string, overrides: Partial<MemoryConfig> = {}): MemoryStore {
   // env: {} keeps ambient NEOTTIA_* variables out of assertions.
   return MemoryStore.fromConfig(loadMemoryConfig(cwd, { env: {}, ...overrides }), cwd);
+}
+
+async function expectImportRejectionWithoutMutation(
+  store: MemoryStore,
+  content: string,
+  message: RegExp,
+): Promise<void> {
+  const before = await store.export();
+  const preview = await store.import(content, true);
+  expect(preview).toMatchObject({ valid: false, records: 0, tombstones: 0 });
+  expect(preview.errors[0]).toMatch(message);
+  expect(await store.export()).toBe(before);
+  await expect(store.import(content)).rejects.toThrow(message);
+  expect(await store.export()).toBe(before);
 }
 
 describe('memory store (filesystem + SQLite index)', () => {
@@ -182,6 +198,56 @@ describe('memory store (filesystem + SQLite index)', () => {
     expect(secretResult.errors[0]).toMatch(/secret/u);
     await expect(destination.import(`${JSON.stringify(secret)}\n`)).rejects.toThrow(/secret/u);
     expect(await destination.list()).toEqual([]);
+  });
+
+  it('rejects conflicting lifecycle retirements before preview or persistence', async () => {
+    expect.assertions(15);
+    const duplicateStore = storeFor(fixture());
+    const duplicateTarget = await duplicateStore.store(fact('Duplicate retirement target'));
+    const replacement = (id: string, summary: string) => ({
+      ...duplicateTarget,
+      id,
+      summary,
+      created_at: new Date(Date.parse(duplicateTarget.created_at) + 1).toISOString(),
+      supersedes: [duplicateTarget.id],
+    });
+    const firstReplacement = replacement('01ARZ3NDEKTSV4RRFFQ69G5FAW', 'First imported replacement');
+    const secondReplacement = replacement('01ARZ3NDEKTSV4RRFFQ69G5FAX', 'Second imported replacement');
+    await expectImportRejectionWithoutMutation(
+      duplicateStore,
+      `${JSON.stringify(firstReplacement)}\n${JSON.stringify(secondReplacement)}\n`,
+      /multiple supersession retirements/u,
+    );
+
+    const mixedStore = storeFor(fixture());
+    const mixedTarget = await mixedStore.store(fact('Mixed retirement target'));
+    const mixedReplacement = { ...firstReplacement, supersedes: [mixedTarget.id] };
+    const tombstone = {
+      schema_version: 1,
+      id: '01ARZ3NDEKTSV4RRFFQ69G5FAY',
+      organization_id: mixedTarget.organization_id,
+      project_id: mixedTarget.project_id,
+      target_id: mixedTarget.id,
+      reason: 'Imported retirement',
+      source: mixedTarget.source,
+      created_at: new Date(Date.parse(mixedTarget.created_at) + 2).toISOString(),
+      created_by: 'test-user',
+    };
+    await expectImportRejectionWithoutMutation(
+      mixedStore,
+      `${JSON.stringify(mixedReplacement)}\n${JSON.stringify(tombstone)}\n`,
+      /both superseded and tombstoned/u,
+    );
+
+    const inactiveStore = storeFor(fixture());
+    const inactiveTarget = await inactiveStore.store(fact('Already inactive target'));
+    await inactiveStore.supersede(inactiveTarget.id, fact('Canonical replacement'));
+    const lateReplacement = { ...secondReplacement, supersedes: [inactiveTarget.id] };
+    await expectImportRejectionWithoutMutation(
+      inactiveStore,
+      `${JSON.stringify(lateReplacement)}\n`,
+      /already inactive in canonical state/u,
+    );
   });
 
   it('rejects supersession cycles before preview or persistence', async () => {
@@ -439,6 +505,45 @@ describe('memory store (filesystem + SQLite index)', () => {
       summary: '😀'.repeat(240),
     });
     expect(await storeFor(cwd).list()).toHaveLength(1);
+  });
+
+  it('publishes canonical schemas for all tool inputs and outputs', () => {
+    const names = MEMORY_TOOLS.map((tool) => tool.name);
+    expect(names).toEqual([
+      'memory_store',
+      'memory_supersede',
+      'memory_delete',
+      'memory_get',
+      'memory_list',
+      'memory_search',
+      'memory_validate',
+      'memory_export',
+      'memory_import',
+    ]);
+    for (const tool of MEMORY_TOOLS) {
+      expect(tool.inputSchema).toBeDefined();
+      expect(tool.outputSchema).toBeDefined();
+    }
+
+    const storeSchema = memoryToolJsonSchema('memory_store', 'input') as {
+      properties: Record<string, Record<string, unknown>>;
+    };
+    expect(storeSchema.properties['summary']).toMatchObject({
+      maxLength: 240,
+      'x-neottia-length-unit': 'unicode-code-points',
+    });
+    expect(storeSchema.properties['details']).toMatchObject({
+      anyOf: [expect.objectContaining({ 'x-neottia-max-nonempty-lines': 12 }), { type: 'null' }],
+    });
+    const searchSchema = memoryToolJsonSchema('memory_search', 'input') as {
+      properties: Record<string, Record<string, unknown>>;
+    };
+    expect(searchSchema.properties['query']?.['x-neottia-max-utf8-bytes']).toBe(16 * 1024);
+    const importSchema = memoryToolJsonSchema('memory_import', 'input') as {
+      properties: Record<string, Record<string, unknown>>;
+    };
+    expect(importSchema.properties['content']?.['x-neottia-max-utf8-bytes']).toBe(64 * 1024 * 1024);
+    expect(memoryToolJsonSchema('memory_export', 'output')).toMatchObject({ type: 'string' });
   });
 
   it('keeps supersession semantics across the tools layer', async () => {

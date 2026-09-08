@@ -1,15 +1,9 @@
 import { FilesystemBackend } from './backend/filesystem.js';
 import { PostgresBackend } from './backend/postgres.js';
-import type {
-  BackendSearchOptions,
-  CacheValidation,
-  ShardState,
-  StorageBackend,
-  StorageReplacement,
-} from './backend/types.js';
+import { assertAcyclic } from './backend/record-helpers.js';
+import type { BackendSearchOptions, ShardState, StorageBackend, StorageReplacement } from './backend/types.js';
 import type { MemoryConfig } from './config.js';
 import { MemoryConflictError, MemoryError } from './errors.js';
-import { assertAcyclic } from './backend/record-helpers.js';
 import { isUlid } from './identities.js';
 import {
   memoryRecordSchema,
@@ -18,6 +12,9 @@ import {
   type MemorySource,
   type MemoryTombstone,
 } from './schemas.js';
+import type { ImportReport, MemoryValidationReport, StoreMemoryInput } from './tool-contracts.js';
+
+export type { ImportReport, MemoryValidationReport, StoreMemoryInput } from './tool-contracts.js';
 
 /**
  * MemoryStore: the facade behind the memory_* tool surface. Operations run
@@ -27,18 +24,6 @@ import {
  * harnessctl-v2 memory implementation; backends are pluggable (issue #6).
  */
 
-export interface StoreMemoryInput {
-  memory_type: MemoryRecord['memory_type'];
-  record_type: MemoryRecord['record_type'];
-  topic?: string;
-  summary: string;
-  details?: string | null;
-  source: MemorySource;
-  created_by: string;
-  confidence: MemoryRecord['confidence'];
-  tags?: string[];
-}
-
 export interface SearchMemoryInput {
   query?: string;
   topic?: string;
@@ -46,23 +31,6 @@ export interface SearchMemoryInput {
   limit?: number;
   max_chars?: number;
   include_superseded?: boolean;
-}
-
-export interface MemoryValidationReport {
-  valid: boolean;
-  records: number;
-  tombstones: number;
-  errors: string[];
-  cache: CacheValidation | { outcome: 'skipped'; evidence: 'memory_validation_failed' };
-}
-
-export interface ImportReport {
-  valid: boolean;
-  records: number;
-  tombstones: number;
-  errors: string[];
-  /** Present when canonical publication succeeded but cache maintenance failed. */
-  warnings?: string[];
 }
 
 export interface MemoryStoreOptions {
@@ -417,6 +385,37 @@ function assertImportRelationships(state: ShardState, records: MemoryRecord[], t
       if (!ids.has(target)) throw new MemoryError(`Broken supersedes reference: ${target}`);
   for (const tombstone of tombstones)
     if (!ids.has(tombstone.target_id)) throw new MemoryError(`Broken tombstone reference: ${tombstone.target_id}`);
+
+  assertSingleRetirement(state, records, tombstones);
+}
+
+/** Ensures every target has exactly one possible transition out of active state. */
+function assertSingleRetirement(
+  state: ShardState,
+  importedRecords: readonly MemoryRecord[],
+  importedTombstones: readonly MemoryTombstone[],
+): void {
+  type Retirement = { kind: 'supersession' | 'tombstone'; imported: boolean };
+  const retirements = new Map<string, Retirement>();
+  const retire = (target: string, retirement: Retirement): void => {
+    const previous = retirements.get(target);
+    if (!previous) {
+      retirements.set(target, retirement);
+      return;
+    }
+    if (previous.kind !== retirement.kind)
+      throw new MemoryConflictError(`Memory record cannot be both superseded and tombstoned: ${target}`);
+    if (retirement.imported && !previous.imported)
+      throw new MemoryConflictError(`Memory record is already inactive in canonical state: ${target}`);
+    throw new MemoryConflictError(`Memory record has multiple ${retirement.kind} retirements: ${target}`);
+  };
+
+  for (const record of state.records)
+    for (const target of record.supersedes) retire(target, { kind: 'supersession', imported: false });
+  for (const tombstone of state.tombstones) retire(tombstone.target_id, { kind: 'tombstone', imported: false });
+  for (const record of importedRecords)
+    for (const target of record.supersedes) retire(target, { kind: 'supersession', imported: true });
+  for (const tombstone of importedTombstones) retire(tombstone.target_id, { kind: 'tombstone', imported: true });
 }
 
 function assertUlid(value: unknown, path: string): asserts value is string {

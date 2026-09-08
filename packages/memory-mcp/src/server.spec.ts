@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { memoryToolJsonSchema, MEMORY_TOOLS } from '@neottia/memory-core';
 import { afterEach, describe, expect, it } from 'vitest';
 import { stringify } from 'yaml';
 import { createMemoryServer, effectiveStalePolicy } from './server.js';
@@ -63,8 +64,31 @@ describe('memory MCP server', () => {
       'memory_export',
       'memory_import',
     ]);
+    for (const expected of MEMORY_TOOLS) {
+      const published = tools.find((tool) => tool.name === expected.name);
+      expect(published?.inputSchema).toEqual(memoryToolJsonSchema(expected.name, 'input'));
+    }
     const store = tools.find((tool) => tool.name === 'memory_store');
-    expect(store?.inputSchema).toMatchObject({ type: 'object', properties: { summary: { type: 'string' } } });
+    expect(store?.inputSchema).toMatchObject({
+      type: 'object',
+      properties: { summary: { type: 'string', maxLength: 240 } },
+    });
+    const objectOutputs = [
+      'memory_store',
+      'memory_supersede',
+      'memory_delete',
+      'memory_validate',
+      'memory_import',
+    ] as const;
+    for (const name of objectOutputs)
+      expect(tools.find((tool) => tool.name === name)?.outputSchema).toEqual(memoryToolJsonSchema(name, 'output'));
+    expect(tools.find((tool) => tool.name === 'memory_get')?.outputSchema).toEqual({
+      ...memoryToolJsonSchema('memory_get', 'output'),
+      type: 'object',
+    });
+    // The installed MCP SDK restricts outputSchema to object roots.
+    expect(tools.find((tool) => tool.name === 'memory_list')?.outputSchema).toBeUndefined();
+    expect(tools.find((tool) => tool.name === 'memory_export')?.outputSchema).toBeUndefined();
   });
 
   it('stores and retrieves memory through the MCP protocol', async () => {
@@ -73,14 +97,21 @@ describe('memory MCP server', () => {
     expect(stored.isError).toBeFalsy();
     const record = JSON.parse((stored.content?.[0]?.text as string) ?? '{}');
     expect(record.id).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/);
+    expect(stored.structuredContent).toEqual(record);
 
     const fetched = await client.callTool({ name: 'memory_get', arguments: { id: record.id } });
     expect(JSON.parse((fetched.content?.[0]?.text as string) ?? '{}')).toMatchObject({
       summary: 'MCP tool parity fact',
     });
+    expect(fetched.structuredContent).toMatchObject({ summary: 'MCP tool parity fact' });
 
     const search = await client.callTool({ name: 'memory_search', arguments: { query: 'parity fact' } });
     expect(JSON.parse((search.content?.[0]?.text as string) ?? '[]')).toHaveLength(1);
+    expect(search.structuredContent).toBeUndefined();
+
+    const exported = await client.callTool({ name: 'memory_export', arguments: {} });
+    expect(exported.content?.[0]?.text).toBe(`${JSON.stringify(record)}\n`);
+    expect(exported.structuredContent).toBeUndefined();
   });
 
   it('surfaces tool errors as isError results with the message', async () => {
