@@ -246,15 +246,16 @@ All environment variables are optional. Booleans accept `true/false/1/0`; intege
 | `NEOTTIA_MEMORY_DB_PG_USER`                   | `memory.provider.db.pg.user` fallback     | —                     |
 | `NEOTTIA_MEMORY_DB_PG_PASSWORD`               | `memory.provider.db.pg.password` fallback | —                     |
 
-Postgres connection settings (`NEOTTIA_MEMORY_DB_PG_HOST`, `..._PORT`, `..._DATABASE`, `..._SSL`) configure the PostgreSQL backend. The backend creates or migrates its scoped tables on first use; run the PostgreSQL integration checks against a disposable database before production rollout. Prefer `${NEOTTIA_MEMORY_DB_PG_USER}` and `${NEOTTIA_MEMORY_DB_PG_PASSWORD}` references (or the fallback environment variables) for credentials. Literal credentials are supported only for local development and must never be committed.
+Postgres connection settings (`NEOTTIA_MEMORY_DB_PG_HOST`, `..._PORT`, `..._DATABASE`, `..._SSL`) configure the PostgreSQL backend. The backend creates or migrates its scoped tables on first use; run the PostgreSQL integration checks against a disposable database before production rollout. Use `${NEOTTIA_MEMORY_DB_PG_USER}` and `${NEOTTIA_MEMORY_DB_PG_PASSWORD}` references (or the fallback environment variables) for YAML credentials. Literal credentials are rejected in YAML.
 
 ### Credentials
 
-`provider.db.pg.user` and `provider.db.pg.password` may be literal values or `${ENV_VAR}` references:
+`provider.db.pg.user` and `provider.db.pg.password` in YAML must be omitted or use an exact `${ENV_VAR}` reference:
 
 - omitted — then the default env vars above are used, or
-- a reference: `user: "${PG_USER}"` — expanded from the environment at load time; a missing variable fails with a named error.
-- a literal: `user: memory_user` — passed through unchanged.
+- a reference: `user: "${PG_USER}"` — expanded once from the environment at load time; a missing variable fails with a named error.
+
+Literal YAML credentials and strings containing anything besides the single reference are rejected. Library-only explicit overrides may pass an already-resolved literal.
 
 ## API
 

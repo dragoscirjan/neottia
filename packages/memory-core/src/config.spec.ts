@@ -10,8 +10,8 @@ import {
   MEMORY_CONFIG_FILE_ENV,
   MEMORY_SHARD_PATH_ENV,
   ConfigError,
-  memoryConfigSchema,
   loadMemoryConfig,
+  memoryConfigFileSchema,
   resolveConfigFile,
   resolvePgSettings,
   resolveShardPath,
@@ -143,7 +143,25 @@ describe('memory config shard', () => {
     }
   });
 
-  it('expands ${VAR} credential references and preserves literal credentials', () => {
+  it('rejects literal YAML credentials while allowing explicit code literals', () => {
+    const cwd = fixture();
+    try {
+      writeConfig(cwd, {
+        version: 1,
+        skills: { memory: { provider: { db: { pg: { user: 'literal-user' } } } } },
+      });
+      expect(() => loadMemoryConfig(cwd)).toThrow(/exact \$\{ENV_VAR\} reference/u);
+
+      rmSync(join(cwd, '.neottia'), { recursive: true, force: true });
+      expect(loadMemoryConfig(cwd, { provider: { db: { pg: { user: 'literal-user' } } } }).provider.db.pg.user).toBe(
+        'literal-user',
+      );
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('expands ${VAR} credential references and preserves literal explicit credentials', () => {
     const cwd = fixture();
     try {
       const referenced = loadMemoryConfig(cwd, {
@@ -164,23 +182,41 @@ describe('memory config shard', () => {
     }
   });
 
-  it('passes resolved credential values to the PostgreSQL backend exactly once', () => {
+  it('passes resolved credential values to PostgreSQL exactly once', () => {
     const cwd = fixture();
     const config = loadMemoryConfig(cwd, {
-      env: { PG_USER: 'memory-user', PG_PASSWORD: 'memory-password' } as NodeJS.ProcessEnv,
+      env: { PG_USER: '${SECOND_USER}', PG_PASSWORD: '${SECOND_PASSWORD}' } as NodeJS.ProcessEnv,
       backend: 'postgres',
       provider: { db: { pg: { user: '${PG_USER}', password: '${PG_PASSWORD}' } } },
     });
-    expect(resolvePgSettings(config, {} as NodeJS.ProcessEnv)).toMatchObject({
-      user: 'memory-user',
-      password: 'memory-password',
+    expect(resolvePgSettings(config)).toMatchObject({
+      user: '${SECOND_USER}',
+      password: '${SECOND_PASSWORD}',
     });
     rmSync(cwd, { recursive: true, force: true });
   });
 
-  it('publishes a configuration schema generated from the runtime schema', () => {
+  it('publishes a configuration schema generated from the YAML file schema', () => {
     const published = JSON.parse(readFileSync(new URL('../config.schema.json', import.meta.url), 'utf8')) as unknown;
-    expect(published).toEqual(memoryConfigSchema.toJSONSchema({ io: 'input' }));
+    expect(published).toEqual(memoryConfigFileSchema.toJSONSchema({ io: 'input' }));
+  });
+
+  it('keeps generated root and credential constraints semantically aligned with YAML loading', () => {
+    const published = memoryConfigFileSchema.toJSONSchema({ io: 'input' }) as {
+      properties: {
+        root: { pattern: string };
+        provider: { properties: { db: { properties: { pg: { properties: { user: { pattern: string } } } } } } };
+      };
+    };
+    const rootPattern = new RegExp(published.properties.root.pattern, 'u');
+    const credentialPattern = new RegExp(
+      published.properties.provider.properties.db.properties.pg.properties.user.pattern,
+      'u',
+    );
+    expect(rootPattern.test('.neottia/memory')).toBe(true);
+    expect(rootPattern.test('../escape')).toBe(false);
+    expect(credentialPattern.test('${PG_USER}')).toBe(true);
+    expect(credentialPattern.test('literal-user')).toBe(false);
   });
 
   it('falls back to credential default env vars and fails on unset ${VAR} references', () => {

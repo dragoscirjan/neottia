@@ -57,31 +57,16 @@ export interface PgConnectionSettings {
   readonly password?: string;
 }
 
-/** Expands ${VAR} credential references from the environment. */
-export function resolvePgSettings(config: MemoryConfig, env: NodeJS.ProcessEnv = process.env): PgConnectionSettings {
-  const pg = config.provider.db.pg;
-  const resolveCredential = (value: string | undefined, fallbackEnv: string, label: string): string | undefined => {
-    if (value === undefined) {
-      const fallback = env[fallbackEnv];
-      if (fallback === undefined || fallback === '') return undefined;
-      return fallback;
-    }
-    if (!/^\$\{[A-Za-z_][A-Za-z0-9_]*\}$/u.test(value)) return value;
-    const varName = value.slice(2, -1);
-    const expanded = env[varName];
-    if (expanded === undefined || expanded === '')
-      throw new MemoryError(
-        `Credential reference '${value}' at skills.memory.${label} points to unset env var '${varName}'.`,
-      );
-    return expanded;
-  };
+/** Maps already-resolved config to pg settings without expanding credentials again. */
+export function resolvePgSettings(config: MemoryConfig): PgConnectionSettings {
+  const settings = config.provider.db.pg;
   return {
-    host: pg.host,
-    port: pg.port,
-    database: pg.database,
-    ssl: pg.ssl,
-    user: resolveCredential(pg.user, 'NEOTTIA_MEMORY_DB_PG_USER', 'provider.db.pg.user'),
-    password: resolveCredential(pg.password, 'NEOTTIA_MEMORY_DB_PG_PASSWORD', 'provider.db.pg.password'),
+    host: settings.host,
+    port: settings.port,
+    database: settings.database,
+    ssl: settings.ssl,
+    user: settings.user,
+    password: settings.password,
   };
 }
 
@@ -90,8 +75,9 @@ export class PostgresBackend implements StorageBackend {
   private readonly scope: NamespaceScope;
   private readonly helperDeps: RecordHelperDeps;
   private readonly scanner: SecretScanner;
+  private readonly limits: { maxFileBytes: number; maxFiles: number; maxTotalBytes: number };
   private textSearchKind: 'pg_textsearch' | 'tsvector' = 'tsvector';
-  private schemaReady = false;
+  private schemaInitialization?: Promise<void>;
   /** Client bound to the active withLock transaction, if any. */
   private readonly txContext = new AsyncLocalStorage<pg.PoolClient>();
 
@@ -101,6 +87,11 @@ export class PostgresBackend implements StorageBackend {
       organizationId: options.config.namespace.organization_id,
       projectId: options.config.namespace.project_id,
       scope: options.config.namespace.scope,
+    };
+    this.limits = {
+      maxFileBytes: options.config.security.limits.max_file_bytes,
+      maxFiles: options.config.security.limits.max_files,
+      maxTotalBytes: options.config.security.limits.max_total_bytes,
     };
     this.scanner = createSecretScanner({
       customPatterns: options.config.security.secret_patterns,
@@ -121,81 +112,124 @@ export class PostgresBackend implements StorageBackend {
       user: settings.user,
       password: settings.password,
       max: 4,
+      connectionTimeoutMillis: 5_000,
+      statement_timeout: 10_000,
+      idle_in_transaction_session_timeout: 15_000,
     });
   }
 
   // -- schema ---------------------------------------------------------------
 
   private async ensureSchema(): Promise<void> {
-    if (this.schemaReady) return;
-    await this.pool.query(`
-      CREATE TABLE IF NOT EXISTS memory_records (
-        id TEXT PRIMARY KEY,
-        organization_id TEXT NOT NULL,
-        project_id TEXT NOT NULL,
-        scope TEXT NOT NULL DEFAULT 'global',
-        memory_type TEXT NOT NULL,
-        record_type TEXT NOT NULL,
-        topic TEXT NOT NULL,
-        summary TEXT NOT NULL,
-        details TEXT,
-        created_at TIMESTAMPTZ NOT NULL,
-        created_by TEXT NOT NULL,
-        supersedes JSONB NOT NULL DEFAULT '[]',
-        tags JSONB NOT NULL DEFAULT '[]',
-        document JSONB NOT NULL
-      );
-      CREATE INDEX IF NOT EXISTS memory_records_active
-        ON memory_records (created_at DESC);
-    `);
-    await this.pool.query(`
-      CREATE TABLE IF NOT EXISTS memory_tombstones (
-        id TEXT PRIMARY KEY,
-        organization_id TEXT NOT NULL,
-        project_id TEXT NOT NULL,
-        scope TEXT NOT NULL DEFAULT 'global',
-        target_id TEXT NOT NULL,
-        created_at TIMESTAMPTZ NOT NULL,
-        document JSONB NOT NULL
-      );
-    `);
-    await this.pool.query(`ALTER TABLE memory_records ADD COLUMN IF NOT EXISTS scope TEXT NOT NULL DEFAULT 'global'`);
-    await this.pool.query(
-      `ALTER TABLE memory_tombstones ADD COLUMN IF NOT EXISTS scope TEXT NOT NULL DEFAULT 'global'`,
-    );
-    await this.pool.query(
-      `CREATE INDEX IF NOT EXISTS memory_records_shard ON memory_records (organization_id, project_id, scope, created_at DESC);`,
-    );
-    await this.pool.query(`CREATE INDEX IF NOT EXISTS memory_tombstones_target ON memory_tombstones (target_id);`);
-    await this.pool.query(
-      `CREATE INDEX IF NOT EXISTS memory_tombstones_shard ON memory_tombstones (organization_id, project_id, scope);`,
-    );
+    this.schemaInitialization ??= this.initializeSchema().catch((error: unknown) => {
+      this.schemaInitialization = undefined;
+      throw asPostgresMemoryError(error, 'initialize the PostgreSQL memory schema');
+    });
+    await this.schemaInitialization;
+  }
 
-    // Search column for the tsvector baseline; pg_textsearch indexes the
-    // same expression via a generated column below when available.
-    await this.pool.query(`
-      ALTER TABLE memory_records
-        ADD COLUMN IF NOT EXISTS search_text TEXT NOT NULL DEFAULT '';
-    `);
-    await this.pool.query(`
-      CREATE INDEX IF NOT EXISTS memory_records_tsvector
-        ON memory_records USING gin (to_tsvector('english', search_text));
-    `);
-
-    // Feature detection: pg_textsearch (BM25) outranks the tsvector baseline.
-    const extension = await this.pool.query(`SELECT 1 FROM pg_extension WHERE extname = 'pg_textsearch'`);
+  /** Migrates canonical tables under a global transaction-scoped lock. */
+  private async initializeSchema(): Promise<void> {
+    const client = await this.pool.connect();
     try {
-      if (extension.rowCount === 0) await this.pool.query(`CREATE EXTENSION IF NOT EXISTS pg_textsearch;`);
+      await client.query('BEGIN');
+      await client.query(`SET LOCAL statement_timeout = '10s'`);
+      await client.query(`SELECT pg_advisory_xact_lock(hashtext('neottia-memory-schema-v2'))`);
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS memory_records (
+          id TEXT NOT NULL,
+          organization_id TEXT NOT NULL,
+          project_id TEXT NOT NULL,
+          scope TEXT NOT NULL DEFAULT 'global',
+          memory_type TEXT NOT NULL,
+          record_type TEXT NOT NULL,
+          topic TEXT NOT NULL,
+          summary TEXT NOT NULL,
+          details TEXT,
+          created_at TIMESTAMPTZ NOT NULL,
+          created_by TEXT NOT NULL,
+          supersedes JSONB NOT NULL DEFAULT '[]',
+          tags JSONB NOT NULL DEFAULT '[]',
+          document JSONB NOT NULL,
+          search_text TEXT NOT NULL DEFAULT '',
+          storage_bytes BIGINT NOT NULL DEFAULT 0,
+          PRIMARY KEY (organization_id, project_id, scope, id)
+        );
+        CREATE TABLE IF NOT EXISTS memory_tombstones (
+          id TEXT NOT NULL,
+          organization_id TEXT NOT NULL,
+          project_id TEXT NOT NULL,
+          scope TEXT NOT NULL DEFAULT 'global',
+          target_id TEXT NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL,
+          document JSONB NOT NULL,
+          storage_bytes BIGINT NOT NULL DEFAULT 0,
+          PRIMARY KEY (organization_id, project_id, scope, id)
+        );
+      `);
+      // Legacy rows lacked scope and had a globally unique id. Defaults retain
+      // those rows in global while the replacement key permits shard reuse.
+      await client.query(`
+        ALTER TABLE memory_records ADD COLUMN IF NOT EXISTS scope TEXT NOT NULL DEFAULT 'global';
+        ALTER TABLE memory_records ADD COLUMN IF NOT EXISTS search_text TEXT NOT NULL DEFAULT '';
+        ALTER TABLE memory_records ADD COLUMN IF NOT EXISTS storage_bytes BIGINT NOT NULL DEFAULT 0;
+        ALTER TABLE memory_tombstones ADD COLUMN IF NOT EXISTS scope TEXT NOT NULL DEFAULT 'global';
+        ALTER TABLE memory_tombstones ADD COLUMN IF NOT EXISTS storage_bytes BIGINT NOT NULL DEFAULT 0;
+        UPDATE memory_records SET storage_bytes = octet_length(document::text) WHERE storage_bytes = 0;
+        UPDATE memory_tombstones SET storage_bytes = octet_length(document::text) WHERE storage_bytes = 0;
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM pg_constraint
+            WHERE conrelid = 'memory_records'::regclass AND contype = 'p'
+              AND pg_get_constraintdef(oid) = 'PRIMARY KEY (organization_id, project_id, scope, id)'
+          ) THEN
+            ALTER TABLE memory_records DROP CONSTRAINT IF EXISTS memory_records_pkey;
+            ALTER TABLE memory_records ADD CONSTRAINT memory_records_pkey
+              PRIMARY KEY (organization_id, project_id, scope, id);
+          END IF;
+          IF NOT EXISTS (
+            SELECT 1 FROM pg_constraint
+            WHERE conrelid = 'memory_tombstones'::regclass AND contype = 'p'
+              AND pg_get_constraintdef(oid) = 'PRIMARY KEY (organization_id, project_id, scope, id)'
+          ) THEN
+            ALTER TABLE memory_tombstones DROP CONSTRAINT IF EXISTS memory_tombstones_pkey;
+            ALTER TABLE memory_tombstones ADD CONSTRAINT memory_tombstones_pkey
+              PRIMARY KEY (organization_id, project_id, scope, id);
+          END IF;
+        END $$;
+        CREATE INDEX IF NOT EXISTS memory_tombstones_shard_target
+          ON memory_tombstones (organization_id, project_id, scope, target_id);
+        CREATE INDEX IF NOT EXISTS memory_records_shard
+          ON memory_records (organization_id, project_id, scope, created_at DESC);
+        CREATE INDEX IF NOT EXISTS memory_tombstones_shard
+          ON memory_tombstones (organization_id, project_id, scope);
+        CREATE INDEX IF NOT EXISTS memory_records_tsvector
+          ON memory_records USING gin (to_tsvector('english', search_text));
+      `);
+      await client.query('COMMIT');
+    } catch (error: unknown) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+
+    // Every pg_textsearch-specific operation is optional. Only select it
+    // after discovery, install, index creation, and a real operator query.
+    try {
+      const extension = await this.pool.query(`SELECT 1 FROM pg_extension WHERE extname = 'pg_textsearch'`);
+      if (extension.rowCount === 0) await this.pool.query(`CREATE EXTENSION IF NOT EXISTS pg_textsearch`);
       await this.pool.query(
-        `CREATE INDEX IF NOT EXISTS memory_records_bm25 ON memory_records USING bm25 (search_text) WITH (text_config = 'english');`,
+        `CREATE INDEX IF NOT EXISTS memory_records_bm25 ON memory_records USING bm25 (search_text) WITH (text_config = 'english')`,
+      );
+      await this.pool.query(
+        `SELECT search_text <@> E'neottia probe' FROM (VALUES ('neottia probe')) probe(search_text)`,
       );
       this.textSearchKind = 'pg_textsearch';
     } catch {
-      // An installed but incompatible extension must not prevent the
-      // tsvector-ranked fallback from serving the memory tools.
       this.textSearchKind = 'tsvector';
     }
-    this.schemaReady = true;
   }
 
   // -- state ----------------------------------------------------------------
@@ -250,28 +284,54 @@ export class PostgresBackend implements StorageBackend {
   /** {@inheritdoc StorageBackend.applyBatch} — upserts in one transaction. */
   public async applyBatch(replacements: readonly StorageReplacement[]): Promise<void> {
     const bound = this.currentClient();
-    if (bound) {
-      // Inside withLock: the caller's transaction already holds the shard
-      // lock and provides atomicity.
-      for (const replacement of replacements) {
-        await this.applyReplacement(bound, replacement);
-      }
+    if (!bound) {
+      await this.withLock(() => this.applyBatch(replacements));
       return;
     }
-    const client = await this.pool.connect();
-    try {
-      await client.query('BEGIN');
-      await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [this.shardKey()]);
-      for (const replacement of replacements) {
-        await this.applyReplacement(client, replacement);
+    // Calculate the resulting shard inventory before the first mutation, so
+    // every limit rejection leaves canonical rows unchanged.
+    await this.assertBatchWithinLimits(bound, replacements);
+    for (const replacement of replacements) await this.applyReplacement(bound, replacement);
+  }
+
+  /** Validates per-item and resulting aggregate storage limits. */
+  private async assertBatchWithinLimits(
+    client: pg.PoolClient,
+    replacements: readonly StorageReplacement[],
+  ): Promise<void> {
+    const result = await client.query(
+      `SELECT 'memory_records' AS table_name, id, storage_bytes FROM memory_records
+       WHERE organization_id = $1 AND project_id = $2 AND scope = $3
+       UNION ALL
+       SELECT 'memory_tombstones' AS table_name, id, storage_bytes FROM memory_tombstones
+       WHERE organization_id = $1 AND project_id = $2 AND scope = $3`,
+      [this.scope.organizationId, this.scope.projectId, this.scope.scope],
+    );
+    const inventory = new Map<string, number>(
+      result.rows.map((row) => [`${String(row.table_name)}:${String(row.id)}`, Number(row.storage_bytes)]),
+    );
+    for (const replacement of replacements) {
+      const parsed = this.parsePath(replacement.path);
+      const key = `${parsed.table}:${parsed.id}`;
+      if (replacement.bytes === undefined) {
+        inventory.delete(key);
+        continue;
       }
-      await client.query('COMMIT');
-    } catch (error: unknown) {
-      await client.query('ROLLBACK').catch(() => undefined);
-      throw error instanceof MemoryError ? error : new MemoryError(describe(error));
-    } finally {
-      client.release();
+      if (replacement.bytes.byteLength > this.limits.maxFileBytes)
+        throw new MemoryError(
+          `PostgreSQL memory item '${replacement.path}' is ${replacement.bytes.byteLength} bytes; max_file_bytes is ${this.limits.maxFileBytes}.`,
+        );
+      inventory.set(key, replacement.bytes.byteLength);
     }
+    if (inventory.size > this.limits.maxFiles)
+      throw new MemoryError(
+        `PostgreSQL memory shard would contain ${inventory.size} items; max_files is ${this.limits.maxFiles}.`,
+      );
+    const totalBytes = [...inventory.values()].reduce((total, bytes) => total + bytes, 0);
+    if (totalBytes > this.limits.maxTotalBytes)
+      throw new MemoryError(
+        `PostgreSQL memory shard would contain ${totalBytes} bytes; max_total_bytes is ${this.limits.maxTotalBytes}.`,
+      );
   }
 
   private async applyReplacement(client: pg.PoolClient, replacement: StorageReplacement): Promise<void> {
@@ -300,20 +360,22 @@ export class PostgresBackend implements StorageBackend {
         tombstone.target_id,
         tombstone.created_at,
         JSON.stringify(tombstone),
+        replacement.bytes.byteLength,
       ];
       const tombstoneInsert = replacement.exclusive
-        ? `INSERT INTO memory_tombstones (id, organization_id, project_id, scope, target_id, created_at, document)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)`
-        : `INSERT INTO memory_tombstones (id, organization_id, project_id, scope, target_id, created_at, document)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)
-           ON CONFLICT (id) DO UPDATE SET target_id = EXCLUDED.target_id, created_at = EXCLUDED.created_at, document = EXCLUDED.document
-           WHERE memory_tombstones.organization_id = EXCLUDED.organization_id
-             AND memory_tombstones.project_id = EXCLUDED.project_id
-             AND memory_tombstones.scope = EXCLUDED.scope`;
+        ? `INSERT INTO memory_tombstones
+             (id, organization_id, project_id, scope, target_id, created_at, document, storage_bytes)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`
+        : `INSERT INTO memory_tombstones
+             (id, organization_id, project_id, scope, target_id, created_at, document, storage_bytes)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+           ON CONFLICT (organization_id, project_id, scope, id) DO UPDATE SET
+             target_id = EXCLUDED.target_id,
+             created_at = EXCLUDED.created_at,
+             document = EXCLUDED.document,
+             storage_bytes = EXCLUDED.storage_bytes`;
       try {
-        const result = await client.query(tombstoneInsert, tombstoneValues);
-        if (!replacement.exclusive && result.rowCount === 0)
-          throw new MemoryConflictError(`Memory ID belongs to another namespace: ${replacement.path}`);
+        await client.query(tombstoneInsert, tombstoneValues);
       } catch (error: unknown) {
         if (replacement.exclusive && isUniqueViolation(error))
           throw new MemoryConflictError(`Memory path already exists: ${replacement.path}`);
@@ -340,17 +402,18 @@ export class PostgresBackend implements StorageBackend {
       JSON.stringify(record.tags),
       searchableText(record),
       JSON.stringify(record),
+      replacement.bytes.byteLength,
     ];
     const recordInsert = replacement.exclusive
       ? `INSERT INTO memory_records
            (id, organization_id, project_id, scope, memory_type, record_type, topic, summary, details,
-            created_at, created_by, supersedes, tags, search_text, document)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`
+            created_at, created_by, supersedes, tags, search_text, document, storage_bytes)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`
       : `INSERT INTO memory_records
            (id, organization_id, project_id, scope, memory_type, record_type, topic, summary, details,
-            created_at, created_by, supersedes, tags, search_text, document)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-         ON CONFLICT (id) DO UPDATE SET
+            created_at, created_by, supersedes, tags, search_text, document, storage_bytes)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+         ON CONFLICT (organization_id, project_id, scope, id) DO UPDATE SET
            organization_id = EXCLUDED.organization_id,
            project_id = EXCLUDED.project_id,
            memory_type = EXCLUDED.memory_type,
@@ -364,14 +427,10 @@ export class PostgresBackend implements StorageBackend {
            tags = EXCLUDED.tags,
            search_text = EXCLUDED.search_text,
            document = EXCLUDED.document,
-           scope = EXCLUDED.scope
-         WHERE memory_records.organization_id = EXCLUDED.organization_id
-           AND memory_records.project_id = EXCLUDED.project_id
-           AND memory_records.scope = EXCLUDED.scope`;
+           scope = EXCLUDED.scope,
+           storage_bytes = EXCLUDED.storage_bytes`;
     try {
-      const result = await client.query(recordInsert, recordValues);
-      if (!replacement.exclusive && result.rowCount === 0)
-        throw new MemoryConflictError(`Memory ID belongs to another namespace: ${replacement.path}`);
+      await client.query(recordInsert, recordValues);
     } catch (error: unknown) {
       if (replacement.exclusive && isUniqueViolation(error))
         throw new MemoryConflictError(`Memory path already exists: ${replacement.path}`);
@@ -450,22 +509,27 @@ export class PostgresBackend implements StorageBackend {
   /** {@inheritdoc StorageBackend.withLock} — advisory lock + snapshot. */
   public async withLock<T>(operation: () => Promise<T>): Promise<T> {
     await this.ensureSchema();
-    // Re-entrant: nested calls reuse the bound transaction (same client,
-    // same lock, one snapshot for the whole operation).
+    // Re-entrant calls share the same transaction, lock, and snapshot.
     if (this.txContext.getStore()) return operation();
-    const client = await this.pool.connect();
-    try {
-      await client.query('BEGIN');
-      await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [this.shardKey()]);
-      const result = await this.txContext.run(client, () => operation());
-      await client.query('COMMIT');
-      return result;
-    } catch (error: unknown) {
-      await client.query('ROLLBACK').catch(() => undefined);
-      throw error;
-    } finally {
-      client.release();
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      let client: pg.PoolClient | undefined;
+      try {
+        client = await this.pool.connect();
+        await client.query('BEGIN');
+        await client.query(`SET LOCAL statement_timeout = '10s'`);
+        await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [this.shardKey()]);
+        const result = await this.txContext.run(client, () => operation());
+        await client.query('COMMIT');
+        return result;
+      } catch (error: unknown) {
+        if (client) await client.query('ROLLBACK').catch(() => undefined);
+        if (attempt === 0 && isRetryableTransactionError(error)) continue;
+        throw asPostgresMemoryError(error, `access PostgreSQL memory shard '${this.shardKey()}'`);
+      } finally {
+        client?.release();
+      }
     }
+    throw new MemoryError(`Unable to access PostgreSQL memory shard '${this.shardKey()}'.`);
   }
 
   /** Escapes literal strings used inside pg_textsearch <@> queries. */
@@ -514,8 +578,8 @@ export class PostgresBackend implements StorageBackend {
 
   /** {@inheritdoc StorageBackend.resetCache} — a no-op for Postgres. */
   public async resetCache(): Promise<void> {
-    this.schemaReady = false;
-    // Nothing to delete: records are canonical here. Recreate the index on
+    this.schemaInitialization = undefined;
+    // Nothing to delete: records are canonical here. Recheck the index on
     // the next operation through ensureSchema.
   }
 
@@ -625,9 +689,42 @@ function postgresPrefixQuery(query: string): string {
 }
 
 function isUniqueViolation(error: unknown): boolean {
-  return (
-    error !== null && typeof error === 'object' && 'code' in error && (error as { code?: string }).code === '23505'
-  );
+  return postgresErrorCode(error) === '23505';
+}
+
+/** Retries only serialization failures and deadlocks, once. */
+function isRetryableTransactionError(error: unknown): boolean {
+  return ['40001', '40P01'].includes(postgresErrorCode(error) ?? '');
+}
+
+function postgresErrorCode(error: unknown): string | undefined {
+  return error !== null && typeof error === 'object' && 'code' in error
+    ? String((error as { code?: unknown }).code)
+    : undefined;
+}
+
+/** Converts bounded wait failures into actionable public errors. */
+function asPostgresMemoryError(error: unknown, action: string): MemoryError {
+  if (error instanceof MemoryError) return error;
+  const code = postgresErrorCode(error);
+  if (code === '57014')
+    return new MemoryError(
+      `Timed out after 10 seconds while attempting to ${action}; check for a long-running query or a process holding the shard advisory lock.`,
+    );
+  if (code === '55P03')
+    return new MemoryError(
+      `Could not acquire a PostgreSQL lock while attempting to ${action}; retry after the lock holder exits.`,
+    );
+  if (code === '53300')
+    return new MemoryError(
+      `PostgreSQL has no connection slots available while attempting to ${action}; check pool capacity.`,
+    );
+  const message = describe(error);
+  if (/timeout|ECONNREFUSED|ENOTFOUND|connection terminated/iu.test(message))
+    return new MemoryError(
+      `PostgreSQL connection failed within the 5 second wait while attempting to ${action}; verify host, port, database, credentials, and server availability. (${message})`,
+    );
+  return new MemoryError(`Unable to ${action}: ${message}`);
 }
 
 function describe(error: unknown): string {

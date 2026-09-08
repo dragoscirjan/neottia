@@ -27,6 +27,7 @@ export {
   MEMORY_SHARD_PATH_ENV,
   CREDENTIAL_DEFAULTS,
   loadMemoryConfig,
+  memoryConfigFileSchema,
   memoryConfigSchema,
   resolveConfigFile,
   resolveShardPath,

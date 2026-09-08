@@ -96,6 +96,10 @@ All optional. Booleans accept `true/false/1/0`; integers accept plain digits. An
 
 This table is the complete environment-binding contract; names inferred from config paths are not supported. In particular, `security.secret_patterns` and every `security.limits` value are file/code-only. Secret patterns are an ordered array, and limits are a security-sensitive group that should remain reviewable in one configuration document; accepting invented scalar or encoded environment forms would make deployment behavior ambiguous.
 
+### PostgreSQL credentials
+
+YAML credential fields must be absent or contain one exact environment reference, such as `user: "${PG_USER}"`. `loadMemoryConfig` expands that reference once. If `PG_USER` itself contains text such as `${SECOND_VAR}`, that text is passed literally to PostgreSQL rather than expanded again. When the fields are absent, `NEOTTIA_MEMORY_DB_PG_USER` and `NEOTTIA_MEMORY_DB_PG_PASSWORD` remain the defaults. Literal credentials in YAML are rejected.
+
 ## Cache policy
 
 The search index is rebuilt automatically from the YAML files when its content hash no longer matches, or when it is older than `max_age_ms`. `stale_policy` decides what _stale_ means for reads:
