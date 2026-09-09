@@ -304,7 +304,15 @@ export class MemoryStore {
       await this.loadState();
       const result = await operation();
       const state = await this.loadState();
-      await this.backend.checkOrRebuildCache(state);
+      try {
+        await this.backend.checkOrRebuildCache(state);
+      } catch (error: unknown) {
+        // Canonical publication is the commit point; callers must not retry as
+        // though the mutation were absent when only disposable cache repair failed.
+        throw new MemoryError('Canonical memory committed; disposable cache synchronization failed.', {
+          cause: error,
+        });
+      }
       return result;
     });
   }

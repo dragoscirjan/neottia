@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash, randomUUID } from 'node:crypto';
 import {
   closeSync,
@@ -15,10 +16,23 @@ import {
   type Stats,
 } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import {
+  DEFAULT_STORE_LIMITS,
+  RepositoryStoreError,
+  StaleRevisionError,
+  applyCanonicalBatch,
+  readManagedFile,
+  resolveManagedPath,
+  scanManagedFiles,
+  resolveManagedRoot,
+  withRepositoryLease,
+  type ManagedRoot,
+  type ManagedRootOptions,
+  type RepositoryLease,
+} from '@neottia/repository-store';
 import { parseDocument, stringify } from 'yaml';
-import { withShardBarrierAsync } from '../barrier.js';
 import type { MemoryConfig } from '../config.js';
-import { MemoryConflictError, MemoryError } from '../errors.js';
+import { MemoryConflictError, MemoryError, MemoryLockError } from '../errors.js';
 import {
   captureDirectoryIdentities as captureDirectoryIdentityChain,
   isFilesystemErrorCode as isCode,
@@ -89,6 +103,10 @@ export class FilesystemBackend implements StorageBackend {
   private readonly stalePolicy: 'prompt' | 'rebuild' | 'fail';
   private readonly onStaleCache?: () => boolean | Promise<boolean>;
   private readonly filesystemOps: FilesystemOperations;
+  private readonly usesInjectedFilesystemOperations: boolean;
+  private repositoryRoot?: Promise<ManagedRoot>;
+  private readonly repositoryRootOptions: ManagedRootOptions;
+  private readonly repositoryLease = new AsyncLocalStorage<RepositoryLease>();
 
   public constructor(options: FilesystemBackendOptions) {
     this.root = resolve(options.cwd, options.config.root);
@@ -97,10 +115,25 @@ export class FilesystemBackend implements StorageBackend {
     this.stalePolicy = options.config.cache.stale_policy;
     this.onStaleCache = options.onStaleCache;
     this.filesystemOps = { ...DEFAULT_FILESYSTEM_OPERATIONS, ...options.filesystemOps };
+    this.usesInjectedFilesystemOperations = options.filesystemOps !== undefined;
     this.limits = {
       maxFileBytes: options.config.security.limits.max_file_bytes,
       maxFiles: options.config.security.limits.max_files,
       maxTotalBytes: options.config.security.limits.max_total_bytes,
+    };
+    const absoluteConfiguredRoot = isAbsolute(options.config.root);
+    this.repositoryRootOptions = {
+      authorityRoot: absoluteConfiguredRoot ? this.root : resolve(options.cwd),
+      ...(absoluteConfiguredRoot ? {} : { managedPath: options.config.root.split(sep).join('/') }),
+      limits: {
+        ...DEFAULT_STORE_LIMITS,
+        maxFileBytes: this.limits.maxFileBytes,
+        maxFiles: this.limits.maxFiles,
+        maxTotalBytes: this.limits.maxTotalBytes,
+        maxBatchPaths: this.limits.maxFiles,
+        maxBeforeImageBytes: this.limits.maxTotalBytes,
+        maxTemporaryBytes: this.limits.maxTotalBytes,
+      },
     };
     this.scanner = createSecretScanner({
       customPatterns: options.config.security.secret_patterns,
@@ -125,6 +158,9 @@ export class FilesystemBackend implements StorageBackend {
 
   /** {@inheritdoc StorageBackend.loadState} */
   public async loadState(): Promise<ShardState> {
+    // Public low-level callers retain their historical no-wrapper behavior,
+    // while every read now first acquires the repository authority and recovers.
+    if (this.repositoryLease.getStore() === undefined) return this.withRepositoryAccess(async () => this.loadState());
     const records: MemoryRecord[] = [];
     const tombstones: MemoryTombstone[] = [];
     const ids = new Set<string>();
@@ -136,8 +172,7 @@ export class FilesystemBackend implements StorageBackend {
     };
 
     for (const [recordType, folder] of Object.entries(RECORD_FOLDERS) as Array<[RecordType, string]>) {
-      for (const path of this.yamlFiles(join(this.root, folder))) {
-        const content = this.readRegular(path);
+      for (const { path, content } of await this.repositoryYamlFiles(folder)) {
         ({ files, bytes } = this.trackUsage(path, content.byteLength, files, bytes));
         track(path, content);
         const record = this.parseCanonical(content, path);
@@ -151,8 +186,7 @@ export class FilesystemBackend implements StorageBackend {
       }
     }
 
-    for (const path of this.yamlFiles(join(this.root, 'tombstones'))) {
-      const content = this.readRegular(path);
+    for (const { path, content } of await this.repositoryYamlFiles('tombstones')) {
       ({ files, bytes } = this.trackUsage(path, content.byteLength, files, bytes));
       track(path, content);
       const tombstone = this.parseCanonical(content, path);
@@ -187,7 +221,46 @@ export class FilesystemBackend implements StorageBackend {
 
   /** {@inheritdoc StorageBackend.applyBatch} */
   public async applyBatch(replacements: readonly StorageReplacement[]): Promise<void> {
-    this.applyBatchSync(replacements);
+    if (this.usesInjectedFilesystemOperations) {
+      // Preserve the documented test seam while production publication uses
+      // repository-store's durable journal implementation.
+      return this.withRepositoryAccess(async () => this.applyBatchSync(replacements));
+    }
+    return this.withRepositoryAccess(async (root, lease) => {
+      if (replacements.length > this.limits.maxFiles) throw new MemoryError('Memory batch path limit exceeded.');
+      const operations = [];
+      for (const replacement of replacements) {
+        if (replacement.bytes) this.validateReplacementIdentity(replacement.path, replacement.bytes);
+        const path = resolveManagedPath(root, replacement.path);
+        let current;
+        try {
+          current = await readManagedFile(root, lease, path);
+        } catch (error: unknown) {
+          if (!isCode(error, 'ENOENT')) throw error;
+        }
+        if (replacement.exclusive && current !== undefined)
+          throw new MemoryConflictError(`Memory path already exists: ${replacement.path}`);
+        if (replacement.bytes === undefined) {
+          if (current !== undefined) operations.push({ kind: 'remove' as const, path, expected: current.revision });
+        } else {
+          operations.push({
+            kind: 'write' as const,
+            path,
+            bytes: replacement.bytes,
+            expected: current?.revision ?? ('absent' as const),
+          });
+        }
+      }
+      try {
+        await applyCanonicalBatch(root, lease, operations, {
+          inventory: [...Object.values(RECORD_FOLDERS), 'tombstones'].map((folder) => resolveManagedPath(root, folder)),
+        });
+      } catch (error: unknown) {
+        if (error instanceof StaleRevisionError)
+          throw new MemoryConflictError(`Memory canonical revision changed during mutation: ${error.message}`);
+        throw error;
+      }
+    });
   }
 
   private applyBatchSync(replacements: readonly StorageReplacement[]): void {
@@ -260,7 +333,46 @@ export class FilesystemBackend implements StorageBackend {
 
   /** {@inheritdoc StorageBackend.withLock} — shard-scoped directory lock. */
   public async withLock<T>(operation: () => Promise<T>): Promise<T> {
-    return withShardBarrierAsync(this.root, this.scopeKey, operation);
+    return this.withRepositoryAccess(async () => operation());
+  }
+
+  /** Lazily resolves storage so constructing a disabled store remains side-effect free. */
+  private async getRepositoryRoot(): Promise<ManagedRoot> {
+    if (this.repositoryRoot !== undefined) return this.repositoryRoot;
+    const resolution = resolveManagedRoot(this.repositoryRootOptions);
+    this.repositoryRoot = resolution;
+    try {
+      return await resolution;
+    } catch (error: unknown) {
+      // Permission or mount problems can be repaired by the operator; do not
+      // permanently cache a rejected initialization promise.
+      if (this.repositoryRoot === resolution) this.repositoryRoot = undefined;
+      throw error;
+    }
+  }
+
+  /** Runs directly under an existing lease or acquires the authority once. */
+  private async withRepositoryAccess<T>(
+    operation: (root: ManagedRoot, lease: RepositoryLease) => Promise<T>,
+  ): Promise<T> {
+    const root = await this.getRepositoryRoot();
+    const existing = this.repositoryLease.getStore();
+    if (existing !== undefined) return operation(root, existing);
+    try {
+      return await withRepositoryLease(root, async (lease) =>
+        this.repositoryLease.run(lease, async () => operation(root, lease)),
+      );
+    } catch (error: unknown) {
+      if (!(error instanceof RepositoryStoreError)) throw error;
+      if (error.category === 'contention') throw new MemoryLockError(error.message, { cause: error });
+      if (error.code === 'LIMIT_EXCEEDED' && /byte (?:count|limit)/u.test(error.message))
+        throw new MemoryError('Aggregate memory byte limit exceeded.', { cause: error });
+      if (error.code === 'LIMIT_EXCEEDED' && error.message.includes('file count'))
+        throw new MemoryError('Memory file limit exceeded.', { cause: error });
+      if (error.category === 'path_safety')
+        throw new MemoryError(`Cannot safely read managed memory path: ${error.message}`, { cause: error });
+      throw new MemoryError(error.message, { cause: error });
+    }
   }
 
   /** {@inheritdoc StorageBackend.checkOrRebuildCache} */
@@ -552,6 +664,19 @@ export class FilesystemBackend implements StorageBackend {
     } finally {
       if (descriptor !== undefined) closeSync(descriptor);
     }
+  }
+
+  /** Discovers and reads canonical YAML through repository-store safety checks. */
+  private async repositoryYamlFiles(folder: string): Promise<Array<{ path: string; content: Uint8Array }>> {
+    const root = await this.getRepositoryRoot();
+    const lease = this.repositoryLease.getStore();
+    if (lease === undefined) throw new MemoryError('Canonical read requires the repository authority lease.');
+    const files = await scanManagedFiles(root, lease, {
+      under: [resolveManagedPath(root, folder)],
+      accept: (path) =>
+        path.startsWith(`${folder}/`) && !path.slice(folder.length + 1).includes('/') && path.endsWith('.yaml'),
+    });
+    return files.map((file) => ({ path: join(this.root, file.path.relativePath), content: file.bytes }));
   }
 
   private readRegular(path: string): Uint8Array {

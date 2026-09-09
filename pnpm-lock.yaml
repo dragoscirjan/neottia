@@ -161,6 +161,9 @@ importers:
 
   packages/memory-core:
     dependencies:
+      '@neottia/repository-store':
+        specifier: workspace:^
+        version: link:../repository-store
       pg:
         specifier: ^8.23.0
         version: 8.23.0
@@ -220,6 +223,21 @@ importers:
       '@neottia/core':
         specifier: workspace:0.1.0
         version: link:../core
+
+  packages/repository-store:
+    devDependencies:
+      '@templ-project/tsconfig':
+        specifier: ^0.2.2
+        version: 0.2.2(@types/node@25.9.5)(tsx@4.23.13)(yaml@2.9.0)
+      '@types/node':
+        specifier: ^25.0.3
+        version: 25.9.5
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.7
+        version: 3.2.7(@types/node@25.9.5)(tsx@4.23.13)(yaml@2.9.0)
 
   packages/testkit:
     dependencies:

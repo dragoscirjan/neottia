@@ -7,6 +7,7 @@ import { defineConfig } from 'vitest/config';
 const workspaceSourceAliases = {
   '@neottia/memory-core': resolve(__dirname, 'packages/memory-core/src/index.ts'),
   '@neottia/memory-mcp': resolve(__dirname, 'packages/memory-mcp/src/index.ts'),
+  '@neottia/repository-store': resolve(__dirname, 'packages/repository-store/src/index.ts'),
   '@neottia/testkit': resolve(__dirname, 'packages/testkit/src/index.ts'),
 };
 

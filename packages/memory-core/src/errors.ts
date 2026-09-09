@@ -16,8 +16,8 @@ export class ConfigError extends Error {
 }
 
 export class MemoryError extends Error {
-  public constructor(message: string) {
-    super(message);
+  public constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
     this.name = 'MemoryError';
   }
 }
@@ -30,8 +30,8 @@ export class MemoryConflictError extends MemoryError {
 }
 
 export class MemoryLockError extends MemoryError {
-  public constructor(message: string) {
-    super(message);
+  public constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
     this.name = 'MemoryLockError';
   }
 }

@@ -2,7 +2,7 @@
 
 Standalone, typed agent memory: **filesystem-canonical YAML records** with a **SQLite FTS5 (BM25) index**, designed to be consumed as a plain library, embedded in AI harness extensions, or exposed over MCP.
 
-A memory module stores what an AI agent (or team of agents) learns while working on a project — facts, decisions, events, and lessons — as small, reviewable YAML files that live **inside the project repository** and can be committed, diffed, and audited like code. A disposable SQLite index sits next to the files and provides ranked full-text search; it can be deleted and rebuilt at any time without losing anything.
+A memory module stores what an AI agent (or team of agents) learns while working on a project — facts, decisions, events, and lessons — as small, reviewable YAML files that live **inside the project repository** and can be committed, diffed, and audited like code. A disposable SQLite index sits next to the files and provides ranked full-text search; it can be deleted and rebuilt at any time without losing anything. Filesystem mode uses `@neottia/repository-store` for the repository-wide lease, exact byte revisions, durable rollback recovery, and safe publication while memory-core retains the YAML schema and search policy.
 
 Part of the [Neottia](https://github.com/dragoscirjan/neottia) SDLC. The configuration model follows the [Sharded Module Configuration](https://github.com/dragoscirjan/neottia/wiki/Sharded-Module-Configuration) design.
 

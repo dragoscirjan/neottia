@@ -13,7 +13,8 @@ Support for additional harnesses will be added as their integrations become avai
 
 Neottia ships independently versioned packages and extensions. A global Neottia release records the exact compatible version of every published module in `@neottia/release`.
 
-| Module                 | Purpose                                                 | Documentation                  |
-| ---------------------- | ------------------------------------------------------- | ------------------------------ |
-| `@neottia/memory-core` | Durable agent memory: YAML records + SQLite BM25 search | [Memory guide](/memory/)       |
-| `@neottia/memory-mcp`  | MCP server exposing the memory tools to any harness     | [Tool contract](/memory/tools) |
+| Module                      | Purpose                                                       | Documentation                         |
+| --------------------------- | ------------------------------------------------------------- | ------------------------------------- |
+| `@neottia/memory-core`      | Durable agent memory: YAML records + SQLite BM25 search       | [Memory guide](/memory/)              |
+| `@neottia/memory-mcp`       | MCP server exposing the memory tools to any harness           | [Tool contract](/memory/tools)        |
+| `@neottia/repository-store` | Canonical files, leases, recovery, and SQLite cache lifecycle | [Repository store](/repository-store) |
