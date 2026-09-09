@@ -10,6 +10,7 @@ export default defineConfig({
     nav: [
       { text: 'Home', link: '/' },
       { text: 'Memory', link: '/memory/' },
+      { text: 'Repository store', link: '/repository-store' },
     ],
     sidebar: {
       '/memory/': [

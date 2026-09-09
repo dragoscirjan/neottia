@@ -1,0 +1,40 @@
+name: Repository Store Runtimes
+
+on:
+  pull_request:
+    paths:
+      - 'packages/repository-store/**'
+      - 'packages/memory-core/**'
+      - 'mise.toml'
+      - 'mise.lock'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/repository-store.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'packages/repository-store/**'
+      - 'packages/memory-core/**'
+      - 'mise.toml'
+      - 'mise.lock'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/repository-store.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  runtime-conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: jdx/mise-action@v3
+        with:
+          install: true
+          cache: true
+      - name: Install workspace dependencies
+        run: mise run deps:sync:pnpm
+      - name: Run Node and Bun repository-store conformance
+        run: mise run test:repository-store:runtimes
+      - name: Verify clean-source test execution
+        run: mise run clean && mise run test

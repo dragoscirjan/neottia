@@ -37,6 +37,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@neottia/repository-store": "workspace:^",
     "pg": "^8.23.0",
     "yaml": "^2.9.0",
     "zod": "^4.5.4"

@@ -1,6 +1,7 @@
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { afterEach, describe, expect, it } from 'vitest';
 import { stringify } from 'yaml';
 import {
@@ -303,6 +304,22 @@ describe('memory store (filesystem + SQLite index)', () => {
     const byteLimited = storeFor(destinationCwd, { security: { limits: { max_total_bytes: bytes } } });
     await expect(byteLimited.store(fact('Would exceed bytes'))).rejects.toThrow(/byte limit/u);
     expect(await byteLimited.list()).toEqual([one]);
+  });
+
+  it('does not count disposable SQLite bytes against canonical file limits', async () => {
+    const cwd = fixture();
+    const store = storeFor(cwd);
+    await store.store(fact('First canonical record'));
+    const database = new DatabaseSync(join(cwd, '.neottia', 'memory', 'index.db'));
+    database.exec('CREATE TABLE cache_padding (value BLOB NOT NULL);');
+    database.prepare('INSERT INTO cache_padding (value) VALUES (?)').run(Buffer.alloc(1_000_000));
+    database.close();
+    const bounded = storeFor(cwd, { security: { limits: { max_total_bytes: 100_000 } } });
+
+    await expect(bounded.store(fact('Second canonical record'))).resolves.toMatchObject({
+      summary: 'Second canonical record',
+    });
+    await expect(bounded.list()).resolves.toHaveLength(2);
   });
 
   it('rejects symlinked roots and SQLite cache artifacts', async () => {

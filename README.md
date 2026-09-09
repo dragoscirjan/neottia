@@ -10,6 +10,7 @@ Neottia provides a shared SDLC that can be understood and used by multiple AI co
 │   ├── core/            # Independently versioned core package
 │   ├── memory-core/     # Canonical memory library and config schema
 │   ├── memory-mcp/      # MCP memory server
+│   ├── repository-store/# Canonical repository persistence primitives
 │   └── release/         # Global release bill of materials
 ├── docs/                # User documentation for VitePress
 ├── .changeset/          # Module release declarations
@@ -64,7 +65,7 @@ This updates `packages/release/package.json` and `packages/release/release-manif
 
 ## Memory
 
-Install `@neottia/memory-core` for the library, `@neottia/memory-mcp` for an MCP server, or the `@neottia/pi-memory` / `@neottia/opencode-memory` extensions for in-process harness tools. Configure the `skills.memory` shard in `.neottia/config.yml`; the user-facing setup and operations guide is [here](docs/memory/).
+Install `@neottia/memory-core` for the library, `@neottia/memory-mcp` for an MCP server, or the `@neottia/pi-memory` / `@neottia/opencode-memory` extensions for in-process harness tools. Configure the `skills.memory` shard in `.neottia/config.yml`; the user-facing setup and operations guide is [here](docs/memory/). Filesystem domains share the crash-recoverable primitives documented in the [repository-store guide](docs/repository-store.md).
 
 ## Documentation
 

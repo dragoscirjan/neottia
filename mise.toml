@@ -8,6 +8,7 @@ lockfile = true
 
 [tools]
 node = "22"
+bun = "1.3.13"
 pnpm = "10.28.2"
 
 ############################################################################
@@ -41,6 +42,26 @@ run = "NEOTTIA_TEST_HARNESS=1 pnpm exec vitest run --root . packages/testkit/src
 [tasks."test:coverage"]
 description = "Run tests and generate aggregate coverage"
 run = "pnpm run test:coverage"
+
+[tasks."test:repository-store:node"]
+description = "Run repository-store tests with Node"
+run = "pnpm --filter @neottia/repository-store test:node"
+
+[tasks."test:repository-store:bun"]
+description = "Run repository-store SQLite conformance with Bun"
+run = "pnpm --filter @neottia/repository-store test:bun"
+
+[tasks."test:repository-store:cross-runtime"]
+description = "Run built-package Node and Bun cache interoperability"
+run = "pnpm --filter @neottia/repository-store test:cross-runtime"
+
+[tasks."test:repository-store:runtimes"]
+description = "Run repository-store conformance under Node and Bun"
+run = [
+  "mise run test:repository-store:node",
+  "mise run test:repository-store:bun",
+  "mise run test:repository-store:cross-runtime",
+]
 
 ############################################################################
 # Documentation                                                            #
