@@ -1,0 +1,169 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "enabled": {
+      "default": false,
+      "type": "boolean"
+    },
+    "root": {
+      "default": ".neottia/design-docs",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?!\\.{1,2}(?:\\/|$))(?!.*(?:^|\\/)\\.{1,2}(?:\\/|$))(?!\\/)(?![A-Za-z]:)[^\\\\\\0\\r\\n]+$"
+    },
+    "retrieval": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "limit": {
+          "default": 20,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        },
+        "snippet_bytes": {
+          "default": 512,
+          "type": "integer",
+          "minimum": 64,
+          "maximum": 16384
+        },
+        "all_versions": {
+          "default": false,
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "cache": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "max_age_ms": {
+          "default": 300000,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "stale_policy": {
+          "default": "prompt",
+          "type": "string",
+          "enum": ["prompt", "rebuild", "fail"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "security": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "limits": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "max_files": {
+              "default": 2000,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "max_versions": {
+              "default": 100,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "max_file_bytes": {
+              "default": 1100000,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "max_body_bytes": {
+              "default": 1000000,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "max_frontmatter_bytes": {
+              "default": 131072,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "max_metadata_bytes": {
+              "default": 65536,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "max_aggregate_bytes": {
+              "default": 8388608,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "max_yaml_depth": {
+              "default": 16,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "max_yaml_nodes": {
+              "default": 2048,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "max_metadata_keys": {
+              "default": 256,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "max_journal_bytes": {
+              "default": 4194304,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "max_backup_bytes": {
+              "default": 33554432,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "max_query_bytes": {
+              "default": 16384,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "max_results": {
+              "default": 200,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 1000
+            },
+            "max_result_bytes": {
+              "default": 4194304,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "max_import_bytes": {
+              "default": 67108864,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

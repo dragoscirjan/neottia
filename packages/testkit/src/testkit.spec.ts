@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { DesignDocumentStore, loadDesignDocsConfig } from '@neottia/design-docs';
 import { loadIssueConfig } from '@neottia/issues';
 import { MemoryStore, loadMemoryConfig } from '@neottia/memory-core';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -10,6 +11,7 @@ import {
   mcpServersDocument,
   openrouterModelId,
   repoRoot,
+  seedDesignDocs,
   seedIssues,
   seedMemory,
   writeOpencodeMcpConfig,
@@ -62,6 +64,17 @@ describe('temp project fixtures', () => {
     const project = createTempProject({ memory: { namespace: { project_id: 'fixture' } } });
     projects.push(project);
     expect(loadMemoryConfig(project.cwd, { env: {} }).namespace.project_id).toBe('fixture');
+  });
+
+  it('seeds canonical design documents through the library', async () => {
+    const project = createTempProject();
+    projects.push(project);
+    const [seeded] = await seedDesignDocs(project, [
+      { title: 'Fixture Design', kind: 'hld', body: 'Temporary canonical document.' },
+    ]);
+    const store = await DesignDocumentStore.fromConfig(loadDesignDocsConfig(project.cwd, { env: {} }), project.cwd);
+    expect((await store.get(seeded!.id)).title).toBe('Fixture Design');
+    expect(existsSync(project.designDocsRoot)).toBe(true);
   });
 
   it('seeds canonical records deterministically through the library', async () => {
