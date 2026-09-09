@@ -10,6 +10,8 @@ Neottia provides a shared SDLC that can be understood and used by multiple AI co
 │   ├── core/            # Independently versioned core package
 │   ├── memory-core/     # Canonical memory library and config schema
 │   ├── memory-mcp/      # MCP memory server
+│   ├── issues/          # Canonical issue domain and tool registry
+│   ├── issues-mcp/      # Generic MCP issue server
 │   ├── repository-store/# Canonical repository persistence primitives
 │   └── release/         # Global release bill of materials
 ├── docs/                # User documentation for VitePress
@@ -66,6 +68,10 @@ This updates `packages/release/package.json` and `packages/release/release-manif
 ## Memory
 
 Install `@neottia/memory-core` for the library, `@neottia/memory-mcp` for an MCP server, or the `@neottia/pi-memory` / `@neottia/opencode-memory` extensions for in-process harness tools. Configure the `skills.memory` shard in `.neottia/config.yml`; the user-facing setup and operations guide is [here](docs/memory/). Filesystem domains share the crash-recoverable primitives documented in the [repository-store guide](docs/repository-store.md).
+
+## Issues
+
+Enable `skills.issues` to manage Git-trackable YAML issues with exact revisions, durable recursive archive/restore, typed design-document links, and a disposable ranked FTS5 cache. Use `@neottia/issues` directly, `@neottia/issues-mcp` over stdio, or the in-process Pi/OpenCode extensions. See the [Issues guide](docs/issues/).
 
 ## Documentation
 

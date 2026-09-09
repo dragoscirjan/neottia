@@ -1,13 +1,16 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { loadIssueConfig } from '@neottia/issues';
 import { MemoryStore, loadMemoryConfig } from '@neottia/memory-core';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  createTempIssueProject,
   createTempProject,
   ensureMemoryDistBuilt,
   mcpServersDocument,
   openrouterModelId,
   repoRoot,
+  seedIssues,
   seedMemory,
   writeOpencodeMcpConfig,
   writeMcpServersJsonFile,
@@ -42,6 +45,17 @@ describe('temp project fixtures', () => {
     const config = loadMemoryConfig(project.cwd, { env: {} });
     expect(config.enabled).toBe(true);
     expect(config.root).toBe('.neottia/memory');
+  });
+
+  it('exports a usable Issues temp-project fixture', async () => {
+    const project = createTempIssueProject();
+    try {
+      expect(loadIssueConfig(project.cwd, { env: {} }).enabled).toBe(true);
+      await seedIssues(project, [{ type: 'task', title: 'Seeded issue' }]);
+      expect(existsSync(project.issuesRoot)).toBe(true);
+    } finally {
+      project.cleanup();
+    }
   });
 
   it('applies config overrides to the generated shard', () => {

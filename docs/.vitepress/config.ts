@@ -10,9 +10,23 @@ export default defineConfig({
     nav: [
       { text: 'Home', link: '/' },
       { text: 'Memory', link: '/memory/' },
+      { text: 'Issues', link: '/issues/' },
       { text: 'Repository store', link: '/repository-store' },
     ],
     sidebar: {
+      '/issues/': [
+        {
+          text: 'Issues',
+          items: [
+            { text: 'Overview', link: '/issues/' },
+            { text: 'Configuration', link: '/issues/configuration' },
+            { text: 'Canonical format', link: '/issues/canonical-format' },
+            { text: 'Tools', link: '/issues/tools' },
+            { text: 'Search and operations', link: '/issues/operations' },
+            { text: 'Migration', link: '/issues/migration' },
+          ],
+        },
+      ],
       '/memory/': [
         {
           text: 'Memory',
