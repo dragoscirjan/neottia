@@ -217,6 +217,17 @@ describe('DesignDocumentStore lifecycle', () => {
     expect(report).toMatchObject({ valid: false, findings: [{ code: 'ISSUE_LINK_UNRESOLVED' }] });
   });
 
+  it('reports an invalid injected clock through the domain error contract', async () => {
+    const root = await project();
+    const store = await DesignDocumentStore.fromConfig(config(), root, {
+      clock: () => new Date(Number.NaN),
+      generateId: () => id,
+    });
+    await expect(store.create({ title: 'Invalid clock', kind: 'hld' })).rejects.toMatchObject({
+      code: 'TIMESTAMP_INVALID',
+    });
+  });
+
   it('fails a disabled capability before creating .neottia', async () => {
     const root = await project();
     await expect(

@@ -29,7 +29,9 @@ describe('Pi Design Docs extension', () => {
     const close = registerDesignDocsTools(api);
     expect(Object.keys(designDocsToolParameters)).toEqual(DESIGN_DOCS_TOOLS.map((tool) => tool.name));
     for (const definition of DESIGN_DOCS_TOOLS)
-      expect(designDocsToolParameters[definition.name]).toEqual(designDocsToolJsonSchema(definition.name, 'input'));
+      expect(JSON.parse(JSON.stringify(designDocsToolParameters[definition.name]))).toMatchObject(
+        designDocsToolJsonSchema(definition.name, 'input'),
+      );
     const first = fixture();
     const second = fixture();
     const create = registered.get('document_create')!;

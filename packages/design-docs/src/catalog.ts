@@ -173,10 +173,10 @@ function validateLineage(id: string, lineage: readonly CatalogEntity[], maxVersi
     );
 }
 function compareEntity(left: CatalogEntity, right: CatalogEntity): number {
-  return (
-    left.decoded.metadata.id.localeCompare(right.decoded.metadata.id) ||
-    left.decoded.metadata.version - right.decoded.metadata.version
-  );
+  const leftId = left.decoded.metadata.id;
+  const rightId = right.decoded.metadata.id;
+  const idOrder = leftId < rightId ? -1 : leftId > rightId ? 1 : 0;
+  return idOrder || left.decoded.metadata.version - right.decoded.metadata.version;
 }
 function relativeUnder(value: string, folder: string): string {
   const prefix = `${folder}/`;

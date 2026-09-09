@@ -6,7 +6,7 @@ import {
   type DesignDocsToolContext,
   type DesignDocsToolName,
 } from '@neottia/design-docs';
-import type { TSchema } from 'typebox';
+import { Type, type TSchema } from 'typebox';
 
 export interface PiExtensionApi {
   on: (event: 'session_shutdown', handler: () => Promise<void>) => unknown;
@@ -30,7 +30,10 @@ export interface DesignDocsExtensionOptions {
   readonly confirmTransition?: (target: 'review' | 'approved') => boolean | Promise<boolean>;
 }
 export const designDocsToolParameters = Object.fromEntries(
-  DESIGN_DOCS_TOOLS.map((definition) => [definition.name, designDocsToolJsonSchema(definition.name, 'input')]),
+  DESIGN_DOCS_TOOLS.map((definition) => [
+    definition.name,
+    Type.Unsafe(designDocsToolJsonSchema(definition.name, 'input') as TSchema),
+  ]),
 ) as unknown as Record<DesignDocsToolName, TSchema>;
 
 /** Registers shared contracts while resolving the active worktree per invocation. */

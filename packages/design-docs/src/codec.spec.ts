@@ -57,6 +57,13 @@ describe('canonical Design Docs codec', () => {
     expect(Buffer.from(left).toString()).toContain('metadata: {"a":true,"z":{"a":1,"b":2}}');
   });
 
+  it('rejects trailing unpaired high surrogates before encoding', () => {
+    expect(() => encodeCanonicalDocument({ ...metadata, title: `Invalid\ud800` }, '', limits)).toThrow(
+      /invalid Unicode/u,
+    );
+    expect(() => encodeCanonicalDocument(metadata, `Invalid\ud800`, limits)).toThrow(/invalid Unicode/u);
+  });
+
   it('rejects Setext H1 syntax outside fenced code', () => {
     expect(() => encodeCanonicalDocument(metadata, 'Other heading\n=====', limits)).toThrow(/level-one/u);
     expect(() => encodeCanonicalDocument(metadata, '```md\nOther heading\n=====\n```', limits)).not.toThrow();

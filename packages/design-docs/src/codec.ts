@@ -347,6 +347,7 @@ function assertUnicode(value: string, label: string): void {
   for (let index = 0; index < value.length; index++) {
     const code = value.charCodeAt(index);
     if (code >= 0xd800 && code <= 0xdbff) {
+      if (index + 1 >= value.length) fail('parse_safety', 'UNICODE_INVALID', `${label} contains invalid Unicode.`);
       const next = value.charCodeAt(++index);
       if (next < 0xdc00 || next > 0xdfff) fail('parse_safety', 'UNICODE_INVALID', `${label} contains invalid Unicode.`);
     } else if (code >= 0xdc00 && code <= 0xdfff)

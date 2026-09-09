@@ -49,10 +49,21 @@ export async function ensureDesignDocsCache(
   const specification = cacheSpecification(cacheRoot, catalog, config);
   const opened = await openDisposableSqliteCache(cacheRoot, lease, specification, control);
   if (opened.state === 'ready') {
-    const rebuiltAt = await opened.database.prepare(
-      "SELECT value FROM neottia_repository_cache_meta WHERE key='rebuilt_at'",
-    );
-    const row = await rebuiltAt.get<{ value: SqliteValue }>();
+    let row: { value: SqliteValue } | undefined;
+    try {
+      const rebuiltAt = await opened.database.prepare(
+        "SELECT value FROM neottia_repository_cache_meta WHERE key='rebuilt_at'",
+      );
+      row = await rebuiltAt.get<{ value: SqliteValue }>();
+    } catch (error: unknown) {
+      // Preserve the probe failure while preventing one leaked handle per retry.
+      try {
+        await opened.close();
+      } catch {
+        // The original probe failure remains the actionable cache diagnosis.
+      }
+      throw error;
+    }
     const rebuiltTime =
       typeof row?.value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u.test(row.value)
         ? Date.parse(row.value)

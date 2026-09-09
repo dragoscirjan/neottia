@@ -824,10 +824,9 @@ function toRepositoryRevision(revision: DocumentRevision): ByteRevision {
   return `sha256:${revision.slice('v1:'.length)}`;
 }
 function timestamp(date: Date): string {
-  const value = date.toISOString();
   if (Number.isNaN(date.getTime()))
     throw new DesignDocsError('schema', 'TIMESTAMP_INVALID', 'Clock returned an invalid date.');
-  return value;
+  return date.toISOString();
 }
 function storeLimits(config: DesignDocsConfig): StoreLimits {
   const limits = config.security.limits;
