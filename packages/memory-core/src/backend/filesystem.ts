@@ -337,9 +337,18 @@ export class FilesystemBackend implements StorageBackend {
   }
 
   /** Lazily resolves storage so constructing a disabled store remains side-effect free. */
-  private getRepositoryRoot(): Promise<ManagedRoot> {
-    this.repositoryRoot ??= resolveManagedRoot(this.repositoryRootOptions);
-    return this.repositoryRoot;
+  private async getRepositoryRoot(): Promise<ManagedRoot> {
+    if (this.repositoryRoot !== undefined) return this.repositoryRoot;
+    const resolution = resolveManagedRoot(this.repositoryRootOptions);
+    this.repositoryRoot = resolution;
+    try {
+      return await resolution;
+    } catch (error: unknown) {
+      // Permission or mount problems can be repaired by the operator; do not
+      // permanently cache a rejected initialization promise.
+      if (this.repositoryRoot === resolution) this.repositoryRoot = undefined;
+      throw error;
+    }
   }
 
   /** Runs directly under an existing lease or acquires the authority once. */
@@ -356,7 +365,7 @@ export class FilesystemBackend implements StorageBackend {
     } catch (error: unknown) {
       if (!(error instanceof RepositoryStoreError)) throw error;
       if (error.category === 'contention') throw new MemoryLockError(error.message, { cause: error });
-      if (error.code === 'LIMIT_EXCEEDED' && error.message.includes('byte count'))
+      if (error.code === 'LIMIT_EXCEEDED' && /byte (?:count|limit)/u.test(error.message))
         throw new MemoryError('Aggregate memory byte limit exceeded.', { cause: error });
       if (error.code === 'LIMIT_EXCEEDED' && error.message.includes('file count'))
         throw new MemoryError('Memory file limit exceeded.', { cause: error });

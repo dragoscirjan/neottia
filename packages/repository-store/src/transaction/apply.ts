@@ -26,9 +26,15 @@ import {
   sameIdentity,
   syncDirectory,
 } from '../internal/filesystem.js';
-import { PATH_STATE, ROOT_STATE, type ManagedPath, type ManagedRoot, type RepositoryLease } from '../internal/model.js';
+import {
+  getPathState,
+  getRootState,
+  type ManagedPath,
+  type ManagedRoot,
+  type RepositoryLease,
+} from '../internal/model.js';
 import { assertLiveLease, checkControl, type OperationControl } from '../lease.js';
-import { portablePathKey } from '../paths.js';
+import { compareCanonicalPaths, portablePathKey } from '../paths.js';
 import { computeByteRevision, type ByteRevision } from '../revision.js';
 import {
   cleanupJournal,
@@ -58,7 +64,7 @@ export async function applyCanonicalBatch(
   // Snapshot caller-owned buffers before the first await so later mutation
   // cannot diverge staged, manifested, and published revisions.
   const ownedOperations = snapshotOperations(operations);
-  const state = root[ROOT_STATE];
+  const state = requireRootState(root);
   if (ownedOperations.length === 0) return { transactionId: randomBytes(32).toString('hex') };
   if (ownedOperations.length > state.limits.maxBatchPaths)
     throw new ResourceLimitError('Canonical batch exceeds maxBatchPaths.');
@@ -129,7 +135,7 @@ export async function applyCanonicalBatch(
     for (const transition of transitions) {
       checkControl(options);
       await verifyCurrent(root, lease, transition.path, transition.original, options);
-      publishTransition(transition.path[PATH_STATE].absolutePath, transition.intended, transactionId);
+      publishTransition(requirePathState(transition.path).absolutePath, transition.intended, transactionId);
       emitTransactionFault('canonical-path-published');
     }
     for (const transition of transitions)
@@ -202,7 +208,7 @@ async function normalizeOperations(
     if (operation.kind === 'write') {
       const current = await readManagedFileIfExists(root, lease, operation.path, options);
       assertExpected(operation.path, current?.revision, operation.expected);
-      if (operation.bytes.byteLength > root[ROOT_STATE].limits.maxFileBytes)
+      if (operation.bytes.byteLength > requireRootState(root).limits.maxFileBytes)
         throw new ResourceLimitError(`Canonical file exceeds maxFileBytes: ${operation.path.relativePath}`);
       add({ path: operation.path, original: current?.bytes ?? null, intended: operation.bytes });
     } else if (operation.kind === 'remove') {
@@ -220,7 +226,9 @@ async function normalizeOperations(
       add({ path: operation.to, original: destination?.bytes ?? null, intended: source?.bytes ?? null });
     }
   }
-  return [...transitions.values()].sort((left, right) => left.path.relativePath.localeCompare(right.path.relativePath));
+  return [...transitions.values()].sort((left, right) =>
+    compareCanonicalPaths(left.path.relativePath, right.path.relativePath),
+  );
 }
 
 function assertExpected(path: ManagedPath, actual: ByteRevision | undefined, expected: 'absent' | ByteRevision): void {
@@ -233,14 +241,14 @@ async function validateProposedInventory(
   transitions: readonly Transition[],
   inventoryRoots: readonly ManagedPath[] | undefined,
 ): Promise<void> {
-  const state = root[ROOT_STATE];
+  const state = requireRootState(root);
   const inventory = new Map<string, { path: string; bytes: number }>();
   if (inventoryRoots === undefined) {
     inventoryWalk(state.managedRoot, state.managedRoot, inventory, state.authorityRoot === state.managedRoot);
   } else {
     for (const inventoryRoot of inventoryRoots) {
       assertPathAuthority(root, inventoryRoot);
-      inventoryWalk(inventoryRoot[PATH_STATE].absolutePath, state.managedRoot, inventory, false);
+      inventoryWalk(requirePathState(inventoryRoot).absolutePath, state.managedRoot, inventory, false);
     }
   }
   for (const transition of transitions) {
@@ -375,6 +383,18 @@ function removePreparationArtifacts(directory: string, token: string): void {
   }
   for (const entry of entries) rmSync(join(directory, entry));
   rmdirSync(directory);
+}
+
+function requireRootState(root: ManagedRoot): NonNullable<ReturnType<typeof getRootState>> {
+  const state = getRootState(root);
+  if (state === undefined) throw new PathSafetyError('Managed root is not a repository-store handle.');
+  return state;
+}
+
+function requirePathState(path: ManagedPath): NonNullable<ReturnType<typeof getPathState>> {
+  const state = getPathState(path);
+  if (state === undefined) throw new PathSafetyError('Managed path is not a repository-store handle.');
+  return state;
 }
 
 function exists(path: string): boolean {

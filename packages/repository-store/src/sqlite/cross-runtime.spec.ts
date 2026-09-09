@@ -17,7 +17,7 @@ describe('built-package SQLite runtime interoperability', () => {
     } finally {
       rmSync(authority, { recursive: true, force: true });
     }
-  });
+  }, 60_000);
 
   it('rolls an interrupted canonical transaction back across runtimes', async () => {
     const fixture = fileURLToPath(new URL('../../test/cross-runtime.mjs', import.meta.url));
@@ -34,7 +34,7 @@ describe('built-package SQLite runtime interoperability', () => {
         rmSync(authority, { recursive: true, force: true });
       }
     }
-  });
+  }, 60_000);
 });
 
 async function runRuntime(

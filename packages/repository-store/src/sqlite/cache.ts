@@ -13,8 +13,8 @@ import {
   syncRegularFile,
 } from '../internal/filesystem.js';
 import {
-  PATH_STATE,
-  ROOT_STATE,
+  getPathState,
+  getRootState,
   managedPathBelongsToRoot,
   type ManagedPath,
   type ManagedRoot,
@@ -58,7 +58,7 @@ export async function openDisposableSqliteCache(
   assertLiveLease(root, lease);
   checkControl(options);
   assertCachePath(root, specification.path);
-  const path = specification.path[PATH_STATE].absolutePath;
+  const path = requirePathState(specification.path).absolutePath;
   if (!artifactExists(path)) return { state: 'rebuild-required', reason: 'missing' };
   const beforeOpen = captureCacheState(path);
   const adapter = await selectSqliteAdapter();
@@ -107,8 +107,8 @@ export async function rebuildDisposableSqliteCache(
   assertLiveLease(root, lease);
   checkControl(options);
   assertCachePath(root, specification.path);
-  const rootState = root[ROOT_STATE];
-  const path = specification.path[PATH_STATE].absolutePath;
+  const rootState = requireRootState(root);
+  const path = requirePathState(specification.path).absolutePath;
   const parent = dirname(path);
   const candidate = join(parent, `.${basename(path)}.${randomUUID()}.candidate`);
   assertArtifactsAbsent(candidate);
@@ -393,8 +393,8 @@ async function verifyDatabase(
   healthGuard?: { readonly beforeHealthCheck: () => void; readonly afterHealthCheck: () => void },
 ): Promise<CacheRebuildReason | undefined> {
   const bounds = {
-    maxRows: root[ROOT_STATE].limits.maxQueryRows,
-    maxBytes: root[ROOT_STATE].limits.maxQueryResultBytes,
+    maxRows: requireRootState(root).limits.maxQueryRows,
+    maxBytes: requireRootState(root).limits.maxQueryResultBytes,
   };
   const application = await (await database.prepare('PRAGMA application_id')).get<{ application_id: number }>();
   if (application?.application_id !== specification.applicationId) return 'wrong-application';
@@ -425,6 +425,18 @@ async function verifyDatabase(
   healthGuard?.afterHealthCheck();
   if (healthError !== undefined) return 'contradictory';
   return undefined;
+}
+
+function requireRootState(root: ManagedRoot): NonNullable<ReturnType<typeof getRootState>> {
+  const state = getRootState(root);
+  if (state === undefined) throw new PathSafetyError('Managed root is not a repository-store handle.');
+  return state;
+}
+
+function requirePathState(path: ManagedPath): NonNullable<ReturnType<typeof getPathState>> {
+  const state = getPathState(path);
+  if (state === undefined) throw new PathSafetyError('Managed path is not a repository-store handle.');
+  return state;
 }
 
 function assertCachePath(root: ManagedRoot, path: ManagedPath): void {

@@ -27,7 +27,14 @@ import {
   sameIdentity,
   syncDirectory,
 } from './internal/filesystem.js';
-import { LEASE_STATE, ROOT_STATE, type ManagedRoot, type RepositoryLease } from './internal/model.js';
+import {
+  createRepositoryLease,
+  getLeaseState,
+  getRootState,
+  type LeaseState,
+  type ManagedRoot,
+  type RepositoryLease,
+} from './internal/model.js';
 
 /** Abort and absolute wall-clock deadline controls accepted by async operations. */
 export interface OperationControl {
@@ -66,7 +73,7 @@ export async function withRepositoryLease<T>(
   operation: (lease: RepositoryLease) => Promise<T>,
   options: RepositoryLeaseOptions = {},
 ): Promise<T> {
-  const rootState = root[ROOT_STATE];
+  const rootState = getRootState(root);
   if (rootState === undefined) throw new RepositoryStoreConfigError('Managed root is not a repository-store handle.');
   if (activeAuthorities.has(rootState.authorityId))
     throw new LeaseContentionError('Repository lease acquisition is non-reentrant.', 'LEASE_REENTRANT');
@@ -85,7 +92,7 @@ export async function withRepositoryLease<T>(
   let acquired = false;
   let lockIdentity: Stats | undefined;
   let ownerIdentity: Stats | undefined;
-  let leaseState: RepositoryLease[typeof LEASE_STATE] | undefined;
+  let leaseState: LeaseState | undefined;
   try {
     while (!acquired) {
       checkControl({ ...options, deadline });
@@ -131,7 +138,7 @@ export async function withRepositoryLease<T>(
 
     if (lockIdentity === undefined || ownerIdentity === undefined)
       throw new LeaseContentionError('Repository lease identity was not initialized.', 'LEASE_OWNER_UNKNOWN');
-    const acquiredState: RepositoryLease[typeof LEASE_STATE] = {
+    const acquiredState: LeaseState = {
       authorityId: rootState.authorityId,
       token,
       lockPath,
@@ -140,10 +147,7 @@ export async function withRepositoryLease<T>(
       active: true,
     };
     leaseState = acquiredState;
-    const lease: RepositoryLease = Object.freeze({
-      authorityRoot: rootState.authorityRoot,
-      [LEASE_STATE]: acquiredState,
-    });
+    const lease = createRepositoryLease(rootState.authorityRoot, acquiredState);
     // A static import would create a lease/recovery initialization cycle.
     const { recoverCanonicalTransactions } = await import('./transaction/recovery.js');
     await recoverCanonicalTransactions(root, lease, options);
@@ -158,8 +162,8 @@ export async function withRepositoryLease<T>(
 
 /** Validates that a live lease belongs to the supplied managed root. */
 export function assertLiveLease(root: ManagedRoot, lease: RepositoryLease): void {
-  const rootState = root[ROOT_STATE];
-  const leaseState = lease[LEASE_STATE];
+  const rootState = getRootState(root);
+  const leaseState = getLeaseState(lease);
   if (rootState === undefined || leaseState === undefined || rootState.authorityId !== leaseState.authorityId)
     throw new RepositoryStoreConfigError('Lease and managed root have different authorities.', 'AUTHORITY_MISMATCH');
   if (!leaseState.active) throw new LeaseContentionError('Repository lease is no longer active.', 'LEASE_BUSY');

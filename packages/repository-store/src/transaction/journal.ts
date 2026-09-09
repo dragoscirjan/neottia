@@ -15,6 +15,7 @@ import { join } from 'node:path';
 import { RecoveryError, ResourceLimitError } from '../errors.js';
 import { emitTransactionFault } from '../internal/fault-injection.js';
 import { assertSafeRegular, ensurePrivateDirectory, readRegularFile, syncDirectory } from '../internal/filesystem.js';
+import { compareCanonicalPaths } from '../paths.js';
 import { isByteRevision } from '../revision.js';
 import type { JournalEntry, JournalManifest } from './types.js';
 
@@ -58,7 +59,7 @@ export function readManifest(directory: string, maxJournalBytes: number): Journa
   if (!isManifest(value)) throw malformed('Transaction manifest has an invalid schema.');
   const { digest, ...unsigned } = value;
   if (manifestDigest(unsigned) !== digest) throw malformed('Transaction manifest digest does not match.');
-  const sorted = [...value.entries].sort((left, right) => left.path.localeCompare(right.path));
+  const sorted = [...value.entries].sort((left, right) => compareCanonicalPaths(left.path, right.path));
   if (sorted.some((entry, index) => entry.path !== value.entries[index]?.path))
     throw malformed('Transaction manifest entries are not canonically sorted.');
   return value;

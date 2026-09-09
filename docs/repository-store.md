@@ -16,4 +16,4 @@ SQLite databases are caches only. Missing, stale, incompatible, or corrupt cache
 
 ## Platform limits
 
-Local filesystems with reliable atomic `mkdir` and same-volume `rename` are required. Shared and network filesystems are unsupported. POSIX hosts receive parent-directory `fsync`; Windows crash durability is limited to the guarantees exposed by the runtime. SQLite's path-only API also means continuous hostile path swapping cannot be prevented portably, though repository-store validates database, WAL, and SHM artifacts around package-controlled phases.
+SQLite caches require Node.js 22.16 or newer or Bun 1.3.13 or newer. Local filesystems with reliable atomic `mkdir` and same-volume `rename` are required. Shared and network filesystems are unsupported. POSIX hosts receive parent-directory `fsync`; Windows crash durability is limited to the guarantees exposed by the runtime. SQLite's path-only API also means continuous hostile path swapping cannot be prevented portably, though repository-store validates database, WAL, and SHM artifacts around package-controlled phases.

@@ -2,8 +2,14 @@ import { createHash } from 'node:crypto';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { PathSafetyError, RepositoryStoreConfigError } from './errors.js';
 import { ensurePrivateDirectory } from './internal/filesystem.js';
-import { PATH_STATE, ROOT_STATE, type ManagedPath, type ManagedRoot } from './internal/model.js';
-import type { StoreLimits } from './limits.js';
+import {
+  createManagedPath,
+  createManagedRoot,
+  getRootState,
+  type ManagedPath,
+  type ManagedRoot,
+} from './internal/model.js';
+import { DEFAULT_STORE_LIMITS, type StoreLimits } from './limits.js';
 
 /** Options binding a managed subtree to its lease authority. */
 export interface ManagedRootOptions {
@@ -26,18 +32,19 @@ export async function resolveManagedRoot(options: ManagedRootOptions): Promise<M
     managedRoot === authorityRoot ? '.' : relative(authorityRoot, managedRoot).split(sep).join('/');
   const managedRootId = createHash('sha256').update(`${authorityId}\0${managedIdentityPath}`).digest('hex');
   const state = { authorityRoot, managedRoot, authorityId, managedRootId, limits: { ...options.limits } };
-  return Object.freeze({ authorityRoot, managedRoot, [ROOT_STATE]: state });
+  return createManagedRoot(state);
 }
 
 /** Creates an authority-bound opaque path after portable normalization checks. */
 export function resolveManagedPath(root: ManagedRoot, relativePath: string): ManagedPath {
-  const state = root[ROOT_STATE];
+  const state = getRootState(root);
   if (state === undefined) throw new RepositoryStoreConfigError('Managed root is not a repository-store handle.');
   const normalized = validateRelativePath(relativePath);
   const absolutePath = resolveWithin(state.managedRoot, normalized);
-  return Object.freeze({
-    relativePath: normalized,
-    [PATH_STATE]: { authorityId: state.authorityId, managedRootId: state.managedRootId, absolutePath },
+  return createManagedPath(normalized, {
+    authorityId: state.authorityId,
+    managedRootId: state.managedRootId,
+    absolutePath,
   });
 }
 
@@ -68,6 +75,11 @@ export function portablePathKey(value: string): string {
   return value.normalize('NFKC').toLocaleLowerCase('en-US');
 }
 
+/** Locale-independent ordering used by durable manifests and recovery. */
+export function compareCanonicalPaths(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
 function resolveWithin(root: string, value: string): string {
   const normalized = validateRelativePath(value.split(sep).join('/'));
   const absolute = resolve(root, normalized);
@@ -78,7 +90,8 @@ function resolveWithin(root: string, value: string): string {
 }
 
 function validateLimits(limits: StoreLimits): void {
-  for (const [name, value] of Object.entries(limits)) {
+  for (const name of Object.keys(DEFAULT_STORE_LIMITS) as Array<keyof StoreLimits>) {
+    const value = limits[name];
     if (!Number.isSafeInteger(value) || value <= 0)
       throw new RepositoryStoreConfigError(`Store limit ${name} must be a positive safe integer.`);
   }

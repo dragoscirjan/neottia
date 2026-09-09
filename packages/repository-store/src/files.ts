@@ -9,8 +9,8 @@ import {
   revalidateDirectories,
 } from './internal/filesystem.js';
 import {
-  PATH_STATE,
-  ROOT_STATE,
+  getPathState,
+  getRootState,
   managedPathBelongsToRoot,
   type ManagedPath,
   type ManagedRoot,
@@ -43,11 +43,14 @@ export async function scanManagedFiles(
 ): Promise<readonly ManagedFile[]> {
   assertLiveLease(root, lease);
   checkControl(options);
-  const rootState = root[ROOT_STATE];
+  const rootState = getRootState(root);
+  if (rootState === undefined) throw new PathSafetyError('Managed root is not a repository-store handle.');
   const discovered: ManagedPath[] = [];
   for (const start of options.under) {
     assertPathAuthority(root, start);
-    walk(root, start[PATH_STATE].absolutePath, discovered, options.accept);
+    const startState = getPathState(start);
+    if (startState === undefined) throw new PathSafetyError('Managed path is not a repository-store handle.');
+    walk(root, startState.absolutePath, discovered, options.accept, options, rootState.limits.maxFiles);
   }
   const keyed = new Map<string, string>();
   for (const path of discovered) {
@@ -81,8 +84,11 @@ export async function readManagedFile(
   assertLiveLease(root, lease);
   assertPathAuthority(root, path);
   checkControl(options);
-  const rootState = root[ROOT_STATE];
-  const absolutePath = path[PATH_STATE].absolutePath;
+  const rootState = getRootState(root);
+  const pathState = getPathState(path);
+  if (rootState === undefined || pathState === undefined)
+    throw new PathSafetyError('Managed root or path is not a repository-store handle.');
+  const absolutePath = pathState.absolutePath;
   const bytes = readRegularFile(absolutePath, rootState.limits.maxFileBytes);
   const stat = lstatSync(absolutePath);
   assertSafeRegular(stat, absolutePath);
@@ -116,7 +122,12 @@ function walk(
   absolute: string,
   output: ManagedPath[],
   accept: ((relativePath: string) => boolean) | undefined,
+  control: OperationControl,
+  maxFiles: number,
 ): void {
+  checkControl(control);
+  const rootState = getRootState(root);
+  if (rootState === undefined) throw new PathSafetyError('Managed root is not a repository-store handle.');
   let stat;
   try {
     stat = lstatSync(absolute);
@@ -127,8 +138,11 @@ function walk(
   if (stat.isSymbolicLink()) throw new PathSafetyError(`Symbolic link is not allowed: ${absolute}`, 'UNSAFE_LINK');
   if (stat.isFile()) {
     assertSafeRegular(stat, absolute);
-    const path = relative(root[ROOT_STATE].managedRoot, absolute).split('\\').join('/');
-    if (accept?.(path) !== false) output.push(resolveManagedPath(root, path));
+    const path = relative(rootState.managedRoot, absolute).split('\\').join('/');
+    if (accept?.(path) !== false) {
+      output.push(resolveManagedPath(root, path));
+      if (output.length > maxFiles) throw new ResourceLimitError('Managed file count limit exceeded.');
+    }
     return;
   }
   if (!stat.isDirectory()) throw new PathSafetyError(`Special managed path is not allowed: ${absolute}`, 'UNSAFE_LINK');
@@ -136,9 +150,10 @@ function walk(
   const entries = readdirSync(absolute, { withFileTypes: true });
   revalidateDirectories(identities);
   for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
+    checkControl(control);
     if (entry.isSymbolicLink())
-      throw new PathSafetyError(`Symbolic link is not allowed: ${join(absolute, entry.name)}`);
-    walk(root, join(absolute, entry.name), output, accept);
+      throw new PathSafetyError(`Symbolic link is not allowed: ${join(absolute, entry.name)}`, 'UNSAFE_LINK');
+    walk(root, join(absolute, entry.name), output, accept, control, maxFiles);
   }
   revalidateDirectories(identities);
 }

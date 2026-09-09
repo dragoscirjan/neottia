@@ -35,6 +35,7 @@ import {
   type LeaseFaultEvent,
   type TransactionFaultEvent,
 } from './internal/fault-injection.js';
+import { getRootState } from './internal/model.js';
 import {
   createTransactionDirectory,
   manifestDigest,
@@ -74,6 +75,19 @@ afterEach(() => {
 });
 
 describe('repository canonical store', () => {
+  it('keeps authority-bearing state private and rejects forged handles', async () => {
+    const root = await fixture();
+    const path = resolveManagedPath(root, 'records/private.txt');
+    expect(Object.getOwnPropertySymbols(root)).toEqual([]);
+    expect(Object.getOwnPropertySymbols(path)).toEqual([]);
+    await expect(
+      withRepositoryLease(root, async (lease) => {
+        expect(Object.getOwnPropertySymbols(lease)).toEqual([]);
+        await readManagedFile(root, lease, { relativePath: path.relativePath } as typeof path);
+      }),
+    ).rejects.toMatchObject({ code: 'PATH_INVALID' });
+  });
+
   it('applies exact write, replacement, move, and removal operations', async () => {
     const root = await fixture();
     const first = resolveManagedPath(root, 'records/first.txt');
@@ -539,6 +553,7 @@ async function runWorkerProcess(
 }
 
 function identityOf(root: Awaited<ReturnType<typeof fixture>>): { authorityId: string; managedRootId: string } {
-  const symbol = Object.getOwnPropertySymbols(root)[0] as keyof typeof root;
-  return root[symbol] as unknown as { authorityId: string; managedRootId: string };
+  const state = getRootState(root);
+  if (state === undefined) throw new Error('Test root has no internal state.');
+  return state;
 }

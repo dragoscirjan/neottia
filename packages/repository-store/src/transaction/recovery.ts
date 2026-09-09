@@ -4,7 +4,7 @@ import { RecoveryError } from '../errors.js';
 import { readManagedFileIfExists } from '../files.js';
 import { emitTransactionFault } from '../internal/fault-injection.js';
 import { syncDirectory } from '../internal/filesystem.js';
-import { PATH_STATE, ROOT_STATE, type ManagedRoot, type RepositoryLease } from '../internal/model.js';
+import { getPathState, getRootState, type ManagedRoot, type RepositoryLease } from '../internal/model.js';
 import { assertLiveLease, checkControl, type OperationControl } from '../lease.js';
 import { resolveManagedPath, validateRelativePath } from '../paths.js';
 import { publishTransition } from './apply.js';
@@ -28,7 +28,7 @@ export async function recoverCanonicalTransactions(
 ): Promise<RecoveryReport> {
   assertLiveLease(root, lease);
   checkControl(options);
-  const state = root[ROOT_STATE];
+  const state = requireRootState(root);
   const transactions = transactionRoot(state.authorityRoot, state.managedRootId);
   const report = { rolledBack: [] as string[], cleanedPrepared: [] as string[], cleanedCommitted: [] as string[] };
   for (const name of readdirSync(transactions).sort()) {
@@ -71,7 +71,7 @@ export async function recoverActiveDirectory(
   directory: string,
   options: OperationControl,
 ): Promise<void> {
-  const state = root[ROOT_STATE];
+  const state = requireRootState(root);
   const transactionId = directory.split(/[\\/]/u).at(-1)?.split('.')[0];
   if (transactionId === undefined) throw malformed('Active transaction path has no identity.');
   const manifest = readAndValidateManifest(root, directory, transactionId);
@@ -93,7 +93,9 @@ export async function recoverActiveDirectory(
       entry.beforeArtifact === null
         ? null
         : readArtifact(directory, entry.beforeArtifact, state.limits.maxBeforeImageBytes);
-    publishTransition(path[PATH_STATE].absolutePath, original, manifest.transactionId);
+    const pathState = getPathState(path);
+    if (pathState === undefined) throw malformed('Recovered path is not a repository-store handle.');
+    publishTransition(pathState.absolutePath, original, manifest.transactionId);
   }
   for (const entry of manifest.entries) {
     const path = resolveManagedPath(root, entry.path);
@@ -109,7 +111,7 @@ export async function recoverActiveDirectory(
 }
 
 function readAndValidateManifest(root: ManagedRoot, directory: string, transactionId: string): JournalManifest {
-  const state = root[ROOT_STATE];
+  const state = requireRootState(root);
   const manifest = readManifest(directory, state.limits.maxJournalBytes);
   if (
     manifest.transactionId !== transactionId ||
@@ -132,6 +134,12 @@ function transitionToCleanup(directory: string, transactionId: string): string {
   syncDirectory(dirname(directory));
   emitTransactionFault('cleanup-state-synced');
   return cleanup;
+}
+
+function requireRootState(root: ManagedRoot): NonNullable<ReturnType<typeof getRootState>> {
+  const state = getRootState(root);
+  if (state === undefined) throw malformed('Managed root is not a repository-store handle.');
+  return state;
 }
 
 function malformed(message: string): RecoveryError {

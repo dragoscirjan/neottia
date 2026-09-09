@@ -48,6 +48,7 @@ export interface DriverStatement {
   run(...parameters: readonly unknown[]): unknown;
   get(...parameters: readonly unknown[]): unknown;
   all(...parameters: readonly unknown[]): unknown;
+  iterate?(...parameters: readonly unknown[]): Iterable<unknown>;
 }
 
 /** Builds one adapter while keeping runtime-specific imports in leaf modules. */
@@ -112,19 +113,21 @@ export function wrapDatabase(runtime: 'node' | 'bun', database: DriverDatabase):
         },
         async all<T>(parameters: SqliteParameters | undefined, bounds: { maxRows: number; maxBytes: number }) {
           ensureOpen();
+          if (statement.iterate !== undefined) {
+            const iterable = await driverCall(runtime, 'iterate rows', () =>
+              invoke(statement.iterate?.bind(statement) as (...values: readonly unknown[]) => unknown, parameters),
+            );
+            if (iterable === null || typeof iterable !== 'object' || !(Symbol.iterator in iterable))
+              throw new CacheSyncError(`SQLite ${runtime} driver returned a non-iterable row cursor.`);
+            return boundedRows(iterable as Iterable<T>, bounds);
+          }
           const rows = await driverCall(
             runtime,
             'read rows',
             () => invoke(statement.all.bind(statement), parameters) as T[],
           );
           if (!Array.isArray(rows)) throw new CacheSyncError(`SQLite ${runtime} driver returned a non-array row set.`);
-          if (rows.length > bounds.maxRows) throw new ResourceLimitError('SQLite query exceeded maxRows.');
-          let bytes = 0;
-          for (const row of rows) {
-            bytes += Buffer.byteLength(JSON.stringify(row, bigintJson));
-            if (bytes > bounds.maxBytes) throw new ResourceLimitError('SQLite query exceeded maxBytes.');
-          }
-          return rows;
+          return boundedRows(rows, bounds);
         },
       };
     },
@@ -134,6 +137,18 @@ export function wrapDatabase(runtime: 'node' | 'bun', database: DriverDatabase):
       closed = true;
     },
   };
+}
+
+function boundedRows<T>(rows: Iterable<T>, bounds: { maxRows: number; maxBytes: number }): T[] {
+  const result: T[] = [];
+  let bytes = 0;
+  for (const row of rows) {
+    if (result.length >= bounds.maxRows) throw new ResourceLimitError('SQLite query exceeded maxRows.');
+    bytes += Buffer.byteLength(JSON.stringify(row, bigintJson));
+    if (bytes > bounds.maxBytes) throw new ResourceLimitError('SQLite query exceeded maxBytes.');
+    result.push(row);
+  }
+  return result;
 }
 
 async function driverCall<T>(runtime: 'node' | 'bun', action: string, operation: () => T): Promise<T> {
