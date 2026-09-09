@@ -182,6 +182,7 @@ export class IssueStore {
         catalog,
         policy,
         this.config.cache.max_age_ms,
+        this.config.security.max_file_bytes + 64 * 1024,
         control,
       );
       try {
@@ -387,6 +388,7 @@ export class IssueStore {
               inspected.catalog,
               policy,
               this.config.cache.max_age_ms,
+              this.config.security.max_file_bytes + 64 * 1024,
               control,
             );
             const cache = handle.rebuilt ? 'rebuilt' : 'checked';
@@ -833,7 +835,7 @@ function matches(
   );
 }
 function issueOrder(left: Issue, right: Issue): number {
-  return right.updated_at.localeCompare(left.updated_at) || left.id.localeCompare(right.id);
+  return compareCodePoints(right.updated_at, left.updated_at) || compareCodePoints(left.id, right.id);
 }
 function errorFinding(error: IssueError): IssueValidationReport['findings'][number] {
   return {

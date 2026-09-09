@@ -44,6 +44,13 @@ describe('issue canonical lifecycle', () => {
     expect(restored[0]?.location).toBe('active');
   });
 
+  it('rejects unpaired surrogate input before canonical YAML encoding', async () => {
+    const issues = store(project());
+    await expect(issues.create({ type: 'task', title: `Invalid\ud800` })).rejects.toMatchObject({
+      code: 'UNICODE_INVALID',
+    });
+  });
+
   it('derives hierarchy/relationships and searches canonical hydrated records', async () => {
     const cwd = project();
     const issues = store(cwd);

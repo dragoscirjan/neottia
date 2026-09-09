@@ -1,4 +1,5 @@
 import type { CatalogIssue } from './catalog.js';
+import { compareCodePoints } from './codec.js';
 import { IssueError } from './errors.js';
 import type { Issue, IssueRecord, IssueType, IssueValidationReport } from './schemas.js';
 
@@ -101,7 +102,7 @@ export function issueSubtree(
   const result: string[] = [];
   const visit = (id: string): void => {
     result.push(id);
-    for (const [childId, child] of [...catalog].sort(([left], [right]) => left.localeCompare(right)))
+    for (const [childId, child] of [...catalog].sort(([left], [right]) => compareCodePoints(left, right)))
       if (child.location === location && child.record.parent === id) visit(childId);
   };
   visit(rootId);

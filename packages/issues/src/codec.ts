@@ -66,6 +66,7 @@ export function decodeIssue(bytes: Uint8Array, prefix = 'issue-', expectedId?: s
 /** Emits deterministic YAML in schema field order with one final newline. */
 export function encodeIssue(input: IssueRecord): Uint8Array {
   const parsed = issueRecordSchema.parse(input);
+  assertUnicodeValues(parsed, 'issue record');
   const ordered = {
     version: 1 as const,
     id: parsed.id,
@@ -170,6 +171,33 @@ export function compareCodePoints(left: string, right: string): number {
 
 function linkKey(link: { kind: string; id: string; version?: number }): string {
   return `${link.kind}\0${link.id}\0${link.version ?? ''}`;
+}
+
+function assertUnicodeValues(value: unknown, label: string): void {
+  if (typeof value === 'string') {
+    for (let index = 0; index < value.length; index++) {
+      const code = value.charCodeAt(index);
+      if (code >= 0xd800 && code <= 0xdbff) {
+        if (index + 1 >= value.length) invalidUnicode(label);
+        const next = value.charCodeAt(++index);
+        if (next < 0xdc00 || next > 0xdfff) invalidUnicode(label);
+      } else if (code >= 0xdc00 && code <= 0xdfff) invalidUnicode(label);
+    }
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) assertUnicodeValues(item, label);
+    return;
+  }
+  if (value !== null && typeof value === 'object')
+    for (const [key, item] of Object.entries(value)) {
+      assertUnicodeValues(key, label);
+      assertUnicodeValues(item, label);
+    }
+}
+
+function invalidUnicode(label: string): never {
+  throw new IssueError(`${label} contains invalid Unicode.`, 'validation', 'UNICODE_INVALID');
 }
 
 function escapeRegExp(value: string): string {

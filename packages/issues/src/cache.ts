@@ -49,15 +49,29 @@ export async function ensureIssueCache(
   catalog: ReadonlyMap<string, CatalogIssue>,
   policy: 'prompt' | 'rebuild' | 'fail',
   maxAgeMs: number,
+  verificationMaxBytes: number,
   control: OperationControl = {},
 ): Promise<{ cache: SqliteConnection; rebuilt: boolean; close(): Promise<void> }> {
-  const specification = cacheSpecification(root, catalog);
+  const specification = cacheSpecification(root, catalog, verificationMaxBytes);
   const opened = await openDisposableSqliteCache(root, lease, specification, control);
   if (opened.state === 'ready') {
-    const rebuiltAt = await (
-      await opened.database.prepare("SELECT value FROM neottia_repository_cache_meta WHERE key='rebuilt_at'")
-    ).get<{ value: string }>();
-    if (rebuiltAt && Date.now() - Date.parse(rebuiltAt.value) <= maxAgeMs)
+    let rebuiltAt: { value: string } | undefined;
+    try {
+      rebuiltAt = await (
+        await opened.database.prepare("SELECT value FROM neottia_repository_cache_meta WHERE key='rebuilt_at'")
+      ).get<{ value: string }>();
+    } catch (error: unknown) {
+      // Preserve the probe failure while preventing one leaked handle per retry.
+      try {
+        await opened.close();
+      } catch {
+        // The original probe failure remains the actionable cache diagnosis.
+      }
+      throw error;
+    }
+    const rebuiltTime = rebuiltAt ? Date.parse(rebuiltAt.value) : Number.NaN;
+    const age = Date.now() - rebuiltTime;
+    if (Number.isFinite(rebuiltTime) && age >= -300_000 && age <= maxAgeMs)
       return { cache: opened.database, rebuilt: false, close: opened.close };
     await opened.close();
     if (policy === 'fail') throw new Error('Issues cache exceeds configured max_age_ms.');
@@ -95,6 +109,7 @@ export async function searchIssueCache(
 function cacheSpecification(
   root: ManagedRoot,
   catalog: ReadonlyMap<string, CatalogIssue>,
+  verificationMaxBytes: number,
 ): DisposableCacheSpecification {
   return {
     path: resolveManagedPath(root, 'issues.sqlite'),
@@ -133,13 +148,21 @@ function cacheSpecification(
       const actual = await (await database.prepare('SELECT count(*) AS value FROM issues')).get<{ value: number }>();
       if (count?.value !== catalog.size || actual?.value !== catalog.size)
         throw new Error('Issue cache count contradicts canonical snapshot.');
-      const rows = await (
-        await database.prepare(
-          'SELECT issues.id,revision,location,type,status,assigned_to,parent,updated_at,title,body,comments,metadata FROM issues JOIN issue_fts ON issues.id=issue_fts.issue_id ORDER BY issues.id',
-        )
-      ).all<ProjectionRow>(undefined, { maxRows: Math.max(1, catalog.size + 1), maxBytes: 64 * 1024 * 1024 });
-      if (JSON.stringify(rows) !== JSON.stringify(projectionRows(catalog)))
-        throw new Error('Issue cache searchable/filter projection contradicts canonical snapshot.');
+      const expectedRows = projectionRows(catalog);
+      const projection = await database.prepare(
+        'SELECT issues.id,revision,location,type,status,assigned_to,parent,updated_at,title,body,comments,metadata FROM issues JOIN issue_fts ON issues.id=issue_fts.issue_id ORDER BY issues.id LIMIT 1 OFFSET ?',
+      );
+      // Verify complete rows incrementally so a valid aggregate cannot exceed one query budget.
+      for (const [index, expected] of expectedRows.entries()) {
+        const rows = await projection.all<ProjectionRow>([index], { maxRows: 1, maxBytes: verificationMaxBytes });
+        if (rows.length !== 1 || JSON.stringify(rows[0]) !== JSON.stringify(expected))
+          throw new Error('Issue cache searchable/filter projection contradicts canonical snapshot.');
+      }
+      const extra = await projection.all<ProjectionRow>([expectedRows.length], {
+        maxRows: 1,
+        maxBytes: verificationMaxBytes,
+      });
+      if (extra.length) throw new Error('Issue cache contains records absent from canonical authority.');
     },
   };
 }
