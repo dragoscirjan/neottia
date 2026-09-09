@@ -200,13 +200,24 @@ export class IssueStore {
         const refreshed = await this.reload(root, lease, control);
         validateIssueGraph(refreshed);
         await this.validateReferences(refreshed, lease, control);
-        return candidates.reduce<Issue[]>((bounded, candidate) => {
+        let bounded: Issue[] = [];
+        for (const candidate of candidates) {
           const canonical = refreshed.get(candidate.id);
-          if (canonical?.revision !== candidate.revision) return bounded;
+          if (canonical?.revision !== candidate.revision) continue;
           const issue = hydrateIssue(refreshed, candidate.id);
-          if (!matches(issue, filters) || !issueMatchesSearch(issue, normalizedQuery)) return bounded;
-          return appendWithinBudget(bounded, issue, filters.maxBytes ?? this.config.retrieval.max_bytes);
-        }, []);
+          if (!matches(issue, filters)) continue;
+          if (
+            !(await issueMatchesSearch(
+              handle.cache,
+              canonical,
+              normalizedQuery,
+              this.config.security.max_file_bytes + 64 * 1024,
+            ))
+          )
+            continue;
+          bounded = appendWithinBudget(bounded, issue, filters.maxBytes ?? this.config.retrieval.max_bytes);
+        }
+        return bounded;
       } finally {
         await handle.close();
       }

@@ -67,6 +67,9 @@ describe('issue canonical lifecycle', () => {
     await issues.comment(epic.id, 'tester', 'BM25 comments are indexed');
     const found = await issues.search('BM25');
     expect(found.map((issue) => issue.id)).toContain(epic.id);
+    const tokenized = await issues.create({ type: 'task', title: 'Café release', body: 'alpha beta rollout' });
+    expect((await issues.search('cafe')).map((issue) => issue.id)).toContain(tokenized.id);
+    expect((await issues.search('alpha-beta')).map((issue) => issue.id)).toContain(tokenized.id);
     expect((await issues.validate()).valid).toBe(true);
   });
 

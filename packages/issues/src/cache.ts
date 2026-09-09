@@ -167,7 +167,14 @@ function cacheSpecification(
   };
 }
 
-interface ProjectionRow {
+interface SearchProjection {
+  readonly title: string;
+  readonly body: string;
+  readonly comments: string;
+  readonly metadata: string;
+}
+
+interface ProjectionRow extends SearchProjection {
   readonly id: string;
   readonly revision: string;
   readonly location: string;
@@ -176,10 +183,6 @@ interface ProjectionRow {
   readonly assigned_to: string | null;
   readonly parent: string | null;
   readonly updated_at: string;
-  readonly title: string;
-  readonly body: string;
-  readonly comments: string;
-  readonly metadata: string;
 }
 
 function projectionRows(catalog: ReadonlyMap<string, CatalogIssue>): readonly ProjectionRow[] {
@@ -194,28 +197,34 @@ function projectionRows(catalog: ReadonlyMap<string, CatalogIssue>): readonly Pr
       assigned_to: entry.record.assigned_to ?? null,
       parent: entry.record.parent ?? null,
       updated_at: entry.record.updated_at,
-      title: entry.record.title,
-      body: entry.record.body,
-      comments: entry.record.comments.map((comment) => comment.body).join('\n'),
-      metadata: searchableMetadata(entry.record.metadata),
+      ...searchProjection(entry.record),
     }));
 }
 
-/** Reapplies the normalized FTS conjunction to hydrated canonical content. */
-export function issueMatchesSearch(record: CatalogIssue['record'], query: string): boolean {
-  const haystack = [
-    record.title,
-    record.body,
-    record.comments.map((comment) => comment.body).join('\n'),
-    searchableMetadata(record.metadata),
-  ]
-    .join('\n')
-    .toLocaleLowerCase('en-US');
-  return query
-    .trim()
-    .split(/\s+/u)
-    .filter(Boolean)
-    .every((term) => haystack.includes(term.toLocaleLowerCase('en-US').replaceAll('"', '')));
+/** Reapplies exact FTS5 semantics while proving the matched projection is canonical. */
+export async function issueMatchesSearch(
+  database: SqliteConnection,
+  issue: CatalogIssue,
+  query: string,
+  maxBytes: number,
+): Promise<boolean> {
+  const statement = await database.prepare(
+    'SELECT title,body,comments,metadata FROM issue_fts JOIN issues ON issues.id=issue_fts.issue_id WHERE issue_fts MATCH ? AND issues.id=? AND issues.revision=? LIMIT 1',
+  );
+  const rows = await statement.all<SearchProjection>([ftsQuery(query), issue.record.id, issue.revision], {
+    maxRows: 1,
+    maxBytes,
+  });
+  return rows.length === 1 && JSON.stringify(rows[0]) === JSON.stringify(searchProjection(issue.record));
+}
+
+function searchProjection(record: CatalogIssue['record']): SearchProjection {
+  return {
+    title: record.title,
+    body: record.body,
+    comments: record.comments.map((comment) => comment.body).join('\n'),
+    metadata: searchableMetadata(record.metadata),
+  };
 }
 
 function ftsQuery(query: string): string {
