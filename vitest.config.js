@@ -5,6 +5,8 @@ import { defineConfig } from 'vitest/config';
 // precondition for running the suite. (The harness E2E tests still build dist
 // explicitly — they spawn the compiled MCP server.)
 const workspaceSourceAliases = {
+  '@neottia/issues': resolve(__dirname, 'packages/issues/src/index.ts'),
+  '@neottia/issues-mcp': resolve(__dirname, 'packages/issues-mcp/src/index.ts'),
   '@neottia/memory-core': resolve(__dirname, 'packages/memory-core/src/index.ts'),
   '@neottia/memory-mcp': resolve(__dirname, 'packages/memory-mcp/src/index.ts'),
   '@neottia/repository-store': resolve(__dirname, 'packages/repository-store/src/index.ts'),

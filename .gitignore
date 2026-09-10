@@ -12,6 +12,7 @@ out/
 
 # Cache folders
 .*cache/
+.neottia/cache/
 .task/
 *.tsbuildinfo
 

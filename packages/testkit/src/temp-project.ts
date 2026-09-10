@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { IssueStore, loadIssueConfig, type CreateIssueInput, type IssueConfigInput } from '@neottia/issues';
 import { loadMemoryConfig, MemoryStore, type MemoryConfigInput, type StoreMemoryInput } from '@neottia/memory-core';
 
 /**
@@ -27,6 +28,21 @@ export interface TempProject {
 export interface CreateTempProjectOptions {
   /** Extra values merged into the `skills.memory` config shard. */
   memory?: Partial<MemoryConfigInput>;
+}
+
+/** Disposable project specialized for Issues integration tests. */
+export interface TempIssueProject {
+  readonly cwd: string;
+  readonly issuesRoot: string;
+  readonly configPath: string;
+  readonly xdgDataDir: string;
+  readonly xdgConfigDir: string;
+  cleanup(): void;
+}
+
+export interface CreateTempIssueProjectOptions {
+  /** Extra values merged into the enabled `skills.issues` shard. */
+  readonly issues?: Partial<IssueConfigInput>;
 }
 
 /**
@@ -57,6 +73,37 @@ export function createTempProject(options: CreateTempProjectOptions = {}): TempP
     xdgConfigDir,
     cleanup: () => rmSync(cwd, { recursive: true, force: true }),
   };
+}
+
+/** Creates an isolated project with only the strict Issues shard enabled. */
+export function createTempIssueProject(options: CreateTempIssueProjectOptions = {}): TempIssueProject {
+  const cwd = mkdtempSync(join(tmpdir(), 'neottia-issues-harness-'));
+  const configPath = join(cwd, '.neottia', 'config.yml');
+  mkdirSync(join(configPath, '..'), { recursive: true });
+  writeFileSync(
+    configPath,
+    `version: 1\nskills:\n  issues:\n${yamlShard({ enabled: true, ...(options.issues ?? {}) })}`,
+    'utf8',
+  );
+  const xdgDataDir = join(cwd, '.xdg-data');
+  const xdgConfigDir = join(cwd, '.xdg-config');
+  mkdirSync(xdgDataDir, { recursive: true });
+  mkdirSync(join(xdgConfigDir, 'opencode'), { recursive: true });
+  writeFileSync(join(xdgConfigDir, 'opencode', 'opencode.json'), '{}\n', 'utf8');
+  return {
+    cwd,
+    issuesRoot: join(cwd, '.neottia', 'issues'),
+    configPath,
+    xdgDataDir,
+    xdgConfigDir,
+    cleanup: () => rmSync(cwd, { recursive: true, force: true }),
+  };
+}
+
+/** Seeds canonical issues through the library without relying on an LLM. */
+export async function seedIssues(project: TempIssueProject, inputs: readonly CreateIssueInput[]): Promise<void> {
+  const store = new IssueStore(loadIssueConfig(project.cwd, { env: {} }), project.cwd);
+  for (const input of inputs) await store.create(input);
 }
 
 /**
