@@ -1,0 +1,26 @@
+{
+  "name": "@neottia/opencode-design-docs",
+  "version": "0.1.0",
+  "description": "OpenCode plugin providing in-process Neottia Design Docs tools",
+  "author": "Dragos Cirjan",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dragoscirjan/neottia.git",
+    "directory": "extensions/opencode-design-docs"
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": { ".": "./src/index.ts" },
+  "files": ["src", "README.md", "LICENSE"],
+  "scripts": { "test": "vitest run --root ../.. extensions/opencode-design-docs/src", "typecheck": "tsc --noEmit" },
+  "dependencies": { "@neottia/design-docs": "workspace:*", "@opencode-ai/plugin": "^1.18.29", "zod": "^4.5.4" },
+  "devDependencies": {
+    "@neottia/testkit": "workspace:*",
+    "@templ-project/tsconfig": "^0.2.2",
+    "@types/node": "^25.0.3",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7"
+  }
+}

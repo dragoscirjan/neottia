@@ -79,6 +79,34 @@ importers:
         specifier: ^3.2.7
         version: 3.2.7(@types/node@25.9.5)(tsx@4.23.13)(yaml@2.9.0)
 
+  extensions/opencode-design-docs:
+    dependencies:
+      '@neottia/design-docs':
+        specifier: workspace:*
+        version: link:../../packages/design-docs
+      '@opencode-ai/plugin':
+        specifier: ^1.18.29
+        version: 1.18.29
+      zod:
+        specifier: ^4.5.4
+        version: 4.5.4
+    devDependencies:
+      '@neottia/testkit':
+        specifier: workspace:*
+        version: link:../../packages/testkit
+      '@templ-project/tsconfig':
+        specifier: ^0.2.2
+        version: 0.2.2(@types/node@25.9.5)(tsx@4.23.13)(yaml@2.9.0)
+      '@types/node':
+        specifier: ^25.0.3
+        version: 25.9.5
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.7
+        version: 3.2.7(@types/node@25.9.5)(tsx@4.23.13)(yaml@2.9.0)
+
   extensions/opencode-issues:
     dependencies:
       '@neottia/issues':
@@ -112,6 +140,31 @@ importers:
       zod:
         specifier: ^4.5.4
         version: 4.5.4
+    devDependencies:
+      '@neottia/testkit':
+        specifier: workspace:*
+        version: link:../../packages/testkit
+      '@templ-project/tsconfig':
+        specifier: ^0.2.2
+        version: 0.2.2(@types/node@25.9.5)(tsx@4.23.13)(yaml@2.9.0)
+      '@types/node':
+        specifier: ^25.0.3
+        version: 25.9.5
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.7
+        version: 3.2.7(@types/node@25.9.5)(tsx@4.23.13)(yaml@2.9.0)
+
+  extensions/pi-design-docs:
+    dependencies:
+      '@neottia/design-docs':
+        specifier: workspace:*
+        version: link:../../packages/design-docs
+      typebox:
+        specifier: ^1.3.7
+        version: 1.3.28
     devDependencies:
       '@neottia/testkit':
         specifier: workspace:*
@@ -196,6 +249,56 @@ importers:
       tsx:
         specifier: ^4.21.0
         version: 4.23.13
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.7
+        version: 3.2.7(@types/node@25.9.5)(tsx@4.23.13)(yaml@2.9.0)
+
+  packages/design-docs:
+    dependencies:
+      '@neottia/repository-store':
+        specifier: workspace:^
+        version: link:../repository-store
+      yaml:
+        specifier: ^2.9.0
+        version: 2.9.0
+      zod:
+        specifier: ^4.5.4
+        version: 4.5.4
+    devDependencies:
+      '@templ-project/tsconfig':
+        specifier: ^0.2.2
+        version: 0.2.2(@types/node@25.9.5)(tsx@4.23.13)(yaml@2.9.0)
+      '@types/node':
+        specifier: ^25.0.3
+        version: 25.9.5
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.7
+        version: 3.2.7(@types/node@25.9.5)(tsx@4.23.13)(yaml@2.9.0)
+
+  packages/design-docs-mcp:
+    dependencies:
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.30.0
+        version: 1.30.0(zod@4.5.4)
+      '@neottia/design-docs':
+        specifier: workspace:*
+        version: link:../design-docs
+      zod:
+        specifier: ^4.5.4
+        version: 4.5.4
+    devDependencies:
+      '@templ-project/tsconfig':
+        specifier: ^0.2.2
+        version: 0.2.2(@types/node@25.9.5)(tsx@4.23.13)(yaml@2.9.0)
+      '@types/node':
+        specifier: ^25.0.3
+        version: 25.9.5
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
@@ -332,6 +435,9 @@ importers:
 
   packages/testkit:
     dependencies:
+      '@neottia/design-docs':
+        specifier: workspace:*
+        version: link:../design-docs
       '@neottia/issues':
         specifier: workspace:*
         version: link:../issues

@@ -1,8 +1,17 @@
-export { ensureIssuesDistBuilt, ensureMemoryDistBuilt, issuesMcpEntry, memoryMcpEntry, repoRoot } from './repo.js';
+export {
+  designDocsMcpEntry,
+  ensureDesignDocsDistBuilt,
+  ensureIssuesDistBuilt,
+  ensureMemoryDistBuilt,
+  issuesMcpEntry,
+  memoryMcpEntry,
+  repoRoot,
+} from './repo.js';
 
 export {
   createTempIssueProject,
   createTempProject,
+  seedDesignDocs,
   seedIssues,
   seedMemory,
   type CreateTempIssueProjectOptions,

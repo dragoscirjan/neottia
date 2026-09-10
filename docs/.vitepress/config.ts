@@ -9,11 +9,18 @@ export default defineConfig({
   themeConfig: {
     nav: [
       { text: 'Home', link: '/' },
+      { text: 'Design Docs', link: '/design-docs/' },
       { text: 'Memory', link: '/memory/' },
       { text: 'Issues', link: '/issues/' },
       { text: 'Repository store', link: '/repository-store' },
     ],
     sidebar: {
+      '/design-docs/': [
+        {
+          text: 'Design Docs',
+          items: [{ text: 'Overview and operations', link: '/design-docs/' }],
+        },
+      ],
       '/issues/': [
         {
           text: 'Issues',

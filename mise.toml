@@ -37,7 +37,7 @@ run = "pnpm run test"
 
 [tasks."test:harness"]
 description = "Run harness integration tests (needs OPENROUTER_API_KEY or opencode auth; uses free OpenRouter models)"
-run = "NEOTTIA_TEST_HARNESS=1 pnpm exec vitest run --root . packages/testkit/src extensions/pi-memory/src extensions/opencode-memory/src extensions/pi-issues/src extensions/opencode-issues/src"
+run = "NEOTTIA_TEST_HARNESS=1 pnpm exec vitest run --root . packages/testkit/src extensions/pi-memory/src extensions/opencode-memory/src extensions/pi-issues/src extensions/opencode-issues/src extensions/pi-design-docs/src extensions/opencode-design-docs/src"
 
 [tasks."test:coverage"]
 description = "Run tests and generate aggregate coverage"

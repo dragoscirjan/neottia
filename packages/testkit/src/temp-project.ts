@@ -1,6 +1,13 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import {
+  DesignDocumentStore,
+  loadDesignDocsConfig,
+  type CreateDocumentInput,
+  type DesignDocsConfigInput,
+  type DocumentRecord,
+} from '@neottia/design-docs';
 import { IssueStore, loadIssueConfig, type CreateIssueInput, type IssueConfigInput } from '@neottia/issues';
 import { loadMemoryConfig, MemoryStore, type MemoryConfigInput, type StoreMemoryInput } from '@neottia/memory-core';
 
@@ -15,6 +22,8 @@ export interface TempProject {
   readonly cwd: string;
   /** Absolute memory root inside the project. */
   readonly memoryRoot: string;
+  /** Canonical Design Docs root inside the project. */
+  readonly designDocsRoot: string;
   /** Path of the generated `.neottia/config.yml`. */
   readonly configPath: string;
   /** Isolated XDG data dir: harness state (auth.json, logs) stays inside the temp tree. */
@@ -28,6 +37,8 @@ export interface TempProject {
 export interface CreateTempProjectOptions {
   /** Extra values merged into the `skills.memory` config shard. */
   memory?: Partial<MemoryConfigInput>;
+  /** Extra values merged into the `skills.design_docs` config shard. */
+  designDocs?: Partial<DesignDocsConfigInput>;
 }
 
 /** Disposable project specialized for Issues integration tests. */
@@ -55,7 +66,12 @@ export function createTempProject(options: CreateTempProjectOptions = {}): TempP
   mkdirSync(join(configPath, '..'), { recursive: true });
 
   const memoryShard = { enabled: true, ...(options.memory ?? {}) };
-  writeFileSync(configPath, `version: 1\nskills:\n  memory:\n${yamlShard(memoryShard)}`, 'utf8');
+  const designDocsShard = { enabled: true, ...(options.designDocs ?? {}) };
+  writeFileSync(
+    configPath,
+    `version: 1\nskills:\n  memory:\n${yamlShard(memoryShard)}  design_docs:\n${yamlShard(designDocsShard)}`,
+    'utf8',
+  );
 
   const xdgDataDir = join(cwd, '.xdg-data');
   mkdirSync(xdgDataDir, { recursive: true });
@@ -68,6 +84,7 @@ export function createTempProject(options: CreateTempProjectOptions = {}): TempP
   return {
     cwd,
     memoryRoot: join(cwd, '.neottia', 'memory'),
+    designDocsRoot: join(cwd, '.neottia', 'design-docs'),
     configPath,
     xdgDataDir,
     xdgConfigDir,
@@ -114,6 +131,17 @@ export async function seedMemory(project: TempProject, inputs: StoreMemoryInput[
   const config = loadMemoryConfig(project.cwd, { env: {} });
   const store = MemoryStore.fromConfig(config, project.cwd);
   for (const input of inputs) await store.store(input);
+}
+
+/** Seeds canonical design documents directly through the domain library. */
+export async function seedDesignDocs(
+  project: TempProject,
+  inputs: readonly CreateDocumentInput[],
+): Promise<DocumentRecord[]> {
+  const store = await DesignDocumentStore.fromConfig(loadDesignDocsConfig(project.cwd, { env: {} }), project.cwd);
+  const records: DocumentRecord[] = [];
+  for (const input of inputs) records.push(await store.create(input));
+  return records;
 }
 
 /** Renders a flat config shard as YAML with two-space indentation. */

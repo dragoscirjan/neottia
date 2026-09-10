@@ -83,6 +83,9 @@ web_modules/
 Thumbs.db
 
 # Runtime data
+.neottia/cache/design-docs.sqlite
+.neottia/cache/design-docs.sqlite-wal
+.neottia/cache/design-docs.sqlite-shm
 *.pid
 *.pid.lock
 *.seed

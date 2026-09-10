@@ -31,6 +31,22 @@ export function ensureIssuesDistBuilt(root: string = repoRoot()): string {
   return entry;
 }
 
+/** Entry point a harness must spawn to run the Design Docs MCP server. */
+export function designDocsMcpEntry(root: string = repoRoot()): string {
+  return join(root, 'packages', 'design-docs-mcp', 'dist', 'cli.js');
+}
+
+/** Builds Design Docs library/server output needed by external harness runtimes. */
+export function ensureDesignDocsDistBuilt(root: string = repoRoot()): string {
+  const entry = designDocsMcpEntry(root);
+  const coreDist = join(root, 'packages', 'design-docs', 'dist', 'index.js');
+  const options = { cwd: root, stdio: 'inherit' } as const;
+  if (!existsSync(coreDist)) execFileSync('pnpm', ['--filter', '@neottia/design-docs', 'run', 'build'], options);
+  if (!existsSync(entry)) execFileSync('pnpm', ['--filter', '@neottia/design-docs-mcp', 'run', 'build'], options);
+  if (!existsSync(entry)) throw new Error(`design-docs-mcp dist still missing after build: ${entry}`);
+  return entry;
+}
+
 /** Entry point a harness must spawn to run the memory MCP server. */
 export function memoryMcpEntry(root: string = repoRoot()): string {
   return join(root, 'packages', 'memory-mcp', 'dist', 'cli.js');
