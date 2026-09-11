@@ -68,6 +68,8 @@
 - Project has a docs folder using VitePress
 - Document the project every time you see fit - documentation needs to be as thorough as possible - user does not need to read the code to understand how to configure / use the tools
 - DO NOT document how to develop the code; document ONLY how users should use the Project
+- When writing/amending documentation, make sure you load `unslop` skill before you write.
+  `
 
 ## README.md
 

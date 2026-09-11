@@ -11,18 +11,30 @@
     "url": "git+https://github.com/dragoscirjan/neottia.git",
     "directory": "extensions/opencode-issues"
   },
-  "publishConfig": { "access": "public" },
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "./src/index.ts",
   "types": "./src/index.ts",
-  "exports": { ".": "./src/index.ts" },
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "files": ["src", "README.md", "LICENSE"],
-  "engines": { "node": ">=22.16.0" },
-  "scripts": { "test": "vitest run --root ../.. extensions/opencode-issues/src", "typecheck": "tsc --noEmit" },
-  "dependencies": { "@neottia/issues": "workspace:*", "@opencode-ai/plugin": "^1.2.27" },
+  "engines": {
+    "node": ">=22.16.0"
+  },
+  "scripts": {
+    "test": "vitest run --root ../.. extensions/opencode-issues/src",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@neottia/issues": "workspace:*",
+    "@opencode-ai/plugin": "^1.2.27"
+  },
   "devDependencies": {
     "@templ-project/tsconfig": "^0.2.2",
     "@types/node": "^25.0.3",
     "typescript": "^5.9.3",
-    "vitest": "^3.2.7"
+    "vitest": "^4.1.11"
   }
 }

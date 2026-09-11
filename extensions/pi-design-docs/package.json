@@ -12,15 +12,23 @@
   },
   "main": "./src/index.ts",
   "types": "./src/index.ts",
-  "exports": { ".": "./src/index.ts" },
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "files": ["src", "README.md", "LICENSE"],
-  "scripts": { "test": "vitest run --root ../.. extensions/pi-design-docs/src", "typecheck": "tsc --noEmit" },
-  "dependencies": { "@neottia/design-docs": "workspace:*", "typebox": "^1.3.7" },
+  "scripts": {
+    "test": "vitest run --root ../.. extensions/pi-design-docs/src",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@neottia/design-docs": "workspace:*",
+    "typebox": "^1.3.7"
+  },
   "devDependencies": {
     "@neottia/testkit": "workspace:*",
     "@templ-project/tsconfig": "^0.2.2",
     "@types/node": "^25.0.3",
     "typescript": "^5.9.3",
-    "vitest": "^3.2.7"
+    "vitest": "^4.1.11"
   }
 }

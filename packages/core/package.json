@@ -50,13 +50,13 @@
   },
   "devDependencies": {
     "@templ-project/tsconfig": "^0.2.2",
-    "esbuild": "^0.27.2",
+    "esbuild": "^0.28.2",
     "eslint": "^9.10.0",
     "npm-run-all2": "^8.0.4",
     "rimraf": "^6.1.2",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
-    "vitest": "^3.2.7"
+    "vitest": "^4.1.11"
   },
   "engines": {
     "node": ">=20.0.0"

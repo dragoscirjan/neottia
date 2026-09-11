@@ -26,7 +26,7 @@ export default defineConfig({
   },
   test: {
     coverage: {
-      all: true,
+      // Vitest 4 covers unloaded files through the explicit include pattern.
       exclude: [
         '**/*.config.*',
         '**/.install/**',
@@ -45,7 +45,15 @@ export default defineConfig({
       skipFull: false,
     },
     environment: 'node',
-    exclude: ['**/*.config.*', '**/.install/**', '**/.jscpd/**', '**/coverage/**', '**/dist/**', '**/node_modules/**'],
+    exclude: [
+      '**/*.bun.test.ts', // Bun-only suites run through their package scripts.
+      '**/*.config.*',
+      '**/.install/**',
+      '**/.jscpd/**',
+      '**/coverage/**',
+      '**/dist/**',
+      '**/node_modules/**',
+    ],
     globals: true,
   },
 });
