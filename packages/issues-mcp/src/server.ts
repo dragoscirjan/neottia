@@ -5,7 +5,7 @@ import {
   findIssueTool,
   issueToolJsonSchema,
   ISSUE_TOOLS,
-  IssueError,
+  asIssueError,
   type IssueToolContext,
   type DesignDocumentReferenceResolver,
 } from '@neottia/issues';
@@ -73,15 +73,8 @@ export function createIssueServer(options: CreateIssueServerOptions = {}): Serve
       const structured = result as Record<string, unknown>;
       return { content: [{ type: 'text', text: JSON.stringify(structured, null, 2) }], structuredContent: structured };
     } catch (error: unknown) {
-      const body =
-        error instanceof IssueError
-          ? error.toJSON()
-          : {
-              category: 'storage',
-              code: 'ISSUE_OPERATION_FAILED',
-              message: error instanceof Error ? error.message : String(error),
-              retryable: false,
-            };
+      // Every adapter serializes the same bounded issue-domain error contract.
+      const body = asIssueError(error).toJSON();
       return { content: [{ type: 'text', text: JSON.stringify(body) }], isError: true };
     }
   });

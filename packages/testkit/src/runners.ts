@@ -111,6 +111,8 @@ export interface HarnessRunOptions {
   readonly xdgDataDir?: string;
   /** Isolated XDG config dir; when set, global harness config cannot leak in. */
   readonly xdgConfigDir?: string;
+  /** Isolated home directory for harnesses that discover global state via HOME. */
+  readonly homeDir?: string;
 }
 
 export interface HarnessRunResult {
@@ -159,6 +161,21 @@ export function piReady(piPath?: string): boolean {
 export function runPi(options: HarnessRunOptions & { piPath: string }): HarnessRunResult {
   const { cwd, prompt, piPath } = options;
   const modelId = options.modelId ?? openrouterModelId();
+  const env = withApiKey(options.apiKey);
+  if (options.xdgDataDir) env.XDG_DATA_HOME = options.xdgDataDir;
+  if (options.xdgConfigDir) env.XDG_CONFIG_HOME = options.xdgConfigDir;
+  if (options.homeDir) {
+    // Pi reads global state beneath HOME; copy only auth into the disposable home.
+    if (!env.OPENROUTER_API_KEY) {
+      const source = join(homedir(), '.pi', 'agent', 'auth.json');
+      if (existsSync(source)) {
+        const destination = join(options.homeDir, '.pi', 'agent', 'auth.json');
+        mkdirSync(join(destination, '..'), { recursive: true, mode: 0o700 });
+        writeFileSync(destination, readFileSync(source), { mode: 0o600 });
+      }
+    }
+    env.HOME = options.homeDir;
+  }
   const result = spawnSync(
     piPath,
     ['-p', '--no-session', '--mode', 'text', '-a', '--provider', 'openrouter', '--model', modelId, prompt],
@@ -166,7 +183,7 @@ export function runPi(options: HarnessRunOptions & { piPath: string }): HarnessR
       cwd,
       encoding: 'utf8',
       timeout: options.timeoutMs ?? 240_000,
-      env: withApiKey(options.apiKey),
+      env,
     },
   );
   return { stdout: result.stdout ?? '', stderr: result.stderr ?? '', status: result.status };

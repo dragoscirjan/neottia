@@ -19,7 +19,7 @@ import type { IssueConfig } from './config.js';
 import { IssueError, asIssueError } from './errors.js';
 import { hydrateIssue, inspectIssueGraph, issueSubtree, validateIssueGraph } from './graph.js';
 import { createUlid } from './identities.js';
-import type { DesignDocumentReferenceResolver } from './resolver.js';
+import { designDocumentReferenceBatchSchema, type DesignDocumentReferenceResolver } from './resolver.js';
 import type {
   DesignDocumentReference,
   Issue,
@@ -165,10 +165,17 @@ export class IssueStore {
     filters: Partial<IssueSearchFilters> = {},
     control: OperationControl = {},
   ): Promise<readonly Issue[]> {
+    if (Buffer.byteLength(query) > this.config.security.max_query_bytes)
+      throw new IssueError('Search query exceeds configured byte limit.', 'validation', 'QUERY_TOO_LARGE');
     const normalizedQuery = query.trim();
     if (!normalizedQuery) throw new IssueError('Search query must not be blank.', 'validation', 'QUERY_INVALID');
-    if (Buffer.byteLength(normalizedQuery) > this.config.security.max_query_bytes)
-      throw new IssueError('Search query exceeds configured byte limit.', 'validation', 'QUERY_TOO_LARGE');
+    // Validate direct-library overrides before opening repository or cache state.
+    const requestedLimit = filters.limit ?? this.config.retrieval.limit;
+    const requestedMaxBytes = filters.maxBytes ?? this.config.retrieval.max_bytes;
+    assertSearchBudget('limit', requestedLimit);
+    assertSearchBudget('maxBytes', requestedMaxBytes);
+    const limit = Math.min(requestedLimit, this.config.security.max_query_rows);
+    const maxBytes = Math.min(requestedMaxBytes, this.config.security.max_result_bytes);
     return this.withCatalog(async (root, lease, catalog) => {
       let policy = this.config.cache.stale_policy;
       if (policy === 'prompt') policy = (await this.options.onStaleCache?.()) === false ? 'fail' : 'rebuild';
@@ -178,13 +185,14 @@ export class IssueStore {
         catalog,
         policy,
         this.config.cache.max_age_ms,
+        this.config.security.max_query_rows,
         this.config.security.max_file_bytes + 64 * 1024,
         control,
       );
       try {
         const candidates = await searchIssueCache(handle.cache, normalizedQuery, {
-          limit: filters.limit ?? this.config.retrieval.limit,
-          maxBytes: filters.maxBytes ?? this.config.retrieval.max_bytes,
+          limit,
+          maxBytes,
           status: filters.status,
           type: filters.type,
           assignee: filters.assignee,
@@ -211,7 +219,7 @@ export class IssueStore {
             ))
           )
             continue;
-          bounded = appendWithinBudget(bounded, issue, filters.maxBytes ?? this.config.retrieval.max_bytes);
+          bounded = appendWithinBudget(bounded, issue, maxBytes);
         }
         return bounded;
       } finally {
@@ -284,7 +292,8 @@ export class IssueStore {
       if (input.relationship === 'relates_to' && ownerId > targetId) [ownerId, targetId] = [targetId, ownerId];
       const owner = requireEntry(catalog, ownerId);
       if (input.expected_revision !== undefined) assertRevision(source, input.expected_revision);
-      if (owner.record[input.relationship].includes(targetId)) return hydrateIssue(catalog, ownerId);
+      if (owner.record[input.relationship].includes(targetId))
+        return this.finishNoOp(root, lease, catalog, ownerId, control);
       const next = {
         ...owner.record,
         [input.relationship]: [...owner.record[input.relationship], targetId],
@@ -307,7 +316,7 @@ export class IssueStore {
       const owner = requireEntry(catalog, ownerId);
       assertRevision(owner, input.expected_revision);
       const values = owner.record[input.relationship];
-      if (!values.includes(targetId)) return hydrateIssue(catalog, ownerId);
+      if (!values.includes(targetId)) return this.finishNoOp(root, lease, catalog, ownerId, control);
       const next = {
         ...owner.record,
         [input.relationship]: values.filter((value) => value !== targetId),
@@ -394,6 +403,7 @@ export class IssueStore {
             inspected.catalog,
             policy,
             this.config.cache.max_age_ms,
+            this.config.security.max_query_rows,
             this.config.security.max_file_bytes + 64 * 1024,
             control,
           );
@@ -545,13 +555,31 @@ export class IssueStore {
         throw new IssueError('expected_revision is required.', 'conflict', 'REVISION_REQUIRED');
       if (expectedRevision !== undefined) assertRevision(entry, expectedRevision);
       const changed = change(structuredClone(entry.record));
-      if (JSON.stringify(changed) === JSON.stringify(entry.record)) return hydrateIssue(catalog, id);
+      // Canonical encoding normalizes recursively ordered metadata mappings.
+      if (Buffer.from(encodeIssue(changed)).equals(Buffer.from(encodeIssue(entry.record))))
+        return this.finishNoOp(root, lease, catalog, id, control, skipReferenceValidation);
       const next = { ...changed, updated_at: new Date().toISOString() };
       return hydrateIssue(
         await this.publishRecord(root, lease, catalog, id, next, control, skipReferenceValidation),
         id,
       );
     }, control);
+  }
+
+  /** Validates an explicit no-op and repairs noncanonical source bytes. */
+  private async finishNoOp(
+    root: ManagedRoot,
+    lease: RepositoryLease,
+    catalog: Map<string, CatalogIssue>,
+    id: string,
+    control: OperationControl,
+    skipReferenceValidation = false,
+  ): Promise<Issue> {
+    if (!skipReferenceValidation) await this.validateReferences(catalog, lease, control);
+    const entry = requireEntry(catalog, id);
+    if (entry.canonical) return hydrateIssue(catalog, id);
+    // Reference validation already succeeded; publication only repairs format.
+    return hydrateIssue(await this.publishRecord(root, lease, catalog, id, entry.record, control, true), id);
   }
 
   private async publishRecord(
@@ -617,18 +645,76 @@ export class IssueStore {
         'cross_domain',
         'RESOLVER_UNAVAILABLE',
       );
-    const batch = await this.options.resolver.resolveMany(references, { lease, ...control });
+    const unparsedBatch: unknown = await this.options.resolver.resolveMany(references, { lease, ...control });
+    const parsedBatch = designDocumentReferenceBatchSchema.safeParse(unparsedBatch);
+    if (!parsedBatch.success)
+      throw new IssueError(
+        'Design-document resolver returned an invalid result batch.',
+        'cross_domain',
+        'RESOLVER_RESULT_INVALID',
+        {
+          details: {
+            issues: parsedBatch.error.issues.slice(0, 20).map((issue) => ({
+              code: issue.code,
+              path: issue.path.join('.'),
+              message: issue.message,
+            })),
+            issueCount: parsedBatch.error.issues.length,
+            truncated: parsedBatch.error.issues.length > 20,
+          },
+        },
+      );
+    const batch = parsedBatch.data;
     if (batch.status !== 'ok')
-      throw new IssueError(`Design-document target snapshot is ${batch.status}.`, 'cross_domain', 'TARGET_INVALID');
-    if (
+      throw new IssueError(`Design-document target snapshot is ${batch.status}.`, 'cross_domain', 'TARGET_INVALID', {
+        details: {
+          targetStatus: batch.status,
+          ...(batch.status === 'target_invalid'
+            ? {
+                findings: batch.findings.slice(0, 20).map((finding) => ({
+                  code: finding.code,
+                  message: finding.message,
+                  ...(finding.id === undefined ? {} : { id: finding.id }),
+                  ...(finding.version === undefined ? {} : { version: finding.version }),
+                })),
+                findingCount: batch.findings.length,
+                findingsTruncated: batch.findings.length > 20,
+              }
+            : {}),
+        },
+      });
+    const malformed =
       batch.results.length !== references.length ||
       batch.results.some(
-        (result, index) =>
-          result.status !== 'resolved' ||
-          linkKey(result.reference) !== linkKey(references[index] as DesignDocumentReference),
-      )
-    )
-      throw new IssueError('One or more design-document links are unresolved.', 'cross_domain', 'LINK_UNRESOLVED');
+        (result, index) => linkKey(result.reference) !== linkKey(references[index] as DesignDocumentReference),
+      );
+    if (malformed)
+      throw new IssueError(
+        'Design-document resolver returned a mismatched result batch.',
+        'cross_domain',
+        'RESOLVER_RESULT_INVALID',
+        {
+          details: {
+            referenceCount: references.length,
+            resultCount: batch.results.length,
+            expected: references.slice(0, 20),
+            actual: batch.results.slice(0, 20).map((result) => result.reference),
+            truncated: references.length > 20 || batch.results.length > 20,
+          },
+        },
+      );
+    const unresolved = batch.results
+      .filter((result) => result.status === 'unresolved')
+      .map((result) => ({ reference: result.reference, reason: result.reason }));
+    if (unresolved.length)
+      throw new IssueError('One or more design-document links are unresolved.', 'cross_domain', 'LINK_UNRESOLVED', {
+        details: {
+          unresolved: unresolved.slice(0, 20),
+          unresolvedCount: unresolved.length,
+          referenceCount: references.length,
+          truncated: unresolved.length > 20,
+        },
+      });
   }
 
   private async withCatalog<T>(
@@ -711,6 +797,13 @@ export class IssueStore {
     if (!this.config.enabled)
       throw new IssueError('Issues capability is disabled.', 'configuration', 'ISSUES_DISABLED');
   }
+}
+
+function assertSearchBudget(field: 'limit' | 'maxBytes', value: number): void {
+  if (!Number.isSafeInteger(value) || value <= 0)
+    throw new IssueError('Search budgets must be positive safe integers.', 'validation', 'SEARCH_BUDGET_INVALID', {
+      details: { field, value: String(value) },
+    });
 }
 
 function appendWithinBudget(issues: Issue[], issue: Issue, maxBytes: number): Issue[] {

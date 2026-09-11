@@ -577,6 +577,12 @@ async function verifyDatabase(
   // Safety validation must run even when domain health checking fails; a path
   // substitution is not disposable corruption and must remain fail-closed.
   healthGuard?.afterHealthCheck();
+  // Cancellation is operation control, not evidence that cache data is bad.
+  if (
+    healthError instanceof RepositoryStoreError &&
+    (healthError.code === 'ABORTED' || healthError.code === 'DEADLINE_EXCEEDED')
+  )
+    throw healthError;
   if (healthError !== undefined) return 'contradictory';
   return undefined;
 }

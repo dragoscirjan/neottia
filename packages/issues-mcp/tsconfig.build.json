@@ -1,5 +1,5 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": { "noEmit": false, "outDir": "dist", "declaration": true, "sourceMap": true },
-  "exclude": ["src/**/*.spec.ts", "dist"]
+  "exclude": ["src/**/*.spec.ts", "src/**/*.test.ts", "coverage", "dist", "node_modules"]
 }

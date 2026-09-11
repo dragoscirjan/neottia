@@ -4,15 +4,16 @@ import { parseDocument } from 'yaml';
 import { z } from 'zod';
 import { IssueError } from './errors.js';
 
+// One schema-visible expression keeps runtime, generated JSON Schema, and the
+// repository-store path grammar aligned for reserved roots and trailing dots.
 const relativeRoot = z
   .string()
   .min(1)
   .max(1024)
   .regex(
-    /^(?!\/)(?!.*(?:^|\/)\.\.?(?:\/|$))(?!.*\\)[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/u,
-    'must be a safe project-relative path',
-  )
-  .refine((value) => !reservedRootOverlap(value), 'must not overlap Neottia cache or repository-store control paths');
+    /^(?!\.[nN][eE][oO][tT][tT][iI][aA](?:$|\/(?:[cC][aA][cC][hH][eE]|[rR][eE][pP][oO][sS][iI][tT][oO][rR][yY]-[sS][tT][oO][rR][eE])(?:\/|$)))(?!\/)(?!.*(?:^|\/)\.\.?(?:\/|$))(?!.*(?:^|\/)[^/]*\.(?:\/|$))(?!.*\\)[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/u,
+    'must be a safe non-reserved project-relative path with no trailing-period component',
+  );
 const positive = z.number().int().positive();
 
 /** Complete strict skills.issues configuration shard. */
@@ -139,12 +140,6 @@ export function loadIssueConfig(cwd: string, options: LoadIssueConfigOptions = {
 /** Returns the resolved config file path for diagnostics and hosts. */
 export function resolveIssueConfigFile(cwd: string, env: NodeJS.ProcessEnv = process.env): string {
   return join(cwd, env.NEOTTIA_CONFIG_FILE ?? env.NEOTTIA_ISSUES_CONFIG_FILE ?? '.neottia/config.yml');
-}
-
-function reservedRootOverlap(root: string): boolean {
-  return ['.neottia/cache', '.neottia/repository-store'].some(
-    (reserved) => root === reserved || root.startsWith(`${reserved}/`) || reserved.startsWith(`${root}/`),
-  );
 }
 
 function configSchemaError(error: z.ZodError): IssueError {

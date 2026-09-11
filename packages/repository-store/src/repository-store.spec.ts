@@ -30,6 +30,7 @@ import {
   readManagedFile,
   resolveManagedPath,
   resolveManagedRoot,
+  validateRelativePath,
   withRepositoryLease,
 } from './index.js';
 import {
@@ -94,6 +95,12 @@ describe('repository canonical store', () => {
         await readManagedFile(root, lease, { relativePath: path.relativePath } as typeof path);
       }),
     ).rejects.toMatchObject({ code: 'PATH_INVALID' });
+  });
+
+  it('enforces portable trailing-period and trailing-space path components', () => {
+    for (const path of ['record.', 'dir./record', 'dir/record.', 'record ', 'dir /record'])
+      expect(() => validateRelativePath(path)).toThrow(PathSafetyError);
+    expect(validateRelativePath('dir/record.name')).toBe('dir/record.name');
   });
 
   it('applies exact write, replacement, move, and removal operations', async () => {

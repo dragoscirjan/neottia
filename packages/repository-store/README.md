@@ -47,7 +47,7 @@ await withRepositoryLease(root, async (lease) => {
 });
 ```
 
-Every write, remove, and move has an exact expected revision. Paths reject traversal, ambiguous separators, control characters, portable case/NFKC collisions, symbolic links, special files, and multiply linked files. Reads compare descriptor and path identity plus size, modification time, and change time around bounded reads.
+Every write, remove, and move has an exact expected revision. Paths reject traversal, ambiguous separators, control characters, components ending in a period or space, portable case/NFKC collisions, symbolic links, special files, and multiply linked files. Reads compare descriptor and path identity plus size, modification time, and change time around bounded reads.
 
 ## Lease and recovery
 

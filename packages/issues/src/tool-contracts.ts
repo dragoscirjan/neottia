@@ -46,9 +46,9 @@ export const issueSearchInputSchema = z
   .object({
     query: z
       .string()
+      .max(16 * 1024)
       .trim()
-      .min(1)
-      .max(16 * 1024),
+      .min(1),
     ...listFilters,
     max_bytes: z
       .number()

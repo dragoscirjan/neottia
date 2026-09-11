@@ -24,6 +24,7 @@ export { DEFAULT_STORE_LIMITS, type StoreLimits } from './limits.js';
 export {
   resolveManagedPath,
   resolveManagedRoot,
+  validateRelativePath,
   type ManagedPath,
   type ManagedRoot,
   type ManagedRootOptions,
