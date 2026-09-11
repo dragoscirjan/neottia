@@ -311,6 +311,12 @@ function tryReclaimLockedLease(lockPath: string, controlRoot: string, hostId: st
     const owner = verifiedOwner.metadata;
     const lockStat = lstatSync(lockPath);
     const ownerStat = verifiedOwner.identity;
+    const releaseExpectation: ReleaseExpectation = {
+      kind: 'directory',
+      identity: lockStat,
+      ownerIdentity: ownerStat,
+      token: owner.token,
+    };
     if (!lockStat.isDirectory() || lockStat.isSymbolicLink())
       throw new PathSafetyError('Unsafe repository lease path.');
     if (Date.now() - lockStat.mtimeMs < staleMs || !conclusivelyDead(owner, hostId)) return false;
@@ -324,16 +330,16 @@ function tryReclaimLockedLease(lockPath: string, controlRoot: string, hostId: st
       !sameLeaseIdentity(ownerStat, movedOwner.identity) ||
       movedOwner.metadata.token !== owner.token
     ) {
-      restoreQuarantinedLease(quarantine, lockPath);
+      restoreQuarantinedLease(quarantine, lockPath, releaseExpectation, {
+        kind: 'directory',
+        identity: movedLock,
+        ownerIdentity: movedOwner.identity,
+        token: movedOwner.metadata.token,
+      });
       throw new LeaseContentionError('Stale lease identity changed during reclamation.', 'LEASE_OWNER_UNKNOWN');
     }
     if (!removeVerifiedOwnerFile(quarantinedOwnerPath, movedOwner)) {
-      restoreQuarantinedLease(quarantine, lockPath, {
-        kind: 'directory',
-        identity: lockStat,
-        ownerIdentity: ownerStat,
-        token: owner.token,
-      });
+      restoreQuarantinedLease(quarantine, lockPath, releaseExpectation);
       return false;
     }
     rmdirSync(quarantine);
@@ -424,10 +430,19 @@ function tryReclaimClaim(
       throw new LeaseContentionError('Claim owner changed during reclamation.', 'LEASE_OWNER_UNKNOWN');
     cleanupInterruptedInitialization(lockPath, controlRoot, owner, staleMs);
     const quarantine = `${claimPath}.release-${owner.token}`;
+    const releaseExpectation: ReleaseExpectation = {
+      kind: 'file',
+      identity: normalizedOwner.identity,
+      token: owner.token,
+    };
     if (!quarantineNoReplace(claimPath, quarantine)) return false;
     const moved = readOwner(quarantine);
     if (!sameIdentity(normalizedOwner.identity, moved.identity) || moved.metadata.token !== owner.token) {
-      restoreQuarantinedLease(quarantine, claimPath);
+      restoreQuarantinedLease(quarantine, claimPath, releaseExpectation, {
+        kind: 'file',
+        identity: moved.identity,
+        token: moved.metadata.token,
+      });
       return false;
     }
     rmSync(quarantine);
@@ -469,10 +484,11 @@ function cleanupInterruptedInitialization(
   }
   if (readdirSync(lockPath).length !== 0) return;
   const quarantine = `${lockPath}.release-${owner.token}`;
+  const releaseExpectation: ReleaseExpectation = { kind: 'directory', identity: lockStat, token: owner.token };
   if (!quarantineNoReplace(lockPath, quarantine)) return;
   const quarantined = lstatSync(quarantine);
   if (!sameIdentity(lockStat, quarantined) || readdirSync(quarantine).length !== 0) {
-    restoreQuarantinedLease(quarantine, lockPath);
+    restoreQuarantinedLease(quarantine, lockPath, releaseExpectation);
     throw new LeaseContentionError('Incomplete lease identity changed during reclamation.', 'LEASE_OWNER_UNKNOWN');
   }
   rmdirSync(quarantine);
@@ -482,32 +498,48 @@ function cleanupInterruptedInitialization(
 /** Cleans an initialization failure while this process still owns its claim. */
 function cleanupOwnedInitialization(lockPath: string, controlRoot: string, token: string, expectedLock: Stats): void {
   const quarantine = `${lockPath}.release-${token}`;
+  let releaseExpectation: ReleaseExpectation = { kind: 'directory', identity: expectedLock, token };
+  let restorationSafe = false;
   try {
     const current = lstatSync(lockPath);
     if (!current.isDirectory() || current.isSymbolicLink() || !sameIdentity(expectedLock, current)) return;
+    const currentEntries = readdirSync(lockPath);
+    if (currentEntries.some((entry) => entry !== 'owner.json')) return;
+    if (currentEntries.includes('owner.json')) {
+      const owner = readOwner(join(lockPath, 'owner.json'));
+      if (owner.metadata.token !== token) return;
+      releaseExpectation = { ...releaseExpectation, ownerIdentity: owner.identity };
+    }
     if (!quarantineNoReplace(lockPath, quarantine)) return;
+    restorationSafe = true;
     const moved = lstatSync(quarantine);
     if (!sameIdentity(expectedLock, moved)) {
-      restoreQuarantinedLease(quarantine, lockPath);
+      restoreQuarantinedLease(quarantine, lockPath, releaseExpectation);
       return;
     }
     const entries = readdirSync(quarantine);
     if (entries.some((entry) => entry !== 'owner.json')) {
-      restoreQuarantinedLease(quarantine, lockPath);
+      restoreQuarantinedLease(quarantine, lockPath, releaseExpectation);
       return;
     }
     if (entries.includes('owner.json')) {
       const ownerPath = join(quarantine, 'owner.json');
       const owner = readOwner(ownerPath);
-      if (owner.metadata.token !== token || !removeVerifiedOwnerFile(ownerPath, owner)) {
-        restoreQuarantinedLease(quarantine, lockPath);
+      if (
+        owner.metadata.token !== token ||
+        releaseExpectation.ownerIdentity === undefined ||
+        !sameIdentity(owner.identity, releaseExpectation.ownerIdentity) ||
+        !removeVerifiedOwnerFile(ownerPath, owner)
+      ) {
+        restoreQuarantinedLease(quarantine, lockPath, releaseExpectation);
         return;
       }
+      restorationSafe = false;
     }
     rmdirSync(quarantine);
     syncDirectory(controlRoot);
   } catch {
-    restoreQuarantinedLease(quarantine, lockPath);
+    if (restorationSafe) restoreQuarantinedLease(quarantine, lockPath, releaseExpectation);
   }
 }
 
@@ -641,6 +673,13 @@ function releaseOwnedLease(
   ownerIdentity: Stats,
 ): void {
   const releasePath = `${lockPath}.release-${token}`;
+  const releaseExpectation: ReleaseExpectation = {
+    kind: 'directory',
+    identity: lockIdentity,
+    ownerIdentity,
+    token,
+  };
+  let restorationSafe = false;
   try {
     const currentLock = lstatSync(lockPath);
     const currentOwner = readOwner(join(lockPath, 'owner.json'));
@@ -653,6 +692,7 @@ function releaseOwnedLease(
     )
       return;
     if (!quarantineNoReplace(lockPath, releasePath)) return;
+    restorationSafe = true;
     const movedLock = lstatSync(releasePath);
     const movedOwnerPath = join(releasePath, 'owner.json');
     const movedOwner = readOwner(movedOwnerPath);
@@ -661,22 +701,24 @@ function releaseOwnedLease(
       !sameLeaseIdentity(ownerIdentity, movedOwner.identity) ||
       movedOwner.metadata.token !== token
     ) {
-      restoreQuarantinedLease(releasePath, lockPath);
-      return;
-    }
-    if (!removeVerifiedOwnerFile(movedOwnerPath, movedOwner)) {
-      restoreQuarantinedLease(releasePath, lockPath, {
+      restoreQuarantinedLease(releasePath, lockPath, releaseExpectation, {
         kind: 'directory',
-        identity: lockIdentity,
-        ownerIdentity,
-        token,
+        identity: movedLock,
+        ownerIdentity: movedOwner.identity,
+        token: movedOwner.metadata.token,
       });
       return;
     }
+    if (!removeVerifiedOwnerFile(movedOwnerPath, movedOwner)) {
+      restoreQuarantinedLease(releasePath, lockPath, releaseExpectation);
+      return;
+    }
+    restorationSafe = false;
     rmdirSync(releasePath);
     syncDirectory(controlRoot);
   } catch {
-    // Fail closed: uncertain ownership remains for stale-owner inspection.
+    // Restore only while the complete captured lease still exists.
+    if (restorationSafe) restoreQuarantinedLease(releasePath, lockPath, releaseExpectation);
   }
 }
 
@@ -687,24 +729,94 @@ export interface ReleaseExpectation {
   readonly ownerIdentity?: Stats;
 }
 
-/** Restores a quarantined entry or removes its verified orphan after a race. */
-export function restoreQuarantinedLease(quarantine: string, lockPath: string, expected?: ReleaseExpectation): void {
+/** Restores only the captured quarantine identity, or removes it after a race. */
+export function restoreQuarantinedLease(
+  quarantine: string,
+  lockPath: string,
+  expected: ReleaseExpectation,
+  movedFromLock?: ReleaseExpectation,
+): void {
+  const verification = `${quarantine}.restore-${randomBytes(16).toString('hex')}`;
+  let staged = false;
+  let preserveUnverified = false;
+  let restorationExpectation: ReleaseExpectation | undefined;
   try {
-    nativeRenameNoReplace(requireNativePublicationBackend(), quarantine, lockPath);
-  } catch (error: unknown) {
-    // A new owner must never be overwritten. Cleanup requires identities
-    // captured before quarantine; a fresh pathname snapshot is insufficient.
-    if (hasCode(error, 'EEXIST') && expected !== undefined) cleanupVerifiedReleaseArtifact(quarantine, expected);
+    nativeRenameNoReplace(requireNativePublicationBackend(), quarantine, verification);
+    staged = true;
+    restorationExpectation = releaseArtifactMatches(verification, expected)
+      ? expected
+      : movedFromLock !== undefined && releaseArtifactMatches(verification, movedFromLock)
+        ? movedFromLock
+        : undefined;
+    if (restorationExpectation === undefined) {
+      preserveUnverified = true;
+      return;
+    }
+    try {
+      nativeRenameNoReplace(requireNativePublicationBackend(), verification, lockPath);
+      staged = false;
+    } catch (error: unknown) {
+      if (!hasCode(error, 'EEXIST')) throw error;
+      // A new owner must never be overwritten. Only package-owned release
+      // identities may be removed; moved substitutions return to quarantine.
+      if (restorationExpectation === expected) cleanupVerifiedReleaseArtifact(verification, expected, quarantine);
+      return;
+    }
+    if (!releaseArtifactMatches(lockPath, restorationExpectation))
+      throw new PathSafetyError('Restored repository lease identity changed.', 'IDENTITY_CHANGED');
+  } catch {
+    // Uncertain restoration state remains fail-closed for later inspection.
+  } finally {
+    if (staged) {
+      try {
+        if (
+          preserveUnverified ||
+          releaseArtifactMatches(verification, expected) ||
+          (movedFromLock !== undefined && releaseArtifactMatches(verification, movedFromLock))
+        )
+          nativeRenameNoReplace(requireNativePublicationBackend(), verification, quarantine);
+      } catch {
+        // Preserve both identities if the original quarantine path reappeared.
+      }
+    }
+  }
+}
+
+/** Checks a staged release artifact against its pre-quarantine identity. */
+function releaseArtifactMatches(path: string, expected: ReleaseExpectation): boolean {
+  try {
+    const identity = lstatSync(path);
+    if (!sameIdentity(identity, expected.identity) || identity.isSymbolicLink()) return false;
+    if (expected.kind === 'file') {
+      if (!identity.isFile()) return false;
+      const owner = readOwner(path);
+      return owner.metadata.token === expected.token && sameIdentity(owner.identity, expected.identity);
+    }
+    if (!identity.isDirectory()) return false;
+    const entries = readdirSync(path);
+    if (expected.ownerIdentity === undefined) return entries.length === 0;
+    if (entries.length !== 1 || entries[0] !== 'owner.json') return false;
+    const owner = readOwner(join(path, 'owner.json'));
+    const finalEntries = readdirSync(path);
+    return (
+      owner.metadata.token === expected.token &&
+      sameIdentity(owner.identity, expected.ownerIdentity) &&
+      sameIdentity(lstatSync(path), expected.identity) &&
+      finalEntries.length === 1 &&
+      finalEntries[0] === 'owner.json'
+    );
+  } catch {
+    return false;
   }
 }
 
 /** Performs one bounded expected-identity cleanup of a `.release-*` artifact. */
-function cleanupVerifiedReleaseArtifact(path: string, expected: ReleaseExpectation): void {
+function cleanupVerifiedReleaseArtifact(path: string, expected: ReleaseExpectation, releasePath = path): void {
   const cleanup = `${path}.cleanup-${randomBytes(16).toString('hex')}`;
   let moved = false;
   let removed = false;
   try {
-    const match = /\.release-([0-9a-f-]{32,64})$/u.exec(basename(path));
+    const match = /\.release-([0-9a-f-]{32,64})$/u.exec(basename(releasePath));
     if (match?.[1] !== expected.token) return;
     nativeRenameNoReplace(requireNativePublicationBackend(), path, cleanup);
     moved = true;
@@ -751,10 +863,15 @@ function removeOwnedClaim(path: string, token: string): boolean {
     const expected = readOwner(path);
     if (expected.metadata.token !== token) return false;
     const quarantine = `${path}.release-${token}`;
+    const releaseExpectation: ReleaseExpectation = { kind: 'file', identity: expected.identity, token };
     if (!quarantineNoReplace(path, quarantine)) return false;
     const moved = readOwner(quarantine);
     if (moved.metadata.token !== token || !sameIdentity(expected.identity, moved.identity)) {
-      restoreQuarantinedLease(quarantine, path);
+      restoreQuarantinedLease(quarantine, path, releaseExpectation, {
+        kind: 'file',
+        identity: moved.identity,
+        token: moved.metadata.token,
+      });
       return false;
     }
     rmSync(quarantine);
@@ -798,22 +915,29 @@ function sameLeaseIdentity(left: Stats, right: Stats): boolean {
 function removeVerifiedOwnerFile(path: string, expected: VerifiedOwner): boolean {
   const quarantine = `${path}.release-${expected.metadata.token}`;
   if (!quarantineNoReplace(path, quarantine)) return false;
-  let verified = false;
   try {
     const moved = readOwner(quarantine);
+    const releaseExpectation: ReleaseExpectation = {
+      kind: 'file',
+      identity: expected.identity,
+      token: expected.metadata.token,
+    };
     if (moved.metadata.token !== expected.metadata.token || !sameIdentity(moved.identity, expected.identity)) {
-      restoreQuarantinedLease(quarantine, path);
+      restoreQuarantinedLease(quarantine, path, releaseExpectation, {
+        kind: 'file',
+        identity: moved.identity,
+        token: moved.metadata.token,
+      });
       return false;
     }
-    verified = true;
     rmSync(quarantine);
     return true;
   } catch {
-    restoreQuarantinedLease(
-      quarantine,
-      path,
-      verified ? { kind: 'file', identity: expected.identity, token: expected.metadata.token } : undefined,
-    );
+    restoreQuarantinedLease(quarantine, path, {
+      kind: 'file',
+      identity: expected.identity,
+      token: expected.metadata.token,
+    });
     return false;
   }
 }

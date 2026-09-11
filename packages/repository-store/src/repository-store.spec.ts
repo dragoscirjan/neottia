@@ -568,6 +568,29 @@ describe('repository authority lease', () => {
     expect(JSON.parse(readFileSync(join(lockPath, 'owner.json'), 'utf8')).token).toBe(currentToken);
   });
 
+  it('restores a verified release identity when the destination remains absent', async () => {
+    const root = await fixture();
+    await withRepositoryLease(root, async () => undefined);
+    const control = join(root.authorityRoot, '.neottia', 'repository-store');
+    const lockPath = join(control, 'authority.lease');
+    const token = randomBytes(32).toString('hex');
+    const releasePath = `${lockPath}.release-${token}`;
+    mkdirSync(releasePath);
+    const ownerPath = join(releasePath, 'owner.json');
+    writeOwnerMetadata(ownerPath, control, process.pid, new Date(), token);
+    const expected = {
+      kind: 'directory' as const,
+      identity: lstatSync(releasePath),
+      ownerIdentity: lstatSync(ownerPath),
+      token,
+    };
+
+    restoreQuarantinedLease(releasePath, lockPath, expected);
+
+    expect(existsSync(releasePath)).toBe(false);
+    expect(JSON.parse(readFileSync(join(lockPath, 'owner.json'), 'utf8')).token).toBe(token);
+  });
+
   it('preserves a same-token release replacement whose identity was not expected', async () => {
     const root = await fixture();
     await withRepositoryLease(root, async () => undefined);
@@ -592,6 +615,33 @@ describe('repository authority lease', () => {
 
     restoreQuarantinedLease(releasePath, lockPath, expected);
 
+    expect(existsSync(releasePath)).toBe(true);
+    expect(JSON.parse(readFileSync(join(releasePath, 'owner.json'), 'utf8')).token).toBe(token);
+  });
+
+  it('does not restore a substituted release identity to an absent lease path', async () => {
+    const root = await fixture();
+    await withRepositoryLease(root, async () => undefined);
+    const control = join(root.authorityRoot, '.neottia', 'repository-store');
+    const lockPath = join(control, 'authority.lease');
+    const token = randomBytes(32).toString('hex');
+    const releasePath = `${lockPath}.release-${token}`;
+    mkdirSync(releasePath);
+    const ownerPath = join(releasePath, 'owner.json');
+    writeOwnerMetadata(ownerPath, control, process.pid, new Date(), token);
+    const expected = {
+      kind: 'directory' as const,
+      identity: lstatSync(releasePath),
+      ownerIdentity: lstatSync(ownerPath),
+      token,
+    };
+    renameSync(releasePath, `${releasePath}.displaced`);
+    mkdirSync(releasePath);
+    writeOwnerMetadata(join(releasePath, 'owner.json'), control, process.pid, new Date(), token);
+
+    restoreQuarantinedLease(releasePath, lockPath, expected);
+
+    expect(existsSync(lockPath)).toBe(false);
     expect(existsSync(releasePath)).toBe(true);
     expect(JSON.parse(readFileSync(join(releasePath, 'owner.json'), 'utf8')).token).toBe(token);
   });
