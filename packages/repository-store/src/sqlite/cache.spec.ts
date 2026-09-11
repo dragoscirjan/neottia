@@ -1,4 +1,14 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  renameSync,
+  statSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -9,10 +19,12 @@ import {
   type DisposableCacheSpecification,
   type DisposableSqliteCache,
 } from './cache.js';
+import { setFilesystemFaultInjectorForTests } from '../internal/fault-injection.js';
 
 const temporaryDirectories: string[] = [];
 
 afterEach(() => {
+  setFilesystemFaultInjectorForTests(undefined);
   while (temporaryDirectories.length > 0)
     rmSync(temporaryDirectories.pop() as string, { recursive: true, force: true });
 });
@@ -38,6 +50,209 @@ describe('disposable SQLite cache', () => {
       ).resolves.toEqual({ state: 'rebuild-required', reason: 'stale-digest' });
     });
   });
+
+  it('rejects an initially oversized valid cache before domain verification', async () => {
+    const { authority, root, specification } = await newCacheFixture('neottia-cache-active-initial-limit-');
+    await withRepositoryLease(root, async (lease) => {
+      const cache = await rebuildDisposableSqliteCache(root, lease, specification);
+      await cache.close();
+    });
+    const databaseBytes = statSync(join(authority, 'cache.db')).size;
+    const constrained = await resolveManagedRoot({
+      authorityRoot: authority,
+      limits: { ...DEFAULT_STORE_LIMITS, maxTemporaryBytes: databaseBytes - 1 },
+    });
+    let healthChecked = false;
+    const constrainedSpecification = {
+      ...specification,
+      path: resolveManagedPath(constrained, 'cache.db'),
+      async healthCheck(): Promise<void> {
+        healthChecked = true;
+      },
+    };
+    await expect(
+      withRepositoryLease(constrained, (lease) =>
+        openDisposableSqliteCache(constrained, lease, constrainedSpecification),
+      ),
+    ).rejects.toMatchObject({ code: 'LIMIT_EXCEEDED' });
+    expect(healthChecked).toBe(false);
+  });
+
+  it('rejects cache growth produced by a domain health check', async () => {
+    const { authority, root, specification } = await newCacheFixture('neottia-cache-active-growth-limit-');
+    await withRepositoryLease(root, async (lease) => {
+      const cache = await rebuildDisposableSqliteCache(root, lease, specification);
+      await cache.close();
+    });
+    const constrained = await resolveManagedRoot({
+      authorityRoot: authority,
+      limits: { ...DEFAULT_STORE_LIMITS, maxTemporaryBytes: 1024 * 1024 },
+    });
+    const originalHealthCheck = specification.healthCheck;
+    const growingSpecification = {
+      ...specification,
+      path: resolveManagedPath(constrained, 'cache.db'),
+      async healthCheck(database: Parameters<typeof originalHealthCheck>[0]): Promise<void> {
+        await originalHealthCheck(database);
+        await database.exec('CREATE TABLE health_growth (payload BLOB NOT NULL)');
+        await database.exec('INSERT INTO health_growth VALUES (zeroblob(2097152))');
+      },
+    };
+    await expect(
+      withRepositoryLease(constrained, (lease) => openDisposableSqliteCache(constrained, lease, growingSpecification)),
+    ).rejects.toMatchObject({ code: 'LIMIT_EXCEEDED' });
+  });
+
+  it('accepts the exact cumulative schema SQL byte boundary', async () => {
+    const authority = mkdtempSync(join(tmpdir(), 'neottia-cache-schema-exact-'));
+    temporaryDirectories.push(authority);
+    const root = await resolveManagedRoot({
+      authorityRoot: authority,
+      limits: { ...DEFAULT_STORE_LIMITS, maxSqlBytes: 256 },
+    });
+    const base = 'CREATE TABLE domain_records (id TEXT PRIMARY KEY, value TEXT NOT NULL);';
+    const schema = `${base}${' '.repeat(256 - Buffer.byteLength(base))}`;
+    const specification = {
+      ...cacheSpecification(resolveManagedPath(root, 'cache.db'), 'exact'),
+      schemaSql: [schema],
+    };
+    await withRepositoryLease(root, async (lease) => {
+      const cache = await rebuildDisposableSqliteCache(root, lease, specification);
+      await cache.close();
+    });
+    expect(existsSync(join(authority, 'cache.db'))).toBe(true);
+  });
+
+  it('rejects aggregate domain schema SQL before creating a candidate', async () => {
+    const authority = mkdtempSync(join(tmpdir(), 'neottia-cache-schema-bound-'));
+    temporaryDirectories.push(authority);
+    const root = await resolveManagedRoot({
+      authorityRoot: authority,
+      limits: { ...DEFAULT_STORE_LIMITS, maxSqlBytes: 256 },
+    });
+    const specification = {
+      ...cacheSpecification(resolveManagedPath(root, 'cache.db'), 'digest'),
+      schemaSql: [`--${'a'.repeat(148)}`, `--${'b'.repeat(148)}`],
+    };
+    await withRepositoryLease(root, async (lease) => {
+      await expect(rebuildDisposableSqliteCache(root, lease, specification)).rejects.toMatchObject({
+        code: 'LIMIT_EXCEEDED',
+      });
+    });
+    expect(existsSync(join(authority, 'cache.db'))).toBe(false);
+  });
+
+  it('applies the cumulative candidate DB/WAL/SHM boundary inclusively and cleans one-byte-over failure', async () => {
+    const baseline = await newCacheFixture('neottia-cache-cumulative-baseline-');
+    const originalHealthCheck = baseline.specification.healthCheck;
+    let observedBytes = 0;
+    const observedSpecification = {
+      ...baseline.specification,
+      async healthCheck(database: Parameters<typeof originalHealthCheck>[0]) {
+        observedBytes = Math.max(observedBytes, candidateArtifactBytes(baseline.authority));
+        await originalHealthCheck(database);
+        observedBytes = Math.max(observedBytes, candidateArtifactBytes(baseline.authority));
+      },
+    };
+    await withRepositoryLease(baseline.root, async (lease) => {
+      const cache = await rebuildDisposableSqliteCache(baseline.root, lease, observedSpecification);
+      await cache.close();
+    });
+    expect(observedBytes).toBeGreaterThan(0);
+
+    const runBoundary = async (delta: 0 | -1): Promise<{ failure: unknown; candidates: string[] }> => {
+      const authority = mkdtempSync(join(tmpdir(), `neottia-cache-cumulative-${delta}-`));
+      temporaryDirectories.push(authority);
+      const root = await resolveManagedRoot({
+        authorityRoot: authority,
+        limits: { ...DEFAULT_STORE_LIMITS, maxTemporaryBytes: observedBytes + delta },
+      });
+      const specification = cacheSpecification(resolveManagedPath(root, 'cache.db'), `boundary-${delta}`);
+      let failure: unknown;
+      try {
+        await withRepositoryLease(root, async (lease) => {
+          const cache = await rebuildDisposableSqliteCache(root, lease, specification);
+          await cache.close();
+        });
+      } catch (error: unknown) {
+        failure = error;
+      }
+      return { failure, candidates: readdirSync(authority).filter((name) => name.includes('.candidate')) };
+    };
+    const exact = await runBoundary(0);
+    expect(exact.failure).toBeUndefined();
+    expect(exact.candidates).toEqual([]);
+    const over = await runBoundary(-1);
+    expect(over.failure).toMatchObject({ code: 'LIMIT_EXCEEDED' });
+    expect(over.candidates).toEqual([]);
+  });
+
+  it('removes exact candidate DB/WAL/SHM after cumulative over-limit failure and preserves active cache', async () => {
+    const { authority, root, specification } = await newCacheFixture('neottia-cache-candidate-limit-');
+    await withRepositoryLease(root, async (lease) => {
+      const active = await rebuildDisposableSqliteCache(root, lease, specification);
+      await active.close();
+    });
+    const activePath = join(authority, 'cache.db');
+    const before = readFileSync(activePath);
+    const constrained = await resolveManagedRoot({
+      authorityRoot: authority,
+      limits: { ...DEFAULT_STORE_LIMITS, maxTemporaryBytes: 1 },
+    });
+    const constrainedSpecification = cacheSpecification(resolveManagedPath(constrained, 'cache.db'), 'next');
+    await withRepositoryLease(constrained, async (lease) => {
+      await expect(rebuildDisposableSqliteCache(constrained, lease, constrainedSpecification)).rejects.toMatchObject({
+        code: 'LIMIT_EXCEEDED',
+      });
+    });
+    expect(readFileSync(activePath)).toEqual(before);
+    expect(readdirSync(authority).filter((name) => name.includes('.candidate'))).toEqual([]);
+  });
+
+  it.each(['candidate-file', 'activation-directory'] as const)(
+    'reports structured durability and cleans exact cache artifacts for %s fsync',
+    async (boundary) => {
+      const { authority, root, specification } = await newCacheFixture(`neottia-cache-${boundary}-`);
+      const cause = new Error(`injected ${boundary} fsync`);
+      const activePath = join(authority, 'cache.db');
+      let published = false;
+      let failedPath = '';
+      let operation = '';
+      await withRepositoryLease(root, async (lease) => {
+        setFilesystemFaultInjectorForTests((event, target) => {
+          if (event === 'exclusive-destination-published' && target === activePath) published = true;
+          const candidateFailure =
+            boundary === 'candidate-file' && event === 'file-fsync' && target.includes('.candidate');
+          const activationFailure =
+            boundary === 'activation-directory' && published && event === 'directory-fsync' && target === authority;
+          if ((candidateFailure || activationFailure) && failedPath === '') {
+            failedPath = target;
+            operation = event;
+            throw cause;
+          }
+        });
+        let failure: unknown;
+        try {
+          await rebuildDisposableSqliteCache(root, lease, specification);
+        } catch (error: unknown) {
+          failure = error;
+        }
+        expect(failure).toMatchObject({
+          category: 'durability',
+          code: 'FSYNC_FAILED',
+          cause,
+          evidence: { operation, path: failedPath },
+        });
+        setFilesystemFaultInjectorForTests(undefined);
+      });
+      expect(readdirSync(authority).filter((name) => name.includes('.candidate'))).toEqual([]);
+      await withRepositoryLease(root, async (lease) => {
+        const repaired = await rebuildDisposableSqliteCache(root, lease, specification);
+        await repaired.close();
+      });
+      expect(readFileSync(activePath).subarray(0, 15).toString()).toBe('SQLite format 3');
+    },
+  );
 
   it('invalidates writable handles after lease settlement while still allowing close', async () => {
     const authority = mkdtempSync(join(tmpdir(), 'neottia-cache-lease-'));
@@ -126,6 +341,32 @@ describe('disposable SQLite cache', () => {
     });
   });
 
+  it('preserves a replacement injected at the final activation mutation', async () => {
+    const { authority, root, path, specification } = await newCacheFixture('neottia-cache-final-activation-');
+    const activePath = join(authority, 'cache.db');
+    await withRepositoryLease(root, async (lease) => {
+      const active = await rebuildDisposableSqliteCache(root, lease, specification);
+      await active.close();
+    });
+    setFilesystemFaultInjectorForTests((event, target) => {
+      if (event === 'before-exact-publication' && target === activePath) replaceWithSentinel(activePath);
+    });
+    await withRepositoryLease(root, async (lease) => {
+      let failure: unknown;
+      try {
+        await rebuildDisposableSqliteCache(
+          root,
+          lease,
+          cacheSpecification(path, `${specification.canonicalDigest}-new`),
+        );
+      } catch (error: unknown) {
+        failure = error;
+      }
+      expect(failure).toMatchObject({ code: 'IDENTITY_CHANGED' });
+    });
+    expect(readFileSync(activePath, 'utf8')).toBe('replacement');
+  });
+
   it.each(['', '-wal', '-shm'])('does not close SQLite over a %s replacement during verification', async (suffix) => {
     const { authority, root, path, specification } = await newCacheFixture('neottia-cache-verification-');
     await withRepositoryLease(root, async (lease) => {
@@ -173,6 +414,15 @@ describe('disposable SQLite cache', () => {
     });
   });
 });
+
+function candidateArtifactBytes(authority: string): number {
+  const names = readdirSync(authority);
+  const candidate = names.find((name) => name.endsWith('.candidate'));
+  if (candidate === undefined) return 0;
+  return names
+    .filter((name) => name === candidate || name === `${candidate}-wal` || name === `${candidate}-shm`)
+    .reduce((total, name) => total + statSync(join(authority, name)).size, 0);
+}
 
 function replaceWithSentinel(path: string): void {
   expect(existsSync(path)).toBe(true);

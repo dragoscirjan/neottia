@@ -8,6 +8,7 @@ export interface StoreLimits {
   readonly maxJournalBytes: number;
   readonly maxTemporaryBytes: number;
   readonly maxSqlBytes: number;
+  readonly maxStatementParameterBytes: number;
   readonly maxQueryRows: number;
   readonly maxQueryResultBytes: number;
 }
@@ -22,6 +23,7 @@ export const DEFAULT_STORE_LIMITS: StoreLimits = {
   maxJournalBytes: 4 * 1_048_576,
   maxTemporaryBytes: 64 * 1_048_576,
   maxSqlBytes: 1_048_576,
+  maxStatementParameterBytes: 1_048_576,
   maxQueryRows: 10_000,
   maxQueryResultBytes: 16 * 1_048_576,
 };

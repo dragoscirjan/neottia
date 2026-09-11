@@ -61,10 +61,6 @@ export interface RelateIssueInput {
   readonly expected_revision?: string;
 }
 
-// Repository-store leases intentionally reject same-process reentrancy. This
-// authority queue serializes overlapping in-process host calls before lease entry.
-const authorityQueues = new Map<string, Promise<void>>();
-
 /** Filesystem-canonical Issues implementation serialized by repository-store. */
 export class IssueStore {
   private rootPromise?: Promise<ManagedRoot>;
@@ -373,45 +369,43 @@ export class IssueStore {
   /** Returns bounded canonical diagnostics and verifies the disposable cache. */
   async validate(control: OperationControl = {}): Promise<IssueValidationReport> {
     this.assertEnabled();
-    return enqueueAuthority(resolve(this.cwd), control, async () => {
-      try {
-        const root = await this.root();
-        return await withRepositoryLease(
-          root,
-          async (lease) => {
-            const inspected = await inspectIssueCatalog(root, lease, this.config.root, this.config.prefix, control);
-            const findings = [...inspected.findings];
-            if (!findings.length) {
-              findings.push(...inspectIssueGraph(inspected.catalog));
-              if (!findings.length)
-                try {
-                  await this.validateReferences(inspected.catalog, lease, control);
-                } catch (error: unknown) {
-                  findings.push(errorFinding(asIssueError(error)));
-                }
-            }
-            if (findings.length) return report(inspected.catalog, findings.slice(0, 1000), 'skipped');
-            let policy = this.config.cache.stale_policy;
-            if (policy === 'prompt') policy = (await this.options.onStaleCache?.()) === false ? 'fail' : 'rebuild';
-            const handle = await ensureIssueCache(
-              await this.cacheRoot(),
-              lease,
-              inspected.catalog,
-              policy,
-              this.config.cache.max_age_ms,
-              this.config.security.max_file_bytes + 64 * 1024,
-              control,
-            );
-            const cache = handle.rebuilt ? 'rebuilt' : 'checked';
-            await handle.close();
-            return report(inspected.catalog, [], cache);
-          },
-          { ...control, waitMs: this.config.lock.wait_ms, staleMs: this.config.lock.stale_ms },
-        );
-      } catch (error: unknown) {
-        return report(new Map(), [errorFinding(asIssueError(error))], 'skipped');
-      }
-    });
+    try {
+      const root = await this.root();
+      return await withRepositoryLease(
+        root,
+        async (lease) => {
+          const inspected = await inspectIssueCatalog(root, lease, this.config.root, this.config.prefix, control);
+          const findings = [...inspected.findings];
+          if (!findings.length) {
+            findings.push(...inspectIssueGraph(inspected.catalog));
+            if (!findings.length)
+              try {
+                await this.validateReferences(inspected.catalog, lease, control);
+              } catch (error: unknown) {
+                findings.push(errorFinding(asIssueError(error)));
+              }
+          }
+          if (findings.length) return report(inspected.catalog, findings.slice(0, 1000), 'skipped');
+          let policy = this.config.cache.stale_policy;
+          if (policy === 'prompt') policy = (await this.options.onStaleCache?.()) === false ? 'fail' : 'rebuild';
+          const handle = await ensureIssueCache(
+            await this.cacheRoot(),
+            lease,
+            inspected.catalog,
+            policy,
+            this.config.cache.max_age_ms,
+            this.config.security.max_file_bytes + 64 * 1024,
+            control,
+          );
+          const cache = handle.rebuilt ? 'rebuilt' : 'checked';
+          await handle.close();
+          return report(inspected.catalog, [], cache);
+        },
+        { ...control, waitMs: this.config.lock.wait_ms, staleMs: this.config.lock.stale_ms },
+      );
+    } catch (error: unknown) {
+      return report(new Map(), [errorFinding(asIssueError(error))], 'skipped');
+    }
   }
 
   /** Exports a deterministic object suitable for native round trips. */
@@ -642,22 +636,20 @@ export class IssueStore {
     control: OperationControl,
   ): Promise<T> {
     this.assertEnabled();
-    return enqueueAuthority(resolve(this.cwd), control, async () => {
-      try {
-        const root = await this.root();
-        return await withRepositoryLease(
-          root,
-          async (lease) => {
-            const catalog = await this.reload(root, lease, control);
-            validateIssueGraph(catalog);
-            return operation(root, lease, catalog);
-          },
-          { ...control, waitMs: this.config.lock.wait_ms, staleMs: this.config.lock.stale_ms },
-        );
-      } catch (error: unknown) {
-        throw asIssueError(error);
-      }
-    });
+    try {
+      const root = await this.root();
+      return await withRepositoryLease(
+        root,
+        async (lease) => {
+          const catalog = await this.reload(root, lease, control);
+          validateIssueGraph(catalog);
+          return operation(root, lease, catalog);
+        },
+        { ...control, waitMs: this.config.lock.wait_ms, staleMs: this.config.lock.stale_ms },
+      );
+    } catch (error: unknown) {
+      throw asIssueError(error);
+    }
   }
 
   private async reload(
@@ -703,8 +695,15 @@ export class IssueStore {
       maxBatchPaths: this.config.security.max_batch_paths,
       maxBeforeImageBytes: this.config.security.max_total_bytes,
       maxTemporaryBytes: this.config.security.max_total_bytes,
+      maxStatementParameterBytes: Math.min(
+        Number.MAX_SAFE_INTEGER,
+        Math.max(DEFAULT_STORE_LIMITS.maxStatementParameterBytes, this.config.security.max_file_bytes + 64 * 1024),
+      ),
       maxQueryRows: this.config.security.max_query_rows,
-      maxQueryResultBytes: this.config.security.max_result_bytes,
+      maxQueryResultBytes: Math.max(
+        this.config.security.max_result_bytes,
+        this.config.security.max_file_bytes + 64 * 1024,
+      ),
     };
   }
 
@@ -712,68 +711,6 @@ export class IssueStore {
     if (!this.config.enabled)
       throw new IssueError('Issues capability is disabled.', 'configuration', 'ISSUES_DISABLED');
   }
-}
-
-/** Serializes one operation per repository authority inside this process. */
-async function enqueueAuthority<T>(key: string, control: OperationControl, operation: () => Promise<T>): Promise<T> {
-  const previous = authorityQueues.get(key) ?? Promise.resolve();
-  let release: () => void = () => undefined;
-  const current = new Promise<void>((resolveQueue) => {
-    release = resolveQueue;
-  });
-  authorityQueues.set(key, current);
-  try {
-    await waitForQueue(previous, control);
-  } catch (error: unknown) {
-    // A cancelled waiter remains in the ordering chain until its predecessor
-    // exits, preventing later calls from entering beside the live lease.
-    void previous.finally(() => {
-      release();
-      if (authorityQueues.get(key) === current) authorityQueues.delete(key);
-    });
-    throw error;
-  }
-  try {
-    return await operation();
-  } finally {
-    release();
-    if (authorityQueues.get(key) === current) authorityQueues.delete(key);
-  }
-}
-
-async function waitForQueue(previous: Promise<void>, control: OperationControl): Promise<void> {
-  if (control.signal?.aborted) throw queueCancellation('ABORTED');
-  if (control.deadline !== undefined && Date.now() >= control.deadline) throw queueCancellation('DEADLINE_EXCEEDED');
-  await new Promise<void>((resolveWait, rejectWait) => {
-    let settled = false;
-    const finish = (error?: IssueError): void => {
-      if (settled) return;
-      settled = true;
-      control.signal?.removeEventListener('abort', aborted);
-      if (timer !== undefined) clearTimeout(timer);
-      if (error) rejectWait(error);
-      else resolveWait();
-    };
-    const aborted = (): void => finish(queueCancellation('ABORTED'));
-    const timer =
-      control.deadline === undefined
-        ? undefined
-        : setTimeout(() => finish(queueCancellation('DEADLINE_EXCEEDED')), Math.max(0, control.deadline - Date.now()));
-    control.signal?.addEventListener('abort', aborted, { once: true });
-    void previous.then(
-      () => finish(),
-      () => finish(),
-    );
-  });
-}
-
-function queueCancellation(code: 'ABORTED' | 'DEADLINE_EXCEEDED'): IssueError {
-  return new IssueError(
-    code === 'ABORTED' ? 'Issue operation was aborted while queued.' : 'Issue operation deadline expired while queued.',
-    'conflict',
-    code,
-    { retryable: true },
-  );
 }
 
 function appendWithinBudget(issues: Issue[], issue: Issue, maxBytes: number): Issue[] {

@@ -1,6 +1,8 @@
 # Generated files, external metadata, and local state
 *.lock
 *.log
+*.gyp
+*.cc
 .editorconfig
 .gitattributes
 .github/

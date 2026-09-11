@@ -6,7 +6,10 @@ import {
   resolveManagedRoot,
   withRepositoryLease,
 } from '../dist/index.js';
-import { setTransactionFaultInjectorForTests } from '../dist/internal/fault-injection.js';
+import {
+  setFilesystemFaultInjectorForTests,
+  setTransactionFaultInjectorForTests,
+} from '../dist/internal/fault-injection.js';
 
 const [authority, requestedEvent, requestedOccurrenceText = '1'] = process.argv.slice(2);
 const requestedOccurrence = Number.parseInt(requestedOccurrenceText, 10);
@@ -26,9 +29,16 @@ await withRepositoryLease(root, (lease) =>
   ]),
 );
 
-setTransactionFaultInjectorForTests((event, occurrence) => {
-  if (event === requestedEvent && occurrence === requestedOccurrence) process.kill(process.pid, 'SIGKILL');
-});
+if (requestedEvent.startsWith('filesystem:')) {
+  const filesystemEvent = requestedEvent.slice('filesystem:'.length);
+  setFilesystemFaultInjectorForTests((event, _path, occurrence) => {
+    if (event === filesystemEvent && occurrence === requestedOccurrence) process.kill(process.pid, 'SIGKILL');
+  });
+} else {
+  setTransactionFaultInjectorForTests((event, occurrence) => {
+    if (event === requestedEvent && occurrence === requestedOccurrence) process.kill(process.pid, 'SIGKILL');
+  });
+}
 await withRepositoryLease(
   root,
   (lease) =>

@@ -153,6 +153,23 @@ describe('issue canonical lifecycle', () => {
     await expect(issues.export()).rejects.toMatchObject({ code: 'RESULT_TOO_LARGE' });
   });
 
+  it('rebuilds and searches a valid near-file-limit issue projection', async () => {
+    const cwd = project();
+    const config = issueConfigSchema.parse({
+      enabled: true,
+      cache: { stale_policy: 'rebuild' },
+      retrieval: { max_bytes: 2_000_000 },
+      security: { max_file_bytes: 1_100_000, max_total_bytes: 4_000_000, max_result_bytes: 2_000_000 },
+    });
+    const issues = new IssueStore(config, cwd);
+    const created = await issues.create({
+      type: 'task',
+      title: 'Near parameter boundary',
+      body: `parameterneedle ${'x'.repeat(1_048_560)}`,
+    });
+    expect((await issues.search('parameterneedle')).map((issue) => issue.id)).toEqual([created.id]);
+  });
+
   it('imports legacy decimal identities, comments, and resolver-mapped links', async () => {
     const cwd = project();
     const resolver: DesignDocumentReferenceResolver = {

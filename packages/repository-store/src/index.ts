@@ -29,7 +29,11 @@ export {
   type ManagedRootOptions,
 } from './paths.js';
 export { computeByteRevision, type ByteRevision } from './revision.js';
-export { openDisposableSqliteCache, rebuildDisposableSqliteCache } from './sqlite/cache.js';
+export {
+  openDisposableSqliteCache,
+  rebuildDisposableSqliteCache,
+  removeDisposableSqliteCache,
+} from './sqlite/cache.js';
 export type {
   CacheOpenResult,
   CacheRebuildReason,
@@ -40,6 +44,7 @@ export { selectSqliteAdapter } from './sqlite/runtime.js';
 export type {
   SqliteAdapter,
   SqliteConnection,
+  SqliteConnectionBounds,
   SqliteParameters,
   SqliteRunResult,
   SqliteStatement,

@@ -94,6 +94,32 @@ describe('DesignDocumentStore lifecycle', () => {
     expect((await store.get(id)).location).toBe('active');
   });
 
+  it('rebuilds and searches a valid near-file-limit document projection', async () => {
+    const root = await project();
+    const nearLimitConfig = designDocsConfigSchema.parse({
+      enabled: true,
+      cache: { max_age_ms: 300_000, stale_policy: 'rebuild' },
+      security: {
+        limits: {
+          max_file_bytes: 1_110_000,
+          max_body_bytes: 1_050_000,
+          max_aggregate_bytes: 4_000_000,
+          max_result_bytes: 2_000_000,
+        },
+      },
+    });
+    const store = await DesignDocumentStore.fromConfig(nearLimitConfig, root, {
+      clock: clock(),
+      generateId: () => id,
+    });
+    await store.create({
+      title: 'Near parameter boundary',
+      kind: 'hld',
+      body: `parameterneedle ${'x'.repeat(1_049_000)}`,
+    });
+    expect((await store.search({ query: 'parameterneedle' })).map((hit) => hit.id)).toEqual([id]);
+  });
+
   it('exports exact bytes and previews/imports without touching legacy authority paths', async () => {
     const sourceRoot = await project();
     const source = await DesignDocumentStore.fromConfig(config(), sourceRoot, { clock: clock(), generateId: () => id });
@@ -166,7 +192,7 @@ describe('DesignDocumentStore lifecycle', () => {
     });
   });
 
-  it('fails one overlapping in-process writer safely and permits an exact retry', async () => {
+  it('serializes overlapping independent in-process writers', async () => {
     const root = await project();
     const first = await DesignDocumentStore.fromConfig(config(), root, {
       generateId: () => 'doc-01ARZ3NDEKTSV4RRFFQ69G5FAV',
@@ -178,11 +204,7 @@ describe('DesignDocumentStore lifecycle', () => {
       first.create({ title: 'First writer', kind: 'hld' }),
       second.create({ title: 'Second writer', kind: 'lld' }),
     ]);
-    expect(attempts.filter((attempt) => attempt.status === 'fulfilled')).toHaveLength(1);
-    const rejected = attempts.find((attempt) => attempt.status === 'rejected') as PromiseRejectedResult;
-    expect(rejected.reason).toMatchObject({ code: 'LEASE_REENTRANT' });
-    if (attempts[0]?.status === 'rejected') await first.create({ title: 'First writer', kind: 'hld' });
-    else await second.create({ title: 'Second writer', kind: 'lld' });
+    expect(attempts.every((attempt) => attempt.status === 'fulfilled')).toBe(true);
     expect(await first.list()).toHaveLength(2);
   });
 

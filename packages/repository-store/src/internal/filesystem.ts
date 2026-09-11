@@ -6,11 +6,12 @@ import {
   lstatSync,
   mkdirSync,
   openSync,
-  readFileSync,
+  readSync,
   type Stats,
 } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
-import { PathSafetyError, ResourceLimitError } from '../errors.js';
+import { DurabilityError, PathSafetyError, ResourceLimitError } from '../errors.js';
+import { emitFilesystemFault } from './fault-injection.js';
 
 /** Stable identity for one existing directory component. */
 export interface DirectoryIdentity {
@@ -93,33 +94,58 @@ export function revalidateDirectories(identities: readonly DirectoryIdentity[]):
   }
 }
 
-/** Reads exact bytes through a no-follow descriptor with pre/post metadata checks. */
-export function readRegularFile(path: string, maxBytes: number): Uint8Array {
+/** Reads exact bytes through a fixed-size no-follow descriptor buffer. */
+export function readRegularFile(
+  path: string,
+  maxBytes: number,
+  options: { readonly allowedLinkCounts?: readonly number[] } = {},
+): Uint8Array {
+  return readRegularFileWithIdentity(path, maxBytes, options).bytes;
+}
+
+/** Returns bytes together with the descriptor-verified filesystem identity. */
+export function readRegularFileWithIdentity(
+  path: string,
+  maxBytes: number,
+  options: { readonly allowedLinkCounts?: readonly number[] } = {},
+): { readonly bytes: Uint8Array; readonly identity: Stats } {
   const parents = captureDirectories(dirname(path));
+  const allowedLinkCounts = options.allowedLinkCounts ?? [1];
   let descriptor: number | undefined;
   try {
     descriptor = openSync(path, fsConstants.O_RDONLY | noFollowFlag());
     const before = fstatSync(descriptor);
-    assertSafeRegular(before, path);
-    if (before.size > maxBytes) throw new ResourceLimitError(`Managed file exceeds maxFileBytes: ${path}`);
+    assertRegularWithLinks(before, path, allowedLinkCounts);
+    if (before.size > maxBytes) throw new ResourceLimitError(`Managed file exceeds configured byte limit: ${path}`);
     const pathBefore = lstatSync(path);
     if (pathBefore.isSymbolicLink() || !sameIdentity(before, pathBefore))
       throw unsafe(`Managed file identity changed before read: ${path}`, 'IDENTITY_CHANGED');
-    const bytes = readFileSync(descriptor);
+    emitFilesystemFault('bounded-read-opened', path);
+    const capacity = Math.min(maxBytes + 1, before.size + 1);
+    const buffer = Buffer.allocUnsafe(capacity);
+    let offset = 0;
+    while (offset < buffer.byteLength) {
+      const count = readSync(descriptor, buffer, offset, buffer.byteLength - offset, offset);
+      if (count === 0) break;
+      offset += count;
+    }
+    if (offset > maxBytes) throw new ResourceLimitError(`Managed file exceeds configured byte limit: ${path}`);
     const after = fstatSync(descriptor);
+    assertRegularWithLinks(after, path, allowedLinkCounts);
     if (
       !sameIdentity(before, after) ||
       before.size !== after.size ||
       before.mtimeMs !== after.mtimeMs ||
       before.ctimeMs !== after.ctimeMs ||
-      bytes.byteLength !== before.size
+      before.nlink !== after.nlink ||
+      offset !== before.size
     )
       throw unsafe(`Managed file changed during read: ${path}`, 'IDENTITY_CHANGED');
     const pathAfter = lstatSync(path);
     if (pathAfter.isSymbolicLink() || !sameIdentity(after, pathAfter))
       throw unsafe(`Managed file identity changed after read: ${path}`, 'IDENTITY_CHANGED');
     revalidateDirectories(parents);
-    return bytes;
+    return { bytes: buffer.subarray(0, offset), identity: after };
   } catch (error: unknown) {
     if (error instanceof PathSafetyError || error instanceof ResourceLimitError) throw error;
     if (hasCode(error, 'ELOOP')) throw unsafe(`Symbolic link is not allowed: ${path}`, 'UNSAFE_LINK', error);
@@ -131,9 +157,27 @@ export function readRegularFile(path: string, maxBytes: number): Uint8Array {
 
 /** Rejects symbolic links, special files, and multiply linked regular files. */
 export function assertSafeRegular(stat: Stats, path: string): void {
+  assertRegularWithLinks(stat, path, [1]);
+}
+
+function assertRegularWithLinks(stat: Stats, path: string, allowedLinkCounts: readonly number[]): void {
   if (stat.isSymbolicLink() || !stat.isFile())
     throw unsafe(`Managed path is not a regular file: ${path}`, 'UNSAFE_LINK');
-  if (stat.nlink !== 1) throw unsafe(`Managed file has multiple hard links: ${path}`, 'UNSAFE_HARD_LINK');
+  if (!allowedLinkCounts.includes(stat.nlink))
+    throw unsafe(`Managed file has an unsafe hard-link count: ${path}`, 'UNSAFE_HARD_LINK');
+}
+
+/** Synchronizes an already-open file descriptor with structured failures. */
+export function syncFileDescriptor(descriptor: number, path: string): void {
+  try {
+    emitFilesystemFault('file-fsync', path);
+    fsyncSync(descriptor);
+  } catch (error: unknown) {
+    throw new DurabilityError(`Failed to synchronize file: ${path}`, {
+      cause: error,
+      evidence: { operation: 'file-fsync', path },
+    });
+  }
 }
 
 /** Synchronizes a verified regular file after a path-only subsystem closes it. */
@@ -143,7 +187,7 @@ export function syncRegularFile(path: string): void {
     descriptor = openSync(path, fsConstants.O_RDONLY | noFollowFlag());
     const opened = fstatSync(descriptor);
     assertSafeRegular(opened, path);
-    fsyncSync(descriptor);
+    syncFileDescriptor(descriptor, path);
     const current = lstatSync(path);
     if (!sameIdentity(opened, current))
       throw unsafe(`File changed during synchronization: ${path}`, 'IDENTITY_CHANGED');
@@ -160,7 +204,15 @@ export function syncDirectory(path: string): void {
     descriptor = openSync(path, fsConstants.O_RDONLY | fsConstants.O_DIRECTORY | noFollowFlag());
     const stat = fstatSync(descriptor);
     if (!stat.isDirectory()) throw unsafe(`Unsafe directory: ${path}`);
-    fsyncSync(descriptor);
+    try {
+      emitFilesystemFault('directory-fsync', path);
+      fsyncSync(descriptor);
+    } catch (error: unknown) {
+      throw new DurabilityError(`Failed to synchronize directory: ${path}`, {
+        cause: error,
+        evidence: { operation: 'directory-fsync', path },
+      });
+    }
   } finally {
     if (descriptor !== undefined) closeSync(descriptor);
   }

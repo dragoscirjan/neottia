@@ -2,7 +2,6 @@ import { createHash } from 'node:crypto';
 import {
   closeSync,
   constants as fsConstants,
-  fsyncSync,
   lstatSync,
   mkdirSync,
   openSync,
@@ -14,7 +13,13 @@ import {
 import { join } from 'node:path';
 import { RecoveryError, ResourceLimitError } from '../errors.js';
 import { emitTransactionFault } from '../internal/fault-injection.js';
-import { assertSafeRegular, ensurePrivateDirectory, readRegularFile, syncDirectory } from '../internal/filesystem.js';
+import {
+  assertSafeRegular,
+  ensurePrivateDirectory,
+  readRegularFile,
+  syncDirectory,
+  syncFileDescriptor,
+} from '../internal/filesystem.js';
 import { compareCanonicalPaths } from '../paths.js';
 import { isByteRevision } from '../revision.js';
 import type { JournalEntry, JournalManifest } from './types.js';
@@ -33,7 +38,7 @@ export function writeDurableFile(path: string, bytes: Uint8Array): void {
   try {
     descriptor = openSync(path, fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL, 0o600);
     writeFileSync(descriptor, bytes);
-    fsyncSync(descriptor);
+    syncFileDescriptor(descriptor, path);
   } finally {
     if (descriptor !== undefined) closeSync(descriptor);
   }

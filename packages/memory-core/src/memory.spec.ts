@@ -2,14 +2,22 @@ import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import {
+  DEFAULT_STORE_LIMITS,
+  rebuildDisposableSqliteCache,
+  resolveManagedRoot,
+  withRepositoryLease,
+} from '@neottia/repository-store';
 import { afterEach, describe, expect, it } from 'vitest';
 import { stringify } from 'yaml';
+import type { ShardState } from './backend/types.js';
+import { memoryCacheSpecification } from './index-sqlite.js';
 import {
   MemoryConflictError,
   MemoryError,
   MemoryStore,
   MEMORY_TOOLS,
-  SqliteIndex,
+  createUlid,
   loadMemoryConfig,
   memoryToolJsonSchema,
   type MemoryConfig,
@@ -193,6 +201,56 @@ describe('memory store (filesystem + SQLite index)', () => {
     expect(await store.validate()).toMatchObject({ valid: true, records: 1 });
   });
 
+  it('verifies a valid cache projection whose aggregate searchable text exceeds 16 MiB', async () => {
+    const cwd = fixture();
+    const store = storeFor(cwd);
+    const seed = await store.store(fact('Aggregate projection seed'));
+    const folder = join(cwd, '.neottia', 'memory', 'facts');
+    const details = 'aggregate '.repeat(1_200);
+    for (let index = 0; index < 1_500; index += 1) {
+      const entropy = new Uint8Array(10);
+      new DataView(entropy.buffer).setUint32(6, index + 1);
+      const record = { ...seed, id: createUlid(1_700_000_000_000, () => entropy), details };
+      writeFileSync(join(folder, `${record.id}.yaml`), stringify(record, { lineWidth: 0 }), 'utf8');
+    }
+    rmSync(join(cwd, '.neottia', 'memory', 'index.db'), { force: true });
+    await expect(store.search({ query: 'aggregate', limit: 5 })).resolves.toBeDefined();
+    await expect(store.validate()).resolves.toMatchObject({ valid: true, records: 1_501 });
+  }, 30_000);
+
+  it.each(['', '-wal', '-shm'] as const)(
+    'preserves canonical YAML and a substituted Memory cache%s artifact',
+    async (suffix) => {
+      const cwd = fixture();
+      const store = storeFor(cwd);
+      const record = await store.store(fact(`Memory cache substitution ${suffix || 'database'}`));
+      const canonical = join(cwd, '.neottia', 'memory', 'facts', `${record.id}.yaml`);
+      const canonicalBytes = readFileSync(canonical);
+      const root = await resolveManagedRoot({
+        authorityRoot: cwd,
+        managedPath: '.neottia/memory',
+        limits: DEFAULT_STORE_LIMITS,
+      });
+      const state: ShardState = {
+        records: [record],
+        tombstones: [],
+        activeIds: new Set([record.id]),
+        contentHash: `substitution-${suffix}`,
+      };
+      await withRepositoryLease(root, async (lease) => {
+        const cache = await rebuildDisposableSqliteCache(root, lease, memoryCacheSpecification(root, state));
+        const artifact = join(cwd, '.neottia', 'memory', `index.db${suffix}`);
+        expect(existsSync(artifact)).toBe(true);
+        rmSync(artifact);
+        writeFileSync(artifact, 'operator replacement');
+        await expect(cache.database.prepare('SELECT 1')).rejects.toMatchObject({ code: 'IDENTITY_CHANGED' });
+        await expect(cache.close()).rejects.toMatchObject({ code: 'IDENTITY_CHANGED' });
+        expect(readFileSync(artifact, 'utf8')).toBe('operator replacement');
+      });
+      expect(readFileSync(canonical)).toEqual(canonicalBytes);
+    },
+  );
+
   it('rejects foreign namespaces and secrets before import mutation', async () => {
     const source = storeFor(fixture(), { namespace: { organization_id: 'source-org' } });
     const destination = storeFor(fixture());
@@ -338,12 +396,11 @@ describe('memory store (filesystem + SQLite index)', () => {
     writeFileSync(cacheTarget, 'not-a-cache');
     rmSync(actualCachePath, { force: true });
     symlinkSync(cacheTarget, actualCachePath);
-    await expect(store.search({ query: 'artifact' })).rejects.toThrow(/cache artifact/u);
+    await expect(store.search({ query: 'artifact' })).rejects.toThrow(/cache artifact|managed memory path/u);
 
     rmSync(actualCachePath, { force: true });
     symlinkSync(join(cacheCwd, 'missing-cache.db'), actualCachePath);
-    await expect(store.search({ query: 'artifact' })).rejects.toThrow(/cache artifact/u);
-    expect(() => SqliteIndex.open(join(cacheCwd, 'memory'), '../outside.db')).toThrow(/cache filename/u);
+    await expect(store.search({ query: 'artifact' })).rejects.toThrow(/cache artifact|managed memory path/u);
   });
 
   it('exports portable JSONL and validates imports without mutation in preview, then synchronizes the cache', async () => {

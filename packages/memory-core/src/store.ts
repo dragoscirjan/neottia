@@ -23,8 +23,8 @@ export type { ImportReport, MemoryValidationReport, StoreMemoryInput } from './t
 
 /**
  * MemoryStore: the facade behind the memory_* tool surface. Operations run
- * inside a backend-scoped lock (file barrier for the filesystem backend,
- * advisory locks for Postgres); mutations re-validate canonical state and
+ * inside backend-scoped authority (repository-store lease authority for the
+ * filesystem backend, advisory locks for Postgres); mutations re-validate canonical state and
  * resynchronize the backend search index afterwards. Ported from the
  * harnessctl-v2 memory implementation; backends are pluggable (issue #6).
  */
@@ -68,7 +68,7 @@ export class MemoryStore {
     await this.backend.close();
   }
 
-  /** Lock identity of the namespace shard this store writes to. */
+  /** Stable logical namespace key; filesystem repository authority is root-wide and separate. */
   public get scopeKey(): string {
     const namespace = this.config.namespace;
     return `${namespace.organization_id}--${namespace.project_id}--${namespace.scope}`;

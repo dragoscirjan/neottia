@@ -25,9 +25,9 @@ Credentials belong in environment variables, never in memory — and never in th
 
 ## Filesystem safety boundaries
 
-Canonical YAML and SQLite cache artifacts are rejected when they are symbolic links. On platforms that provide `O_NOFOLLOW`, Neottia combines it with descriptor metadata checks; it also revalidates directory and destination identities around publication. SQLite is a disposable cache, so unsafe database, WAL, or shared-memory artifacts fail closed instead of being followed or automatically removed.
+Canonical YAML and SQLite cache artifacts are rejected when they are links or unsafe file types. Final publication atomically evacuates an expected file, authenticates its exact identity and revision, and creates the new destination through an exclusive no-overwrite regular-file link. A replacement introduced in the final mutation window is restored without overwrite or retained as actionable recovery evidence.
 
-Portable Node.js APIs do not provide descriptor-relative `openat`/`renameat` operations or a custom SQLite VFS. The checks therefore detect persistent path replacement but cannot promise immunity to an attacker who can continuously swap directories in the tiny intervals between path operations. Protect the memory root with operating-system permissions and do not place it in a directory writable by untrusted users. Windows also lacks portable directory `fsync`; atomic rename is used, but the same crash-durability guarantee available after POSIX directory `fsync` cannot be claimed there.
+This protocol requires Linux x64 or arm64, the repository-store Node-API addon built with a C++17 compiler, Python, Make, and Linux development headers, kernel/libc `renameat2(..., RENAME_NOREPLACE)` support, and a recognized local ext4, XFS, Btrfs, tmpfs, or overlay filesystem with same-volume regular-file hard links. Repository authority acquisition fails with `UNSUPPORTED_RUNTIME` before creating claim or lease artifacts on macOS, Windows, shared/network filesystems, or when the addon is missing or unloadable; filesystem Memory cannot perform read-only leased operations there either. Protect the memory root with operating-system permissions because SQLite itself remains path-based. Filesystem Memory uses the repository authority lease and disposable-cache APIs exclusively; legacy `.locks`, shard barriers, and direct SQLite handles are not used.
 
 ## Resource limits
 
@@ -51,23 +51,23 @@ Because agents write autonomously, hard ceilings protect the store from runaway 
 
 ## Concurrency
 
-- Each namespace shard (`organization/project/scope`) has its own lock, so independent projects and branches never block each other.
-- A writer holds the lock for the whole operation — including the index refresh — and readers run inside the same barrier, so nothing ever observes a partial write.
-- Acquisition waits up to 10 seconds (configurable per call in the library) before failing with `Shard barrier is busy`.
-- A lock left behind by a crashed writer is stolen automatically, but **only** when it is older than 60 seconds _and_ the owning process is provably gone. A live writer — even a slow one — is never interrupted, and unknown ownership is always preserved.
+- Relative filesystem Memory roots share the repository authority lease with other filesystem domains; an explicitly configured absolute root remains its own authority.
+- A writer holds the lease through canonical recovery, mutation, and cache refresh. Readers use the same lease, so cooperating operations never observe a partial write.
+- Independent same-process operations queue FIFO. Acquisition waits up to 10 seconds by default before failing with `Repository authority lease is busy`.
+- A lease left by a crashed writer is reclaimed only after its age threshold and conclusive same-host owner death. A live writer is never interrupted, and unknown ownership is preserved.
 
 ## Troubleshooting
 
-| Symptom                                                | Cause                                                | Fix                                                                                        |
-| ------------------------------------------------------ | ---------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `Memory operation requires skills.memory.enabled=true` | Memory is disabled                                   | `skills.memory.enabled: true` or `NEOTTIA_MEMORY_ENABLED=true`                             |
-| `Config requires an explicit 'version: 1'`             | Missing version key in the config file               | Add `version: 1` at the top                                                                |
-| `Memory backend 'postgres' connection failed`          | PostgreSQL is unavailable or credentials are invalid | Verify host, port, database, and credentials; retry when the database is reachable         |
-| `summary has N Unicode characters; limit is 240`       | Compactness violation                                | Shorten the summary (details: 2000 chars / 12 lines)                                       |
-| `Suspected secret at …`                                | Secret scanner match                                 | Remove the secret; tune `security.secret_patterns` / `entropy_heuristic` if false-positive |
-| `Invalid memory record: record_type …`                 | Type pairing violated                                | Pair `semantic/fact`, `episodic/decision` or `event`, `procedural/lesson`                  |
-| `Shard barrier is busy`                                | Concurrent writer held the lock > 10 s               | Retry; investigate stuck processes (live owners are never stolen)                          |
-| `Memory cache is stale and cache.stale_policy is fail` | Read refused on a stale index                        | Run `memory_validate`, or change `stale_policy`                                            |
-| `Memory path already exists`                           | Duplicate identity on store/import                   | List first; supersede instead of re-storing                                                |
-| Search returns nothing for known content               | Index stale or corrupt                               | `memory_validate` (rebuilds), or delete `index.db`                                         |
-| `Duplicate memory ID` on validate                      | The same ULID exists twice on disk                   | Remove the duplicate file; IDs are unique by construction when written through the tools   |
+| Symptom                                                | Cause                                                 | Fix                                                                                        |
+| ------------------------------------------------------ | ----------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `Memory operation requires skills.memory.enabled=true` | Memory is disabled                                    | `skills.memory.enabled: true` or `NEOTTIA_MEMORY_ENABLED=true`                             |
+| `Config requires an explicit 'version: 1'`             | Missing version key in the config file                | Add `version: 1` at the top                                                                |
+| `Memory backend 'postgres' connection failed`          | PostgreSQL is unavailable or credentials are invalid  | Verify host, port, database, and credentials; retry when the database is reachable         |
+| `summary has N Unicode characters; limit is 240`       | Compactness violation                                 | Shorten the summary (details: 2000 chars / 12 lines)                                       |
+| `Suspected secret at …`                                | Secret scanner match                                  | Remove the secret; tune `security.secret_patterns` / `entropy_heuristic` if false-positive |
+| `Invalid memory record: record_type …`                 | Type pairing violated                                 | Pair `semantic/fact`, `episodic/decision` or `event`, `procedural/lesson`                  |
+| `Repository authority lease is busy`                   | Another operation held the lease past the wait budget | Retry; investigate stuck processes (live owners are never reclaimed)                       |
+| `Memory cache is stale and cache.stale_policy is fail` | Read refused on a stale index                         | Run `memory_validate`, or change `stale_policy`                                            |
+| `Memory path already exists`                           | Duplicate identity on store/import                    | List first; supersede instead of re-storing                                                |
+| Search returns nothing for known content               | Index stale or corrupt                                | `memory_validate` (rebuilds), or delete `index.db`                                         |
+| `Duplicate memory ID` on validate                      | The same ULID exists twice on disk                    | Remove the duplicate file; IDs are unique by construction when written through the tools   |

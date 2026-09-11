@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -13,74 +13,14 @@ afterEach(() => {
   while (tempDirs.length > 0) rmSync(tempDirs.pop() as string, { recursive: true, force: true });
 });
 
-describe('filesystem atomic publication', () => {
-  it('keeps default publication behavior when no filesystem seam is supplied', async () => {
+describe('repository-backed filesystem publication', () => {
+  it('publishes canonical YAML only through the repository transaction layer', async () => {
     const { backend } = fixture();
     const record = makeRecord(backend, 'default publication');
 
     await backend.applyBatch([{ path: backend.recordPath(record), bytes: backend.encode(record), exclusive: true }]);
 
     expect((await backend.loadState()).records).toEqual([record]);
-  });
-
-  it('rolls back a single file when directory fsync fails after rename', async () => {
-    const setup = fixture();
-    const original = makeRecord(setup.backend, 'original');
-    await setup.backend.applyBatch([
-      { path: setup.backend.recordPath(original), bytes: setup.backend.encode(original), exclusive: true },
-    ]);
-    let syncCalls = 0;
-    const backend = new FilesystemBackend({
-      config: setup.config,
-      cwd: setup.cwd,
-      filesystemOps: {
-        syncDirectory: () => {
-          syncCalls += 1;
-          if (syncCalls === 1) throw new Error('injected post-rename fsync failure');
-        },
-      },
-    });
-    const replacement = { ...original, summary: 'replacement' };
-
-    await expect(
-      backend.applyBatch([{ path: backend.recordPath(replacement), bytes: backend.encode(replacement) }]),
-    ).rejects.toThrow('injected post-rename fsync failure');
-
-    expect((await setup.backend.loadState()).records).toEqual([original]);
-  });
-
-  it('rolls back every published file when a later directory fsync fails', async () => {
-    const setup = fixture();
-    const originals = [makeRecord(setup.backend, 'first original'), makeRecord(setup.backend, 'second original')];
-    await setup.backend.applyBatch(
-      originals.map((record) => ({
-        path: setup.backend.recordPath(record),
-        bytes: setup.backend.encode(record),
-        exclusive: true,
-      })),
-    );
-    let syncCalls = 0;
-    const backend = new FilesystemBackend({
-      config: setup.config,
-      cwd: setup.cwd,
-      filesystemOps: {
-        syncDirectory: () => {
-          syncCalls += 1;
-          if (syncCalls === 2) throw new Error('injected second post-rename fsync failure');
-        },
-      },
-    });
-    const replacements = originals.map((record) => ({ ...record, summary: `${record.summary} replaced` }));
-
-    await expect(
-      backend.applyBatch(
-        replacements.map((record) => ({ path: backend.recordPath(record), bytes: backend.encode(record) })),
-      ),
-    ).rejects.toThrow('injected second post-rename fsync failure');
-
-    expect(new Map((await setup.backend.loadState()).records.map((record) => [record.id, record]))).toEqual(
-      new Map(originals.map((record) => [record.id, record])),
-    );
   });
 
   it('uses the strict ULID range for canonical paths', async () => {
@@ -106,29 +46,6 @@ describe('filesystem atomic publication', () => {
     symlinkSync(outside, path);
 
     await expect(backend.loadState()).rejects.toThrow(/Unsafe memory file|safely read managed memory path/u);
-  });
-
-  it('fails closed when a destination is replaced immediately after rename', async () => {
-    const setup = fixture();
-    const record = makeRecord(setup.backend, 'destination race');
-    const outside = join(setup.cwd, 'outside.yaml');
-    writeFileSync(outside, 'outside remains unchanged');
-    const backend = new FilesystemBackend({
-      config: setup.config,
-      cwd: setup.cwd,
-      filesystemOps: {
-        renameSync: (source, destination) => {
-          renameSync(source, destination);
-          rmSync(destination);
-          symlinkSync(outside, destination);
-        },
-      },
-    });
-
-    await expect(
-      backend.applyBatch([{ path: backend.recordPath(record), bytes: backend.encode(record), exclusive: true }]),
-    ).rejects.toThrow(/rollback failed|destination changed/u);
-    expect(readFileSync(outside, 'utf8')).toBe('outside remains unchanged');
   });
 });
 

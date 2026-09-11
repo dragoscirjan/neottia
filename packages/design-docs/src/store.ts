@@ -838,9 +838,13 @@ function storeLimits(config: DesignDocsConfig): StoreLimits {
     maxBatchPaths: Math.max(2, limits.max_files),
     maxBeforeImageBytes: limits.max_backup_bytes,
     maxJournalBytes: limits.max_journal_bytes,
-    maxTemporaryBytes: limits.max_aggregate_bytes,
+    maxTemporaryBytes: Math.max(DEFAULT_STORE_LIMITS.maxTemporaryBytes, limits.max_aggregate_bytes),
+    maxStatementParameterBytes: Math.min(
+      Number.MAX_SAFE_INTEGER,
+      Math.max(DEFAULT_STORE_LIMITS.maxStatementParameterBytes, limits.max_file_bytes + 64 * 1024),
+    ),
     maxQueryRows: limits.max_results,
-    maxQueryResultBytes: limits.max_result_bytes,
+    maxQueryResultBytes: Math.max(limits.max_result_bytes, limits.max_file_bytes + 64 * 1024),
   };
 }
 function parseDomainInput<Output>(

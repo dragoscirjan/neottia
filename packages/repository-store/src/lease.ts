@@ -1,16 +1,15 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomBytes } from 'node:crypto';
 import {
   closeSync,
   constants as fsConstants,
-  existsSync,
-  fsyncSync,
+  fstatSync,
   linkSync,
   lstatSync,
   mkdirSync,
   openSync,
   readFileSync,
   readdirSync,
-  renameSync,
   rmSync,
   rmdirSync,
   writeFileSync,
@@ -18,14 +17,19 @@ import {
 } from 'node:fs';
 import { hostname } from 'node:os';
 import { basename, dirname, join } from 'node:path';
-import { LeaseContentionError, PathSafetyError, RepositoryStoreConfigError } from './errors.js';
-import { emitLeaseFault } from './internal/fault-injection.js';
+import { LeaseContentionError, PathSafetyError, RepositoryStoreConfigError, ResourceLimitError } from './errors.js';
+import { emitFilesystemFault, emitLeaseFault } from './internal/fault-injection.js';
 import {
   assertSafeRegular,
+  captureDirectories,
   ensurePrivateDirectory,
   hasCode,
+  readRegularFile,
+  readRegularFileWithIdentity,
+  revalidateDirectories,
   sameIdentity,
   syncDirectory,
+  syncFileDescriptor,
 } from './internal/filesystem.js';
 import {
   createRepositoryLease,
@@ -35,6 +39,11 @@ import {
   type ManagedRoot,
   type RepositoryLease,
 } from './internal/model.js';
+import {
+  assertNativePublicationPath,
+  nativeRenameNoReplace,
+  requireNativePublicationBackend,
+} from './internal/native-publication.js';
 
 /** Abort and absolute wall-clock deadline controls accepted by async operations. */
 export interface OperationControl {
@@ -62,10 +71,17 @@ interface OwnerMetadata {
   readonly processStart?: string;
 }
 
-const activeAuthorities = new Set<string>();
+interface VerifiedOwner {
+  readonly metadata: OwnerMetadata;
+  readonly identity: Stats;
+}
+
+const authorityContext = new AsyncLocalStorage<ReadonlyMap<string, LeaseState>>();
+const authorityQueueTails = new Map<string, Promise<void>>();
 const DEFAULT_STALE_MS = 60_000;
 const DEFAULT_POLL_MS = 20;
 const DEFAULT_WAIT_MS = 10_000;
+const MAX_LEASE_METADATA_BYTES = 4 * 1024;
 
 /** Holds the sole authority lease across awaited work and performs recovery first. */
 export async function withRepositoryLease<T>(
@@ -75,33 +91,50 @@ export async function withRepositoryLease<T>(
 ): Promise<T> {
   const rootState = getRootState(root);
   if (rootState === undefined) throw new RepositoryStoreConfigError('Managed root is not a repository-store handle.');
-  if (activeAuthorities.has(rootState.authorityId))
+  const inherited = authorityContext.getStore()?.get(rootState.authorityId);
+  if (inherited?.active === true)
     throw new LeaseContentionError('Repository lease acquisition is non-reentrant.', 'LEASE_REENTRANT');
   checkControl(options);
   const staleMs = positiveInteger(options.staleMs ?? DEFAULT_STALE_MS, 'staleMs');
   const pollMs = positiveInteger(options.pollMs ?? DEFAULT_POLL_MS, 'pollMs');
-  const deadline = options.deadline ?? Date.now() + nonnegativeInteger(options.waitMs ?? DEFAULT_WAIT_MS, 'waitMs');
-  const controlRoot = join(rootState.authorityRoot, '.neottia', 'repository-store');
-  ensurePrivateDirectory(controlRoot);
-  const hostId = ensureHostId(controlRoot);
-  const lockPath = join(controlRoot, 'authority.lease');
-  const claimPath = join(controlRoot, 'authority.claim');
-  const token = randomBytes(32).toString('hex');
+  const explicitDeadline = options.deadline;
+  const deadline = explicitDeadline ?? Date.now() + nonnegativeInteger(options.waitMs ?? DEFAULT_WAIT_MS, 'waitMs');
+  const turn = enqueueAuthority(rootState.authorityId);
+  try {
+    await waitForAuthorityTurn(turn.predecessor, deadline, explicitDeadline !== undefined, options.signal);
+  } catch (error: unknown) {
+    // Keep the cancelled slot in FIFO order, but do not make its caller wait.
+    void turn.predecessor.finally(turn.release);
+    throw error;
+  }
 
-  activeAuthorities.add(rootState.authorityId);
+  const controlRoot = join(rootState.authorityRoot, '.neottia', 'repository-store');
   let acquired = false;
   let lockIdentity: Stats | undefined;
   let ownerIdentity: Stats | undefined;
   let leaseState: LeaseState | undefined;
+  let lockPath = '';
+  let token = '';
   try {
+    checkAcquisitionControl(deadline, explicitDeadline !== undefined, options.signal);
+    ensurePrivateDirectory(controlRoot);
+    // Every successful acquisition must later remove its claim and lease.
+    // Prove that exact native cleanup is available before creating either.
+    const cleanupBackend = requireNativePublicationBackend();
+    assertNativePublicationPath(cleanupBackend, controlRoot);
+    const hostId = ensureHostId(controlRoot);
+    lockPath = join(controlRoot, 'authority.lease');
+    const claimPath = join(controlRoot, 'authority.claim');
+    token = randomBytes(32).toString('hex');
     while (!acquired) {
-      checkControl({ ...options, deadline });
+      checkAcquisitionControl(deadline, explicitDeadline !== undefined, options.signal);
       if (!acquireClaim(claimPath, controlRoot, token, hostId)) {
         if (tryReclaimClaim(claimPath, lockPath, controlRoot, hostId, staleMs)) continue;
-        await waitForLeasePoll(pollMs, deadline, options);
+        await waitForLeasePoll(pollMs, deadline, explicitDeadline !== undefined, options.signal);
         continue;
       }
       let initializingLock: Stats | undefined;
+      let claimOwnershipUncertain = false;
       try {
         try {
           mkdirSync(lockPath, { mode: 0o700 });
@@ -110,18 +143,22 @@ export async function withRepositoryLease<T>(
         } catch (error: unknown) {
           if (!hasCode(error, 'EEXIST')) throw error;
           if (tryReclaimLockedLease(lockPath, controlRoot, hostId, staleMs)) continue;
-          await waitForLeasePoll(pollMs, deadline, options);
+          await waitForLeasePoll(pollMs, deadline, explicitDeadline !== undefined, options.signal);
           continue;
         }
-        writeOwner(lockPath, ownerMetadata(token, hostId));
+        ownerIdentity = writeOwner(lockPath, ownerMetadata(token, hostId));
         emitLeaseFault('lease-owner-written');
         lockIdentity = lstatSync(lockPath);
         if (!lockIdentity.isDirectory() || lockIdentity.isSymbolicLink())
           throw new PathSafetyError('Unsafe repository lease path.');
-        ownerIdentity = lstatSync(join(lockPath, 'owner.json'));
-        assertSafeRegular(ownerIdentity, join(lockPath, 'owner.json'));
+        const ownerPath = join(lockPath, 'owner.json');
+        const ownerAtPath = lstatSync(ownerPath);
+        assertSafeRegular(ownerAtPath, ownerPath);
+        if (!sameLeaseIdentity(ownerIdentity, ownerAtPath))
+          throw new PathSafetyError('Repository lease owner changed during initialization.', 'IDENTITY_CHANGED');
         syncDirectory(controlRoot);
         if (!removeOwnedClaim(claimPath, token)) {
+          claimOwnershipUncertain = true;
           releaseOwnedLease(lockPath, controlRoot, token, lockIdentity, ownerIdentity);
           throw new LeaseContentionError('Repository initialization claim ownership changed.', 'LEASE_OWNER_UNKNOWN');
         }
@@ -132,7 +169,7 @@ export async function withRepositoryLease<T>(
           cleanupOwnedInitialization(lockPath, controlRoot, token, initializingLock);
         throw error;
       } finally {
-        if (!acquired) removeOwnedClaim(claimPath, token);
+        if (!acquired && !claimOwnershipUncertain) removeOwnedClaim(claimPath, token);
       }
     }
 
@@ -148,15 +185,19 @@ export async function withRepositoryLease<T>(
     };
     leaseState = acquiredState;
     const lease = createRepositoryLease(rootState.authorityRoot, acquiredState);
-    // A static import would create a lease/recovery initialization cycle.
-    const { recoverCanonicalTransactions } = await import('./transaction/recovery.js');
-    await recoverCanonicalTransactions(root, lease, options);
-    return await operation(lease);
+    const context = new Map(authorityContext.getStore() ?? []);
+    context.set(rootState.authorityId, acquiredState);
+    return await authorityContext.run(context, async () => {
+      // A static import avoids a lease/recovery initialization cycle.
+      const { recoverCanonicalTransactions } = await import('./transaction/recovery.js');
+      await recoverCanonicalTransactions(root, lease, options);
+      return operation(lease);
+    });
   } finally {
     if (leaseState !== undefined) leaseState.active = false;
     if (acquired && lockIdentity !== undefined && ownerIdentity !== undefined)
       releaseOwnedLease(lockPath, controlRoot, token, lockIdentity, ownerIdentity);
-    activeAuthorities.delete(rootState.authorityId);
+    turn.release();
   }
 }
 
@@ -182,17 +223,19 @@ export function checkControl(control: OperationControl): void {
     throw new LeaseContentionError('Repository operation deadline was exceeded.', 'DEADLINE_EXCEEDED');
 }
 
-function writeOwner(directory: string, owner: OwnerMetadata): void {
-  writeOwnerFile(join(directory, 'owner.json'), owner);
+function writeOwner(directory: string, owner: OwnerMetadata): Stats {
+  const identity = writeOwnerFile(join(directory, 'owner.json'), owner);
   syncDirectory(directory);
+  return identity;
 }
 
-function writeOwnerFile(path: string, owner: OwnerMetadata): void {
+function writeOwnerFile(path: string, owner: OwnerMetadata): Stats {
   let descriptor: number | undefined;
   try {
     descriptor = openSync(path, fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL, 0o600);
     writeFileSync(descriptor, `${JSON.stringify(owner)}\n`);
-    fsyncSync(descriptor);
+    syncFileDescriptor(descriptor, path);
+    return fstatSync(descriptor);
   } finally {
     if (descriptor !== undefined) closeSync(descriptor);
   }
@@ -218,9 +261,7 @@ declare const Bun: undefined | { readonly version: string };
 function ensureHostId(controlRoot: string): string {
   const path = join(controlRoot, 'host-id');
   try {
-    const stat = lstatSync(path);
-    assertSafeRegular(stat, path);
-    const value = readFileSync(path, 'utf8').trim();
+    const value = new TextDecoder().decode(readRegularFile(path, MAX_LEASE_METADATA_BYTES)).trim();
     if (!/^[0-9a-f]{64}$/u.test(value)) throw new PathSafetyError('Repository host-id is malformed.');
     return value;
   } catch (error: unknown) {
@@ -231,7 +272,7 @@ function ensureHostId(controlRoot: string): string {
     const descriptor = openSync(path, fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL, 0o600);
     try {
       writeFileSync(descriptor, `${value}\n`);
-      fsyncSync(descriptor);
+      syncFileDescriptor(descriptor, path);
     } finally {
       closeSync(descriptor);
     }
@@ -244,29 +285,64 @@ function ensureHostId(controlRoot: string): string {
 }
 
 function tryReclaimLockedLease(lockPath: string, controlRoot: string, hostId: string, staleMs: number): boolean {
+  const controlDirectories = captureDirectories(controlRoot);
   try {
     const ownerPath = join(lockPath, 'owner.json');
-    const owner = readOwner(ownerPath);
+    const verifiedOwner = readOwner(ownerPath);
+    const owner = verifiedOwner.metadata;
     const lockStat = lstatSync(lockPath);
-    const ownerStat = lstatSync(ownerPath);
+    const ownerStat = verifiedOwner.identity;
     if (!lockStat.isDirectory() || lockStat.isSymbolicLink())
       throw new PathSafetyError('Unsafe repository lease path.');
     if (Date.now() - lockStat.mtimeMs < staleMs || !conclusivelyDead(owner, hostId)) return false;
     const quarantine = `${lockPath}.release-${owner.token}`;
-    renameSync(lockPath, quarantine);
-    if (!quarantinedLeaseIdentityMatches(quarantine, owner.token, lockStat, ownerStat)) {
+    if (!quarantineNoReplace(lockPath, quarantine)) return false;
+    const quarantinedOwnerPath = join(quarantine, 'owner.json');
+    const movedOwner = readOwner(quarantinedOwnerPath);
+    const movedLock = lstatSync(quarantine);
+    if (
+      !sameIdentity(lockStat, movedLock) ||
+      !sameLeaseIdentity(ownerStat, movedOwner.identity) ||
+      movedOwner.metadata.token !== owner.token
+    ) {
       restoreQuarantinedLease(quarantine, lockPath);
       throw new LeaseContentionError('Stale lease identity changed during reclamation.', 'LEASE_OWNER_UNKNOWN');
     }
-    rmSync(join(quarantine, 'owner.json'));
+    if (!removeVerifiedOwnerFile(quarantinedOwnerPath, movedOwner)) {
+      restoreQuarantinedLease(quarantine, lockPath);
+      return false;
+    }
     rmdirSync(quarantine);
     syncDirectory(controlRoot);
     return true;
   } catch (error: unknown) {
-    if (hasCode(error, 'ENOENT')) return !existsSync(lockPath);
-    if (error instanceof PathSafetyError) throw error;
+    if (hasCode(error, 'ENOENT') || (error instanceof PathSafetyError && error.code === 'IDENTITY_CHANGED'))
+      return exactPathWasReleased(lockPath, controlDirectories, error);
+    if (error instanceof PathSafetyError || error instanceof ResourceLimitError) throw error;
     return false;
   }
+}
+
+/** Proves exact release without accepting ancestor rebinding or path replacement. */
+function exactPathWasReleased(
+  path: string,
+  controlDirectories: ReturnType<typeof captureDirectories>,
+  originalError: unknown,
+  failOnExistingIdentityChange = true,
+): boolean {
+  revalidateDirectories(controlDirectories);
+  try {
+    lstatSync(path);
+  } catch (inspectionError: unknown) {
+    if (hasCode(inspectionError, 'ENOENT')) {
+      revalidateDirectories(controlDirectories);
+      return true;
+    }
+    if (originalError instanceof PathSafetyError) throw originalError;
+    throw inspectionError;
+  }
+  if (failOnExistingIdentityChange && originalError instanceof PathSafetyError) throw originalError;
+  return false;
 }
 
 /** Publishes complete claim metadata atomically, eliminating ownerless claims. */
@@ -300,20 +376,33 @@ function tryReclaimClaim(
   hostId: string,
   staleMs: number,
 ): boolean {
+  const controlDirectories = captureDirectories(controlRoot);
   try {
     const preliminary = lstatSync(claimPath);
-    if (preliminary.isSymbolicLink() || !preliminary.isFile() || (preliminary.nlink !== 1 && preliminary.nlink !== 2))
+    if (preliminary.isSymbolicLink())
+      throw new PathSafetyError('Unsafe repository claim symbolic link.', 'UNSAFE_LINK');
+    if (!preliminary.isFile() || (preliminary.nlink !== 1 && preliminary.nlink !== 2))
       throw new PathSafetyError('Unsafe repository claim artifact.', 'UNSAFE_HARD_LINK');
-    if (Date.now() - preliminary.mtimeMs < staleMs) return false;
-    const owner = readOwner(claimPath, true);
+    const verifiedOwner = readOwner(claimPath, true);
+    if (!sameIdentity(preliminary, verifiedOwner.identity))
+      throw new LeaseContentionError('Claim identity changed before owner verification.', 'LEASE_OWNER_UNKNOWN');
+    if (Date.now() - verifiedOwner.identity.mtimeMs < staleMs) return false;
+    const owner = verifiedOwner.metadata;
     if (!conclusivelyDead(owner, hostId)) return false;
+    emitFilesystemFault('after-stale-claim-owner-verified', claimPath);
     normalizeInterruptedClaimLink(claimPath, controlRoot);
-    const stat = lstatSync(claimPath);
-    assertSafeRegular(stat, claimPath);
+    const normalizedOwner = readOwner(claimPath);
+    if (
+      !sameIdentity(preliminary, normalizedOwner.identity) ||
+      !sameIdentity(verifiedOwner.identity, normalizedOwner.identity) ||
+      normalizedOwner.metadata.token !== owner.token
+    )
+      throw new LeaseContentionError('Claim owner changed during reclamation.', 'LEASE_OWNER_UNKNOWN');
     cleanupInterruptedInitialization(lockPath, controlRoot, owner, staleMs);
     const quarantine = `${claimPath}.release-${owner.token}`;
-    renameSync(claimPath, quarantine);
-    if (!ownerTokenMatches(quarantine, owner.token)) {
+    if (!quarantineNoReplace(claimPath, quarantine)) return false;
+    const moved = readOwner(quarantine);
+    if (!sameIdentity(normalizedOwner.identity, moved.identity) || moved.metadata.token !== owner.token) {
       restoreQuarantinedLease(quarantine, claimPath);
       return false;
     }
@@ -321,8 +410,11 @@ function tryReclaimClaim(
     syncDirectory(controlRoot);
     return true;
   } catch (error: unknown) {
-    if (hasCode(error, 'ENOENT')) return true;
-    if (error instanceof PathSafetyError) throw error;
+    if (hasCode(error, 'ENOENT') || (error instanceof PathSafetyError && error.code === 'IDENTITY_CHANGED'))
+      // A new contender claim can replace a released claim before inspection.
+      // Preserve it as contention; unsafe persistent links still fail above.
+      return exactPathWasReleased(claimPath, controlDirectories, error, false);
+    if (error instanceof PathSafetyError || error instanceof ResourceLimitError) throw error;
     // Missing/malformed ownership is unknown and therefore remains locked.
     return false;
   }
@@ -353,7 +445,7 @@ function cleanupInterruptedInitialization(
   }
   if (readdirSync(lockPath).length !== 0) return;
   const quarantine = `${lockPath}.release-${owner.token}`;
-  renameSync(lockPath, quarantine);
+  if (!quarantineNoReplace(lockPath, quarantine)) return;
   const quarantined = lstatSync(quarantine);
   if (!sameIdentity(lockStat, quarantined) || readdirSync(quarantine).length !== 0) {
     restoreQuarantinedLease(quarantine, lockPath);
@@ -369,7 +461,7 @@ function cleanupOwnedInitialization(lockPath: string, controlRoot: string, token
   try {
     const current = lstatSync(lockPath);
     if (!current.isDirectory() || current.isSymbolicLink() || !sameIdentity(expectedLock, current)) return;
-    renameSync(lockPath, quarantine);
+    if (!quarantineNoReplace(lockPath, quarantine)) return;
     const moved = lstatSync(quarantine);
     if (!sameIdentity(expectedLock, moved)) {
       restoreQuarantinedLease(quarantine, lockPath);
@@ -382,8 +474,11 @@ function cleanupOwnedInitialization(lockPath: string, controlRoot: string, token
     }
     if (entries.includes('owner.json')) {
       const ownerPath = join(quarantine, 'owner.json');
-      assertSafeRegular(lstatSync(ownerPath), ownerPath);
-      rmSync(ownerPath);
+      const owner = readOwner(ownerPath);
+      if (owner.metadata.token !== token || !removeVerifiedOwnerFile(ownerPath, owner)) {
+        restoreQuarantinedLease(quarantine, lockPath);
+        return;
+      }
     }
     rmdirSync(quarantine);
     syncDirectory(controlRoot);
@@ -439,15 +534,29 @@ function readProcessStart(pid: number): string | undefined {
   }
 }
 
-function readOwner(path: string, allowInterruptedClaimLink = false): OwnerMetadata {
-  const stat = lstatSync(path);
-  if (allowInterruptedClaimLink) {
-    if (stat.isSymbolicLink() || !stat.isFile() || (stat.nlink !== 1 && stat.nlink !== 2))
-      throw new PathSafetyError('Unsafe interrupted repository claim.', 'UNSAFE_HARD_LINK');
-  } else {
-    assertSafeRegular(stat, path);
+function readOwner(path: string, allowInterruptedClaimLink = false): VerifiedOwner {
+  const initialIdentity = allowInterruptedClaimLink ? lstatSync(path) : undefined;
+  const stagingPeer = allowInterruptedClaimLink ? interruptedClaimPeer(path, initialIdentity) : undefined;
+  let file: ReturnType<typeof readRegularFileWithIdentity>;
+  try {
+    file = readRegularFileWithIdentity(path, MAX_LEASE_METADATA_BYTES, {
+      allowedLinkCounts: allowInterruptedClaimLink ? [1, 2] : [1],
+    });
+  } catch (error: unknown) {
+    if (initialIdentity === undefined || !(error instanceof PathSafetyError) || error.code !== 'IDENTITY_CHANGED')
+      throw error;
+    const stabilized = lstatSync(path);
+    if (
+      stabilized.isSymbolicLink() ||
+      !stabilized.isFile() ||
+      stabilized.nlink !== 1 ||
+      !sameIdentity(initialIdentity, stabilized)
+    )
+      throw error;
+    // Retry only the legitimate staging-link finalization transition.
+    file = readRegularFileWithIdentity(path, MAX_LEASE_METADATA_BYTES);
   }
-  const owner = JSON.parse(readFileSync(path, 'utf8')) as Partial<OwnerMetadata>;
+  const owner = JSON.parse(new TextDecoder().decode(file.bytes)) as Partial<OwnerMetadata>;
   if (
     owner.version !== 1 ||
     typeof owner.token !== 'string' ||
@@ -459,7 +568,45 @@ function readOwner(path: string, allowInterruptedClaimLink = false): OwnerMetada
     typeof owner.runtime !== 'string'
   )
     throw new Error('Malformed lease owner.');
-  return owner as OwnerMetadata;
+  const finalIdentity = allowInterruptedClaimLink ? lstatSync(path) : undefined;
+  if (finalIdentity !== undefined && !sameIdentity(file.identity, finalIdentity))
+    throw new PathSafetyError('Interrupted claim identity changed after owner verification.', 'IDENTITY_CHANGED');
+  const finalStagingPeer =
+    allowInterruptedClaimLink && finalIdentity !== undefined ? interruptedClaimPeer(path, finalIdentity) : undefined;
+  if ([stagingPeer, finalStagingPeer].some((peer) => peer !== undefined && owner.token !== peer.token))
+    throw new PathSafetyError('Interrupted claim token does not match its package-owned staging link.');
+  return { metadata: owner as OwnerMetadata, identity: file.identity };
+}
+
+/** Returns the sole package-owned staging peer for an interrupted claim. */
+function interruptedClaimPeer(path: string, observed?: Stats): { readonly token: string } | undefined {
+  const stat = observed ?? lstatSync(path);
+  if (stat.isSymbolicLink() || !stat.isFile() || (stat.nlink !== 1 && stat.nlink !== 2))
+    throw new PathSafetyError('Unsafe interrupted repository claim.', 'UNSAFE_HARD_LINK');
+  if (stat.nlink === 1) return undefined;
+  const prefix = `${basename(path)}.prepare-`;
+  const peers = readdirSync(dirname(path)).flatMap((name) => {
+    if (!name.startsWith(prefix)) return [];
+    const token = name.slice(prefix.length);
+    if (!/^[0-9a-f-]{32,64}$/u.test(token)) return [];
+    try {
+      const peer = lstatSync(join(dirname(path), name));
+      return peer.isFile() && !peer.isSymbolicLink() && sameIdentity(stat, peer) ? [{ token }] : [];
+    } catch (error: unknown) {
+      // acquireClaim removes its staging name immediately after publication.
+      if (hasCode(error, 'ENOENT')) return [];
+      throw error;
+    }
+  });
+  if (peers.length === 1) return peers[0];
+
+  // A legitimate publisher can unlink the sole staging peer between the
+  // claim's nlink observation and directory scan. Accept only that stabilized
+  // transition: the claim must still be the same regular inode with one link.
+  const stabilized = lstatSync(path);
+  if (!stabilized.isSymbolicLink() && stabilized.isFile() && stabilized.nlink === 1 && sameIdentity(stat, stabilized))
+    return undefined;
+  throw new PathSafetyError('Interrupted claim hard link is not package-owned.', 'UNSAFE_HARD_LINK');
 }
 
 function releaseOwnedLease(
@@ -471,13 +618,32 @@ function releaseOwnedLease(
 ): void {
   const releasePath = `${lockPath}.release-${token}`;
   try {
-    if (!ownedLeaseIdentityMatches(lockPath, token, lockIdentity, ownerIdentity)) return;
-    renameSync(lockPath, releasePath);
-    if (!quarantinedLeaseIdentityMatches(releasePath, token, lockIdentity, ownerIdentity)) {
+    const currentLock = lstatSync(lockPath);
+    const currentOwner = readOwner(join(lockPath, 'owner.json'));
+    if (
+      !currentLock.isDirectory() ||
+      currentLock.isSymbolicLink() ||
+      !sameLeaseIdentity(lockIdentity, currentLock) ||
+      !sameLeaseIdentity(ownerIdentity, currentOwner.identity) ||
+      currentOwner.metadata.token !== token
+    )
+      return;
+    if (!quarantineNoReplace(lockPath, releasePath)) return;
+    const movedLock = lstatSync(releasePath);
+    const movedOwnerPath = join(releasePath, 'owner.json');
+    const movedOwner = readOwner(movedOwnerPath);
+    if (
+      !sameIdentity(lockIdentity, movedLock) ||
+      !sameLeaseIdentity(ownerIdentity, movedOwner.identity) ||
+      movedOwner.metadata.token !== token
+    ) {
       restoreQuarantinedLease(releasePath, lockPath);
       return;
     }
-    rmSync(join(releasePath, 'owner.json'));
+    if (!removeVerifiedOwnerFile(movedOwnerPath, movedOwner)) {
+      restoreQuarantinedLease(releasePath, lockPath);
+      return;
+    }
     rmdirSync(releasePath);
     syncDirectory(controlRoot);
   } catch {
@@ -488,7 +654,7 @@ function releaseOwnedLease(
 /** Restores a directory moved during a token race without overwriting a new owner. */
 function restoreQuarantinedLease(quarantine: string, lockPath: string): void {
   try {
-    renameSync(quarantine, lockPath);
+    nativeRenameNoReplace(requireNativePublicationBackend(), quarantine, lockPath);
   } catch {
     // Both paths are preserved when another owner already acquired lockPath.
   }
@@ -496,11 +662,19 @@ function restoreQuarantinedLease(quarantine: string, lockPath: string): void {
 
 function removeOwnedClaim(path: string, token: string): boolean {
   try {
-    if (!ownerTokenMatches(path, token)) return false;
-    rmSync(path);
+    const expected = readOwner(path);
+    if (expected.metadata.token !== token) return false;
+    const quarantine = `${path}.release-${token}`;
+    if (!quarantineNoReplace(path, quarantine)) return false;
+    const moved = readOwner(quarantine);
+    if (moved.metadata.token !== token || !sameIdentity(expected.identity, moved.identity)) {
+      restoreQuarantinedLease(quarantine, path);
+      return false;
+    }
+    rmSync(quarantine);
     return true;
   } catch {
-    // A substituted claim is preserved.
+    // A substituted claim and every uncertain quarantine are preserved.
     return false;
   }
 }
@@ -513,35 +687,13 @@ function ownedLeaseIdentityMatches(
 ): boolean {
   try {
     const currentLock = lstatSync(lockPath);
-    const currentOwner = lstatSync(join(lockPath, 'owner.json'));
-    if (
-      !currentLock.isDirectory() ||
-      currentLock.isSymbolicLink() ||
-      !sameLeaseIdentity(lockIdentity, currentLock) ||
-      !sameLeaseIdentity(ownerIdentity, currentOwner)
-    )
-      return false;
-    return ownerTokenMatches(join(lockPath, 'owner.json'), token);
-  } catch {
-    return false;
-  }
-}
-
-function quarantinedLeaseIdentityMatches(
-  releasePath: string,
-  token: string,
-  lockIdentity: Stats,
-  ownerIdentity: Stats,
-): boolean {
-  try {
-    const currentLock = lstatSync(releasePath);
-    const currentOwner = lstatSync(join(releasePath, 'owner.json'));
+    const currentOwner = readOwner(join(lockPath, 'owner.json'));
     return (
       currentLock.isDirectory() &&
       !currentLock.isSymbolicLink() &&
-      sameIdentity(lockIdentity, currentLock) &&
-      sameLeaseIdentity(ownerIdentity, currentOwner) &&
-      ownerTokenMatches(join(releasePath, 'owner.json'), token)
+      sameLeaseIdentity(lockIdentity, currentLock) &&
+      sameLeaseIdentity(ownerIdentity, currentOwner.identity) &&
+      currentOwner.metadata.token === token
     );
   } catch {
     return false;
@@ -557,43 +709,126 @@ function sameLeaseIdentity(left: Stats, right: Stats): boolean {
   );
 }
 
-function ownerTokenMatches(path: string, token: string): boolean {
+function removeVerifiedOwnerFile(path: string, expected: VerifiedOwner): boolean {
+  const quarantine = `${path}.release-${expected.metadata.token}`;
+  if (!quarantineNoReplace(path, quarantine)) return false;
   try {
-    const stat = lstatSync(path);
-    assertSafeRegular(stat, path);
-    const owner = JSON.parse(readFileSync(path, 'utf8')) as { token?: string };
-    return owner.token === token;
+    const moved = readOwner(quarantine);
+    if (moved.metadata.token !== expected.metadata.token || !sameIdentity(moved.identity, expected.identity)) {
+      restoreQuarantinedLease(quarantine, path);
+      return false;
+    }
+    rmSync(quarantine);
+    return true;
   } catch {
+    restoreQuarantinedLease(quarantine, path);
     return false;
   }
 }
 
-async function waitForLeasePoll(pollMs: number, deadline: number, options: RepositoryLeaseOptions): Promise<void> {
-  if (Date.now() >= deadline) throw new LeaseContentionError('Repository authority lease is busy.', 'LEASE_BUSY');
-  await interruptibleDelay(Math.min(pollMs, Math.max(1, deadline - Date.now())), { ...options, deadline });
+interface AuthorityTurn {
+  readonly predecessor: Promise<void>;
+  readonly release: () => void;
 }
 
-async function interruptibleDelay(ms: number, control: OperationControl): Promise<void> {
-  checkControl(control);
+/** Adds one non-rejecting FIFO slot for an authority. */
+function enqueueAuthority(authorityId: string): AuthorityTurn {
+  const predecessor = authorityQueueTails.get(authorityId) ?? Promise.resolve();
+  let releaseGate = (): void => undefined;
+  const gate = new Promise<void>((resolveGate) => {
+    releaseGate = resolveGate;
+  });
+  const tail = predecessor.then(() => gate);
+  authorityQueueTails.set(authorityId, tail);
+  let released = false;
+  return {
+    predecessor,
+    release() {
+      if (released) return;
+      released = true;
+      releaseGate();
+      if (authorityQueueTails.get(authorityId) === tail) authorityQueueTails.delete(authorityId);
+    },
+  };
+}
+
+async function waitForAuthorityTurn(
+  predecessor: Promise<void>,
+  deadline: number,
+  hasExplicitDeadline: boolean,
+  signal?: AbortSignal,
+): Promise<void> {
+  checkAcquisitionControl(deadline, hasExplicitDeadline, signal);
+  await new Promise<void>((resolveTurn, rejectTurn) => {
+    let settled = false;
+    const timer = setTimeout(timedOut, Math.max(0, deadline - Date.now()));
+    const settle = (operation: () => void): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', aborted);
+      operation();
+    };
+    const aborted = (): void =>
+      settle(() => rejectTurn(new LeaseContentionError('Repository operation was aborted.', 'ABORTED')));
+    function timedOut(): void {
+      settle(() => rejectTurn(acquisitionTimeout(hasExplicitDeadline)));
+    }
+    signal?.addEventListener('abort', aborted, { once: true });
+    void predecessor.then(() => settle(resolveTurn));
+  });
+  checkAcquisitionControl(deadline, hasExplicitDeadline, signal);
+}
+
+async function waitForLeasePoll(
+  pollMs: number,
+  deadline: number,
+  hasExplicitDeadline: boolean,
+  signal?: AbortSignal,
+): Promise<void> {
+  checkAcquisitionControl(deadline, hasExplicitDeadline, signal);
+  await interruptibleDelay(Math.min(pollMs, Math.max(1, deadline - Date.now())), signal);
+  checkAcquisitionControl(deadline, hasExplicitDeadline, signal);
+}
+
+async function interruptibleDelay(ms: number, signal?: AbortSignal): Promise<void> {
   await new Promise<void>((resolveDelay, rejectDelay) => {
     const timer = setTimeout(done, ms);
-    const deadlineTimer =
-      control.deadline === undefined ? undefined : setTimeout(done, Math.max(0, control.deadline - Date.now()));
     function done(): void {
-      clearTimeout(timer);
-      if (deadlineTimer !== undefined) clearTimeout(deadlineTimer);
-      control.signal?.removeEventListener('abort', aborted);
+      signal?.removeEventListener('abort', aborted);
       resolveDelay();
     }
     function aborted(): void {
       clearTimeout(timer);
-      if (deadlineTimer !== undefined) clearTimeout(deadlineTimer);
-      control.signal?.removeEventListener('abort', aborted);
+      signal?.removeEventListener('abort', aborted);
       rejectDelay(new LeaseContentionError('Repository operation was aborted.', 'ABORTED'));
     }
-    control.signal?.addEventListener('abort', aborted, { once: true });
+    signal?.addEventListener('abort', aborted, { once: true });
   });
-  checkControl(control);
+}
+
+function checkAcquisitionControl(deadline: number, hasExplicitDeadline: boolean, signal?: AbortSignal): void {
+  if (signal?.aborted) throw new LeaseContentionError('Repository operation was aborted.', 'ABORTED');
+  if (Date.now() >= deadline) throw acquisitionTimeout(hasExplicitDeadline);
+}
+
+function acquisitionTimeout(hasExplicitDeadline: boolean): LeaseContentionError {
+  return hasExplicitDeadline
+    ? new LeaseContentionError('Repository operation deadline was exceeded.', 'DEADLINE_EXCEEDED')
+    : new LeaseContentionError('Repository authority lease is busy.', 'LEASE_BUSY');
+}
+
+function quarantineNoReplace(source: string, destination: string): boolean {
+  emitFilesystemFault('before-lease-artifact-quarantine', source);
+  try {
+    const backend = requireNativePublicationBackend();
+    assertNativePublicationPath(backend, dirname(source));
+    nativeRenameNoReplace(backend, source, destination);
+    return true;
+  } catch (error: unknown) {
+    if (hasCode(error, 'EEXIST') || hasCode(error, 'ENOENT')) return false;
+    throw error;
+  }
 }
 
 function positiveInteger(value: number, name: string): number {
