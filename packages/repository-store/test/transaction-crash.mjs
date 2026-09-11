@@ -6,10 +6,7 @@ import {
   resolveManagedRoot,
   withRepositoryLease,
 } from '../dist/index.js';
-import {
-  setFilesystemFaultInjectorForTests,
-  setTransactionFaultInjectorForTests,
-} from '../dist/internal/fault-injection.js';
+import { setFilesystemFaultInjectorForTests, setTransactionFaultInjectorForTests } from '../dist/testing.js';
 
 const [authority, requestedEvent, requestedOccurrenceText = '1'] = process.argv.slice(2);
 const requestedOccurrence = Number.parseInt(requestedOccurrenceText, 10);

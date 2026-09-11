@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import {
   existsSync,
   mkdirSync,
@@ -7,24 +8,30 @@ import {
   renameSync,
   statSync,
   rmSync,
+  utimesSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { DEFAULT_STORE_LIMITS, resolveManagedPath, resolveManagedRoot, withRepositoryLease } from '../index.js';
+import type { SqliteAdapter } from './adapter.js';
 import {
   openDisposableSqliteCache,
   rebuildDisposableSqliteCache,
   type DisposableCacheSpecification,
   type DisposableSqliteCache,
 } from './cache.js';
+import { nodeSqliteAdapter } from './node.js';
+import { setSqliteAdapterForTests } from './runtime.js';
 import { setFilesystemFaultInjectorForTests } from '../internal/fault-injection.js';
 
 const temporaryDirectories: string[] = [];
 
 afterEach(() => {
   setFilesystemFaultInjectorForTests(undefined);
+  setSqliteAdapterForTests(undefined);
   while (temporaryDirectories.length > 0)
     rmSync(temporaryDirectories.pop() as string, { recursive: true, force: true });
 });
@@ -254,6 +261,39 @@ describe('disposable SQLite cache', () => {
     },
   );
 
+  it.each(['before-exact-publication', 'destination-evacuated', 'exclusive-destination-published'] as const)(
+    'recovers cache activation killed at %s before rebuilding',
+    async (event) => {
+      const authority = mkdtempSync(join(tmpdir(), 'neottia-cache-publication-crash-'));
+      temporaryDirectories.push(authority);
+      const worker = fileURLToPath(new URL('../../test/cache-crash.mjs', import.meta.url));
+      const child = spawnSync(process.execPath, [worker, authority, event]);
+      expect(child.signal).toBe('SIGKILL');
+      const leasePath = join(authority, '.neottia', 'repository-store', 'authority.lease');
+      utimesSync(leasePath, new Date(0), new Date(0));
+
+      const root = await resolveManagedRoot({ authorityRoot: authority, limits: DEFAULT_STORE_LIMITS });
+      const specification = cacheSpecification(resolveManagedPath(root, 'cache.db'), 'replacement');
+      await withRepositoryLease(
+        root,
+        async (lease) => {
+          const rebuilt = await rebuildDisposableSqliteCache(root, lease, specification);
+          await rebuilt.close();
+          const opened = await openDisposableSqliteCache(root, lease, specification);
+          expect(opened.state).toBe('ready');
+          if (opened.state === 'ready') await opened.close();
+        },
+        { staleMs: 1 },
+      );
+      expect(readFileSync(join(authority, 'cache.db')).subarray(0, 15).toString()).toBe('SQLite format 3');
+      const publications = join(authority, '.neottia', 'repository-store', 'cache-publications');
+      expect(
+        readdirSync(publications, { recursive: true }).filter((name) => /\.(?:prepare|active|cleanup)$/u.test(name)),
+      ).toEqual([]);
+    },
+    30_000,
+  );
+
   it('invalidates writable handles after lease settlement while still allowing close', async () => {
     const authority = mkdtempSync(join(tmpdir(), 'neottia-cache-lease-'));
     temporaryDirectories.push(authority);
@@ -265,6 +305,30 @@ describe('disposable SQLite cache', () => {
     });
     await expect(escaped?.database.prepare('SELECT 1')).rejects.toMatchObject({ code: 'LEASE_BUSY' });
     await expect(escaped?.close()).resolves.toBeUndefined();
+  });
+
+  it('holds the lease until a started handle operation settles', async () => {
+    const started = deferred();
+    const release = deferred();
+    setSqliteAdapterForTests(delayedPrepareAdapter(started, release));
+    const { root, specification } = await newCacheFixture('neottia-cache-pending-lease-');
+    let cache: DisposableSqliteCache | undefined;
+    let operation: Promise<unknown> | undefined;
+    const first = withRepositoryLease(root, async (lease) => {
+      cache = await rebuildDisposableSqliteCache(root, lease, specification);
+      operation = cache.database.prepare('SELECT 1 /* pending identity check */');
+      await started.promise;
+    });
+    await started.promise;
+    let secondEntered = false;
+    const second = withRepositoryLease(root, async () => {
+      secondEntered = true;
+    });
+    expect(secondEntered).toBe(false);
+    release.resolve();
+    await Promise.all([first, second, operation]);
+    expect(secondEntered).toBe(true);
+    await cache?.close();
   });
 
   it('does not activate a candidate when cancellation arrives during population', async () => {
@@ -319,6 +383,42 @@ describe('disposable SQLite cache', () => {
       await expect(cache.database.prepare('SELECT 1')).rejects.toMatchObject({ code: 'IDENTITY_CHANGED' });
       await expect(cache.close()).rejects.toMatchObject({ code: 'IDENTITY_CHANGED' });
       expect(readFileSync(sidecar, 'utf8')).toBe('replacement');
+    });
+  });
+
+  it.each(['', '-wal', '-shm'])('rejects %s replacement while a handle operation is pending', async (suffix) => {
+    const started = deferred();
+    const release = deferred();
+    setSqliteAdapterForTests(delayedPrepareAdapter(started, release));
+    const { authority, root, specification } = await newCacheFixture('neottia-cache-pending-operation-');
+    await withRepositoryLease(root, async (lease) => {
+      const cache = await rebuildDisposableSqliteCache(root, lease, specification);
+      const operation = cache.database.prepare('SELECT 1 /* pending identity check */');
+      await started.promise;
+      const artifact = join(authority, `cache.db${suffix}`);
+      replaceWithSentinel(artifact);
+      release.resolve();
+      await expect(operation).rejects.toMatchObject({ code: 'IDENTITY_CHANGED' });
+      expect(readFileSync(artifact, 'utf8')).toBe('replacement');
+      await expect(cache.close()).rejects.toMatchObject({ code: 'IDENTITY_CHANGED' });
+    });
+  });
+
+  it('rejects candidate replacement while close remains pending', async () => {
+    const started = deferred();
+    const release = deferred();
+    setSqliteAdapterForTests(delayedCandidateCloseAdapter(started, release));
+    const { authority, root, specification } = await newCacheFixture('neottia-cache-pending-close-');
+    await withRepositoryLease(root, async (lease) => {
+      const rebuild = rebuildDisposableSqliteCache(root, lease, specification);
+      await started.promise;
+      const candidate = readdirSync(authority).find((name) => name.endsWith('.candidate'));
+      expect(candidate).toBeDefined();
+      const candidatePath = join(authority, candidate as string);
+      replaceWithSentinel(candidatePath);
+      release.resolve();
+      await expect(rebuild).rejects.toMatchObject({ code: 'IDENTITY_CHANGED' });
+      expect(readFileSync(candidatePath, 'utf8')).toBe('replacement');
     });
   });
 
@@ -415,6 +515,61 @@ describe('disposable SQLite cache', () => {
   });
 });
 
+function delayedPrepareAdapter(started: Deferred, release: Deferred): SqliteAdapter {
+  return {
+    runtime: 'node',
+    async open(path, options) {
+      const database = await nodeSqliteAdapter.open(path, options);
+      return {
+        exec: (sql) => database.exec(sql),
+        async prepare(sql) {
+          if (sql === 'SELECT 1 /* pending identity check */') {
+            started.resolve();
+            await release.promise;
+          }
+          return database.prepare(sql);
+        },
+        close: () => database.close(),
+      };
+    },
+  };
+}
+
+function delayedCandidateCloseAdapter(started: Deferred, release: Deferred): SqliteAdapter {
+  let delayed = false;
+  return {
+    runtime: 'node',
+    async open(path, options) {
+      const database = await nodeSqliteAdapter.open(path, options);
+      return {
+        exec: (sql) => database.exec(sql),
+        prepare: (sql) => database.prepare(sql),
+        async close() {
+          await database.close();
+          if (!delayed && path.endsWith('.candidate')) {
+            delayed = true;
+            started.resolve();
+            await release.promise;
+          }
+        },
+      };
+    },
+  };
+}
+
+interface Deferred {
+  readonly promise: Promise<void>;
+  readonly resolve: () => void;
+}
+
+function deferred(): Deferred {
+  let resolve = (): void => undefined;
+  const promise = new Promise<void>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
 function candidateArtifactBytes(authority: string): number {
   const names = readdirSync(authority);
   const candidate = names.find((name) => name.endsWith('.candidate'));
@@ -426,8 +581,9 @@ function candidateArtifactBytes(authority: string): number {
 
 function replaceWithSentinel(path: string): void {
   expect(existsSync(path)).toBe(true);
-  rmSync(path);
-  writeFileSync(path, 'replacement');
+  const replacement = `${path}.replacement`;
+  writeFileSync(replacement, 'replacement');
+  renameSync(replacement, path);
 }
 
 async function newCacheFixture(prefix: string, digest = 'digest') {

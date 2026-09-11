@@ -65,6 +65,7 @@ export function runSqliteAdapterContract(api: SuiteApi, adapter: SqliteAdapter):
 
         const named = await database.prepare('INSERT INTO items (id, value) VALUES ($id, $value)');
         await named.run({ $id: 'n', $value: '1234567' });
+        overCode = undefined;
         try {
           await named.run({ $id: 'x', $value: '12345678' });
         } catch (error: unknown) {
@@ -77,6 +78,7 @@ export function runSqliteAdapterContract(api: SuiteApi, adapter: SqliteAdapter):
         const byText = await database.prepare('SELECT id FROM items WHERE id = ?');
         const rows = await byText.all<{ id: string }>(['éééé'], { maxRows: 10, maxBytes: 100 });
         api.expect(rows).toEqual([]);
+        overCode = undefined;
         try {
           await byText.all(['ééééx'], { maxRows: 10, maxBytes: 100 });
         } catch (error: unknown) {

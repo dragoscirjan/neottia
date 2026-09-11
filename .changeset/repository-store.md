@@ -1,5 +1,5 @@
 ---
-"@neottia/repository-store": patch
+"@neottia/repository-store": minor
 "@neottia/memory-core": minor
 "@neottia/issues": patch
 "@neottia/design-docs": patch

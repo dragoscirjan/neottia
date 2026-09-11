@@ -181,6 +181,7 @@ export async function withRepositoryLease<T>(
       lockPath,
       lockIdentity,
       ownerIdentity,
+      pendingOperations: new Set(),
       active: true,
     };
     leaseState = acquiredState;
@@ -194,7 +195,12 @@ export async function withRepositoryLease<T>(
       return operation(lease);
     });
   } finally {
-    if (leaseState !== undefined) leaseState.active = false;
+    if (leaseState !== undefined) {
+      // Fire-and-forget cache calls remain part of the lease until their
+      // identity validation settles, so another owner cannot overlap them.
+      while (leaseState.pendingOperations.size > 0) await Promise.allSettled([...leaseState.pendingOperations]);
+      leaseState.active = false;
+    }
     if (acquired && lockIdentity !== undefined && ownerIdentity !== undefined)
       releaseOwnedLease(lockPath, controlRoot, token, lockIdentity, ownerIdentity);
     turn.release();
@@ -214,6 +220,19 @@ export function assertLiveLease(root: ManagedRoot, lease: RepositoryLease): void
     leaseState.active = false;
     throw new LeaseContentionError('Repository lease ownership changed.', 'LEASE_OWNER_UNKNOWN');
   }
+}
+
+/** Retains authority until one already-started asynchronous operation settles. */
+export function trackLeaseOperation<T>(lease: RepositoryLease, operation: Promise<T>): Promise<T> {
+  // Attach rejection handling immediately even when a caller intentionally
+  // does not await the operation; the original promise still rejects normally.
+  void operation.catch(() => undefined);
+  const state = getLeaseState(lease);
+  if (state === undefined || !state.active)
+    throw new LeaseContentionError('Repository lease is no longer active.', 'LEASE_BUSY');
+  state.pendingOperations.add(operation);
+  void operation.finally(() => state.pendingOperations.delete(operation)).catch(() => undefined);
+  return operation;
 }
 
 /** Throws a structured cancellation/deadline error before I/O phases. */
@@ -309,7 +328,12 @@ function tryReclaimLockedLease(lockPath: string, controlRoot: string, hostId: st
       throw new LeaseContentionError('Stale lease identity changed during reclamation.', 'LEASE_OWNER_UNKNOWN');
     }
     if (!removeVerifiedOwnerFile(quarantinedOwnerPath, movedOwner)) {
-      restoreQuarantinedLease(quarantine, lockPath);
+      restoreQuarantinedLease(quarantine, lockPath, {
+        kind: 'directory',
+        identity: lockStat,
+        ownerIdentity: ownerStat,
+        token: owner.token,
+      });
       return false;
     }
     rmdirSync(quarantine);
@@ -641,7 +665,12 @@ function releaseOwnedLease(
       return;
     }
     if (!removeVerifiedOwnerFile(movedOwnerPath, movedOwner)) {
-      restoreQuarantinedLease(releasePath, lockPath);
+      restoreQuarantinedLease(releasePath, lockPath, {
+        kind: 'directory',
+        identity: lockIdentity,
+        ownerIdentity,
+        token,
+      });
       return;
     }
     rmdirSync(releasePath);
@@ -651,12 +680,69 @@ function releaseOwnedLease(
   }
 }
 
-/** Restores a directory moved during a token race without overwriting a new owner. */
-function restoreQuarantinedLease(quarantine: string, lockPath: string): void {
+export interface ReleaseExpectation {
+  readonly kind: 'file' | 'directory';
+  readonly identity: Stats;
+  readonly token: string;
+  readonly ownerIdentity?: Stats;
+}
+
+/** Restores a quarantined entry or removes its verified orphan after a race. */
+export function restoreQuarantinedLease(quarantine: string, lockPath: string, expected?: ReleaseExpectation): void {
   try {
     nativeRenameNoReplace(requireNativePublicationBackend(), quarantine, lockPath);
+  } catch (error: unknown) {
+    // A new owner must never be overwritten. Cleanup requires identities
+    // captured before quarantine; a fresh pathname snapshot is insufficient.
+    if (hasCode(error, 'EEXIST') && expected !== undefined) cleanupVerifiedReleaseArtifact(quarantine, expected);
+  }
+}
+
+/** Performs one bounded expected-identity cleanup of a `.release-*` artifact. */
+function cleanupVerifiedReleaseArtifact(path: string, expected: ReleaseExpectation): void {
+  const cleanup = `${path}.cleanup-${randomBytes(16).toString('hex')}`;
+  let moved = false;
+  let removed = false;
+  try {
+    const match = /\.release-([0-9a-f-]{32,64})$/u.exec(basename(path));
+    if (match?.[1] !== expected.token) return;
+    nativeRenameNoReplace(requireNativePublicationBackend(), path, cleanup);
+    moved = true;
+    const identity = lstatSync(cleanup);
+    if (!sameIdentity(identity, expected.identity) || identity.isSymbolicLink()) return;
+    if (expected.kind === 'file') {
+      if (!identity.isFile()) return;
+      const owner = readOwner(cleanup);
+      if (owner.metadata.token !== expected.token || !sameIdentity(owner.identity, expected.identity)) return;
+      rmSync(cleanup);
+      removed = true;
+    } else {
+      if (!identity.isDirectory()) return;
+      const entries = readdirSync(cleanup);
+      if (expected.ownerIdentity === undefined) {
+        if (entries.length !== 0) return;
+      } else {
+        if (entries.length !== 1 || entries[0] !== 'owner.json') return;
+        const ownerPath = join(cleanup, 'owner.json');
+        const owner = readOwner(ownerPath);
+        if (owner.metadata.token !== expected.token || !sameIdentity(owner.identity, expected.ownerIdentity)) return;
+        rmSync(ownerPath);
+      }
+      if (!sameIdentity(lstatSync(cleanup), expected.identity) || readdirSync(cleanup).length !== 0) return;
+      rmdirSync(cleanup);
+      removed = true;
+    }
+    syncDirectory(dirname(path));
   } catch {
-    // Both paths are preserved when another owner already acquired lockPath.
+    // Uncertain or concurrently changed release artifacts remain fail-closed.
+  } finally {
+    if (moved && !removed) {
+      try {
+        nativeRenameNoReplace(requireNativePublicationBackend(), cleanup, path);
+      } catch {
+        // Preserve both identities if the original quarantine path reappeared.
+      }
+    }
   }
 }
 
@@ -712,16 +798,22 @@ function sameLeaseIdentity(left: Stats, right: Stats): boolean {
 function removeVerifiedOwnerFile(path: string, expected: VerifiedOwner): boolean {
   const quarantine = `${path}.release-${expected.metadata.token}`;
   if (!quarantineNoReplace(path, quarantine)) return false;
+  let verified = false;
   try {
     const moved = readOwner(quarantine);
     if (moved.metadata.token !== expected.metadata.token || !sameIdentity(moved.identity, expected.identity)) {
       restoreQuarantinedLease(quarantine, path);
       return false;
     }
+    verified = true;
     rmSync(quarantine);
     return true;
   } catch {
-    restoreQuarantinedLease(quarantine, path);
+    restoreQuarantinedLease(
+      quarantine,
+      path,
+      verified ? { kind: 'file', identity: expected.identity, token: expected.metadata.token } : undefined,
+    );
     return false;
   }
 }

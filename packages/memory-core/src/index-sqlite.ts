@@ -114,15 +114,18 @@ export async function openMemoryCache(
 ): Promise<DisposableSqliteCache | undefined> {
   const opened = await openDisposableSqliteCache(root, lease, memoryCacheSpecification(root, state));
   if (opened.state !== 'ready') return undefined;
-  const rebuilt = await (
-    await opened.database.prepare("SELECT value FROM neottia_repository_cache_meta WHERE key='rebuilt_at'")
-  ).get<{ value: string }>();
-  const rebuiltAt = Date.parse(rebuilt?.value ?? '');
-  if (!Number.isFinite(rebuiltAt) || Date.now() - rebuiltAt > maxAgeMs) {
-    await opened.close();
-    return undefined;
+  let fresh = false;
+  try {
+    const rebuilt = await (
+      await opened.database.prepare("SELECT value FROM neottia_repository_cache_meta WHERE key='rebuilt_at'")
+    ).get<{ value: string }>();
+    const rebuiltAt = Date.parse(rebuilt?.value ?? '');
+    fresh = Number.isFinite(rebuiltAt) && Date.now() - rebuiltAt <= maxAgeMs;
+  } finally {
+    // The caller cannot close a handle that fails validation before return.
+    if (!fresh) await opened.close();
   }
-  return opened;
+  return fresh ? opened : undefined;
 }
 
 /** Rebuilds the disposable projection from canonical records. */

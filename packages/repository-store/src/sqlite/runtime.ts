@@ -1,8 +1,16 @@
 import { UnsupportedRuntimeError } from '../errors.js';
 import type { SqliteAdapter } from './adapter.js';
 
+let testAdapter: SqliteAdapter | undefined;
+
+/** Installs an adapter seam for deterministic pending-operation tests. */
+export function setSqliteAdapterForTests(adapter: SqliteAdapter | undefined): void {
+  testAdapter = adapter;
+}
+
 /** Selects Bun first, otherwise the supported Node built-in, without eager imports. */
 export async function selectSqliteAdapter(): Promise<SqliteAdapter> {
+  if (testAdapter !== undefined) return testAdapter;
   if (typeof Bun !== 'undefined') {
     if (!atLeast(Bun.version, [1, 3, 13]))
       throw new UnsupportedRuntimeError(`bun:sqlite requires Bun >=1.3.13; current version is ${Bun.version}.`);

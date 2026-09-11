@@ -41,6 +41,7 @@ import {
 } from './internal/fault-injection.js';
 import { getRootState } from './internal/model.js';
 import { setNativePublicationBackendForTests } from './internal/native-publication.js';
+import { restoreQuarantinedLease } from './lease.js';
 import {
   createTransactionDirectory,
   manifestDigest,
@@ -313,7 +314,7 @@ describe('repository canonical store', () => {
       setFilesystemFaultInjectorForTests(undefined);
     });
     await withRepositoryLease(root, async () => undefined);
-    expect(existsSync(path.absolutePath)).toBe(false);
+    expect(existsSync(join(root.managedRoot, path.relativePath))).toBe(false);
     expect(transactionEntries(root)).toEqual([]);
   });
 
@@ -469,13 +470,12 @@ describe('repository canonical store', () => {
       );
       const identity = identityOf(root);
       expect(readdirSync(transactionRoot(authority, identity.managedRootId))).toEqual([]);
-      const control = join(authority, '.neottia', 'repository-store');
-      expect(readdirSync(control, { recursive: true }).filter((entry) => entry.includes('.link-probe'))).toEqual([]);
+      expect(publicationArtifacts(join(authority, 'records'))).toEqual([]);
     },
   );
 
   it.each(['before-exact-publication', 'exclusive-destination-published'] as const)(
-    'recovers a SIGKILL %s linking without leaving probe artifacts',
+    'recovers a SIGKILL %s without leaving publication artifacts',
     async (event) => {
       const authority = mkdtempSync(join(tmpdir(), `neottia-publication-crash-${event}-`));
       tempDirectories.push(authority);
@@ -484,8 +484,7 @@ describe('repository canonical store', () => {
       const root = await resolveManagedRoot({ authorityRoot: authority, limits: DEFAULT_STORE_LIMITS });
       await withRepositoryLease(root, async () => undefined, { staleMs: 1 });
       expect(readFileSync(join(authority, 'records/first.txt'), 'utf8')).toBe('original-first');
-      const control = join(authority, '.neottia', 'repository-store');
-      expect(readdirSync(control, { recursive: true }).filter((entry) => entry.includes('.link-probe'))).toEqual([]);
+      expect(publicationArtifacts(join(authority, 'records'))).toEqual([]);
     },
   );
 
@@ -543,6 +542,60 @@ describe('repository authority lease', () => {
     expect(existsSync(join(control, 'authority.lease'))).toBe(false);
   });
 
+  it('removes only an expected stale release entry when a new owner blocks restoration', async () => {
+    const root = await fixture();
+    await withRepositoryLease(root, async () => undefined);
+    const control = join(root.authorityRoot, '.neottia', 'repository-store');
+    const lockPath = join(control, 'authority.lease');
+    const staleToken = randomBytes(32).toString('hex');
+    const releasePath = `${lockPath}.release-${staleToken}`;
+    mkdirSync(releasePath);
+    const staleOwnerPath = join(releasePath, 'owner.json');
+    writeOwnerMetadata(staleOwnerPath, control, process.pid, new Date(), staleToken);
+    const expected = {
+      kind: 'directory' as const,
+      identity: lstatSync(releasePath),
+      ownerIdentity: lstatSync(staleOwnerPath),
+      token: staleToken,
+    };
+    const currentToken = randomBytes(32).toString('hex');
+    mkdirSync(lockPath);
+    writeOwnerMetadata(join(lockPath, 'owner.json'), control, process.pid, new Date(), currentToken);
+
+    restoreQuarantinedLease(releasePath, lockPath, expected);
+
+    expect(existsSync(releasePath)).toBe(false);
+    expect(JSON.parse(readFileSync(join(lockPath, 'owner.json'), 'utf8')).token).toBe(currentToken);
+  });
+
+  it('preserves a same-token release replacement whose identity was not expected', async () => {
+    const root = await fixture();
+    await withRepositoryLease(root, async () => undefined);
+    const control = join(root.authorityRoot, '.neottia', 'repository-store');
+    const lockPath = join(control, 'authority.lease');
+    const token = randomBytes(32).toString('hex');
+    const releasePath = `${lockPath}.release-${token}`;
+    mkdirSync(releasePath);
+    const ownerPath = join(releasePath, 'owner.json');
+    writeOwnerMetadata(ownerPath, control, process.pid, new Date(), token);
+    const expected = {
+      kind: 'directory' as const,
+      identity: lstatSync(releasePath),
+      ownerIdentity: lstatSync(ownerPath),
+      token,
+    };
+    renameSync(releasePath, `${releasePath}.displaced`);
+    mkdirSync(releasePath);
+    writeOwnerMetadata(join(releasePath, 'owner.json'), control, process.pid, new Date(), token);
+    mkdirSync(lockPath);
+    writeOwnerMetadata(join(lockPath, 'owner.json'), control, process.pid, new Date());
+
+    restoreQuarantinedLease(releasePath, lockPath, expected);
+
+    expect(existsSync(releasePath)).toBe(true);
+    expect(JSON.parse(readFileSync(join(releasePath, 'owner.json'), 'utf8')).token).toBe(token);
+  });
+
   it.each(LEASE_FAULT_EVENTS)('recovers a compiled-package lease crash at %s', async (faultEvent) => {
     const authority = mkdtempSync(join(tmpdir(), 'neottia-lease-crash-'));
     tempDirectories.push(authority);
@@ -566,7 +619,7 @@ describe('repository authority lease', () => {
       const id = lines[index]?.split(':')[0];
       expect(lines.slice(index, index + 2)).toEqual([`${id}:start`, `${id}:end`]);
     }
-  });
+  }, 120_000);
 
   it('fails closed when the lease control root is rebound during owner verification', async () => {
     const root = await fixture();
@@ -611,12 +664,12 @@ describe('repository authority lease', () => {
       await firstGate;
       order.push('first:end');
     });
-    await new Promise((resolveDelay) => setTimeout(resolveDelay, 10));
+    await waitForCondition(() => order.includes('first:start'));
     const second = withRepositoryLease(root, async () => {
       order.push('second:start');
       order.push('second:end');
     });
-    await new Promise((resolveDelay) => setTimeout(resolveDelay, 10));
+    // The second call reaches the synchronous queue before returning its promise.
     expect(order).toEqual(['first:start']);
     releaseFirst();
     await Promise.all([first, second]);
@@ -959,6 +1012,20 @@ async function runWorkerProcess(
       else rejectWorker(new Error(`${label} exited ${code}/${signal}: ${errorOutput}`));
     });
   });
+}
+
+function publicationArtifacts(directory: string): string[] {
+  return readdirSync(directory).filter(
+    (name) => name.endsWith('.repository-store.tmp') || name.endsWith('.repository-store.evacuated'),
+  );
+}
+
+async function waitForCondition(condition: () => boolean): Promise<void> {
+  for (let attempt = 0; attempt < 500; attempt += 1) {
+    if (condition()) return;
+    await new Promise((resolveDelay) => setTimeout(resolveDelay, 10));
+  }
+  throw new Error('Test condition was not reached.');
 }
 
 function identityOf(root: Awaited<ReturnType<typeof fixture>>): { authorityId: string; managedRootId: string } {

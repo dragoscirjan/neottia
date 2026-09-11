@@ -24,7 +24,7 @@ describe('filesystem Memory on Bun', () => {
       created_by: 'bun-test',
       confidence: 'confirmed',
     });
-    await store.validate();
+    expect(await store.validate()).toMatchObject({ valid: true });
     const result = await store.search({ query: 'interoperability' });
     expect(result.map((record) => record.id)).toEqual([stored.id]);
     expect(existsSync(join(cwd, '.neottia', 'memory', 'facts', `${stored.id}.yaml`))).toBe(true);

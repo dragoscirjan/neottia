@@ -214,7 +214,7 @@ describe('memory store (filesystem + SQLite index)', () => {
       writeFileSync(join(folder, `${record.id}.yaml`), stringify(record, { lineWidth: 0 }), 'utf8');
     }
     rmSync(join(cwd, '.neottia', 'memory', 'index.db'), { force: true });
-    await expect(store.search({ query: 'aggregate', limit: 5 })).resolves.toBeDefined();
+    await expect(store.search({ query: 'aggregate', limit: 5, max_chars: 100_000 })).resolves.toHaveLength(5);
     await expect(store.validate()).resolves.toMatchObject({ valid: true, records: 1_501 });
   }, 30_000);
 

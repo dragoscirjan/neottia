@@ -57,7 +57,7 @@ Before publication, bounded before-images, staged bytes, and a digested manifest
 
 ## Disposable SQLite caches
 
-`openDisposableSqliteCache`, `rebuildDisposableSqliteCache`, and `removeDisposableSqliteCache` manage exact DB/WAL/SHM artifacts. Runtime selection is lazy and loads only `node:sqlite` or `bun:sqlite`. Every connection enforces root SQL-byte, aggregate statement-parameter-byte, query-row, and query-result ceilings; `get()` is bounded automatically, `all()` cannot raise the root limits, aggregate schema SQL is bounded, and both active and candidate DB/WAL/SHM bytes share `maxTemporaryBytes`. Drivers must expose cursor iteration because eager unbounded `all()` fallback is rejected. Canonical files always win; a cache failure never rolls them back.
+`openDisposableSqliteCache`, `rebuildDisposableSqliteCache`, and `removeDisposableSqliteCache` manage exact DB/WAL/SHM artifacts. Cache replacement tokens and allowed revisions are synchronized beneath `cache-publications/<managed-root-id>/`, so the next cache operation restores an evacuated active database after a crash before rebuilding. Runtime selection is lazy and loads only `node:sqlite` or `bun:sqlite`. Every connection enforces root SQL-byte, aggregate statement-parameter-byte, query-row, and query-result ceilings; `get()` is bounded automatically, `all()` cannot raise the root limits, aggregate schema SQL is bounded, and both active and candidate DB/WAL/SHM bytes share `maxTemporaryBytes`. Drivers must expose cursor iteration because eager unbounded `all()` fallback is rejected. Canonical files always win; a cache failure never rolls them back.
 
 ## Durability and threat model
 

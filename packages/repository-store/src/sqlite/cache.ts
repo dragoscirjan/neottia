@@ -24,7 +24,8 @@ import {
   type RepositoryLease,
 } from '../internal/model.js';
 import { publishExactRegularFile } from '../internal/publication.js';
-import { assertLiveLease, checkControl, type OperationControl } from '../lease.js';
+import { assertLiveLease, checkControl, trackLeaseOperation, type OperationControl } from '../lease.js';
+import { publishCacheDatabase, recoverCachePublications } from './cache-publication.js';
 
 /** Domain-owned schema and projection callbacks for a disposable cache. */
 export interface DisposableCacheSpecification {
@@ -62,6 +63,7 @@ export async function openDisposableSqliteCache(
   checkControl(options);
   assertCachePath(root, specification.path);
   const rootState = requireRootState(root);
+  recoverCachePublications(root, lease, options);
   const path = requirePathState(specification.path).absolutePath;
   if (!artifactExists(path)) return { state: 'rebuild-required', reason: 'missing' };
   const beforeOpen = captureCacheState(path);
@@ -129,6 +131,7 @@ export async function rebuildDisposableSqliteCache(
   checkControl(options);
   assertCachePath(root, specification.path);
   const rootState = requireRootState(root);
+  recoverCachePublications(root, lease, options);
   const path = requirePathState(specification.path).absolutePath;
   const parent = dirname(path);
   const candidate = join(parent, `.${basename(path)}.${randomUUID()}.candidate`);
@@ -227,8 +230,10 @@ export async function rebuildDisposableSqliteCache(
     activationSnapshot = removeExactSidecars(path, activationSnapshot);
     revalidateExactCacheState(path, activationSnapshot);
     const active = activationSnapshot.artifacts.get('');
-    publishExactRegularFile(
-      path,
+    publishCacheDatabase(
+      root,
+      lease,
+      specification.path,
       candidateBytes,
       active === undefined
         ? undefined
@@ -237,7 +242,7 @@ export async function rebuildDisposableSqliteCache(
             revision: computeByteRevision(readRegularFile(path, rootState.limits.maxTemporaryBytes)),
             maxBytes: rootState.limits.maxTemporaryBytes,
           },
-      randomUUID(),
+      options,
     );
     removeExactArtifacts(candidate, candidateSnapshot);
     candidateSnapshot = undefined;
@@ -284,6 +289,7 @@ export async function removeDisposableSqliteCache(
   assertLiveLease(root, lease);
   checkControl(options);
   assertCachePath(root, path);
+  recoverCachePublications(root, lease, options);
   const absolute = requirePathState(path).absolutePath;
   const snapshot = captureCacheState(absolute);
   if (snapshot.artifacts.size === 0) return;
@@ -306,13 +312,14 @@ function bindConnectionToCandidate(
   updateSnapshot: (snapshot: CacheStateSnapshot) => void,
 ): SqliteConnection {
   const guarded = async <T>(operation: () => Promise<T>): Promise<T> => {
-    updateSnapshot(refreshBoundedCacheState(path, snapshot(), maxBytes));
+    const before = refreshBoundedCacheState(path, snapshot(), maxBytes);
+    updateSnapshot(before);
     try {
       return await operation();
     } finally {
-      const current = captureCacheState(path);
-      // Retain the post-operation identity even when its size raises below so
-      // cleanup can authenticate and remove the exact over-limit artifacts.
+      const current = captureContinuousCacheState(path, before);
+      // Retain size growth only after proving the operation did not substitute
+      // any artifact, so cleanup stays bound to the original identities.
       updateSnapshot(current);
       assertCacheSize(current, maxBytes);
     }
@@ -327,9 +334,11 @@ function bindConnectionToCandidate(
     exec: (sql) => guarded(() => database.exec(sql)),
     prepare: (sql) => guarded(async () => wrapStatement(await database.prepare(sql))),
     async close() {
-      revalidateCacheState(path, snapshot());
+      // Closing must remain possible after an operation grows past its bound.
+      const before = captureContinuousCacheState(path, snapshot());
+      updateSnapshot(before);
       await database.close();
-      updateSnapshot(captureCacheState(path));
+      updateSnapshot(captureContinuousCacheState(path, before));
     },
   };
 }
@@ -344,14 +353,19 @@ function bindConnectionToLease(
   let openedState = captureCacheState(path);
   const maxBytes = requireRootState(root).limits.maxTemporaryBytes;
   const guarded = async <T>(operation: () => Promise<T>): Promise<T> => {
-    openedState = refreshBoundedCacheState(path, openedState, maxBytes);
-    assertLiveLease(root, lease);
-    try {
-      return await operation();
-    } finally {
-      openedState = captureCacheState(path);
-      assertCacheSize(openedState, maxBytes);
-    }
+    const pending = (async (): Promise<T> => {
+      const before = refreshBoundedCacheState(path, openedState, maxBytes);
+      openedState = before;
+      assertLiveLease(root, lease);
+      try {
+        return await operation();
+      } finally {
+        const current = captureContinuousCacheState(path, before);
+        openedState = current;
+        assertCacheSize(current, maxBytes);
+      }
+    })();
+    return trackLeaseOperation(lease, pending);
   };
   const wrapStatement = (statement: SqliteStatement): SqliteStatement => ({
     run: (parameters?: SqliteParameters) => guarded(() => statement.run(parameters)),
@@ -392,11 +406,17 @@ function captureCacheState(path: string): CacheStateSnapshot {
   return { parents, artifacts };
 }
 
-/** Refreshes current sizes only after proving continuity with the prior identities. */
-function refreshBoundedCacheState(path: string, expected: CacheStateSnapshot, maxBytes: number): CacheStateSnapshot {
+/** Captures post-operation state only while prior artifact identities remain continuous. */
+function captureContinuousCacheState(path: string, expected: CacheStateSnapshot): CacheStateSnapshot {
   revalidateCacheState(path, expected);
   const current = captureCacheState(path);
   revalidateCacheState(path, expected);
+  return current;
+}
+
+/** Refreshes current sizes only after proving continuity with the prior identities. */
+function refreshBoundedCacheState(path: string, expected: CacheStateSnapshot, maxBytes: number): CacheStateSnapshot {
+  const current = captureContinuousCacheState(path, expected);
   assertCacheSize(current, maxBytes);
   return current;
 }

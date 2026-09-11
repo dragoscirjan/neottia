@@ -358,13 +358,13 @@ Each tool has a Zod input schema (`MEMORY_TOOLS` / `findMemoryTool(name)` / the 
 
 ## Error handling
 
-| Error                                       | When                                                                                                                       | Handling suggestion                                                |
-| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `ConfigError`                               | Invalid config file, shard, or env values; carries `validationPaths`                                                       | Fix the named paths                                                |
-| `MemoryError`                               | Base class for operation failures: disabled memory, invalid records, limits, unsafe paths, stale cache under `fail` policy | Message is precise; safe to surface to the user                    |
-| `MemoryConflictError` extends `MemoryError` | Duplicate ID, superseding an inactive record                                                                               | Re-read state and retry deliberately                               |
-| `MemoryLockError`                           | Another writer holds the shard lock past the wait window                                                                   | Retry; the lock is released automatically when the writer finishes |
-| `MemorySecretError`                         | Content matched a secret pattern or the entropy heuristic                                                                  | Remove the secret; never store credentials                         |
+| Error                                       | When                                                                                                                       | Handling suggestion                                                    |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `ConfigError`                               | Invalid config file, shard, or env values; carries `validationPaths`                                                       | Fix the named paths                                                    |
+| `MemoryError`                               | Base class for operation failures: disabled memory, invalid records, limits, unsafe paths, stale cache under `fail` policy | Message is precise; safe to surface to the user                        |
+| `MemoryConflictError` extends `MemoryError` | Duplicate ID, superseding an inactive record                                                                               | Re-read state and retry deliberately                                   |
+| `MemoryLockError`                           | Another read, recovery, cache task, or write holds the repository authority lease past the wait window                     | Retry; the lease is released automatically when the operation finishes |
+| `MemorySecretError`                         | Content matched a secret pattern or the entropy heuristic                                                                  | Remove the secret; never store credentials                             |
 
 ## Security
 

@@ -56,7 +56,7 @@ let filesystemFaultInjector: ((event: FilesystemFaultEvent, path: string, occurr
 const transactionOccurrences = new Map<TransactionFaultEvent, number>();
 const filesystemOccurrences = new Map<string, number>();
 
-/** Installs a process-local test seam; this module is not package-exported. */
+/** Installs a process-local seam exposed only through the testing subpath. */
 export function setTransactionFaultInjectorForTests(
   injector: ((event: TransactionFaultEvent, occurrence: number) => void) | undefined,
 ): void {
