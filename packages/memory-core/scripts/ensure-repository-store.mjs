@@ -5,12 +5,13 @@ import { fileURLToPath } from 'node:url';
 
 const repositoryStore = fileURLToPath(new URL('../../repository-store/', import.meta.url));
 const sourceRoot = join(repositoryStore, 'src');
-const compiledSources = filesUnder(sourceRoot).filter(isCompiledSource);
+const sourceInputs = filesUnder(sourceRoot).filter(isBuildInput);
+const compiledSources = sourceInputs.filter(isCompiledSource);
 const packageInputs = [
   join(repositoryStore, 'package.json'),
   join(repositoryStore, 'tsconfig.build.json'),
   join(repositoryStore, 'tsconfig.json'),
-  ...compiledSources,
+  ...sourceInputs,
 ];
 const nativeInputs = [
   join(repositoryStore, 'package.json'),
@@ -43,13 +44,13 @@ function filesUnder(path) {
 }
 
 /** Mirrors the source exclusions in repository-store's build configuration. */
+function isBuildInput(path) {
+  return path.endsWith('.ts') && !/\.(?:fixture|spec|test)\.ts$/u.test(path) && basename(path) !== 'test-contract.ts';
+}
+
+/** Identifies TypeScript inputs that emit their own output set. */
 function isCompiledSource(path) {
-  return (
-    path.endsWith('.ts') &&
-    !path.endsWith('.d.ts') &&
-    !/\.(?:fixture|spec|test)\.ts$/u.test(path) &&
-    basename(path) !== 'test-contract.ts'
-  );
+  return !path.endsWith('.d.ts');
 }
 
 /** Returns all files emitted for one compiled TypeScript source. */
