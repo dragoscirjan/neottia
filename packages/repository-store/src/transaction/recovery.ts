@@ -2,11 +2,6 @@ import { lstatSync, readdirSync, renameSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { RecoveryError } from '../errors.js';
 import { readManagedFileIfExists } from '../files.js';
-import { emitTransactionFault } from '../internal/fault-injection.js';
-import { syncDirectory } from '../internal/filesystem.js';
-import { getPathState, getRootState, type ManagedRoot, type RepositoryLease } from '../internal/model.js';
-import { assertLiveLease, checkControl, type OperationControl } from '../lease.js';
-import { resolveManagedPath, validateRelativePath } from '../paths.js';
 import { publishTransition } from './apply.js';
 import {
   cleanupIncompleteJournal,
@@ -17,6 +12,12 @@ import {
   validateArtifacts,
 } from './journal.js';
 import type { JournalManifest, RecoveryReport } from './types.js';
+import { emitTransactionFault } from '../internal/fault-injection.js';
+import { assertSafeRegular, syncDirectory } from '../internal/filesystem.js';
+import { getPathState, getRootState, type ManagedRoot, type RepositoryLease } from '../internal/model.js';
+import { recoverExactPublication } from '../internal/publication.js';
+import { assertLiveLease, checkControl, type OperationControl } from '../lease.js';
+import { resolveManagedPath, validateRelativePath } from '../paths.js';
 
 const STATE_NAME = /^([0-9a-f]{64})\.(prepare|active|committed|cleanup)$/u;
 
@@ -78,6 +79,14 @@ export async function recoverActiveDirectory(
   for (const entry of [...manifest.entries].reverse()) {
     checkControl(options);
     const path = resolveManagedPath(root, entry.path);
+    const pathState = getPathState(path);
+    if (pathState === undefined) throw malformed('Recovered path is not a repository-store handle.');
+    recoverExactPublication(
+      pathState.absolutePath,
+      manifest.transactionId,
+      [entry.originalRevision, entry.intendedRevision],
+      state.limits.maxFileBytes,
+    );
     const current = await readManagedFileIfExists(root, lease, path, options);
     const revision = current?.revision ?? null;
     if (revision === entry.originalRevision) continue;
@@ -93,9 +102,20 @@ export async function recoverActiveDirectory(
       entry.beforeArtifact === null
         ? null
         : readArtifact(directory, entry.beforeArtifact, state.limits.maxBeforeImageBytes);
-    const pathState = getPathState(path);
-    if (pathState === undefined) throw malformed('Recovered path is not a repository-store handle.');
-    publishTransition(pathState.absolutePath, original, manifest.transactionId);
+    const identity = current === undefined ? undefined : lstatSync(pathState.absolutePath);
+    if (identity !== undefined) assertSafeRegular(identity, pathState.absolutePath);
+    publishTransition(
+      pathState.absolutePath,
+      original,
+      manifest.transactionId,
+      current === undefined
+        ? undefined
+        : {
+            identity: identity as NonNullable<typeof identity>,
+            revision: current.revision,
+            maxBytes: state.limits.maxFileBytes,
+          },
+    );
   }
   for (const entry of manifest.entries) {
     const path = resolveManagedPath(root, entry.path);

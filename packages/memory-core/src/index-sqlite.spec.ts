@@ -1,57 +1,59 @@
-import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
-import { MemoryError } from './errors.js';
-import { captureDirectoryIdentities } from './filesystem-safety.js';
-import { SqliteIndex } from './index-sqlite.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const tempDirs: string[] = [];
+const repositoryStore = vi.hoisted(() => ({
+  openDisposableSqliteCache: vi.fn(),
+  resolveManagedPath: vi.fn(() => ({})),
+}));
+
+vi.mock('@neottia/repository-store', () => ({
+  openDisposableSqliteCache: repositoryStore.openDisposableSqliteCache,
+  resolveManagedPath: repositoryStore.resolveManagedPath,
+}));
+
+import { openMemoryCache } from './index-sqlite.js';
+
+const root = {} as Parameters<typeof openMemoryCache>[0];
+const lease = {} as Parameters<typeof openMemoryCache>[1];
+const state = {
+  records: [],
+  tombstones: [],
+  activeIds: new Set<string>(),
+  contentHash: 'digest',
+};
 
 afterEach(() => {
-  while (tempDirs.length > 0) rmSync(tempDirs.pop() as string, { recursive: true, force: true });
+  vi.clearAllMocks();
 });
 
-describe('SQLite cache filesystem safety', () => {
-  it.each(['', '-wal', '-shm'])('rejects a symbolic link used as the index%s artifact', (suffix) => {
-    const root = temporaryDirectory();
-    const outside = join(temporaryDirectory(), 'outside.db');
-    writeFileSync(outside, 'not a database');
-    symlinkSync(outside, join(root, `index.db${suffix}`));
+describe('Memory SQLite cache lifecycle', () => {
+  it('closes an opened cache when freshness validation rejects', async () => {
+    const failure = new Error('freshness query failed');
+    const close = vi.fn().mockResolvedValue(undefined);
+    repositoryStore.openDisposableSqliteCache.mockResolvedValue({
+      state: 'ready',
+      database: {
+        prepare: vi.fn().mockRejectedValue(failure),
+      },
+      close,
+    });
 
-    expect(() => SqliteIndex.open(root)).toThrow(/Unsafe memory cache artifact/u);
+    await expect(openMemoryCache(root, lease, state, 1_000)).rejects.toBe(failure);
+    expect(close).toHaveBeenCalledOnce();
   });
 
-  it('normalizes missing directory identity errors', () => {
-    const missing = join(temporaryDirectory(), 'missing');
-    expect(() => captureDirectoryIdentities(missing, 'test directory')).toThrow(MemoryError);
-    expect(() => captureDirectoryIdentities(missing, 'test directory')).toThrow(/ENOENT/u);
-  });
+  it('closes an opened cache whose freshness metadata is stale', async () => {
+    const close = vi.fn().mockResolvedValue(undefined);
+    repositoryStore.openDisposableSqliteCache.mockResolvedValue({
+      state: 'ready',
+      database: {
+        prepare: vi.fn().mockResolvedValue({
+          get: vi.fn().mockResolvedValue({ value: new Date(0).toISOString() }),
+        }),
+      },
+      close,
+    });
 
-  it('rejects a symbolic-link cache root', () => {
-    const parent = temporaryDirectory();
-    const outside = temporaryDirectory();
-    const root = join(parent, 'memory');
-    symlinkSync(outside, root, 'dir');
-
-    expect(() => SqliteIndex.open(root)).toThrow(/Unsafe memory cache directory/u);
-  });
-
-  it('detects deterministic artifact replacement after the database is open', () => {
-    const root = temporaryDirectory();
-    const outside = join(temporaryDirectory(), 'outside.db');
-    writeFileSync(outside, 'outside remains unchanged');
-    const index = SqliteIndex.open(root);
-    rmSync(index.path);
-    symlinkSync(outside, index.path);
-
-    expect(() => index.meta()).toThrow(/Unsafe memory cache artifact/u);
-    expect(() => index.close()).toThrow(/Unsafe memory cache artifact/u);
+    await expect(openMemoryCache(root, lease, state, 1_000)).resolves.toBeUndefined();
+    expect(close).toHaveBeenCalledOnce();
   });
 });
-
-function temporaryDirectory(): string {
-  const path = mkdtempSync(join(tmpdir(), 'neottia-index-safety-'));
-  tempDirs.push(path);
-  return path;
-}

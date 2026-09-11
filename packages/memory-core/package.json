@@ -33,7 +33,9 @@
   },
   "scripts": {
     "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json && node scripts/generate-config-schema.mjs && pnpm exec prettier --write config.schema.json",
-    "test": "vitest run --root ../.. packages/memory-core/src",
+    "test": "pnpm run test:node && pnpm run test:bun",
+    "test:node": "node scripts/ensure-repository-store.mjs && vitest run --root ../.. packages/memory-core/src --exclude packages/memory-core/src/memory.bun.test.ts",
+    "test:bun": "node scripts/ensure-repository-store.mjs && bun test ./src/memory.bun.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

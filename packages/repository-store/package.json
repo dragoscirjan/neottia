@@ -20,23 +20,38 @@
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "typesVersions": {
+    "*": {
+      "testing": ["dist/testing.d.ts"]
+    }
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "default": "./dist/testing.js"
     }
   },
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": ["dist", "native", "scripts/install-native.mjs", "binding.gyp", "README.md", "LICENSE"],
+  "gypfile": true,
   "engines": {
     "node": ">=22.16.0"
   },
   "scripts": {
-    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
+    "build": "pnpm run build:native && node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
+    "build:native": "node-gyp rebuild",
+    "install": "node scripts/install-native.mjs",
     "test": "pnpm run test:node && pnpm run test:bun && pnpm run test:cross-runtime",
     "test:node": "pnpm run build && vitest run --root ../.. packages/repository-store/src/repository-store.spec.ts packages/repository-store/src/sqlite/cache.spec.ts packages/repository-store/src/sqlite/node-adapter.spec.ts",
-    "test:bun": "pnpm run build && bun test ./src/sqlite/bun-adapter.bun.test.ts",
+    "test:bun": "pnpm run build && bun test ./src/sqlite/bun-adapter.bun.test.ts ./src/publication.bun.test.ts",
     "test:cross-runtime": "pnpm run build && vitest run --root ../.. packages/repository-store/src/sqlite/cross-runtime.spec.ts",
     "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "node-gyp": "^11.5.0"
   },
   "devDependencies": {
     "@templ-project/tsconfig": "^0.2.2",

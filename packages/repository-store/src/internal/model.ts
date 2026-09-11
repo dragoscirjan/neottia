@@ -25,6 +25,7 @@ export interface LeaseState {
   readonly lockPath: string;
   readonly lockIdentity: Stats;
   readonly ownerIdentity: Stats;
+  readonly pendingOperations: Set<Promise<unknown>>;
   active: boolean;
 }
 

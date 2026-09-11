@@ -34,8 +34,9 @@ Part of the [Neottia](https://github.com/dragoscirjan/neottia) SDLC. The configu
 
 ## Requirements
 
-- **Node.js >= 22.16.0** — the first Node release whose built-in `node:sqlite` ships with FTS5 enabled. No native modules, no compilation, no external database.
-- A writable project directory (memory files are stored relative to the working directory you give the store).
+- **Node.js >= 22.16.0** or **Bun >= 1.3.13** with built-in SQLite and FTS5.
+- Linux x64 or arm64, the repository-store Node-API addon (built with a C++17 compiler, Python, Make, and Linux development headers), and kernel/libc support for `renameat2(..., RENAME_NOREPLACE)`.
+- A writable project directory on a recognized local ext4, XFS, Btrfs, tmpfs, or overlay filesystem with same-volume regular-file hard links. Filesystem Memory cannot acquire repository authority on macOS, Windows, shared/network filesystems, or when the native addon is missing or unloadable.
 
 ## Installation
 
@@ -357,13 +358,13 @@ Each tool has a Zod input schema (`MEMORY_TOOLS` / `findMemoryTool(name)` / the 
 
 ## Error handling
 
-| Error                                       | When                                                                                                                       | Handling suggestion                                                |
-| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `ConfigError`                               | Invalid config file, shard, or env values; carries `validationPaths`                                                       | Fix the named paths                                                |
-| `MemoryError`                               | Base class for operation failures: disabled memory, invalid records, limits, unsafe paths, stale cache under `fail` policy | Message is precise; safe to surface to the user                    |
-| `MemoryConflictError` extends `MemoryError` | Duplicate ID, superseding an inactive record                                                                               | Re-read state and retry deliberately                               |
-| `MemoryLockError`                           | Another writer holds the shard lock past the wait window                                                                   | Retry; the lock is released automatically when the writer finishes |
-| `MemorySecretError`                         | Content matched a secret pattern or the entropy heuristic                                                                  | Remove the secret; never store credentials                         |
+| Error                                       | When                                                                                                                       | Handling suggestion                                                    |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `ConfigError`                               | Invalid config file, shard, or env values; carries `validationPaths`                                                       | Fix the named paths                                                    |
+| `MemoryError`                               | Base class for operation failures: disabled memory, invalid records, limits, unsafe paths, stale cache under `fail` policy | Message is precise; safe to surface to the user                        |
+| `MemoryConflictError` extends `MemoryError` | Duplicate ID, superseding an inactive record                                                                               | Re-read state and retry deliberately                                   |
+| `MemoryLockError`                           | Another read, recovery, cache task, or write holds the repository authority lease past the wait window                     | Retry; the lease is released automatically when the operation finishes |
+| `MemorySecretError`                         | Content matched a secret pattern or the entropy heuristic                                                                  | Remove the secret; never store credentials                             |
 
 ## Security
 
@@ -375,23 +376,23 @@ Each tool has a Zod input schema (`MEMORY_TOOLS` / `findMemoryTool(name)` / the 
 
 ## Concurrency
 
-- Writers serialize through a **shard-scoped lock** (one per `organization/project/scope`) stored under `<memory-root>/.locks/`.
-- The lock is a directory created atomically; a waiting writer retries for `waitMs` (default 10 s) before failing with `MemoryLockError`.
-- A stale lock is stolen **only** when it is past `staleMs` (default 60 s) **and** the owning process is provably gone (`ESRCH`). Unknown ownership is preserved, never stolen.
-- Readers operate inside the same barrier, so no operation ever observes a batch mid-write.
+- Filesystem operations share the repository authority lease at `<authority>/.neottia/repository-store/`; legacy `<memory-root>/.locks/` artifacts are no longer used.
+- Independent same-process calls queue with other filesystem domains, while cross-process callers wait for the same authority lease. Timeouts surface as `MemoryLockError`.
+- A stale lease is reclaimed only when its same-host owner is conclusively dead. Unknown ownership is preserved.
+- Reads, canonical transactions, recovery, and disposable cache work use the same lease, so no cooperating operation observes a batch mid-write.
 
 ## Troubleshooting
 
-| Symptom                                                | Cause                                                | Fix                                                                                                |
-| ------------------------------------------------------ | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `Memory operation requires skills.memory.enabled=true` | Memory is off                                        | Set `skills.memory.enabled: true` or `NEOTTIA_MEMORY_ENABLED=true`                                 |
-| `Config requires an explicit 'version: 1'`             | Config file missing the version key                  | Add `version: 1` at the top                                                                        |
-| `Memory backend 'postgres' connection failed`          | PostgreSQL is unavailable or credentials are invalid | Verify host, port, database, and credentials; retry when the database is reachable                 |
-| `summary has N Unicode characters; limit is 240`       | Compactness violation                                | Shorten `summary` (or `details`: 2000 chars / 12 lines)                                            |
-| `Suspected secret at …`                                | Secret scanner match                                 | Remove the secret; adjust `security.secret_patterns` / entropy heuristic if it is a false positive |
-| `Shard barrier is busy`                                | Concurrent writer held the lock > 10 s               | Retry; check for stuck processes (a live owner is never stolen)                                    |
-| `Memory cache is stale and cache.stale_policy is fail` | Read refused on stale index                          | Run `memory_validate`, or change the policy                                                        |
-| Search returns nothing for known content               | Index stale or corrupt                               | `memory_validate` (it rebuilds), or delete `index.db`                                              |
+| Symptom                                                | Cause                                                 | Fix                                                                                                |
+| ------------------------------------------------------ | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `Memory operation requires skills.memory.enabled=true` | Memory is off                                         | Set `skills.memory.enabled: true` or `NEOTTIA_MEMORY_ENABLED=true`                                 |
+| `Config requires an explicit 'version: 1'`             | Config file missing the version key                   | Add `version: 1` at the top                                                                        |
+| `Memory backend 'postgres' connection failed`          | PostgreSQL is unavailable or credentials are invalid  | Verify host, port, database, and credentials; retry when the database is reachable                 |
+| `summary has N Unicode characters; limit is 240`       | Compactness violation                                 | Shorten `summary` (or `details`: 2000 chars / 12 lines)                                            |
+| `Suspected secret at …`                                | Secret scanner match                                  | Remove the secret; adjust `security.secret_patterns` / entropy heuristic if it is a false positive |
+| `Repository authority lease is busy`                   | Another repository operation exceeded its wait budget | Retry; check for stuck processes (a live owner is never stolen)                                    |
+| `Memory cache is stale and cache.stale_policy is fail` | Read refused on stale index                           | Run `memory_validate`, or change the policy                                                        |
+| Search returns nothing for known content               | Index stale or corrupt                                | `memory_validate` (it rebuilds), or delete `index.db`                                              |
 
 ## License
 

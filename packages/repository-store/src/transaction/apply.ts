@@ -1,41 +1,8 @@
 import { randomBytes } from 'node:crypto';
-import {
-  closeSync,
-  constants as fsConstants,
-  fstatSync,
-  fsyncSync,
-  lstatSync,
-  openSync,
-  readdirSync,
-  renameSync,
-  rmSync,
-  rmdirSync,
-  writeFileSync,
-} from 'node:fs';
-import { dirname, join, relative } from 'node:path';
+import { lstatSync, readdirSync, renameSync, rmSync, rmdirSync } from 'node:fs';
+import { join, relative } from 'node:path';
 import { PathSafetyError, RecoveryError, ResourceLimitError, StaleRevisionError } from '../errors.js';
 import { assertPathAuthority, readManagedFileIfExists } from '../files.js';
-import { emitTransactionFault } from '../internal/fault-injection.js';
-import {
-  assertSafeRegular,
-  captureDirectories,
-  ensurePrivateDirectory,
-  hasCode,
-  noFollowFlag,
-  revalidateDirectories,
-  sameIdentity,
-  syncDirectory,
-} from '../internal/filesystem.js';
-import {
-  getPathState,
-  getRootState,
-  type ManagedPath,
-  type ManagedRoot,
-  type RepositoryLease,
-} from '../internal/model.js';
-import { assertLiveLease, checkControl, type OperationControl } from '../lease.js';
-import { compareCanonicalPaths, portablePathKey } from '../paths.js';
-import { computeByteRevision, type ByteRevision } from '../revision.js';
 import {
   cleanupJournal,
   createTransactionDirectory,
@@ -45,6 +12,19 @@ import {
 } from './journal.js';
 import { recoverActiveDirectory } from './recovery.js';
 import type { ApplyCanonicalBatchOptions, CanonicalOperation, JournalEntry, JournalManifest } from './types.js';
+import { emitTransactionFault } from '../internal/fault-injection.js';
+import { assertSafeRegular, hasCode, syncDirectory } from '../internal/filesystem.js';
+import {
+  getPathState,
+  getRootState,
+  type ManagedPath,
+  type ManagedRoot,
+  type RepositoryLease,
+} from '../internal/model.js';
+import { publishExactRegularFile, type ExpectedRegularFile } from '../internal/publication.js';
+import { assertLiveLease, checkControl, type OperationControl } from '../lease.js';
+import { compareCanonicalPaths, portablePathKey } from '../paths.js';
+import { computeByteRevision, type ByteRevision } from '../revision.js';
 
 interface Transition {
   readonly path: ManagedPath;
@@ -69,6 +49,10 @@ export async function applyCanonicalBatch(
   if (ownedOperations.length > state.limits.maxBatchPaths)
     throw new ResourceLimitError('Canonical batch exceeds maxBatchPaths.');
   const transitions = await normalizeOperations(root, lease, ownedOperations, options);
+  // Moves expand into source and destination transitions, and both affected
+  // paths count toward the mutation bound before journal creation.
+  if (transitions.length > state.limits.maxBatchPaths)
+    throw new ResourceLimitError('Canonical batch exceeds maxBatchPaths after move normalization.');
   await validateProposedInventory(root, transitions, options.inventory);
   const transactionId = randomBytes(32).toString('hex');
   const transactions = transactionRoot(state.authorityRoot, state.managedRootId);
@@ -134,8 +118,8 @@ export async function applyCanonicalBatch(
 
     for (const transition of transitions) {
       checkControl(options);
-      await verifyCurrent(root, lease, transition.path, transition.original, options);
-      publishTransition(requirePathState(transition.path).absolutePath, transition.intended, transactionId);
+      const expected = await verifyCurrent(root, lease, transition.path, transition.original, options);
+      publishTransition(requirePathState(transition.path).absolutePath, transition.intended, transactionId, expected);
       emitTransactionFault('canonical-path-published');
     }
     for (const transition of transitions)
@@ -315,7 +299,7 @@ async function verifyCurrent(
   expected: Uint8Array | null,
   options: OperationControl,
   recoveryVerification = false,
-): Promise<void> {
+): Promise<ExpectedRegularFile | undefined> {
   const current = await readManagedFileIfExists(root, lease, path, options);
   const actualRevision = current?.revision;
   const expectedRevision = expected === null ? undefined : computeByteRevision(expected);
@@ -326,53 +310,21 @@ async function verifyCurrent(
       });
     throw new StaleRevisionError(`Canonical path changed during publication: ${path.relativePath}`);
   }
+  if (current === undefined) return undefined;
+  const absolute = requirePathState(path).absolutePath;
+  const identity = lstatSync(absolute);
+  assertSafeRegular(identity, absolute);
+  return { identity, revision: current.revision, maxBytes: requireRootState(root).limits.maxFileBytes };
 }
 
-/** Publishes one transition using a same-directory durable temporary file. */
-export function publishTransition(path: string, bytes: Uint8Array | null, token: string): void {
-  const parent = dirname(path);
-  ensurePrivateDirectory(parent);
-  const parents = captureDirectories(parent);
-  if (bytes === null) {
-    const stat = lstatSync(path);
-    assertSafeRegular(stat, path);
-    revalidateDirectories(parents);
-    rmSync(path);
-    revalidateDirectories(parents);
-    syncDirectory(parent);
-    return;
-  }
-  const temporary = join(parent, `.${token}.repository-store.tmp`);
-  let descriptor: number | undefined;
-  try {
-    descriptor = openSync(
-      temporary,
-      fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL | noFollowFlag(),
-      0o600,
-    );
-    writeFileSync(descriptor, bytes);
-    fsyncSync(descriptor);
-    const temporaryStat = fstatSync(descriptor);
-    assertSafeRegular(temporaryStat, temporary);
-    closeSync(descriptor);
-    descriptor = undefined;
-    if (exists(path)) assertSafeRegular(lstatSync(path), path);
-    revalidateDirectories(parents);
-    renameSync(temporary, path);
-    const destination = lstatSync(path);
-    if (!sameIdentity(temporaryStat, destination))
-      throw new PathSafetyError(`Destination changed during publication: ${path}`, 'IDENTITY_CHANGED');
-    revalidateDirectories(parents);
-    syncDirectory(parent);
-  } finally {
-    if (descriptor !== undefined) closeSync(descriptor);
-    try {
-      revalidateDirectories(parents);
-      if (exists(temporary)) rmSync(temporary);
-    } catch {
-      // Never clean through a rebound parent.
-    }
-  }
+/** Publishes one transition without overwriting an unchecked destination. */
+export function publishTransition(
+  path: string,
+  bytes: Uint8Array | null,
+  token: string,
+  expected?: ExpectedRegularFile,
+): void {
+  publishExactRegularFile(path, bytes, expected, token);
 }
 
 function removePreparationArtifacts(directory: string, token: string): void {
@@ -395,14 +347,4 @@ function requirePathState(path: ManagedPath): NonNullable<ReturnType<typeof getP
   const state = getPathState(path);
   if (state === undefined) throw new PathSafetyError('Managed path is not a repository-store handle.');
   return state;
-}
-
-function exists(path: string): boolean {
-  try {
-    lstatSync(path);
-    return true;
-  } catch (error: unknown) {
-    if (hasCode(error, 'ENOENT')) return false;
-    throw error;
-  }
 }

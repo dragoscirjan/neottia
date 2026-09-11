@@ -91,10 +91,16 @@ export class LeaseContentionError extends RepositoryStoreError {
   }
 }
 
+/** Evidence identifying the synchronization operation that failed. */
+export interface DurabilityEvidence extends Readonly<Record<string, unknown>> {
+  readonly operation: 'file-fsync' | 'directory-fsync';
+  readonly path: string;
+}
+
 /** A durable filesystem operation failed. */
 export class DurabilityError extends RepositoryStoreError {
-  public constructor(message: string, options?: ErrorOptions) {
-    super(message, 'durability', 'FSYNC_FAILED', false, undefined, options);
+  public constructor(message: string, options?: ErrorOptions & { readonly evidence?: DurabilityEvidence }) {
+    super(message, 'durability', 'FSYNC_FAILED', false, options?.evidence, options);
     this.name = 'DurabilityError';
   }
 }

@@ -41,6 +41,59 @@ export function runSqliteAdapterContract(api: SuiteApi, adapter: SqliteAdapter):
       }
     });
 
+    api.it('bounds positional and named parameter bytes before driver mutation', async () => {
+      const root = mkdtempSync(join(tmpdir(), `neottia-${adapter.runtime}-parameters-`));
+      const path = join(root, 'parameters.db');
+      const limits = {
+        maxSqlBytes: 1_000,
+        maxStatementParameterBytes: 8,
+        maxQueryRows: 10,
+        maxQueryResultBytes: 1_000,
+      };
+      const database = await adapter.open(path, { readOnly: false, busyTimeoutMs: 1_000, limits });
+      try {
+        await database.exec('CREATE TABLE items (id TEXT PRIMARY KEY, value BLOB NOT NULL);');
+        const positional = await database.prepare('INSERT INTO items (id, value) VALUES (?, ?)');
+        await positional.run(['é', new Uint8Array(6)]);
+        let overCode: unknown;
+        try {
+          await positional.run(['é', new Uint8Array(7)]);
+        } catch (error: unknown) {
+          overCode = error instanceof Error && 'code' in error ? error.code : undefined;
+        }
+        api.expect(overCode).toBe('LIMIT_EXCEEDED');
+
+        const named = await database.prepare('INSERT INTO items (id, value) VALUES ($id, $value)');
+        await named.run({ $id: 'n', $value: '1234567' });
+        overCode = undefined;
+        try {
+          await named.run({ $id: 'x', $value: '12345678' });
+        } catch (error: unknown) {
+          overCode = error instanceof Error && 'code' in error ? error.code : undefined;
+        }
+        api.expect(overCode).toBe('LIMIT_EXCEEDED');
+
+        const byNumber = await database.prepare('SELECT id FROM items WHERE length(value) = ?');
+        api.expect((await byNumber.get<{ id: string }>([6]))?.id).toBe('é');
+        const byText = await database.prepare('SELECT id FROM items WHERE id = ?');
+        const rows = await byText.all<{ id: string }>(['éééé'], { maxRows: 10, maxBytes: 100 });
+        api.expect(rows).toEqual([]);
+        overCode = undefined;
+        try {
+          await byText.all(['ééééx'], { maxRows: 10, maxBytes: 100 });
+        } catch (error: unknown) {
+          overCode = error instanceof Error && 'code' in error ? error.code : undefined;
+        }
+        api.expect(overCode).toBe('LIMIT_EXCEEDED');
+
+        const count = await (await database.prepare('SELECT count(*) AS count FROM items')).get<{ count: number }>();
+        api.expect(count?.count).toBe(2);
+      } finally {
+        await database.close();
+        rmSync(root, { recursive: true, force: true });
+      }
+    });
+
     api.it('normalizes write contention as retryable cache busy', async () => {
       const root = mkdtempSync(join(tmpdir(), `neottia-${adapter.runtime}-busy-`));
       const path = join(root, 'busy.db');

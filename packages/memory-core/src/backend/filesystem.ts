@@ -1,20 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { createHash, randomUUID } from 'node:crypto';
-import {
-  closeSync,
-  constants as fsConstants,
-  fstatSync,
-  fsyncSync,
-  lstatSync,
-  mkdirSync,
-  openSync,
-  readFileSync,
-  readdirSync,
-  renameSync,
-  rmSync,
-  writeFileSync,
-  type Stats,
-} from 'node:fs';
+import { createHash } from 'node:crypto';
+import { lstatSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import {
   DEFAULT_STORE_LIMITS,
@@ -33,16 +19,8 @@ import {
 import { parseDocument, stringify } from 'yaml';
 import type { MemoryConfig } from '../config.js';
 import { MemoryConflictError, MemoryError, MemoryLockError } from '../errors.js';
-import {
-  captureDirectoryIdentities as captureDirectoryIdentityChain,
-  isFilesystemErrorCode as isCode,
-  noFollowFlag,
-  revalidateDirectoryIdentities as revalidateDirectoryIdentityChain,
-  sameFilesystemIdentity as sameIdentity,
-  type DirectoryIdentity,
-} from '../filesystem-safety.js';
 import { isUlid } from '../identities.js';
-import { SqliteIndex } from '../index-sqlite.js';
+import { openMemoryCache, rebuildMemoryCache, removeMemoryCache, searchMemoryCache } from '../index-sqlite.js';
 import type { MemoryRecord, MemoryTombstone, RecordType } from '../schemas.js';
 import { createSecretScanner, type SecretScanner } from '../security.js';
 import {
@@ -78,18 +56,11 @@ export const RECORD_FOLDERS: Readonly<Record<RecordType, string>> = {
   lesson: 'lessons',
 };
 
-export interface FilesystemOperations {
-  readonly renameSync: typeof renameSync;
-  readonly syncDirectory: (path: string) => void;
-}
-
 export interface FilesystemBackendOptions {
   readonly config: MemoryConfig;
   readonly cwd: string;
   /** Host hook for stale_policy 'prompt' (see MemoryStoreOptions). */
   readonly onStaleCache?: () => boolean | Promise<boolean>;
-  /** Advanced injection hook for testing atomic publication failures. */
-  readonly filesystemOps?: Partial<FilesystemOperations>;
 }
 
 export class FilesystemBackend implements StorageBackend {
@@ -102,8 +73,6 @@ export class FilesystemBackend implements StorageBackend {
   private readonly cacheMaxAgeMs: number;
   private readonly stalePolicy: 'prompt' | 'rebuild' | 'fail';
   private readonly onStaleCache?: () => boolean | Promise<boolean>;
-  private readonly filesystemOps: FilesystemOperations;
-  private readonly usesInjectedFilesystemOperations: boolean;
   private repositoryRoot?: Promise<ManagedRoot>;
   private readonly repositoryRootOptions: ManagedRootOptions;
   private readonly repositoryLease = new AsyncLocalStorage<RepositoryLease>();
@@ -114,8 +83,6 @@ export class FilesystemBackend implements StorageBackend {
     this.cacheMaxAgeMs = options.config.cache.max_age_ms;
     this.stalePolicy = options.config.cache.stale_policy;
     this.onStaleCache = options.onStaleCache;
-    this.filesystemOps = { ...DEFAULT_FILESYSTEM_OPERATIONS, ...options.filesystemOps };
-    this.usesInjectedFilesystemOperations = options.filesystemOps !== undefined;
     this.limits = {
       maxFileBytes: options.config.security.limits.max_file_bytes,
       maxFiles: options.config.security.limits.max_files,
@@ -132,7 +99,15 @@ export class FilesystemBackend implements StorageBackend {
         maxTotalBytes: this.limits.maxTotalBytes,
         maxBatchPaths: this.limits.maxFiles,
         maxBeforeImageBytes: this.limits.maxTotalBytes,
-        maxTemporaryBytes: this.limits.maxTotalBytes,
+        maxTemporaryBytes: Math.max(DEFAULT_STORE_LIMITS.maxTemporaryBytes, this.limits.maxTotalBytes),
+        maxStatementParameterBytes: Math.min(
+          Number.MAX_SAFE_INTEGER,
+          Math.max(DEFAULT_STORE_LIMITS.maxStatementParameterBytes, this.limits.maxFileBytes + 64 * 1024),
+        ),
+        maxQueryResultBytes: Math.min(
+          Number.MAX_SAFE_INTEGER,
+          Math.max(DEFAULT_STORE_LIMITS.maxQueryResultBytes, this.limits.maxFileBytes + 64 * 1024),
+        ),
       },
     };
     this.scanner = createSecretScanner({
@@ -221,11 +196,6 @@ export class FilesystemBackend implements StorageBackend {
 
   /** {@inheritdoc StorageBackend.applyBatch} */
   public async applyBatch(replacements: readonly StorageReplacement[]): Promise<void> {
-    if (this.usesInjectedFilesystemOperations) {
-      // Preserve the documented test seam while production publication uses
-      // repository-store's durable journal implementation.
-      return this.withRepositoryAccess(async () => this.applyBatchSync(replacements));
-    }
     return this.withRepositoryAccess(async (root, lease) => {
       if (replacements.length > this.limits.maxFiles) throw new MemoryError('Memory batch path limit exceeded.');
       const operations = [];
@@ -263,80 +233,37 @@ export class FilesystemBackend implements StorageBackend {
     });
   }
 
-  private applyBatchSync(replacements: readonly StorageReplacement[]): void {
-    if (replacements.length > this.limits.maxFiles) throw new MemoryError('Memory batch path limit exceeded.');
-    const ordered = [...replacements].sort((left, right) => left.path.localeCompare(right.path));
-    const before = new Map<string, Uint8Array | undefined>();
-    const seen = new Set<string>();
-    let resultingFiles = 0;
-    let resultingBytes = 0;
-    for (const folder of [...Object.values(RECORD_FOLDERS), 'tombstones']) {
-      for (const path of this.yamlFiles(join(this.root, folder))) {
-        resultingFiles += 1;
-        resultingBytes += this.regularSize(path);
-      }
-    }
-
-    for (const replacement of ordered) {
-      const absolute = this.managedPath(replacement.path);
-      if (replacement.bytes) this.validateReplacementIdentity(replacement.path, replacement.bytes);
-      const key = replacement.path.normalize('NFKC').toLowerCase();
-      if (seen.has(key)) throw new MemoryError('Memory batch contains duplicate paths.');
-      seen.add(key);
-      const previous = this.readRegularIfExists(absolute);
-      if (replacement.exclusive && previous)
-        throw new MemoryConflictError(`Memory path already exists: ${replacement.path}`);
-      const nextBytes = replacement.bytes?.byteLength ?? 0;
-      if (nextBytes > this.limits.maxFileBytes) throw new MemoryError(`Memory file exceeds limit: ${replacement.path}`);
-      resultingFiles += previous ? (replacement.bytes ? 0 : -1) : replacement.bytes ? 1 : 0;
-      resultingBytes += nextBytes - (previous?.byteLength ?? 0);
-      before.set(replacement.path, previous);
-    }
-    if (resultingFiles > this.limits.maxFiles) throw new MemoryError('Memory file limit exceeded.');
-    if (resultingBytes > this.limits.maxTotalBytes) throw new MemoryError('Aggregate memory byte limit exceeded.');
-
-    const applied: StorageReplacement[] = [];
-    try {
-      for (const replacement of ordered)
-        this.publish(replacement.path, replacement.bytes, () => {
-          // Rename/remove is the publication point. Track it before directory
-          // fsync so a durability failure still rolls back the visible file.
-          applied.push(replacement);
-        });
-    } catch (error: unknown) {
-      let rollbackFailed = false;
-      for (const replacement of applied.reverse()) {
-        try {
-          this.publish(replacement.path, before.get(replacement.path), () => undefined);
-        } catch {
-          rollbackFailed = true;
-        }
-      }
-      if (rollbackFailed) throw new MemoryError('Memory batch rollback failed; canonical state may be inconsistent.');
-      throw error;
-    }
-  }
-
-  /** {@inheritdoc StorageBackend.search} — BM25 through the SQLite index. */
+  /** {@inheritdoc StorageBackend.search} — BM25 over a disposable projection. */
   public async search(state: ShardState, query: string, options: BackendSearchOptions): Promise<MemoryRecord[]> {
-    const index = await this.ensureIndex(state);
-    let operationFailed = false;
-    try {
-      return index.search(query, state, options);
-    } catch (error: unknown) {
-      operationFailed = true;
-      throw error;
-    } finally {
-      closeIndexPreservingError(index, operationFailed);
-    }
+    return this.withRepositoryAccess(async (root, lease) => {
+      let cache = await openMemoryCache(root, lease, state, this.cacheMaxAgeMs);
+      if (cache === undefined) {
+        await this.resolveStaleness();
+        cache = await rebuildMemoryCache(root, lease, state);
+      }
+      let primaryError: unknown;
+      let result: MemoryRecord[] | undefined;
+      try {
+        result = await searchMemoryCache(cache, query, state, options);
+      } catch (error: unknown) {
+        primaryError = error;
+      }
+      try {
+        await cache.close();
+      } catch (error: unknown) {
+        primaryError ??= error;
+      }
+      if (primaryError !== undefined) throw primaryError;
+      return result as MemoryRecord[];
+    });
   }
 
-  /** {@inheritdoc StorageBackend.withLock} — shard-scoped directory lock. */
+  /** {@inheritdoc StorageBackend.withLock} */
   public async withLock<T>(operation: () => Promise<T>): Promise<T> {
     return this.withRepositoryAccess(async () => operation());
   }
 
-  /** Lazily resolves storage so constructing a disabled store remains side-effect free. */
+  /** Lazily resolves storage so disabled construction remains side-effect free. */
   private async getRepositoryRoot(): Promise<ManagedRoot> {
     if (this.repositoryRoot !== undefined) return this.repositoryRoot;
     const resolution = resolveManagedRoot(this.repositoryRootOptions);
@@ -344,27 +271,26 @@ export class FilesystemBackend implements StorageBackend {
     try {
       return await resolution;
     } catch (error: unknown) {
-      // Permission or mount problems can be repaired by the operator; do not
-      // permanently cache a rejected initialization promise.
       if (this.repositoryRoot === resolution) this.repositoryRoot = undefined;
       throw error;
     }
   }
 
-  /** Runs directly under an existing lease or acquires the authority once. */
+  /** Runs under an existing lease or acquires the shared repository authority. */
   private async withRepositoryAccess<T>(
     operation: (root: ManagedRoot, lease: RepositoryLease) => Promise<T>,
   ): Promise<T> {
-    const root = await this.getRepositoryRoot();
-    const existing = this.repositoryLease.getStore();
-    if (existing !== undefined) return operation(root, existing);
     try {
+      const root = await this.getRepositoryRoot();
+      const existing = this.repositoryLease.getStore();
+      if (existing !== undefined) return await operation(root, existing);
       return await withRepositoryLease(root, async (lease) =>
         this.repositoryLease.run(lease, async () => operation(root, lease)),
       );
     } catch (error: unknown) {
       if (!(error instanceof RepositoryStoreError)) throw error;
       if (error.category === 'contention') throw new MemoryLockError(error.message, { cause: error });
+      if (error.code === 'REVISION_MISMATCH') throw new MemoryConflictError(error.message);
       if (error.code === 'LIMIT_EXCEEDED' && /byte (?:count|limit)/u.test(error.message))
         throw new MemoryError('Aggregate memory byte limit exceeded.', { cause: error });
       if (error.code === 'LIMIT_EXCEEDED' && error.message.includes('file count'))
@@ -377,62 +303,37 @@ export class FilesystemBackend implements StorageBackend {
 
   /** {@inheritdoc StorageBackend.checkOrRebuildCache} */
   public async checkOrRebuildCache(state: ShardState): Promise<CacheValidation> {
-    // Fresh connection per call: the index file can be replaced externally
-    // (tests, manual deletion), and an open handle would read stale pages.
-    const index = SqliteIndex.open(this.root);
-    let operationFailed = false;
-    try {
-      if (!index.isStale(this.cacheMaxAgeMs, state))
+    return this.withRepositoryAccess(async (root, lease) => {
+      const opened = await openMemoryCache(root, lease, state, this.cacheMaxAgeMs);
+      if (opened !== undefined) {
+        await opened.close();
         return { outcome: 'checked', evidence: 'canonical_snapshot_match_verified' };
-      index.rebuild(state);
+      }
+      const rebuilt = await rebuildMemoryCache(root, lease, state);
+      await rebuilt.close();
       return { outcome: 'rebuilt', evidence: 'canonical_snapshot_rebuild_verified' };
-    } catch (error: unknown) {
-      operationFailed = true;
-      throw error;
-    } finally {
-      closeIndexPreservingError(index, operationFailed);
-    }
+    });
   }
 
   /** {@inheritdoc StorageBackend.resetCache} */
   public async resetCache(): Promise<void> {
-    SqliteIndex.destroy(this.root);
+    return this.withRepositoryAccess((root, lease) => removeMemoryCache(root, lease));
   }
 
-  /** {@inheritdoc StorageBackend.close} — the index opens per operation. */
+  /** {@inheritdoc StorageBackend.close} — cache handles are operation-scoped. */
   public async close(): Promise<void> {
     await Promise.resolve();
   }
 
-  /** Opens a fresh index connection and resolves staleness per policy. */
-  private async ensureIndex(state: ShardState): Promise<SqliteIndex> {
-    const index = SqliteIndex.open(this.root);
-    try {
-      if (!index.isStale(this.cacheMaxAgeMs, state)) return index;
-      await this.resolveStaleness(index, state);
-      return index;
-    } catch (error: unknown) {
-      // A failed staleness resolution (fail policy, declined prompt) must not
-      // leak the opened handle or be hidden by a cleanup safety error.
-      closeIndexPreservingError(index, true);
-      throw error;
-    }
-  }
-
-  private async resolveStaleness(index: SqliteIndex, state: ShardState): Promise<void> {
+  private async resolveStaleness(): Promise<void> {
     switch (this.stalePolicy) {
       case 'rebuild':
-        index.rebuild(state);
         return;
       case 'fail':
         throw new MemoryError('Memory cache is stale and cache.stale_policy is fail; run memory_validate.');
-      case 'prompt': {
-        if (this.onStaleCache === undefined || (await this.onStaleCache()) === true) {
-          index.rebuild(state);
-          return;
-        }
+      case 'prompt':
+        if (this.onStaleCache === undefined || (await this.onStaleCache()) === true) return;
         throw new MemoryError('Memory cache is stale; rebuild declined by the host.');
-      }
     }
   }
 
@@ -487,27 +388,6 @@ export class FilesystemBackend implements StorageBackend {
     return Buffer.from(stringify(value, { lineWidth: 0 }), 'utf8');
   }
 
-  private yamlFiles(directory: string): string[] {
-    try {
-      const stat = lstatSync(directory);
-      if (stat.isSymbolicLink() || !stat.isDirectory()) throw new MemoryError(`Unsafe memory directory: ${directory}`);
-    } catch (error: unknown) {
-      if (isCode(error, 'ENOENT')) return [];
-      throw error;
-    }
-    const identities = captureDirectoryIdentities(directory);
-    const entries = readdirSync(directory, { withFileTypes: true });
-    revalidateDirectoryIdentities(identities);
-    return entries
-      .filter((entry) => entry.name.endsWith('.yaml'))
-      .map((entry) => {
-        if (!entry.isFile() || entry.isSymbolicLink())
-          throw new MemoryError(`Unsafe memory file: ${join(directory, entry.name)}`);
-        return join(directory, entry.name);
-      })
-      .sort();
-  }
-
   private trackUsage(path: string, size: number, files: number, bytes: number): { files: number; bytes: number } {
     if (size > this.limits.maxFileBytes) throw new MemoryError(`Memory file exceeds limit: ${path}`);
     const result = { files: files + 1, bytes: bytes + size };
@@ -546,126 +426,6 @@ export class FilesystemBackend implements StorageBackend {
     throw new MemoryError(`Memory path does not map to a canonical document: ${path}`);
   }
 
-  private publish(path: string, bytes: Uint8Array | undefined, published: () => void): void {
-    const absolute = this.managedPath(path);
-    const parent = dirname(absolute);
-    this.ensureSafeDirectories(dirname(relative(this.root, absolute)).split(sep).join('/'));
-    const parentIdentities = captureDirectoryIdentities(parent);
-    if (!bytes) {
-      if (assertRegularDestinationIfPresent(absolute)) {
-        revalidateDirectoryIdentities(parentIdentities);
-        rmSync(absolute);
-        published();
-        revalidateDirectoryIdentities(parentIdentities);
-      }
-      this.filesystemOps.syncDirectory(parent);
-      return;
-    }
-    const temporary = join(parent, `.${randomUUID()}.tmp`);
-    let descriptor: number | undefined;
-    let temporaryIdentity: Stats | undefined;
-    let parentIsCurrent = true;
-    try {
-      descriptor = openSync(
-        temporary,
-        fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL | noFollowFlag(),
-        0o600,
-      );
-      temporaryIdentity = fstatSync(descriptor);
-      if (!temporaryIdentity.isFile()) throw new MemoryError(`Unsafe temporary memory file: ${temporary}`);
-      writeFileSync(descriptor, bytes);
-      fsyncSync(descriptor);
-      closeSync(descriptor);
-      descriptor = undefined;
-      assertRegularDestinationIfPresent(absolute);
-      revalidateDirectoryIdentities(parentIdentities);
-      this.filesystemOps.renameSync(temporary, absolute);
-      published();
-      const destinationStat = lstatSync(absolute);
-      if (destinationStat.isSymbolicLink() || !sameIdentity(temporaryIdentity, destinationStat))
-        throw new MemoryError(`Memory destination changed during publication: ${absolute}`);
-      try {
-        revalidateDirectoryIdentities(parentIdentities);
-      } catch (error: unknown) {
-        parentIsCurrent = false;
-        throw error;
-      }
-      this.filesystemOps.syncDirectory(parent);
-    } finally {
-      if (descriptor !== undefined) closeSync(descriptor);
-      // Never clean up through a parent path that was rebound concurrently.
-      if (parentIsCurrent) rmSync(temporary, { force: true });
-    }
-  }
-
-  private managedPath(path: string): string {
-    const safe = safeProjectPath(path);
-    const absolute = resolve(this.root, safe);
-    const nested = relative(this.root, absolute);
-    if (!nested || isAbsolute(nested) || nested === '..' || nested.startsWith(`..${sep}`))
-      throw new MemoryError('Memory path escapes project root.');
-    this.assertSafeRoot(dirname(safe).split(sep).join('/'));
-    return absolute;
-  }
-
-  private assertSafeRoot(path: string): void {
-    let current = resolve(this.root);
-    for (const component of path.split(/[\\/]/u).filter(Boolean)) {
-      current = join(current, component);
-      try {
-        const stat = lstatSync(current);
-        if (!stat.isDirectory() || stat.isSymbolicLink()) throw new MemoryError(`Unsafe memory path ancestor: ${path}`);
-      } catch (error: unknown) {
-        if (isCode(error, 'ENOENT')) return;
-        throw error;
-      }
-    }
-  }
-
-  private ensureSafeDirectories(path: string): void {
-    const target = resolve(this.root, path);
-    const components: string[] = [];
-    let current = target;
-    while (dirname(current) !== current) {
-      components.unshift(basename(current));
-      current = dirname(current);
-    }
-    for (const component of components) {
-      current = join(current, component);
-      try {
-        const stat = lstatSync(current);
-        if (!stat.isDirectory() || stat.isSymbolicLink()) throw new MemoryError('Unsafe memory directory ancestor.');
-      } catch (error: unknown) {
-        if (!isCode(error, 'ENOENT')) throw error;
-        mkdirSync(current, { mode: 0o700 });
-        const stat = lstatSync(current);
-        if (!stat.isDirectory() || stat.isSymbolicLink()) throw new MemoryError('Unsafe memory directory ancestor.');
-      }
-    }
-  }
-
-  /** Reads only verified file metadata for pre-batch resource accounting. */
-  private regularSize(path: string): number {
-    let descriptor: number | undefined;
-    try {
-      const parentIdentities = captureDirectoryIdentities(dirname(path));
-      descriptor = openSync(path, fsConstants.O_RDONLY | noFollowFlag());
-      const openedStat = fstatSync(descriptor);
-      if (!openedStat.isFile()) throw new MemoryError('Managed memory path is not a regular file.');
-      const pathStat = lstatSync(path);
-      if (pathStat.isSymbolicLink() || !sameIdentity(openedStat, pathStat))
-        throw new MemoryError('Managed memory path changed while it was opened.');
-      revalidateDirectoryIdentities(parentIdentities);
-      return openedStat.size;
-    } catch (error: unknown) {
-      if (error instanceof MemoryError) throw error;
-      if (isCode(error, 'ENOENT')) throw new MissingMemoryPathError(path);
-      throw new MemoryError(`Cannot safely inspect managed memory path: ${path}: ${describe(error)}`);
-    } finally {
-      if (descriptor !== undefined) closeSync(descriptor);
-    }
-  }
-
   /** Discovers and reads canonical YAML through repository-store safety checks. */
   private async repositoryYamlFiles(folder: string): Promise<Array<{ path: string; content: Uint8Array }>> {
     const root = await this.getRepositoryRoot();
@@ -677,39 +437,6 @@ export class FilesystemBackend implements StorageBackend {
         path.startsWith(`${folder}/`) && !path.slice(folder.length + 1).includes('/') && path.endsWith('.yaml'),
     });
     return files.map((file) => ({ path: join(this.root, file.path.relativePath), content: file.bytes }));
-  }
-
-  private readRegular(path: string): Uint8Array {
-    let descriptor: number | undefined;
-    try {
-      const parentIdentities = captureDirectoryIdentities(dirname(path));
-      descriptor = openSync(path, fsConstants.O_RDONLY | noFollowFlag());
-      const openedStat = fstatSync(descriptor);
-      if (!openedStat.isFile()) throw new MemoryError('Managed memory path is not a regular file.');
-      const pathStat = lstatSync(path);
-      if (pathStat.isSymbolicLink() || !sameIdentity(openedStat, pathStat))
-        throw new MemoryError('Managed memory path changed while it was opened.');
-      const bytes = readFileSync(descriptor);
-      revalidateDirectoryIdentities(parentIdentities);
-      return bytes;
-    } catch (error: unknown) {
-      if (error instanceof MemoryError) throw error;
-      if (isCode(error, 'ENOENT')) throw new MissingMemoryPathError(path);
-      throw new MemoryError(`Cannot safely read managed memory path: ${path}: ${describe(error)}`);
-    } finally {
-      if (descriptor !== undefined) closeSync(descriptor);
-    }
-  }
-
-  private readRegularIfExists(path: string): Uint8Array | undefined {
-    try {
-      const stat = lstatSync(path);
-      if (stat.isSymbolicLink() || !stat.isFile()) throw new MemoryError('Managed memory path is not a regular file.');
-    } catch (error: unknown) {
-      if (isCode(error, 'ENOENT')) return undefined;
-      throw error;
-    }
-    return this.readRegular(path);
   }
 }
 
@@ -787,59 +514,8 @@ function parseYamlBytes(bytes: Uint8Array, path: string): unknown {
   }
 }
 
-const DEFAULT_FILESYSTEM_OPERATIONS: FilesystemOperations = {
-  renameSync,
-  syncDirectory,
-};
-
-function captureDirectoryIdentities(directory: string): DirectoryIdentity[] {
-  return captureDirectoryIdentityChain(directory, 'memory directory');
-}
-
-function revalidateDirectoryIdentities(identities: readonly DirectoryIdentity[]): void {
-  revalidateDirectoryIdentityChain(identities, 'Memory directory');
-}
-
-function assertRegularDestinationIfPresent(path: string): boolean {
-  try {
-    const stat = lstatSync(path);
-    if (stat.isSymbolicLink() || !stat.isFile()) throw new MemoryError(`Unsafe memory destination: ${path}`);
-    return true;
-  } catch (error: unknown) {
-    if (isCode(error, 'ENOENT')) return false;
-    throw error;
-  }
-}
-
-/** Closes the cache without replacing an error from the primary operation. */
-function closeIndexPreservingError(index: SqliteIndex, operationFailed: boolean): void {
-  try {
-    index.close();
-  } catch (error: unknown) {
-    if (!operationFailed) throw error;
-  }
-}
-
-function syncDirectory(path: string): void {
-  if (process.platform === 'win32') return;
-  let descriptor: number | undefined;
-  try {
-    descriptor = openSync(path, fsConstants.O_RDONLY | fsConstants.O_DIRECTORY | noFollowFlag());
-    if (!fstatSync(descriptor).isDirectory()) throw new MemoryError(`Unsafe memory directory: ${path}`);
-    fsyncSync(descriptor);
-  } catch (error: unknown) {
-    const code = (error as NodeJS.ErrnoException).code;
-    if (!['EINVAL', 'ENOTSUP', 'EISDIR'].includes(code ?? '')) throw error;
-  } finally {
-    if (descriptor !== undefined) closeSync(descriptor);
-  }
-}
-
-class MissingMemoryPathError extends MemoryError {
-  public constructor(path: string) {
-    super(`Managed memory path does not exist: ${path}`);
-    this.name = 'MissingMemoryPathError';
-  }
+function isCode(error: unknown, code: string): boolean {
+  return error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === code;
 }
 
 function describe(error: unknown): string {
