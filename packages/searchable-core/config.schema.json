@@ -1,0 +1,240 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "enabled": {
+      "default": false,
+      "type": "boolean"
+    },
+    "root": {
+      "default": ".neottia/searchable",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?!\\.{1,2}(?:\\/|$))(?!.*(?:^|\\/)\\.{1,2}(?:\\/|$))(?!\\/)(?![A-Za-z]:)[^\\\\\\0\\r\\n]+$"
+    },
+    "search": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "provider": {
+          "default": "duckduckgo",
+          "type": "string",
+          "enum": ["duckduckgo", "google", "bing", "brave"]
+        },
+        "limit": {
+          "default": 5,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "credentials": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "google_api_key": {
+              "type": "string",
+              "pattern": "^\\$\\{[A-Za-z_][A-Za-z0-9_]*\\}$"
+            },
+            "google_cse_id": {
+              "type": "string",
+              "pattern": "^\\$\\{[A-Za-z_][A-Za-z0-9_]*\\}$"
+            },
+            "bing_api_key": {
+              "type": "string",
+              "pattern": "^\\$\\{[A-Za-z_][A-Za-z0-9_]*\\}$"
+            },
+            "brave_api_key": {
+              "type": "string",
+              "pattern": "^\\$\\{[A-Za-z_][A-Za-z0-9_]*\\}$"
+            }
+          },
+          "additionalProperties": false
+        },
+        "bing_api_endpoint": {
+          "default": "https://api.bing.microsoft.com/v7.0/search",
+          "type": "string",
+          "maxLength": 8192,
+          "pattern": "^[hH][tT][tT][pP][sS]?:\\/\\/",
+          "format": "uri"
+        }
+      },
+      "additionalProperties": false
+    },
+    "fetch": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "strategies": {
+          "default": ["direct", "jina", "wayback"],
+          "uniqueItems": true,
+          "minItems": 1,
+          "maxItems": 3,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["direct", "jina", "wayback"]
+          }
+        },
+        "timeout_ms": {
+          "default": 10000,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 300000
+        },
+        "overall_timeout_ms": {
+          "default": 20000,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 600000
+        },
+        "max_response_bytes": {
+          "default": 10485760,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 10485760
+        }
+      },
+      "additionalProperties": false
+    },
+    "grep": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "limit": {
+          "default": 5,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "snippet_bytes": {
+          "default": 512,
+          "type": "integer",
+          "minimum": 64,
+          "maximum": 16384
+        }
+      },
+      "additionalProperties": false
+    },
+    "ask": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "limit": {
+          "default": 3,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "context_bytes": {
+          "default": 131072,
+          "type": "integer",
+          "minimum": 256,
+          "maximum": 4194304
+        }
+      },
+      "additionalProperties": false
+    },
+    "ollama": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "endpoint": {
+          "default": "http://localhost:11434",
+          "type": "string",
+          "maxLength": 8192,
+          "pattern": "^[hH][tT][tT][pP][sS]?:\\/\\/",
+          "format": "uri"
+        },
+        "model": {
+          "default": "llama3",
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "timeout_ms": {
+          "default": 60000,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 600000
+        }
+      },
+      "additionalProperties": false
+    },
+    "cache": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "max_age_ms": {
+          "default": 300000,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "stale_policy": {
+          "default": "prompt",
+          "type": "string",
+          "enum": ["prompt", "rebuild", "fail"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "security": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "limits": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "max_query_bytes": {
+              "default": 16384,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 16384
+            },
+            "max_url_bytes": {
+              "default": 8192,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 8192
+            },
+            "max_title_bytes": {
+              "default": 4096,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 4096
+            },
+            "max_content_bytes": {
+              "default": 10485760,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 10485760
+            },
+            "max_results": {
+              "default": 100,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 100
+            },
+            "max_result_bytes": {
+              "default": 4194304,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 4194304
+            },
+            "max_storage_bytes": {
+              "default": 268435456,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 268435456
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

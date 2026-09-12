@@ -15,6 +15,7 @@ Neottia provides a shared SDLC that can be understood and used by multiple AI co
 │   ├── issues/          # Canonical issue domain and tool registry
 │   ├── issues-mcp/      # Generic MCP issue server
 │   ├── repository-store/# Canonical repository persistence primitives
+│   ├── searchable-core/ # Shared Searchable contracts and service registry
 │   └── release/         # Global release bill of materials
 ├── docs/                # User documentation for VitePress
 ├── .changeset/          # Module release declarations
@@ -78,6 +79,10 @@ Enable `skills.issues` to manage Git-trackable YAML issues with exact revisions,
 ## Design Docs
 
 Install `@neottia/design-docs` for strict repository-local Markdown/YAML design records, `@neottia/design-docs-mcp` for generic stdio MCP, or the Pi/OpenCode extensions for in-process tools. Enable `skills.design_docs` in `.neottia/config.yml`. The [Design Docs guide](docs/design-docs/) covers authoring, approval, immutable versioning, BM25 search, archive/restore, stable issue references, migration, and recovery.
+
+## Searchable foundation
+
+`@neottia/searchable-core` defines the strict configuration, schemas, errors, injectable service interfaces, and shared registry for `web_search`, `web_fetch`, `web_stash`, `web_grep`, and `web_ask`. This first foundation release does not yet include provider, extraction, storage/cache, Ollama, MCP, Pi, or OpenCode implementations; tools work only when an application injects those services. See the [package guide](packages/searchable-core/README.md).
 
 ## Documentation
 
