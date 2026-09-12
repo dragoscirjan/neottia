@@ -1,3 +1,4 @@
+import type { DeepReadonly } from '@neottia/config';
 import { z } from 'zod';
 import { loadIssueConfig, type IssueConfigInput } from './config.js';
 import { IssueError } from './errors.js';
@@ -10,6 +11,9 @@ export interface IssueToolContext {
   readonly cwd: string;
   readonly interactive: boolean;
   readonly signal?: AbortSignal;
+  /** Pre-resolved immutable shard supplied by a shared host snapshot. */
+  readonly config?: DeepReadonly<import('./config.js').IssueConfig>;
+  /** Deprecated standalone overrides used only when no resolved shard is supplied. */
   readonly configOverrides?: Partial<IssueConfigInput>;
   readonly onStaleCache?: () => boolean | Promise<boolean>;
   readonly resolver?: DesignDocumentReferenceResolver;
@@ -29,7 +33,9 @@ function storeFor(context: IssueToolContext): IssueStore {
   const key = context.storeKey ?? context;
   const existing = stores.get(key);
   if (existing) return existing;
-  const store = new IssueStore(loadIssueConfig(context.cwd, context.configOverrides), context.cwd, {
+  const config = (context.config ??
+    loadIssueConfig(context.cwd, context.configOverrides)) as import('./config.js').IssueConfig;
+  const store = new IssueStore(config, context.cwd, {
     resolver: context.resolver,
     onStaleCache: context.onStaleCache,
   });

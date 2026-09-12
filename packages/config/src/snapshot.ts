@@ -126,6 +126,9 @@ function createSnapshot(
       const { id, state } = getSnapshotContribution(snapshot, contribution);
       return state.provenance.get(id)?.get(pathKey(path));
     },
+    derive(overrides: Readonly<Record<string, unknown>>, label: string): ResolvedConfigSnapshot {
+      return deriveSnapshot(snapshot, registry, overrides, label);
+    },
     toJSON(): DeepReadonly<Record<string, unknown>> {
       const state = snapshotStates.get(snapshot);
       if (state === undefined) {
@@ -144,6 +147,60 @@ function createSnapshot(
   });
   snapshotStates.set(snapshot, { contributionIds: registryState.contributionIds, provenance, shards });
   return snapshot;
+}
+
+/** Applies trusted runtime patches without rereading global or project files. */
+function deriveSnapshot(
+  snapshot: ResolvedConfigSnapshot,
+  registry: ConfigRegistry,
+  overrides: Readonly<Record<string, unknown>>,
+  label: string,
+): ResolvedConfigSnapshot {
+  if (!isRecord(overrides) || label.trim().length === 0) {
+    throw new ConfigSnapshotError('INVALID_SHARD_VALUES', 'derived snapshot overrides and label must be valid');
+  }
+  const state = snapshotStates.get(snapshot);
+  if (state === undefined) throw new ConfigSnapshotError('INVALID_REGISTRY', 'snapshot state is unavailable');
+  const remainder = cloneMutable(overrides);
+  const values: Record<string, unknown> = {};
+  const provenance: Record<string, Record<string, ConfigProvenance>> = {};
+
+  for (const contribution of registry.contributions) {
+    const patch = getAtPath(overrides, contribution.path);
+    values[contribution.id] = state.shards.get(contribution.id);
+    provenance[contribution.id] = Object.fromEntries(state.provenance.get(contribution.id) ?? []);
+    if (patch === undefined) continue;
+    const parsed = contribution.runtimePatchSchema.safeParse(patch);
+    if (!parsed.success) {
+      throw new ConfigSnapshotError(
+        'INVALID_SHARD',
+        `runtime override for shard "${contribution.id}" does not satisfy its registered schema`,
+        contribution.id,
+      );
+    }
+    const merged = mergeConfigValues(values[contribution.id], parsed.data);
+    const resolved = contribution.resolvedSchema.safeParse(merged);
+    if (!resolved.success) {
+      throw new ConfigSnapshotError(
+        'INVALID_SHARD',
+        `derived shard "${contribution.id}" does not satisfy its registered schema`,
+        contribution.id,
+      );
+    }
+    values[contribution.id] = resolved.data;
+    for (const path of leafPaths(parsed.data)) {
+      provenance[contribution.id]![pathKey(path)] = Object.freeze({ kind: 'override', label });
+    }
+    deleteAtPath(remainder, contribution.path);
+  }
+  if (Object.keys(remainder as Record<string, unknown>).length > 0) {
+    throw new ConfigSnapshotError('UNKNOWN_SHARD', 'derived snapshot contains an unregistered configuration path');
+  }
+  return createResolvedConfigSnapshotWithMetadata(registry, values, {
+    diagnostics: snapshot.diagnostics,
+    provenance,
+    validatedShards: true,
+  });
 }
 
 /** Resolves and checks the private identity mapping for typed snapshot methods. */
@@ -210,6 +267,42 @@ function cloneMutable(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(cloneMutable);
   if (!isRecord(value)) return value;
   return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, cloneMutable(child)]));
+}
+
+/** Reads one canonical path without interpreting dots inside segments. */
+function getAtPath(value: unknown, path: readonly string[]): unknown {
+  let current = value;
+  for (const segment of path) {
+    if (!isRecord(current) || !Object.prototype.hasOwnProperty.call(current, segment)) return undefined;
+    current = current[segment];
+  }
+  return current;
+}
+
+/** Removes one consumed path and any empty parent mappings. */
+function deleteAtPath(value: unknown, path: readonly string[]): void {
+  if (!isRecord(value) || path.length === 0) return;
+  const [segment, ...rest] = path;
+  if (rest.length === 0) delete value[segment as string];
+  else {
+    deleteAtPath(value[segment as string], rest);
+    const child = value[segment as string];
+    if (isRecord(child) && Object.keys(child).length === 0) delete value[segment as string];
+  }
+}
+
+/** Runtime patches recursively merge mappings and replace arrays/scalars. */
+function mergeConfigValues(lower: unknown, upper: unknown): unknown {
+  if (!isRecord(lower) || !isRecord(upper)) return cloneMutable(upper);
+  const merged = cloneMutable(lower) as Record<string, unknown>;
+  for (const [key, value] of Object.entries(upper)) merged[key] = mergeConfigValues(merged[key], value);
+  return merged;
+}
+
+/** Returns shard-relative leaf paths for override provenance. */
+function leafPaths(value: unknown, prefix: readonly string[] = []): readonly (readonly string[])[] {
+  if (!isRecord(value) || Object.keys(value).length === 0) return [prefix];
+  return Object.entries(value).flatMap(([key, child]) => leafPaths(child, [...prefix, key]));
 }
 
 /** Checks whether a complete relative path exists. */

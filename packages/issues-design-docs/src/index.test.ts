@@ -4,12 +4,33 @@ import { join } from 'node:path';
 import { createConfigRegistry, resolveConfig } from '@neottia/config';
 import { DesignDocumentStore, designDocsConfigContribution, loadDesignDocsConfig } from '@neottia/design-docs';
 import { decodeIssue, encodeIssue, IssueStore, issueConfigContribution, loadIssueConfig } from '@neottia/issues';
+import { memoryConfigContribution } from '@neottia/memory-core';
 import { DEFAULT_STORE_LIMITS, resolveManagedRoot, withRepositoryLease } from '@neottia/repository-store';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createIssuesDesignDocsComposition } from './index.js';
+import { createIssuesDesignDocsComposition, resolveHostConfigSnapshot } from './index.js';
 
 const roots: string[] = [];
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))));
+
+describe('shared host snapshots', () => {
+  it('derives non-interactive policy without changing declared shards', async () => {
+    const cwd = await mkdtemp(join(tmpdir(), 'neottia-host-config-'));
+    roots.push(cwd);
+    const declared = resolveHostConfigSnapshot({ cwd, env: {}, interactive: true });
+    const effective = resolveHostConfigSnapshot({ cwd, interactive: false, snapshot: declared });
+
+    expect(declared.get(memoryConfigContribution).cache.stale_policy).toBe('prompt');
+    expect(declared.get(issueConfigContribution).cache.stale_policy).toBe('prompt');
+    expect(declared.get(designDocsConfigContribution).cache.stale_policy).toBe('prompt');
+    expect(effective.get(memoryConfigContribution).cache.stale_policy).toBe('rebuild');
+    expect(effective.get(issueConfigContribution).cache.stale_policy).toBe('rebuild');
+    expect(effective.get(designDocsConfigContribution).cache.stale_policy).toBe('rebuild');
+    expect(effective.sourceOf(issueConfigContribution, ['cache', 'stale_policy'])).toEqual({
+      kind: 'override',
+      label: 'non-interactive host stale-cache policy',
+    });
+  });
+});
 
 describe('Issues and Design Docs composition', () => {
   it('resolves real stable links and validates them under one repository lease', async () => {

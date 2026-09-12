@@ -137,6 +137,16 @@ snapshot.sourceOf(exampleConfig, ["enabled"]);
 
 Arrays have provenance as complete leaves. Metadata can identify a source kind, file, profile, environment variable name, or deprecated path, but never contains a resolved secret value.
 
+### Host-effective runtime policy
+
+Hosts can derive an immutable effective snapshot without rereading configuration or mutating declared values. This is how non-interactive MCP and OpenCode surfaces translate `stale_policy: prompt` to `rebuild`, while Pi preserves the interactive prompt:
+
+```ts
+export const effective = snapshot.derive({ modules: { example: { enabled: true } } }, "non-interactive host policy");
+```
+
+Derived overrides are checked with each contribution's runtime and resolved schemas, retain lower-precedence values, and receive override provenance with the supplied label. Unknown shard paths fail. Keep the original snapshot when both declared and host-effective views are needed.
+
 Resolution failures throw `ConfigResolutionError`. Its immutable `diagnostics` cover YAML, version, I/O, path ownership, merge collisions, schemas, profiles, environment coercion, and secrets. Diagnostics report paths and constraints without rejected values and are bounded by `MAX_CONFIG_DIAGNOSTICS`.
 
 ### Deprecated wrapper compatibility

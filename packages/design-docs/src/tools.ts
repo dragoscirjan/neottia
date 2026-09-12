@@ -1,3 +1,4 @@
+import type { DeepReadonly } from '@neottia/config';
 import { z } from 'zod';
 import { loadDesignDocsConfig, type DesignDocsConfigInput } from './config.js';
 import { DesignDocsError } from './errors.js';
@@ -24,6 +25,9 @@ export interface DesignDocsToolContext {
   readonly cwd: string;
   readonly interactive: boolean;
   readonly signal?: AbortSignal;
+  /** Pre-resolved immutable shard supplied by a shared host snapshot. */
+  readonly config?: DeepReadonly<import('./config.js').DesignDocsConfig>;
+  /** Deprecated standalone overrides used only when no resolved shard is supplied. */
   readonly configOverrides?: Partial<DesignDocsConfigInput>;
   readonly onStaleCache?: () => boolean | Promise<boolean>;
   readonly linkValidator?: DesignDocLinkValidator;
@@ -53,7 +57,8 @@ function storeFor(context: DesignDocsToolContext): Promise<RoutedStore> {
   }
   let store = stores.get(context.cwd);
   if (!store) {
-    const config = loadDesignDocsConfig(context.cwd, context.configOverrides);
+    const config = (context.config ??
+      loadDesignDocsConfig(context.cwd, context.configOverrides)) as import('./config.js').DesignDocsConfig;
     store = DesignDocumentStore.fromConfig(config, context.cwd, {
       onStaleCache: context.onStaleCache,
       linkValidator: context.linkValidator,

@@ -153,6 +153,9 @@ importers:
 
   extensions/opencode-memory:
     dependencies:
+      '@neottia/issues-design-docs':
+        specifier: workspace:*
+        version: link:../../packages/issues-design-docs
       '@neottia/memory-core':
         specifier: workspace:*
         version: link:../../packages/memory-core
@@ -268,6 +271,9 @@ importers:
 
   extensions/pi-memory:
     dependencies:
+      '@neottia/issues-design-docs':
+        specifier: workspace:*
+        version: link:../../packages/issues-design-docs
       '@neottia/memory-core':
         specifier: workspace:*
         version: link:../../packages/memory-core
@@ -404,6 +410,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.30.0
         version: 1.30.0(zod@4.5.4)
+      '@neottia/config':
+        specifier: workspace:^
+        version: link:../config
       '@neottia/design-docs':
         specifier: workspace:*
         version: link:../design-docs
@@ -469,6 +478,9 @@ importers:
       '@neottia/issues':
         specifier: workspace:^
         version: link:../issues
+      '@neottia/memory-core':
+        specifier: workspace:^
+        version: link:../memory-core
       '@neottia/repository-store':
         specifier: workspace:^
         version: link:../repository-store
@@ -491,6 +503,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.30.0
         version: 1.30.0(zod@4.5.4)
+      '@neottia/config':
+        specifier: workspace:^
+        version: link:../config
       '@neottia/issues':
         specifier: workspace:*
         version: link:../issues
@@ -556,6 +571,12 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.30.0
         version: 1.30.0(zod@4.5.4)
+      '@neottia/config':
+        specifier: workspace:^
+        version: link:../config
+      '@neottia/issues-design-docs':
+        specifier: workspace:*
+        version: link:../issues-design-docs
       '@neottia/memory-core':
         specifier: workspace:*
         version: link:../memory-core
@@ -671,12 +692,18 @@ importers:
 
   packages/testkit:
     dependencies:
+      '@neottia/config':
+        specifier: workspace:^
+        version: link:../config
       '@neottia/design-docs':
         specifier: workspace:*
         version: link:../design-docs
       '@neottia/issues':
         specifier: workspace:*
         version: link:../issues
+      '@neottia/issues-design-docs':
+        specifier: workspace:*
+        version: link:../issues-design-docs
       '@neottia/memory-core':
         specifier: workspace:*
         version: link:../memory-core

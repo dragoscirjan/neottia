@@ -1,6 +1,7 @@
 import { resolve } from 'node:path';
 import {
   closeIssueToolContext,
+  issueConfigContribution,
   issueToolJsonSchema,
   ISSUE_TOOLS,
   type IssueConfigInput,
@@ -8,7 +9,7 @@ import {
   type IssueToolName,
   type DesignDocumentReferenceResolver,
 } from '@neottia/issues';
-import { createIssuesDesignDocsComposition } from '@neottia/issues-design-docs';
+import { createIssuesDesignDocsComposition, resolveHostConfigSnapshot } from '@neottia/issues-design-docs';
 import { Type, type TSchema } from 'typebox';
 
 /** Minimal Pi registration surface used by this extension. */
@@ -33,6 +34,7 @@ export interface PiIssuesOptions {
   readonly configOverrides?: Partial<IssueConfigInput>;
   readonly resolver?: DesignDocumentReferenceResolver;
   readonly onStaleCache?: () => boolean | Promise<boolean>;
+  readonly env?: NodeJS.ProcessEnv;
 }
 
 /** Pi schemas are generated from core Zod rather than maintained by adapters. */
@@ -62,12 +64,18 @@ export function registerIssueTools(pi: PiExtensionApi, options: PiIssuesOptions 
         const cwd = resolve(invocation.cwd ?? defaultCwd);
         let state = contexts.get(cwd);
         if (!state) {
+          const snapshot = resolveHostConfigSnapshot({
+            cwd,
+            interactive: true,
+            env: options.env ?? process.env,
+            ...(options.configOverrides ? { overrides: { modules: { issues: options.configOverrides } } } : {}),
+          });
           state = {
             context: {
               cwd,
               interactive: true,
-              configOverrides: options.configOverrides,
-              resolver: options.resolver ?? createIssuesDesignDocsComposition({ cwd }).resolver,
+              config: snapshot.get(issueConfigContribution),
+              resolver: options.resolver ?? createIssuesDesignDocsComposition({ cwd, snapshot }).resolver,
               storeKey: {},
             },
           };

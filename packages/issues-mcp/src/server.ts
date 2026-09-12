@@ -1,15 +1,18 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import type { ResolvedConfigSnapshot } from '@neottia/config';
 import {
   closeIssueToolContext,
   findIssueTool,
+  issueConfigContribution,
   issueToolJsonSchema,
   ISSUE_TOOLS,
   asIssueError,
+  type IssueConfigInput,
   type IssueToolContext,
   type DesignDocumentReferenceResolver,
 } from '@neottia/issues';
-import { createIssuesDesignDocsComposition } from '@neottia/issues-design-docs';
+import { createIssuesDesignDocsComposition, resolveHostConfigSnapshot } from '@neottia/issues-design-docs';
 
 export interface CreateIssueServerOptions {
   readonly cwd?: string;
@@ -17,15 +20,26 @@ export interface CreateIssueServerOptions {
   readonly version?: string;
   /** Optional composition seam for stable design-document links. */
   readonly resolver?: DesignDocumentReferenceResolver;
+  readonly snapshot?: ResolvedConfigSnapshot;
+  readonly env?: NodeJS.ProcessEnv;
+  readonly configOverrides?: Partial<IssueConfigInput>;
 }
 
 /** Creates a harness-neutral, non-interactive MCP server. */
 export function createIssueServer(options: CreateIssueServerOptions = {}): Server {
   const cwd = options.cwd ?? process.cwd();
+  const effectiveSnapshot = resolveHostConfigSnapshot({
+    cwd,
+    interactive: false,
+    ...(options.snapshot ? { snapshot: options.snapshot } : {}),
+    ...(options.env ? { env: options.env } : {}),
+    ...(options.configOverrides ? { overrides: { modules: { issues: options.configOverrides } } } : {}),
+  });
   const context: IssueToolContext = {
     cwd,
     interactive: false,
-    resolver: options.resolver ?? createIssuesDesignDocsComposition({ cwd }).resolver,
+    config: effectiveSnapshot.get(issueConfigContribution),
+    resolver: options.resolver ?? createIssuesDesignDocsComposition({ cwd, snapshot: effectiveSnapshot }).resolver,
     storeKey: {},
   };
   const server = new Server(

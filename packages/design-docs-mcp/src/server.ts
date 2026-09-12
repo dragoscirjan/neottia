@@ -1,27 +1,32 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import type { ResolvedConfigSnapshot } from '@neottia/config';
 import {
   closeDesignDocsToolContext,
   DESIGN_DOCS_TOOLS,
+  designDocsConfigContribution,
   designDocsToolJsonSchema,
   findDesignDocsTool,
-  loadDesignDocsConfig,
   serializeDesignDocsError,
+  type DesignDocsConfigInput,
   type DesignDocsToolContext,
   type DesignDocsToolName,
   type DesignDocLinkValidator,
 } from '@neottia/design-docs';
-import { createIssuesDesignDocsComposition } from '@neottia/issues-design-docs';
+import { createIssuesDesignDocsComposition, resolveHostConfigSnapshot } from '@neottia/issues-design-docs';
 
 export interface CreateDesignDocsServerOptions {
   readonly cwd?: string;
   readonly name?: string;
   readonly version?: string;
   readonly linkValidator?: DesignDocLinkValidator;
+  readonly snapshot?: ResolvedConfigSnapshot;
+  readonly env?: NodeJS.ProcessEnv;
+  readonly configOverrides?: Partial<DesignDocsConfigInput>;
 }
 export function effectiveDesignDocsStalePolicy(cwd: string, env: NodeJS.ProcessEnv = process.env): 'rebuild' | 'fail' {
-  const policy = loadDesignDocsConfig(cwd, { env }).cache.stale_policy;
-  return policy === 'fail' ? 'fail' : 'rebuild';
+  const snapshot = resolveHostConfigSnapshot({ cwd, env, interactive: false });
+  return snapshot.get(designDocsConfigContribution).cache.stale_policy === 'fail' ? 'fail' : 'rebuild';
 }
 
 /** Creates a non-interactive MCP server from the shared registry. */
@@ -31,11 +36,19 @@ export function createDesignDocsServer(options: CreateDesignDocsServerOptions = 
     { name: options.name ?? '@neottia/design-docs-mcp', version: options.version ?? '0.1.0' },
     { capabilities: { tools: {} } },
   );
+  const effectiveSnapshot = resolveHostConfigSnapshot({
+    cwd,
+    interactive: false,
+    ...(options.snapshot ? { snapshot: options.snapshot } : {}),
+    ...(options.env ? { env: options.env } : {}),
+    ...(options.configOverrides ? { overrides: { modules: { design_docs: options.configOverrides } } } : {}),
+  });
   const context: DesignDocsToolContext = {
     cwd,
     interactive: false,
-    configOverrides: { cache: { stale_policy: effectiveDesignDocsStalePolicy(cwd) } },
-    linkValidator: options.linkValidator ?? createIssuesDesignDocsComposition({ cwd }).linkValidator,
+    config: effectiveSnapshot.get(designDocsConfigContribution),
+    linkValidator:
+      options.linkValidator ?? createIssuesDesignDocsComposition({ cwd, snapshot: effectiveSnapshot }).linkValidator,
   };
   const originalClose = server.close.bind(server);
   server.close = async () => {

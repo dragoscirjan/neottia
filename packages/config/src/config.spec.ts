@@ -197,6 +197,20 @@ describe('resolved configuration snapshots', () => {
     expect(() => snapshot.get(lookalike)).toThrow(/not registered in this snapshot/u);
   });
 
+  it('derives runtime overrides without mutating the declared snapshot', () => {
+    const module = defineConfigContribution(contribution('module', ['modules', 'module']));
+    const snapshot = createResolvedConfigSnapshot(createConfigRegistry([module]), {
+      module: { enabled: false, nested: { labels: ['declared'] } },
+    });
+
+    const effective = snapshot.derive({ modules: { module: { enabled: true } } }, 'non-interactive host');
+
+    expect(snapshot.get(module).enabled).toBe(false);
+    expect(effective.get(module)).toEqual({ enabled: true, nested: { labels: ['declared'] } });
+    expect(effective.sourceOf(module, ['enabled'])).toEqual({ kind: 'override', label: 'non-interactive host' });
+    expect(() => effective.derive({ modules: { unknown: {} } }, 'invalid')).toThrow(/unregistered/u);
+  });
+
   it('accepts the source contribution object when a registry normalizes raw metadata', () => {
     const source = contribution('module', ['modules', 'module']);
     const snapshot = createResolvedConfigSnapshot(createConfigRegistry([source]));

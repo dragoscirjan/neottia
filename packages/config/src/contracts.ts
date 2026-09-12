@@ -115,6 +115,9 @@ export interface ResolvedConfigSnapshot {
     path: readonly string[],
   ): ConfigProvenance | undefined;
 
+  /** Creates a new immutable snapshot from trusted root-shaped runtime overrides. */
+  derive(overrides: Readonly<Record<string, unknown>>, label: string): ResolvedConfigSnapshot;
+
   /** Serializes canonical configuration while replacing every declared secret. */
   toJSON(): DeepReadonly<Record<string, unknown>>;
 }

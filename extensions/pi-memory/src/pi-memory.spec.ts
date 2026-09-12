@@ -79,6 +79,27 @@ describe('pi memory extension', () => {
     ).toContain('UTF-8 bytes');
   });
 
+  it('isolates stores and snapshots by invocation cwd', async () => {
+    const first = fixture();
+    const second = fixture();
+    const { api, registered } = fakePi();
+    const close = registerMemoryTools(api);
+    const store = registered.find((tool) => tool.name === 'memory_store') as {
+      execute: (...args: unknown[]) => Promise<unknown>;
+    };
+    const list = registered.find((tool) => tool.name === 'memory_list') as {
+      execute: (...args: unknown[]) => Promise<{ content: Array<{ text: string }> }>;
+    };
+    await store.execute('first', { ...FACT, summary: 'First worktree only' }, undefined, undefined, { cwd: first });
+    await store.execute('second', { ...FACT, summary: 'Second worktree only' }, undefined, undefined, { cwd: second });
+    const firstList = await list.execute('list-first', {}, undefined, undefined, { cwd: first });
+    const secondList = await list.execute('list-second', {}, undefined, undefined, { cwd: second });
+    expect(firstList.content[0]?.text).toContain('First worktree only');
+    expect(firstList.content[0]?.text).not.toContain('Second worktree only');
+    expect(secondList.content[0]?.text).toContain('Second worktree only');
+    await close();
+  });
+
   it('stores a memory in-process through the tool handler', async () => {
     const cwd = fixture();
     const { api, registered } = fakePi();

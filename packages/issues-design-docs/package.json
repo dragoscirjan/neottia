@@ -11,15 +11,24 @@
     "url": "git+https://github.com/dragoscirjan/neottia.git",
     "directory": "packages/issues-design-docs"
   },
-  "publishConfig": { "access": "public" },
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
   "files": ["dist", "README.md", "LICENSE"],
-  "engines": { "node": ">=22.16.0" },
+  "engines": {
+    "node": ">=22.16.0"
+  },
   "scripts": {
     "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
-    "pretest": "pnpm --filter @neottia/design-docs run build && pnpm --filter @neottia/issues run build && pnpm run build",
+    "pretest": "pnpm --filter @neottia/design-docs run build && pnpm --filter @neottia/issues run build && pnpm --filter @neottia/memory-core run build && pnpm run build",
     "test": "vitest run --root ../.. packages/issues-design-docs/src",
     "typecheck": "tsc --noEmit"
   },
@@ -27,6 +36,7 @@
     "@neottia/config": "workspace:^",
     "@neottia/design-docs": "workspace:^",
     "@neottia/issues": "workspace:^",
+    "@neottia/memory-core": "workspace:^",
     "@neottia/repository-store": "workspace:^"
   },
   "devDependencies": {

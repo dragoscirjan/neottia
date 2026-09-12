@@ -12,6 +12,13 @@ export {
 } from './repo.js';
 
 export {
+  createConfigFixture,
+  type ConfigFixture,
+  type ConfigFixtureModules,
+  type CreateConfigFixtureOptions,
+} from './config-fixture.js';
+
+export {
   createTempIssueProject,
   createTempProject,
   seedDesignDocs,

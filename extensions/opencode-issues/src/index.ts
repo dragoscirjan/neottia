@@ -1,10 +1,11 @@
 import {
   closeIssueToolContext,
+  issueConfigContribution,
   ISSUE_TOOLS,
   type DesignDocumentReferenceResolver,
   type IssueToolContext,
 } from '@neottia/issues';
-import { createIssuesDesignDocsComposition } from '@neottia/issues-design-docs';
+import { createIssuesDesignDocsComposition, resolveHostConfigSnapshot } from '@neottia/issues-design-docs';
 import { tool, type Plugin } from '@opencode-ai/plugin';
 
 export type OpenCodeToolFactory = typeof tool;
@@ -33,15 +34,23 @@ export function buildIssueTools(
 
 export interface OpenCodeIssuesOptions {
   readonly resolver?: DesignDocumentReferenceResolver;
+  readonly env?: NodeJS.ProcessEnv;
 }
 
 /** Builds a composable plugin while keeping the default package entry thin. */
 export function createIssuesPlugin(options: OpenCodeIssuesOptions = {}): Plugin {
   return async (host) => {
+    const effective = resolveHostConfigSnapshot({
+      cwd: host.directory,
+      env: options.env ?? process.env,
+      interactive: false,
+    });
     const context: IssueToolContext = {
       cwd: host.directory,
       interactive: false,
-      resolver: options.resolver ?? createIssuesDesignDocsComposition({ cwd: host.directory }).resolver,
+      config: effective.get(issueConfigContribution),
+      resolver:
+        options.resolver ?? createIssuesDesignDocsComposition({ cwd: host.directory, snapshot: effective }).resolver,
       storeKey: {},
     };
     return { tool: buildIssueTools(context, tool), dispose: () => closeIssueToolContext(context) };

@@ -2,10 +2,11 @@ import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DesignDocumentStore, loadDesignDocsConfig } from '@neottia/design-docs';
 import { loadIssueConfig } from '@neottia/issues';
-import { MemoryStore, loadMemoryConfig } from '@neottia/memory-core';
+import { MemoryStore, loadMemoryConfig, memoryConfigContribution } from '@neottia/memory-core';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   assertHarnessConclusive,
+  createConfigFixture,
   createTempIssueProject,
   createTempProject,
   ensureMemoryDistBuilt,
@@ -40,6 +41,33 @@ function fact(summary: string) {
     confidence: 'confirmed' as const,
   };
 }
+
+describe('shared configuration fixtures', () => {
+  it('covers every precedence layer and isolates multiple invocation directories', () => {
+    const fixture = createConfigFixture({
+      global: { memory: { enabled: true, namespace: { organization_id: 'global' } } },
+      project: { memory: { retrieval: { limit: 3 } } },
+      secondProject: { memory: { root: '.neottia/second-memory' } },
+      profile: { name: 'ci', modules: { memory: { retrieval: { include_superseded: true } } } },
+      env: { NEOTTIA_MEMORY_NAMESPACE_PROJECT_ID: 'environment' },
+      overrides: { modules: { memory: { cache: { stale_policy: 'fail' } } } },
+    });
+    try {
+      const first = fixture.resolve().get(memoryConfigContribution);
+      const second = fixture.resolve(fixture.cwds[1]).get(memoryConfigContribution);
+      expect(first).toMatchObject({
+        enabled: true,
+        namespace: { organization_id: 'global', project_id: 'environment' },
+        retrieval: { limit: 3, include_superseded: true },
+        cache: { stale_policy: 'fail' },
+      });
+      expect(second.root).toBe('.neottia/second-memory');
+      expect(first.root).toBe('.neottia/memory');
+    } finally {
+      fixture.cleanup();
+    }
+  });
+});
 
 describe('temp project fixtures', () => {
   it('creates an enabled memory shard inside a temp folder only', () => {

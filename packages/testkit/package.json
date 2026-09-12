@@ -23,8 +23,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@neottia/config": "workspace:^",
     "@neottia/design-docs": "workspace:*",
     "@neottia/issues": "workspace:*",
+    "@neottia/issues-design-docs": "workspace:*",
     "@neottia/memory-core": "workspace:*"
   },
   "devDependencies": {

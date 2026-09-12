@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
+import type { DeepReadonly } from '@neottia/config';
 import { z } from 'zod';
 import { loadMemoryConfig } from './config.js';
 import type { MemoryConfig, MemoryConfigInput } from './config.js';
@@ -28,7 +29,9 @@ export interface MemoryToolContext {
   readonly cwd: string;
   /** Whether the host harness can prompt the user (extensions: yes, MCP: no). */
   readonly interactive: boolean;
-  /** Optional config overrides resolved by the host before calling core. */
+  /** Pre-resolved immutable shard supplied by a shared host snapshot. */
+  readonly config?: DeepReadonly<MemoryConfig>;
+  /** Deprecated standalone overrides used only when no resolved shard is supplied. */
   readonly configOverrides?: Partial<MemoryConfigInput>;
   /** Interactive host callback for stale cache rebuild confirmation. */
   readonly onStaleCache?: () => boolean | Promise<boolean>;
@@ -59,7 +62,8 @@ function storeFor(context: MemoryToolContext): MemoryStore {
   // PostgreSQL pool for every tool invocation. The callback is resolved from
   // async-local state so overlapping host calls keep their own UI context.
   const createStore = context.storeFactory ?? MemoryStore.fromConfig;
-  const store = createStore(loadMemoryConfig(context.cwd, context.configOverrides), context.cwd, {
+  const config = (context.config ?? loadMemoryConfig(context.cwd, context.configOverrides)) as MemoryConfig;
+  const store = createStore(config, context.cwd, {
     onStaleCache: () => {
       const callback = staleCacheCallbacks.getStore() ?? context.onStaleCache;
       return callback ? callback() : true;
