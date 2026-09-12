@@ -71,9 +71,45 @@ export interface ConfigRegistry {
   readonly contributions: readonly UnknownConfigContribution[];
 }
 
+/** Ordered source layers that can supply a resolved leaf. */
+export type ConfigSourceKind = 'defaults' | 'global' | 'project' | 'profile' | 'environment' | 'override';
+
+/** Value-free source metadata for one resolved configuration leaf. */
+export interface ConfigProvenance {
+  readonly kind: ConfigSourceKind;
+  readonly file?: string;
+  readonly profile?: string;
+  readonly environment?: string;
+  readonly legacyPath?: readonly string[];
+  readonly label?: string;
+}
+
+/** Stable diagnostic categories emitted while resolving configuration. */
+export type ConfigDiagnosticCode =
+  'ENVIRONMENT' | 'IO' | 'LIMIT' | 'MERGE' | 'PATH' | 'PROFILE' | 'SCHEMA' | 'SECRET' | 'VERSION' | 'YAML';
+
+/** A bounded, structured resolution problem that never contains rejected values. */
+export interface ConfigDiagnostic {
+  readonly code: ConfigDiagnosticCode;
+  readonly message: string;
+  readonly path?: readonly string[];
+  readonly source?: ConfigProvenance;
+}
+
 /** Immutable typed access to all shards produced by one resolution. */
 export interface ResolvedConfigSnapshot {
+  readonly diagnostics: readonly ConfigDiagnostic[];
+
   get<FilePatch, RuntimePatch, Resolved>(
     contribution: ConfigContribution<FilePatch, RuntimePatch, Resolved>,
   ): DeepReadonly<Resolved>;
+
+  /** Returns metadata for a shard-relative leaf without exposing its value. */
+  sourceOf<FilePatch, RuntimePatch, Resolved>(
+    contribution: ConfigContribution<FilePatch, RuntimePatch, Resolved>,
+    path: readonly string[],
+  ): ConfigProvenance | undefined;
+
+  /** Serializes canonical configuration while replacing every declared secret. */
+  toJSON(): DeepReadonly<Record<string, unknown>>;
 }

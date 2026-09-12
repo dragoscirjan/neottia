@@ -2,7 +2,11 @@
 export {
   CONFIG_ROOT_SECTIONS,
   type ConfigContribution,
+  type ConfigDiagnostic,
+  type ConfigDiagnosticCode,
+  type ConfigProvenance,
   type ConfigRegistry,
+  type ConfigSourceKind,
   type DeepReadonly,
   type EnvironmentBinding,
   type EnvironmentValueKind,
@@ -18,6 +22,14 @@ export {
   type ConfigRegistrationProblem,
   type ConfigRegistrationProblemCode,
 } from './registry.js';
+export {
+  ConfigResolutionError,
+  getDefaultGlobalConfigPath,
+  MAX_CONFIG_DIAGNOSTICS,
+  resolveConfig,
+  type DefaultGlobalConfigPathOptions,
+  type ResolveConfigOptions,
+} from './resolver.js';
 export {
   ConfigSnapshotError,
   createResolvedConfigSnapshot,

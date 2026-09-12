@@ -7,6 +7,7 @@ Neottia provides a shared SDLC that can be understood and used by multiple AI co
 ```text
 ├── extensions/          # Independently versioned harness extensions
 ├── packages/
+│   ├── config/          # Shared layered configuration platform
 │   ├── core/            # Independently versioned core package
 │   ├── design-docs/     # Canonical design documents and shared tools
 │   ├── design-docs-mcp/ # Generic Design Docs MCP server
@@ -72,6 +73,10 @@ mise run release:global -- 1.0.0
 ```
 
 This updates `packages/release/package.json` and `packages/release/release-manifest.json`. The published `@neottia/release` package converts exact `workspace:` references into exact registry versions, making the global release reproducible.
+
+## Configuration
+
+`@neottia/config` composes domain-owned schemas into one immutable snapshot. It loads optional global and project YAML, applies profiles, environment bindings, and explicit overrides in a fixed order, tracks value-free leaf provenance, and redacts declared secrets. See the [package guide](packages/config/README.md) for source locations, profiles, secret references, diagnostics, and embedding.
 
 ## Memory
 
