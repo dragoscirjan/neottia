@@ -2,6 +2,8 @@
 
 `@neottia/config` is Neottia's domain-neutral configuration platform. Domain packages contribute their schemas, defaults, environment bindings, and secret fields. A registry resolves those contributions together, so every consumer receives one coherent immutable snapshot without `@neottia/config` importing a domain, MCP, or harness package.
 
+Read the [unified configuration guide](../../docs/configuration.md) to configure global and project files, profiles, secrets, migrated modules, diagnostics, and embedding. The complete strict editor schema is exported as `@neottia/config/config.schema.json`.
+
 ## Define and register a contribution
 
 A contribution owns one canonical path beneath a registered root section. File and runtime patches use separate schemas so file-only rules, including secret references, can differ from trusted runtime overrides. Patch schemas must not inject defaults; the complete merged value is checked once with `resolvedSchema`.
@@ -55,6 +57,10 @@ Environment `names` are ordered from the preferred name to compatibility aliases
 A binding may declare a synchronous `parse(value)` hook when a legacy environment variable does not map directly to a string, integer, or boolean leaf. This hook runs as trusted module-contribution code and replaces built-in `kind` coercion. Its result must satisfy the contribution's runtime patch and resolved schemas. Thrown errors and invalid results produce value-free environment diagnostics; parser errors and raw environment text are never included.
 
 The configurable root sections are `modules`, `sdlc`, `connections`, `capabilities`, `agents`, `harnesses`, `assets`, and `templates`. `version` and `profiles` are document metadata. Registration rejects invalid metadata, duplicate IDs, exact duplicate paths, ancestor/descendant ownership, and canonical or legacy alias collisions.
+
+## Generate a composed schema
+
+`generateConfigJsonSchema(registry)` returns a draft-07 schema for the registry's canonical file paths and profile fragments. The schema requires `version: 1` and rejects unregistered keys. Neottia's published `config.schema.json` composes the official Memory, Issues, Design Docs, and Searchable contributions at repository build time, so this package keeps no runtime dependency on those modules.
 
 ## Resolve configuration
 

@@ -14,6 +14,8 @@ Node.js 22.16 or newer is required. Canonical stash files and the SQLite FTS cac
 
 Searchable contributes the canonical `modules.searchable` shard to `@neottia/config`. Hosts resolve the official registry once and pass the immutable shard to the runtime and tool context. `loadSearchableConfig()` remains available for standalone use and accepts the deprecated `skills.searchable` path.
 
+See the [unified configuration guide](../../docs/configuration.md) for shared files, profiles, precedence, secret handling, diagnostics, and migration. Configuration resolves in this order: defaults, global file, project file, selected global profile, selected project profile, environment bindings, and explicit runtime overrides. The YAML root must contain `version: 1`.
+
 Create `.neottia/config.yml` in the project working directory:
 
 ```yaml

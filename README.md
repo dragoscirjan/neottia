@@ -76,7 +76,7 @@ This updates `packages/release/package.json` and `packages/release/release-manif
 
 ## Configuration
 
-`@neottia/config` composes domain-owned schemas into one immutable snapshot. It loads optional global and project YAML, applies profiles, environment bindings, and explicit overrides in a fixed order, tracks value-free leaf provenance, and redacts declared secrets. See the [package guide](packages/config/README.md) for source locations, profiles, secret references, diagnostics, and embedding.
+`@neottia/config` composes domain-owned schemas into one immutable snapshot. It loads optional global and project YAML, applies profiles, environment bindings, and explicit overrides in a fixed order, tracks value-free leaf provenance, and redacts declared secrets. Use the [unified configuration guide](docs/configuration.md) for files, profiles, precedence, secrets, diagnostics, embedding, and `skills.*` migration. The package publishes the complete editor schema as `@neottia/config/config.schema.json`.
 
 ## Memory
 
@@ -88,7 +88,7 @@ Enable `modules.issues` to manage Git-trackable YAML issues with exact revisions
 
 ## Design Docs
 
-Install `@neottia/design-docs` for strict repository-local Markdown/YAML design records, `@neottia/design-docs-mcp` for generic stdio MCP, or the Pi/OpenCode extensions for in-process tools. Enable `skills.design_docs` in `.neottia/config.yml`; enable `skills.issues` too for real stable-link validation through `@neottia/issues-design-docs`. The [Design Docs guide](docs/design-docs/) covers authoring, approval, immutable versioning, BM25 search, archive/restore, stable issue references, migration, and recovery.
+Install `@neottia/design-docs` for strict repository-local Markdown/YAML design records, `@neottia/design-docs-mcp` for generic stdio MCP, or the Pi/OpenCode extensions for in-process tools. Enable `modules.design_docs` in `.neottia/config.yml`; enable `modules.issues` too for real stable-link validation through `@neottia/issues-design-docs`. The [Design Docs guide](docs/design-docs/) covers authoring, approval, immutable versioning, BM25 search, archive/restore, stable issue references, migration, and recovery.
 
 ## Searchable
 

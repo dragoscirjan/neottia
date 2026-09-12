@@ -7,6 +7,7 @@ import {
   createConfigRegistry,
   createResolvedConfigSnapshot,
   defineConfigContribution,
+  generateConfigJsonSchema,
   type ConfigContribution,
   type RootSection,
 } from './index.js';
@@ -162,6 +163,44 @@ describe('configuration contribution registry', () => {
         }),
       ),
     ).toThrow(/secret binding/u);
+  });
+});
+
+describe('root JSON Schema generation', () => {
+  it('composes canonical module paths and strict profile fragments', () => {
+    const memory = defineConfigContribution(contribution('memory', ['modules', 'memory']));
+    const issues = defineConfigContribution(contribution('issues', ['modules', 'issues']));
+    const schema = generateConfigJsonSchema(createConfigRegistry([memory, issues])) as {
+      additionalProperties?: boolean;
+      properties?: Record<string, unknown>;
+    };
+    const modules = schema.properties?.modules as {
+      additionalProperties?: boolean;
+      properties?: Record<string, unknown>;
+    };
+    const profiles = schema.properties?.profiles as {
+      additionalProperties?: { properties?: Record<string, unknown> };
+    };
+    const profileModules = profiles.additionalProperties?.properties?.modules as {
+      additionalProperties?: boolean;
+      properties?: Record<string, unknown>;
+    };
+
+    expect(schema).toMatchObject({
+      $id: 'https://neottia.dev/schema/config-v1.json',
+      additionalProperties: false,
+      required: ['version'],
+    });
+    expect(Object.keys(modules.properties ?? {})).toEqual(['issues', 'memory']);
+    expect(modules.additionalProperties).toBe(false);
+    expect(Object.keys(profileModules.properties ?? {})).toEqual(['issues', 'memory']);
+    expect(profileModules.additionalProperties).toBe(false);
+  });
+
+  it('rejects registries not created by the package', () => {
+    expect(() => generateConfigJsonSchema({ rootSections: CONFIG_ROOT_SECTIONS, contributions: [] })).toThrow(
+      /not created by @neottia\/config/u,
+    );
   });
 });
 

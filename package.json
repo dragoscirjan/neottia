@@ -22,6 +22,8 @@
     "build": "pnpm -r run --if-present build",
     "changeset": "changeset",
     "clean": "pnpm -r run --if-present clean && rimraf .nyc_output coverage docs/.vitepress/dist docs/.vitepress/cache",
+    "config:contracts": "node scripts/config-contracts.mjs",
+    "config:schema:generate": "node scripts/config-contracts.mjs --write",
     "docs": "vitepress build docs",
     "docs:check": "vitest run --root . scripts/documentation.spec.ts",
     "docs:preview": "vitepress preview docs",
@@ -40,7 +42,7 @@
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "typecheck": "pnpm -r run --if-present typecheck",
-    "validate": "pnpm run format:check && pnpm run docs:check && pnpm run lint:check && pnpm run duplicate-check && pnpm run test && pnpm run build && pnpm run docs",
+    "validate": "pnpm run format:check && pnpm run docs:check && pnpm run lint:check && pnpm run duplicate-check && pnpm run test && pnpm run build && pnpm run config:contracts && pnpm run docs",
     "version:modules": "changeset version"
   },
   "devDependencies": {

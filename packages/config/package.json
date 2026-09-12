@@ -24,9 +24,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
-    }
+    },
+    "./config.schema.json": "./config.schema.json"
   },
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": ["dist", "README.md", "LICENSE", "config.schema.json"],
   "engines": {
     "node": ">=22.16.0"
   },

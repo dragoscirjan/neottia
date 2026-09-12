@@ -30,6 +30,7 @@ export {
   type DefaultGlobalConfigPathOptions,
   type ResolveConfigOptions,
 } from './resolver.js';
+export { CONFIG_JSON_SCHEMA_ID, generateConfigJsonSchema } from './schema.js';
 export {
   ConfigSnapshotError,
   createResolvedConfigSnapshot,

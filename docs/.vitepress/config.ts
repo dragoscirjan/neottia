@@ -10,6 +10,7 @@ export default defineConfig({
     nav: [
       { text: 'Home', link: '/' },
       { text: 'Get started', link: '/get-started/' },
+      { text: 'Configuration', link: '/configuration' },
       {
         text: 'Features',
         items: [
@@ -49,6 +50,12 @@ export default defineConfig({
       },
     ],
     sidebar: {
+      '/configuration': [
+        {
+          text: 'Configuration',
+          items: [{ text: 'Unified configuration', link: '/configuration' }],
+        },
+      ],
       '/get-started/': [
         {
           text: 'Get started',
