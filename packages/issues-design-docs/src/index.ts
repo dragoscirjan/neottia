@@ -39,13 +39,11 @@ export function createIssuesDesignDocsComposition(
   options: IssuesDesignDocsCompositionOptions,
 ): IssuesDesignDocsComposition {
   const cwd = resolve(options.cwd);
-  let designDocsStore: Promise<DesignDocumentStore> | undefined;
   const resolver: DesignDocumentReferenceResolver = {
     async resolveMany(references, context) {
       const config = loadDesignDocsConfig(cwd, options.designDocsConfigOverrides);
       if (!config.enabled) return { status: 'target_disabled' };
-      designDocsStore ??= DesignDocumentStore.fromConfig(config, cwd);
-      const store = await designDocsStore;
+      const store = await DesignDocumentStore.fromConfig(config, cwd);
       const unique = new Map(references.map((reference) => [addressKey(reference), reference]));
       const resolvedByKey = new Map<string, DocumentAddressResult>();
       const distinct = [...unique.values()];

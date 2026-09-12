@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DesignDocumentStore, loadDesignDocsConfig } from '@neottia/design-docs';
@@ -87,6 +87,32 @@ describe('Issues and Design Docs composition', () => {
     expect(batch.results).toHaveLength(references.length);
     expect(batch.results.map((result) => result.reference)).toEqual(references);
     expect(batch.results.filter((result) => result.status === 'resolved')).toHaveLength(69);
+  });
+
+  it('reloads the Design Docs store after configuration changes', async () => {
+    const cwd = await mkdtemp(join(tmpdir(), 'neottia-composition-config-'));
+    roots.push(cwd);
+    await mkdir(join(cwd, '.neottia'));
+    const configPath = join(cwd, '.neottia/config.yml');
+    const writeConfig = (root: string) =>
+      writeFile(configPath, `version: 1\nskills:\n  design_docs:\n    enabled: true\n    root: ${root}\n`);
+    await writeConfig('docs-a');
+    const composition = createIssuesDesignDocsComposition({ cwd });
+    const firstStore = await DesignDocumentStore.fromConfig(loadDesignDocsConfig(cwd), cwd);
+    const first = await firstStore.create({ title: 'First root', kind: 'hld' });
+    const authority = await resolveManagedRoot({ authorityRoot: cwd, limits: DEFAULT_STORE_LIMITS });
+    const firstResult = await withRepositoryLease(authority, (lease) =>
+      composition.resolver.resolveMany([{ kind: 'design-doc', id: first.id }], { lease }),
+    );
+    expect(firstResult).toMatchObject({ status: 'ok', results: [{ status: 'resolved' }] });
+
+    await writeConfig('docs-b');
+    const secondStore = await DesignDocumentStore.fromConfig(loadDesignDocsConfig(cwd), cwd);
+    const second = await secondStore.create({ title: 'Second root', kind: 'hld' });
+    const secondResult = await withRepositoryLease(authority, (lease) =>
+      composition.resolver.resolveMany([{ kind: 'design-doc', id: second.id }], { lease }),
+    );
+    expect(secondResult).toMatchObject({ status: 'ok', results: [{ status: 'resolved' }] });
   });
 
   it('reports missing stable IDs and pinned versions from canonical Issues', async () => {

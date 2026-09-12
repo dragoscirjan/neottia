@@ -92,6 +92,9 @@ importers:
         specifier: ^4.5.4
         version: 4.5.4
     devDependencies:
+      '@neottia/issues':
+        specifier: workspace:*
+        version: link:../../packages/issues
       '@neottia/repository-store':
         specifier: workspace:*
         version: link:../../packages/repository-store

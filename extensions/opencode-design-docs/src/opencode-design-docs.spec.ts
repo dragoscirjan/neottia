@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DESIGN_DOCS_TOOLS } from '@neottia/design-docs';
+import { IssueStore, loadIssueConfig } from '@neottia/issues';
 import { StaleRevisionError } from '@neottia/repository-store';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -41,6 +42,27 @@ describe('OpenCode Design Docs plugin', () => {
     ).toBe(true);
     const validated = JSON.parse(await hooks.tool.document_validate.execute({ cross_domain: true }));
     expect(validated).toMatchObject({ valid: true, findings: [] });
+
+    const missingId = 'doc-01ARZ3NDEKTSV4RRFFQ69G5FAW';
+    const issues = new IssueStore(loadIssueConfig(cwd), cwd, {
+      resolver: {
+        resolveMany: async (references) => ({
+          status: 'ok',
+          results: references.map((reference) => ({
+            status: 'resolved',
+            reference,
+            resolvedVersion: 1,
+            location: 'active',
+            revision: `v1:${'0'.repeat(64)}`,
+          })),
+        }),
+      },
+    });
+    const issue = await issues.create({ type: 'task', title: 'Missing design link' });
+    await issues.linkDocument(issue.id, { kind: 'design-doc', id: missingId }, issue.revision);
+    const missing = JSON.parse(await hooks.tool.document_validate.execute({ cross_domain: true }));
+    expect(missing).toMatchObject({ valid: false, findings: [{ code: 'ISSUE_LINK_ID_NOT_FOUND' }] });
+
     const error = JSON.parse(await hooks.tool.document_create.execute({ title: 'Invalid', kind: 'adr' }));
     expect(error).toMatchObject({ category: 'schema', code: 'TOOL_INPUT_INVALID', retryable: false });
   });

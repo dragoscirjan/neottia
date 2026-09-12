@@ -51,7 +51,7 @@ export function encodeCanonicalDocument(
   limits: DesignDocsLimits,
 ): Uint8Array {
   validateMetadata(metadata, limits);
-  const body = canonicalDocumentBody(metadata.title, content);
+  const body = canonicalDocumentBody(metadata.title, content, limits.max_body_bytes);
   validateBody(metadata.title, body, limits);
   const source = [
     '---',
@@ -140,16 +140,19 @@ function decodeSource(source: string | Uint8Array, limits: DesignDocsLimits, har
   };
 }
 
-export function canonicalDocumentBody(title: string, content: string): string {
+export function canonicalDocumentBody(title: string, content: string, maximumBytes?: number): string {
   assertUnicode(content, 'document content');
   const lines = content.replaceAll('\r\n', '\n').replaceAll('\r', '\n').split('\n');
   // Remove surrounding blank lines without erasing indentation from the first code line.
   while (lines[0]?.trim() === '') lines.shift();
   while (lines.at(-1)?.trim() === '') lines.pop();
-  const normalized = lines.join('\n');
+  const body = `# ${title}\n\n${lines.join('\n')}`;
+  // Reject oversized bodies before the CommonMark parser allocates its syntax tree.
+  if (maximumBytes !== undefined && encoder.encode(body).byteLength > maximumBytes)
+    limit('BODY_LIMIT', 'Document body byte limit exceeded.');
   if (containsAdditionalH1(lines, true))
     fail('canonical_form', 'H1_ADDITIONAL', 'Document content must not contain a level-one heading.');
-  return `# ${title}\n\n${normalized}`;
+  return body;
 }
 
 function validateBody(title: string, body: string, limits: DesignDocsLimits, allowLegacySetext = false): void {
@@ -173,7 +176,7 @@ function encodeHarnessctlDocument(
   limits: DesignDocsLimits,
 ): Uint8Array {
   validateMetadata(metadata, limits);
-  const body = canonicalDocumentBody(metadata.title, content);
+  const body = canonicalDocumentBody(metadata.title, content, limits.max_body_bytes);
   validateBody(metadata.title, body, limits, true);
   const source = [
     '---',

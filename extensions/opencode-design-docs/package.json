@@ -27,6 +27,7 @@
     "zod": "^4.5.4"
   },
   "devDependencies": {
+    "@neottia/issues": "workspace:*",
     "@neottia/repository-store": "workspace:*",
     "@neottia/testkit": "workspace:*",
     "@templ-project/tsconfig": "^0.2.2",

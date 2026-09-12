@@ -41,6 +41,16 @@ describe('canonical Design Docs codec', () => {
     expect(() => decodeDocument(source, limits)).toThrow();
   });
 
+  it('rejects oversized content before parsing additional headings', () => {
+    let error: unknown;
+    try {
+      encodeCanonicalDocument(metadata, `# additional\n${'x'.repeat(64)}`, { ...limits, max_body_bytes: 32 });
+    } catch (value: unknown) {
+      error = value;
+    }
+    expect(error).toMatchObject({ category: 'resource_limit', code: 'BODY_LIMIT' });
+  });
+
   it.each([0, 1, 2, 3])('rejects an additional ATX H1 with %i leading spaces', (indent) => {
     expect(() => encodeCanonicalDocument(metadata, `Ordinary content\n${' '.repeat(indent)}# invalid`, limits)).toThrow(
       /level-one/u,
