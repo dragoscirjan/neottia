@@ -52,16 +52,16 @@ tags:
 
 ## Field rules
 
-| Field         | Rule                                                                                                         |
-| ------------- | ------------------------------------------------------------------------------------------------------------ |
-| `summary`     | Required; at most **240 Unicode characters** when an agent writes it (files can hold up to 1000 when loaded) |
-| `details`     | Optional; at most **2000 Unicode characters** and **12 non-empty lines** on write                            |
-| `source.kind` | `artifact`, `user-confirmed`, `discussion`, or `tool-observation` — where the knowledge came from            |
-| `confidence`  | `confirmed` or `verified`; **`verified` requires source kind `artifact` or `tool-observation`**              |
-| `topic`       | Defaults to the configured `default_topic`                                                                   |
-| `tags`        | Sorted, unique                                                                                               |
+| Field         | Rule                                                                                                           |
+| ------------- | -------------------------------------------------------------------------------------------------------------- |
+| `summary`     | Required; at most **240 Unicode characters** when an agent writes it (files can hold up to 1000 when loaded)   |
+| `details`     | Optional; at most **2000 Unicode characters** and **12 non-empty lines** on write                              |
+| `source.kind` | `artifact`, `user-confirmed`, `discussion`, or `tool-observation`. This records where the knowledge came from. |
+| `confidence`  | `confirmed` or `verified`; **`verified` requires source kind `artifact` or `tool-observation`**                |
+| `topic`       | Defaults to the configured `default_topic`                                                                     |
+| `tags`        | Sorted, unique                                                                                                 |
 
-The write-time limits exist so an agent cannot flood memory with unbounded prose — memory records are promptsized summaries, not documents.
+Write-time limits prevent unbounded prose. Memory records contain short summaries rather than full documents.
 
 ## Lifecycle
 
@@ -120,7 +120,7 @@ The SQLite index exists only for fast, ranked search. See [Configuration](./conf
 
 Track the YAML directories because they are the canonical memory. Add these exact entries to the consumer project's `.gitignore`:
 
-```gitignore
+```text
 .neottia/memory/index.db
 .neottia/memory/index.db-wal
 .neottia/memory/index.db-shm

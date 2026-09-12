@@ -2,6 +2,25 @@
 
 Filesystem-canonical issue management for Neottia. Each issue is a deterministic YAML file in `.neottia/issues`; `.neottia/cache/issues.sqlite` is a disposable FTS5/BM25 projection and is never authority.
 
+```sh
+pnpm add @neottia/issues
+```
+
+Read the [Issues user guide](https://github.com/dragoscirjan/neottia/blob/main/docs/issues/index.md) and [library reference](https://github.com/dragoscirjan/neottia/blob/main/docs/issues/library.md).
+
+```ts
+import { IssueStore, loadIssueConfig } from "@neottia/issues";
+
+const cwd = process.cwd();
+const store = new IssueStore(loadIssueConfig(cwd, { enabled: true }), cwd);
+const issue = await store.create({
+  type: "story",
+  title: "Add a deployment status page",
+  created_by: "user:owner",
+});
+console.log(issue.id, issue.revision);
+```
+
 ## Configure
 
 ```yaml
@@ -21,4 +40,4 @@ Hosts compose typed design-document validation by injecting `DesignDocumentRefer
 
 Commit `.neottia/issues/**/*.yml`; do not commit `.neottia/cache/`. Root components cannot end in a period. Never configure the issue root as `.neottia` or to overlap `.neottia/cache` or `.neottia/repository-store`.
 
-See the [Issues user guide](../../docs/issues/) for schemas, tools, migration, recovery, and troubleshooting.
+The user guide covers schemas, tools, migration, recovery, and troubleshooting.

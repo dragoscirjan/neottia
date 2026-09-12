@@ -2,6 +2,25 @@
 
 Repository-local, versioned design documents for Neottia. Canonical Markdown is the sole authority; a domain-owned SQLite FTS5 database is a disposable search cache.
 
+```sh
+pnpm add @neottia/design-docs
+```
+
+Read the [Design Docs user guide](https://github.com/dragoscirjan/neottia/blob/main/docs/design-docs/index.md) and [library reference](https://github.com/dragoscirjan/neottia/blob/main/docs/design-docs/library.md).
+
+```ts
+import { DesignDocumentStore, loadDesignDocsConfig } from "@neottia/design-docs";
+
+const cwd = process.cwd();
+const store = await DesignDocumentStore.fromConfig(loadDesignDocsConfig(cwd, { enabled: true }), cwd);
+const document = await store.create({
+  title: "Deployment status page",
+  kind: "hld",
+  created_by: "user:owner",
+});
+console.log(document.id, document.revision);
+```
+
 ## Configuration
 
 Enable the strict shard in `.neottia/config.yml`:

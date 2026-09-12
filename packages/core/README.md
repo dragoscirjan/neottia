@@ -1,11 +1,19 @@
 # @neottia/core
 
-Core APIs for Neottia. This package is independently versioned and published from the monorepo.
+Template-level greeting utility. It is not a shared SDLC coordinator.
 
-## Usage
+```sh
+pnpm add @neottia/core
+```
 
 ```ts
-import { hello } from "@neottia/core";
+import { Greeter, hello, main } from "@neottia/core";
 
 console.log(hello("World"));
+console.log(new Greeter().goodbye("World"));
+main();
 ```
+
+The root exports `Greeter`, `hello`, and `main`. `Greeter` has `hello` and `goodbye`; the package root does not export a standalone `goodbye`.
+
+Read the [Core reference](https://github.com/dragoscirjan/neottia/blob/main/docs/reference/core.md).

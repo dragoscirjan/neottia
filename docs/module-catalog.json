@@ -1,0 +1,129 @@
+[
+  {
+    "name": "@neottia/core",
+    "manifest": "packages/core/package.json",
+    "classification": "library/embedding",
+    "route": "/reference/core",
+    "issue": 107
+  },
+  {
+    "name": "@neottia/design-docs",
+    "manifest": "packages/design-docs/package.json",
+    "classification": "library/embedding",
+    "route": "/design-docs/library",
+    "issue": 103
+  },
+  {
+    "name": "@neottia/design-docs-mcp",
+    "manifest": "packages/design-docs-mcp/package.json",
+    "classification": "generic MCP",
+    "route": "/mcp/design-docs",
+    "issue": 102
+  },
+  {
+    "name": "@neottia/issues",
+    "manifest": "packages/issues/package.json",
+    "classification": "library/embedding",
+    "route": "/issues/library",
+    "issue": 105
+  },
+  {
+    "name": "@neottia/issues-design-docs",
+    "manifest": "packages/issues-design-docs/package.json",
+    "classification": "library/embedding",
+    "route": "/issues/design-docs",
+    "issue": 105
+  },
+  {
+    "name": "@neottia/issues-mcp",
+    "manifest": "packages/issues-mcp/package.json",
+    "classification": "generic MCP",
+    "route": "/mcp/issues",
+    "issue": 102
+  },
+  {
+    "name": "@neottia/memory-core",
+    "manifest": "packages/memory-core/package.json",
+    "classification": "library/embedding",
+    "route": "/memory/library",
+    "issue": 104
+  },
+  {
+    "name": "@neottia/memory-mcp",
+    "manifest": "packages/memory-mcp/package.json",
+    "classification": "generic MCP",
+    "route": "/mcp/memory",
+    "issue": 102
+  },
+  {
+    "name": "@neottia/release",
+    "manifest": "packages/release/package.json",
+    "classification": "library/embedding",
+    "route": "/reference/release",
+    "issue": 107
+  },
+  {
+    "name": "@neottia/repository-store",
+    "manifest": "packages/repository-store/package.json",
+    "classification": "library/embedding",
+    "route": "/repository-store",
+    "issue": 107
+  },
+  {
+    "name": "@neottia/searchable-core",
+    "manifest": "packages/searchable-core/package.json",
+    "classification": "foundation-only",
+    "route": "/searchable/",
+    "issue": 106
+  },
+  {
+    "name": "@neottia/testkit",
+    "manifest": "packages/testkit/package.json",
+    "classification": "internal/private",
+    "route": null,
+    "disposition": "Private repository test helpers; packages/testkit/README.md is the internal reference.",
+    "issue": 107
+  },
+  {
+    "name": "@neottia/pi-memory",
+    "manifest": "extensions/pi-memory/package.json",
+    "classification": "native extension",
+    "route": "/harnesses/pi#memory",
+    "issue": 101
+  },
+  {
+    "name": "@neottia/pi-issues",
+    "manifest": "extensions/pi-issues/package.json",
+    "classification": "native extension",
+    "route": "/harnesses/pi#issues",
+    "issue": 101
+  },
+  {
+    "name": "@neottia/pi-design-docs",
+    "manifest": "extensions/pi-design-docs/package.json",
+    "classification": "native extension",
+    "route": "/harnesses/pi#design-docs",
+    "issue": 101
+  },
+  {
+    "name": "@neottia/opencode-memory",
+    "manifest": "extensions/opencode-memory/package.json",
+    "classification": "native extension",
+    "route": "/harnesses/opencode#memory",
+    "issue": 101
+  },
+  {
+    "name": "@neottia/opencode-issues",
+    "manifest": "extensions/opencode-issues/package.json",
+    "classification": "native extension",
+    "route": "/harnesses/opencode#issues",
+    "issue": 101
+  },
+  {
+    "name": "@neottia/opencode-design-docs",
+    "manifest": "extensions/opencode-design-docs/package.json",
+    "classification": "native extension",
+    "route": "/harnesses/opencode#design-docs",
+    "issue": 101
+  }
+]

@@ -1,7 +1,39 @@
 # Issues configuration
 
-`skills.issues` is strict: unknown keys are rejected. Every leaf supports `NEOTTIA_ISSUES_*` environment overrides; explicit library values override environment, which overrides YAML, which overrides defaults. `NEOTTIA_CONFIG_FILE` or `NEOTTIA_ISSUES_CONFIG_FILE` selects a file and `NEOTTIA_CONFIG_ISSUES_PATH` selects the shard.
+The strict `skills.issues` shard rejects unknown keys. Explicit library values override environment bindings, which override YAML and defaults.
 
-Options include `enabled`, safe project-relative `root`, portable `prefix`, retrieval limits, cache maximum age/stale policy, lease wait/stale bounds, and filesystem/query/result resource ceilings. The default root is `.neottia/issues`, prefix is `issue-`, and stale policy is `prompt` (non-interactive adapters rebuild). Explicit `fail` is never replaced by an adapter. Root components may not end in a period. The `.neottia` control root and roots case-insensitively equal to or beneath `.neottia/cache` or `.neottia/repository-store` are rejected; near matches such as `.neottia/cache-x` remain valid. Runtime validation and the published JSON Schema enforce the same rules. Disabled tools reject before roots, leases, or cache files are created.
+```yaml
+version: 1
+skills:
+  issues:
+    enabled: true
+    root: .neottia/issues
+    prefix: issue-
+    retrieval:
+      limit: 20
+      max_bytes: 1048576
+    cache:
+      max_age_ms: 300000
+      stale_policy: prompt
+    lock:
+      wait_ms: 10000
+      stale_ms: 60000
+    security:
+      max_file_bytes: 1048576
+      max_files: 10000
+      max_total_bytes: 67108864
+      max_batch_paths: 1000
+      max_query_bytes: 16384
+      max_query_rows: 10000
+      max_result_bytes: 16777216
+```
 
-Environment names follow the leaf exactly: `NEOTTIA_ISSUES_ENABLED`, `_ROOT`, `_PREFIX`, `_RETRIEVAL_LIMIT`, `_RETRIEVAL_MAX_BYTES`, `_CACHE_MAX_AGE_MS`, `_CACHE_STALE_POLICY`, `_LOCK_WAIT_MS`, `_LOCK_STALE_MS`, and `_MAX_FILE_BYTES`, `_MAX_FILES`, `_MAX_TOTAL_BYTES`, `_MAX_BATCH_PATHS`, `_MAX_QUERY_BYTES`, `_MAX_QUERY_ROWS`, `_MAX_RESULT_BYTES`. Boolean values accept `true/false/1/0`; numeric leaves require decimal integers.
+The root is a safe project-relative path. It cannot overlap `.neottia/cache` or `.neottia/repository-store`. Prefixes match `^[a-z][a-z0-9-]{0,31}$`. Issues default to disabled; after `enabled: true`, the other values above are the effective defaults.
+
+Bindings are `NEOTTIA_ISSUES_ENABLED`, `_ROOT`, `_PREFIX`, `_RETRIEVAL_LIMIT`, `_RETRIEVAL_MAX_BYTES`, `_CACHE_MAX_AGE_MS`, `_CACHE_STALE_POLICY`, `_LOCK_WAIT_MS`, `_LOCK_STALE_MS`, `_MAX_FILE_BYTES`, `_MAX_FILES`, `_MAX_TOTAL_BYTES`, `_MAX_BATCH_PATHS`, `_MAX_QUERY_BYTES`, `_MAX_QUERY_ROWS`, and `_MAX_RESULT_BYTES`, each prefixed with `NEOTTIA_ISSUES`. File selectors are `NEOTTIA_CONFIG_FILE`, `NEOTTIA_ISSUES_CONFIG_FILE`, and `NEOTTIA_CONFIG_ISSUES_PATH`.
+
+Environment booleans accept case-insensitive `true` or `1` and `false` or `0`. Integer bindings accept trimmed decimal digits. An empty environment value is ignored; an invalid value fails configuration loading. These environment-string conversions are runtime behavior and are not expressed by the JSON Schema.
+
+With `stale_policy: prompt`, the core rebuilds unless an injected callback explicitly declines, which makes the operation fail. Pi supplies the interactive confirmation. The non-interactive OpenCode and MCP adapters do not supply a callback, so `prompt` rebuilds. This adapter behavior is also outside the schema.
+
+The shipped [JSON Schema](https://github.com/dragoscirjan/neottia/blob/main/packages/issues/config.schema.json) is the machine-readable reference. Disabled tools reject before creating roots, leases, or caches.

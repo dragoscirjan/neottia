@@ -86,11 +86,19 @@ Install `@neottia/design-docs` for strict repository-local Markdown/YAML design 
 
 ## Searchable foundation
 
-`@neottia/searchable-core` defines the strict configuration, schemas, errors, injectable service interfaces, and shared registry for `web_search`, `web_fetch`, `web_stash`, `web_grep`, and `web_ask`. This first foundation release does not yet include provider, extraction, storage/cache, Ollama, MCP, Pi, or OpenCode implementations; tools work only when an application injects those services. See the [package guide](packages/searchable-core/README.md).
+`@neottia/searchable-core` defines strict configuration, schemas, errors, injected service interfaces, and contracts for `web_search`, `web_fetch`, `web_stash`, `web_grep`, and `web_ask`. It is foundation-only. It has no provider, extraction, storage, Ollama, MCP, Pi, or OpenCode implementation. See the [Searchable guide](docs/searchable/).
+
+## Delivery methods
+
+Pi and OpenCode each have native Memory, Issues, and Design Docs extensions. Other MCP-compatible clients can launch the three generic stdio servers. TypeScript applications can embed the domain libraries directly. Searchable is available only through direct library injection.
+
+## Supporting packages
+
+`@neottia/repository-store` provides Linux filesystem authority, exact revisions, durable batches, leases, recovery, and disposable SQLite adapters. `@neottia/core` remains a template-level greeting utility. `@neottia/release` publishes a versioned bill of materials, while private `@neottia/testkit` stays internal to repository tests.
 
 ## Documentation
 
-User documentation is under [`docs/`](docs/) and built with VitePress.
+Start with the [delivery chooser](docs/get-started/) and [complete 18-module catalog](docs/reference/modules.md). User documentation is under [`docs/`](docs/) and built with VitePress. `mise run docs:check` validates catalog coverage, routes, links, configuration examples, and documented tool registries.
 
 ## License
 

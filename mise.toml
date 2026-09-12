@@ -79,6 +79,10 @@ run = [
 description = "Build the VitePress documentation site"
 run = "pnpm run docs"
 
+[tasks."docs:check"]
+description = "Validate documentation catalogs, links, examples, schemas, and tool references"
+run = "pnpm run docs:check"
+
 [tasks."docs:serve"]
 description = "Serve the VitePress documentation site locally"
 run = "pnpm run serve"
@@ -138,6 +142,7 @@ run = "pnpm run audit"
 description = "Run the complete local validation pipeline"
 run = [
   "mise run format:check",
+  "mise run docs:check",
   "mise run clean",
   "mise run build",
   "mise run lint:check",

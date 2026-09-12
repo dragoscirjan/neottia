@@ -1,28 +1,29 @@
 # Issue tools
 
-The library, MCP, Pi, and OpenCode surfaces expose the same generated contracts:
+All delivery methods use this registry order and reject unknown input fields. Every tool accepts an optional positive absolute `deadline` unless stated otherwise below.
 
-| Tool                             | Principal input                                                 | Output                                    |
-| -------------------------------- | --------------------------------------------------------------- | ----------------------------------------- |
-| `issue_id`                       | none                                                            | `{id}`                                    |
-| `issue_create`                   | `type`, `title`; optional body/creator/assignee/parent/metadata | hydrated issue                            |
-| `issue_get`                      | `id`                                                            | hydrated issue                            |
-| `issue_list`                     | optional status/type/assignee/parent/location/limit             | `{issues}`                                |
-| `issue_search`                   | nonblank `query`; optional list filters, `max_bytes`            | ranked `{issues}`                         |
-| `issue_update`                   | `id`, `expected_revision`, one or more mutable fields           | updated issue                             |
-| `issue_transition`               | `id`, `status`, `expected_revision`                             | updated issue                             |
-| `issue_comment`                  | `id`, `author`, `body`; optional revision                       | updated issue                             |
-| `issue_relate`                   | source/target IDs, relationship; optional revision              | deterministic owner issue                 |
-| `issue_unrelate`                 | source/target IDs, relationship, owner revision                 | deterministic owner issue                 |
-| `issue_link_document`            | issue ID, document ID/version; optional revision                | updated issue                             |
-| `issue_unlink_document`          | issue ID, document ID/version, revision                         | updated issue                             |
-| `issue_validate`                 | none                                                            | bounded findings and cache state          |
-| `issue_archive`, `issue_restore` | root issue ID and revision                                      | `{issues}` subtree                        |
-| `issue_export`                   | none                                                            | native format/content/count               |
-| `issue_import`                   | content; optional `preview` (default true)                      | planned/imported counts, warnings, errors |
+| Tool                    | Exact input                                                                                                                                                | Exact output                                  |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| `issue_id`              | optional `deadline`                                                                                                                                        | `{id}`                                        |
+| `issue_create`          | `type` and `title` up to 500 characters; optional `body` up to 1 MiB, `created_by`, `assigned_to`, `parent`, `metadata`, and `deadline`                    | hydrated issue                                |
+| `issue_get`             | `id`; optional `deadline`                                                                                                                                  | hydrated issue                                |
+| `issue_list`            | optional `status`, `type`, `assignee`, `parent`, `location`, `limit` of 1-100, and `deadline`                                                              | `{issues}`                                    |
+| `issue_search`          | nonblank `query` up to 16 KiB; optional `status`, `type`, `assignee`, `parent`, `location`, `limit` of 1-100, `max_bytes` of 1024-16777216, and `deadline` | ranked `{issues}`                             |
+| `issue_update`          | `id`, `expected_revision`, and at least one of `title`, `body`, nullable `assigned_to`, nullable `parent`, or `metadata`; optional `deadline`              | updated issue                                 |
+| `issue_transition`      | `id`, `status`, and `expected_revision`; optional `deadline`                                                                                               | updated issue                                 |
+| `issue_comment`         | `id`, `author`, and `body` up to 64 KiB; optional `expected_revision` and `deadline`                                                                       | updated issue                                 |
+| `issue_relate`          | `source_id`, `target_id`, and `relationship`; optional `expected_revision` and `deadline`                                                                  | deterministic owner issue                     |
+| `issue_unrelate`        | `source_id`, `target_id`, `relationship`, and `expected_revision`; optional `deadline`                                                                     | deterministic owner issue                     |
+| `issue_link_document`   | `id` and `document_id`; optional positive `document_version`, `expected_revision`, and `deadline`                                                          | updated issue                                 |
+| `issue_unlink_document` | `id`, `document_id`, and `expected_revision`; optional positive `document_version` and optional `deadline`                                                 | updated issue                                 |
+| `issue_validate`        | optional `deadline`                                                                                                                                        | graph and cache report                        |
+| `issue_archive`         | `id` and `expected_revision`; optional `deadline`                                                                                                          | `{issues}` subtree                            |
+| `issue_restore`         | `id` and `expected_revision`; optional `deadline`                                                                                                          | `{issues}` subtree                            |
+| `issue_export`          | optional `deadline`                                                                                                                                        | `{format: neottia-issues-v1, content, count}` |
+| `issue_import`          | `content` up to 64 MiB; optional `preview` and `deadline`                                                                                                  | import report                                 |
 
-Update, transition, archive, restore, relation removal, and link removal require `expected_revision`. Comment and additive/idempotent relation/link calls accept optional evidence and enforce it when supplied. For symmetric relations the lexical owner is the returned issue, so its returned revision is directly usable by `issue_unrelate`.
+Relationships are `depends_on`, `relates_to`, `duplicates`, and `supersedes`. Change dependencies through relation tools, not `issue_update`. Additive relationship and link calls are idempotent. Comments and additive calls enforce an optional revision when supplied. Update, transition, archive, restore, unrelate, and unlink require `v1:<sha256>` revision evidence.
 
-Link identity is a design-document ID plus optional pinned version, never a path. Library hosts inject `DesignDocumentReferenceResolver`; MCP uses `createIssueServer({resolver})`, Pi registration accepts `resolver`, and OpenCode composition uses `createIssuesPlugin({resolver})`. An idempotent link call still resolves the complete link snapshot; an unavailable target, unresolved reference, or malformed result batch fails without changing YAML.
+A hydrated issue contains the canonical fields plus `revision`, `location`, `children`, `blocks`, `blocked_by`, and `related_to`. Validation returns `valid`, active, archived, and total counts, findings, and cache state. Import previews by default and returns `valid`, `preview`, `planned`, `imported`, `warnings`, and `errors`.
 
-Errors are JSON objects with `category`, stable `code`, `message`, `retryable`, and optional bounded structured `details`. Resolver errors retain target findings or unresolved reference/reason evidence; cache-policy errors retain the rebuild reason. Output that exceeds the effective configured or call-specific UTF-8 budget fails with `RESULT_TOO_LARGE`.
+Errors contain `category`, stable `code`, `message`, `retryable`, and optional bounded `details`. `TOOL_INPUT_INVALID` covers strict contract failures; `TOOL_OUTPUT_INVALID` covers an invalid internal result; `RESULT_TOO_LARGE` covers serialized output. Resolver, stale revision, graph, path, contention, recovery, cache, and resource errors retain their source code and bounded evidence.

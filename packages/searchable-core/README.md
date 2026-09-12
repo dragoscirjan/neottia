@@ -1,10 +1,16 @@
 # `@neottia/searchable-core`
 
-`@neottia/searchable-core` is the host-neutral foundation for Neottia's Searchable web tools. It publishes strict runtime and JSON Schema contracts, a versioned configuration loader, structured errors, redaction helpers, service interfaces, and one executable registry shared by future MCP, Pi, and OpenCode adapters.
+`@neottia/searchable-core` is the host-neutral foundation for Neottia's Searchable web tools. It publishes strict runtime and JSON Schema contracts, a versioned configuration loader, structured errors, redaction helpers, service interfaces, and one executable registry for caller-owned services.
+
+```sh
+pnpm add @neottia/searchable-core
+```
+
+Read the [Searchable foundation guide](https://github.com/dragoscirjan/neottia/blob/main/docs/searchable/index.md) and [service implementation guide](https://github.com/dragoscirjan/neottia/blob/main/docs/searchable/services.md).
 
 ## Foundation status
 
-This package **does not perform network, storage, extraction, or model operations by itself**. Every tool requires caller-injected `SearchableServices`. Provider clients, direct/Jina/Wayback extraction, canonical filesystem or SQLite storage and cache migration, Ollama integration, MCP delivery, and Pi/OpenCode extensions are intentionally deferred. Applications must not present these tools as operational until they inject working services.
+This package **does not perform network, storage, extraction, or model operations by itself**. Every tool requires caller-injected `SearchableServices`. Provider clients, direct/Jina/Wayback extraction, canonical filesystem or SQLite storage and cache migration, Ollama integration, MCP delivery, and Pi/OpenCode extensions are intentionally deferred. Applications must not present these tools as operational until they inject working services. The current registry passes the resolved `enabled` value to services but does not reject calls when it is false, so the embedding application owns that gate.
 
 ## Tools
 
