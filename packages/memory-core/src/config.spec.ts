@@ -1,8 +1,10 @@
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createConfigRegistry, defineConfigContribution, resolveConfig } from '@neottia/config';
 import { describe, expect, it } from 'vitest';
 import { stringify } from 'yaml';
+import { z } from 'zod';
 import {
   CONFIG_FILE_ENV,
   CREDENTIAL_DEFAULTS,
@@ -12,6 +14,8 @@ import {
   ConfigError,
   MemoryStore,
   loadMemoryConfig,
+  memoryConfigContribution,
+  memoryConfigFilePatchSchema,
   memoryConfigFileSchema,
   memoryConfigSchema,
   resolveConfigFile,
@@ -29,6 +33,16 @@ function writeConfig(cwd: string, config: unknown, file = '.neottia/config.yml')
   writeFileSync(path, stringify(config, { lineWidth: 0 }), 'utf8');
   return path;
 }
+
+const companionPatchSchema = z.object({ enabled: z.boolean().optional() }).strict();
+const companionContribution = defineConfigContribution({
+  id: 'companion',
+  path: ['modules', 'companion'],
+  filePatchSchema: companionPatchSchema,
+  runtimePatchSchema: companionPatchSchema,
+  resolvedSchema: z.object({ enabled: z.boolean() }).strict(),
+  defaults: { enabled: false },
+});
 
 describe('memory config shard', () => {
   it('resolves defaults when the config file is missing', () => {
@@ -50,7 +64,7 @@ describe('memory config shard', () => {
     }
   });
 
-  it('reads the shard from the harnessctl-shaped config object', () => {
+  it('reads the deprecated skills.memory shard through the compatibility wrapper', () => {
     const cwd = fixture();
     try {
       writeConfig(cwd, {
@@ -62,6 +76,69 @@ describe('memory config shard', () => {
       expect(config.root).toBe('.neottia/custom-memory');
       expect(config.namespace.project_id).toBe('acme');
       expect(config.namespace.organization_id).toBe('local');
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('composes canonical global, project, and profile layers without patch defaults', () => {
+    const cwd = fixture();
+    try {
+      const globalFile = writeConfig(
+        cwd,
+        {
+          version: 1,
+          modules: { memory: { namespace: { organization_id: 'global-org' }, retrieval: { limit: 3 } } },
+        },
+        'global.yml',
+      );
+      writeConfig(cwd, {
+        version: 1,
+        modules: { memory: { namespace: { project_id: 'project-id' } } },
+        profiles: { ci: { modules: { memory: { retrieval: { limit: 11 } } } } },
+      });
+
+      const config = loadMemoryConfig(cwd, {
+        env: { NEOTTIA_GLOBAL_CONFIG_FILE: globalFile, NEOTTIA_PROFILE: 'ci' },
+      });
+
+      expect(config.namespace).toMatchObject({ organization_id: 'global-org', project_id: 'project-id' });
+      expect(config.retrieval.limit).toBe(11);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it('provides an immutable Memory shard from a shared multi-module snapshot', () => {
+    const cwd = fixture();
+    try {
+      const projectFile = writeConfig(cwd, {
+        version: 1,
+        modules: {
+          companion: { enabled: true },
+          memory: {
+            enabled: true,
+            backend: 'postgres',
+            provider: { db: { pg: { user: '${PG_USER}', password: '${PG_PASSWORD}' } } },
+          },
+        },
+      });
+      const registry = createConfigRegistry([memoryConfigContribution, companionContribution]);
+      const snapshot = resolveConfig(registry, {
+        cwd,
+        env: { PG_USER: 'shared-user', PG_PASSWORD: 'shared-password' },
+        globalFile: false,
+        projectFile,
+      });
+      const memory = snapshot.get(memoryConfigContribution);
+
+      expect(snapshot.get(companionContribution).enabled).toBe(true);
+      expect(memory.provider.db.pg.user).toBe('shared-user');
+      expect(Object.isFrozen(memory.provider.db.pg)).toBe(true);
+      expect(snapshot.toJSON()).toMatchObject({
+        modules: { memory: { provider: { db: { pg: { user: '[REDACTED]', password: '[REDACTED]' } } } } },
+      });
+      expect(resolvePgSettings(memory)).toMatchObject({ user: 'shared-user', password: 'shared-password' });
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
@@ -211,6 +288,8 @@ describe('memory config shard', () => {
   it('publishes a configuration schema generated from the YAML file schema', () => {
     const published = JSON.parse(readFileSync(new URL('../config.schema.json', import.meta.url), 'utf8')) as unknown;
     expect(published).toEqual(memoryConfigFileSchema.toJSONSchema({ io: 'input' }));
+    expect(memoryConfigContribution.filePatchSchema).toBe(memoryConfigFilePatchSchema);
+    expect(memoryConfigFilePatchSchema.safeParse({ namespace: { project_id: 'patch-only' } }).success).toBe(true);
   });
 
   it('keeps generated root and credential constraints semantically aligned with YAML loading', async () => {
@@ -349,14 +428,14 @@ describe('memory config shard', () => {
   it('exposes env bindings for every schema leaf that declares one', () => {
     // Every binding must resolve through the schema without error.
     const env: Record<string, string> = {
-      NEOTTIA_MEMORY_ENABLED: 'true',
+      NEOTTIA_MEMORY_ENABLED: ' 1 ',
       NEOTTIA_MEMORY_BACKEND: 'postgres',
       NEOTTIA_MEMORY_RETRIEVAL_LIMIT: '20',
       NEOTTIA_MEMORY_RETRIEVAL_MAX_CHARS: '20000',
       NEOTTIA_MEMORY_CACHE_MAX_AGE_MS: '1000',
       NEOTTIA_MEMORY_CACHE_STALE_POLICY: 'rebuild',
       NEOTTIA_MEMORY_DB_PG_PORT: '5433',
-      NEOTTIA_MEMORY_DB_PG_SSL: 'false',
+      NEOTTIA_MEMORY_DB_PG_SSL: ' FALSE ',
       NEOTTIA_MEMORY_RETRIEVAL_INCLUDE_SUPERSEDED: 'true',
       NEOTTIA_MEMORY_SECURITY_ENTROPY_HEURISTIC: 'false',
     };

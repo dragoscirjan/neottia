@@ -11,4 +11,13 @@ Check [requirements](/get-started/requirements), then choose the [library](/memo
 - [Import and export](/memory/import-export)
 - [Operate and troubleshoot](/memory/operations)
 
+Enable the canonical shared shard in the project configuration:
+
+```yaml
+version: 1
+modules:
+  memory:
+    enabled: true
+```
+
 Track filesystem YAML and ignore the cache as described in [Repository files](/guides/repository-files).

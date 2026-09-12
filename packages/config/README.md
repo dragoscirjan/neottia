@@ -86,7 +86,7 @@ const snapshot = resolveConfig(registry, {
 export const config = snapshot.get(exampleConfig);
 ```
 
-Pass `cwd` for every invocation. Relative explicitly selected files and the default project file resolve from this directory. Pass `env` to isolate resolution from ambient process environment in an embedding application or test.
+Pass `cwd` for every invocation. Relative explicitly selected files and the default project file resolve from this directory. Pass `env` to isolate resolution from ambient process environment in an embedding application or test. Every present global or project document must declare the exact integer `version: 1`; an absent optional default file still resolves to contribution defaults.
 
 ### File discovery
 
@@ -118,7 +118,7 @@ profiles:
 
 ### Environment values and secrets
 
-String, integer, and boolean environment bindings are supported. Integers use base-10 safe-integer syntax. Booleans must be exactly `true` or `false`.
+String, integer, and boolean environment bindings are supported. Integers use trimmed base-10 safe-integer syntax. For compatibility with existing Neottia modules, booleans accept case-insensitive, trimmed `true`, `false`, `1`, or `0`.
 
 A secret in YAML must be one exact environment reference, such as `${EXAMPLE_TOKEN}`. Prefixes, suffixes, and literal file secrets are rejected. Only the winning file reference is resolved, and it is resolved once: if `EXAMPLE_TOKEN` itself contains `${OTHER_TOKEN}`, that text remains literal. Secret fallback environment bindings and explicit runtime overrides may supply trusted literal values.
 
@@ -136,6 +136,10 @@ snapshot.sourceOf(exampleConfig, ["enabled"]);
 Arrays have provenance as complete leaves. Metadata can identify a source kind, file, profile, environment variable name, or deprecated path, but never contains a resolved secret value.
 
 Resolution failures throw `ConfigResolutionError`. Its immutable `diagnostics` cover YAML, version, I/O, path ownership, merge collisions, schemas, profiles, environment coercion, and secrets. Diagnostics report paths and constraints without rejected values and are bounded by `MAX_CONFIG_DIAGNOSTICS`.
+
+### Deprecated wrapper compatibility
+
+Domain compatibility wrappers may pass `compatibility.ignoreUnregisteredPaths` so a standalone loader can read its registered shard from a legacy shared document containing unrelated roots or module shards. They may also pass `compatibility.resolveOverrideSecretReferences` to preserve an older library API that accepted `${ENV_VAR}` in explicit overrides. Normal multi-module resolution must leave both options unset: unregistered paths then fail, and trusted runtime strings remain literal. These switches do not suppress YAML, version, owned-shard schema, profile, environment, or secret errors.
 
 ## Construct a trusted snapshot directly
 

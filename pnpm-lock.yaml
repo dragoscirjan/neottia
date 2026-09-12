@@ -510,6 +510,9 @@ importers:
 
   packages/memory-core:
     dependencies:
+      '@neottia/config':
+        specifier: workspace:^
+        version: link:../config
       '@neottia/repository-store':
         specifier: workspace:^
         version: link:../repository-store

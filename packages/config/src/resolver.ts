@@ -23,6 +23,11 @@ export interface ResolveConfigOptions {
   readonly globalFile?: string | false;
   readonly projectFile?: string | false;
   readonly overrides?: Readonly<Record<string, unknown>>;
+  /** Narrow legacy behaviors used only by deprecated domain compatibility wrappers. */
+  readonly compatibility?: {
+    readonly ignoreUnregisteredPaths?: boolean;
+    readonly resolveOverrideSecretReferences?: boolean;
+  };
 }
 
 /** Injectable inputs for deterministic platform-specific global path discovery. */
@@ -98,7 +103,13 @@ export function resolveConfig(registry: ConfigRegistry, options: ResolveConfigOp
   const parsedFiles = new Map<string, unknown>();
   const documents: LoadedDocument[] = [];
   for (const selection of selections) {
-    const loaded = loadDocument(registry, selection, parsedFiles, collector);
+    const loaded = loadDocument(
+      registry,
+      selection,
+      parsedFiles,
+      collector,
+      options.compatibility?.ignoreUnregisteredPaths ?? false,
+    );
     if (loaded !== undefined) documents.push(loaded);
   }
 
@@ -134,10 +145,24 @@ export function resolveConfig(registry: ConfigRegistry, options: ResolveConfigOp
   applyEnvironment(registry, resolutions, env, collector);
   if (options.overrides !== undefined) {
     const source: ConfigProvenance = { kind: 'override', label: 'explicit overrides' };
-    const overrides = validateFragment(registry, options.overrides, source, 'runtime', collector);
+    const overrides = validateFragment(
+      registry,
+      options.overrides,
+      source,
+      'runtime',
+      collector,
+      [],
+      options.compatibility?.ignoreUnregisteredPaths ?? false,
+    );
     if (overrides !== undefined) applyFragment(resolutions, overrides, source);
   }
-  resolveSecrets(registry, resolutions, env, collector);
+  resolveSecrets(
+    registry,
+    resolutions,
+    env,
+    collector,
+    options.compatibility?.resolveOverrideSecretReferences ?? false,
+  );
 
   const values: Record<string, unknown> = {};
   for (const contribution of registry.contributions) {
@@ -214,6 +239,7 @@ function loadDocument(
   selection: SourceSelection,
   parsedFiles: Map<string, unknown>,
   collector: MutableDiagnosticCollector,
+  ignoreUnregisteredPaths: boolean,
 ): LoadedDocument | undefined {
   if (!existsSync(selection.file)) {
     if (selection.explicit) {
@@ -273,8 +299,8 @@ function loadDocument(
   }
   validateVersion(root, source, collector);
   const baseRoot = Object.fromEntries(Object.entries(root).filter(([key]) => key !== 'version' && key !== 'profiles'));
-  const base = validateFragment(registry, baseRoot, source, 'file', collector);
-  const profiles = validateProfiles(registry, root.profiles, selection, collector);
+  const base = validateFragment(registry, baseRoot, source, 'file', collector, [], ignoreUnregisteredPaths);
+  const profiles = validateProfiles(registry, root.profiles, selection, collector, ignoreUnregisteredPaths);
   return {
     base: base ?? { shards: new Map() },
     file: selection.file,
@@ -289,7 +315,7 @@ function validateVersion(
   source: ConfigProvenance,
   collector: MutableDiagnosticCollector,
 ): void {
-  if (Object.prototype.hasOwnProperty.call(root, 'version') && root.version !== 1) {
+  if (root.version !== 1) {
     addDiagnostic(collector, {
       code: 'VERSION',
       message: 'configuration version must be the supported integer version 1',
@@ -305,6 +331,7 @@ function validateProfiles(
   candidate: unknown,
   selection: SourceSelection,
   collector: MutableDiagnosticCollector,
+  ignoreUnregisteredPaths: boolean,
 ): ReadonlyMap<string, ValidatedFragment> {
   const profiles = new Map<string, ValidatedFragment>();
   if (candidate === undefined) return profiles;
@@ -329,7 +356,15 @@ function validateProfiles(
       });
       continue;
     }
-    const validated = validateFragment(registry, fragment, source, 'file', collector, ['profiles', name]);
+    const validated = validateFragment(
+      registry,
+      fragment,
+      source,
+      'file',
+      collector,
+      ['profiles', name],
+      ignoreUnregisteredPaths,
+    );
     if (validated !== undefined) profiles.set(name, validated);
   }
   return profiles;
@@ -343,6 +378,7 @@ function validateFragment(
   mode: 'file' | 'runtime',
   collector: MutableDiagnosticCollector,
   prefix: readonly string[] = [],
+  ignoreUnregisteredPaths = false,
 ): ValidatedFragment | undefined {
   if (!isRecord(candidate)) {
     addDiagnostic(collector, {
@@ -358,7 +394,7 @@ function validateFragment(
     contribution.path,
     ...(mode === 'file' ? (contribution.legacyPaths ?? []) : []),
   ]);
-  validateOwnedTree(candidate, [], ownedPaths, source, prefix, collector);
+  validateOwnedTree(candidate, [], ownedPaths, source, prefix, collector, ignoreUnregisteredPaths);
 
   const shards = new Map<string, LocatedShard>();
   for (const contribution of registry.contributions) {
@@ -379,12 +415,13 @@ function validateFragment(
     if (found === undefined) continue;
     const schema = mode === 'file' ? contribution.filePatchSchema : contribution.runtimePatchSchema;
     const result = schema.safeParse(found.patch);
+    // Secret diagnostics remain actionable even when the file schema rejects the same literal.
+    if (mode === 'file') {
+      validateSecretReferences(contribution, found.patch, [...prefix, ...found.actualPath], source, collector);
+    }
     if (!result.success) {
       addSchemaDiagnostics(collector, contribution, [...prefix, ...found.actualPath], result.error.issues, source);
       continue;
-    }
-    if (mode === 'file') {
-      validateSecretReferences(contribution, found.patch, [...prefix, ...found.actualPath], source, collector);
     }
     const legacyPath = pathsEqual(found.actualPath, contribution.path) ? undefined : found.actualPath;
     shards.set(contribution.id, {
@@ -404,6 +441,7 @@ function validateOwnedTree(
   source: ConfigProvenance,
   prefix: readonly string[],
   collector: MutableDiagnosticCollector,
+  ignoreUnregisteredPaths: boolean,
 ): void {
   if (ownedPaths.some((ownedPath) => pathsEqual(ownedPath, currentPath))) return;
   if (!isRecord(candidate)) {
@@ -419,15 +457,17 @@ function validateOwnedTree(
     const childPath = [...currentPath, key];
     const possible = ownedPaths.filter((ownedPath) => isPrefix(childPath, ownedPath));
     if (possible.length === 0) {
-      addDiagnostic(collector, {
-        code: source.kind === 'profile' ? 'PROFILE' : 'PATH',
-        message: 'configuration path is not owned by a registered contribution',
-        path: [...prefix, ...childPath],
-        source,
-      });
+      if (!ignoreUnregisteredPaths) {
+        addDiagnostic(collector, {
+          code: source.kind === 'profile' ? 'PROFILE' : 'PATH',
+          message: 'configuration path is not owned by a registered contribution',
+          path: [...prefix, ...childPath],
+          source,
+        });
+      }
       continue;
     }
-    validateOwnedTree(child, childPath, possible, source, prefix, collector);
+    validateOwnedTree(child, childPath, possible, source, prefix, collector, ignoreUnregisteredPaths);
   }
 }
 
@@ -436,16 +476,25 @@ function addSchemaDiagnostics(
   collector: MutableDiagnosticCollector,
   contribution: UnknownConfigContribution,
   shardPath: readonly string[],
-  issues: readonly { readonly path: readonly PropertyKey[] }[],
+  issues: readonly {
+    readonly code?: string;
+    readonly keys?: readonly string[];
+    readonly path: readonly PropertyKey[];
+  }[],
   source: ConfigProvenance,
 ): void {
   for (const issue of issues) {
-    addDiagnostic(collector, {
-      code: 'SCHEMA',
-      message: `configuration for contribution "${contribution.id}" does not satisfy its registered schema`,
-      path: [...shardPath, ...issue.path.map(String)],
-      source,
-    });
+    // Unknown key names are safe structural metadata and make strict-schema failures actionable.
+    const suffixes =
+      issue.code === 'unrecognized_keys' && issue.keys !== undefined ? issue.keys.map((key) => [key]) : [[]];
+    for (const suffix of suffixes) {
+      addDiagnostic(collector, {
+        code: 'SCHEMA',
+        message: `configuration for contribution "${contribution.id}" does not satisfy its registered schema`,
+        path: [...shardPath, ...issue.path.map(String), ...suffix],
+        source,
+      });
+    }
   }
 }
 
@@ -563,6 +612,7 @@ function resolveSecrets(
   resolutions: Map<string, MutableResolution>,
   env: Readonly<Record<string, string | undefined>>,
   collector: MutableDiagnosticCollector,
+  resolveOverrideReferences: boolean,
 ): void {
   for (const contribution of registry.contributions) {
     const resolution = resolutions.get(contribution.id);
@@ -570,7 +620,10 @@ function resolveSecrets(
     for (const secret of contribution.secrets ?? []) {
       if (!hasAtPath(resolution.value, secret.path)) continue;
       const source = resolution.provenance.get(pathKey(secret.path));
-      if (source === undefined || !['global', 'project', 'profile'].includes(source.kind)) continue;
+      const resolvableKinds = resolveOverrideReferences
+        ? ['global', 'project', 'profile', 'override']
+        : ['global', 'project', 'profile'];
+      if (source === undefined || !resolvableKinds.includes(source.kind)) continue;
       const reference = getAtPath(resolution.value, secret.path);
       if (typeof reference !== 'string' || !ENVIRONMENT_REFERENCE.test(reference)) continue;
       const name = reference.slice(2, -1);
@@ -649,13 +702,14 @@ function coerceEnvironment(
   kind: 'string' | 'integer' | 'boolean',
 ): string | number | boolean | undefined {
   if (kind === 'string') return value;
+  const normalized = value.trim().toLowerCase();
   if (kind === 'boolean') {
-    if (value === 'true') return true;
-    if (value === 'false') return false;
+    if (normalized === 'true' || normalized === '1') return true;
+    if (normalized === 'false' || normalized === '0') return false;
     return undefined;
   }
-  if (!/^-?(?:0|[1-9]\d*)$/u.test(value)) return undefined;
-  const integer = Number(value);
+  if (!/^-?(?:0|[1-9]\d*)$/u.test(normalized)) return undefined;
+  const integer = Number(normalized);
   return Number.isSafeInteger(integer) ? integer : undefined;
 }
 

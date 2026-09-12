@@ -13,7 +13,7 @@ Agents routinely see credentials. Memory **refuses to store** anything that look
 
 Rejected writes fail with `Suspected secret at <path>; memory write rejected.` The operation writes no memory data.
 
-Tuning (in `skills.memory.security`):
+Tuning (in `modules.memory.security`):
 
 | Setting                    | Effect                                                                 |
 | -------------------------- | ---------------------------------------------------------------------- |
@@ -31,7 +31,7 @@ This protocol requires Linux x64 or arm64, the repository-store Node-API addon b
 
 ## Resource limits
 
-Because agents write autonomously, hard ceilings protect the store from runaway loops. All are configurable under `skills.memory.security.limits`:
+Because agents write autonomously, hard ceilings protect the store from runaway loops. All are configurable under `modules.memory.security.limits`:
 
 | Limit             | Default                                          | Applies to                      |
 | ----------------- | ------------------------------------------------ | ------------------------------- |
@@ -60,7 +60,7 @@ Because agents write autonomously, hard ceilings protect the store from runaway 
 
 | Symptom                                                | Cause                                                 | Fix                                                                                        |
 | ------------------------------------------------------ | ----------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `Memory operation requires skills.memory.enabled=true` | Memory is disabled                                    | `skills.memory.enabled: true` or `NEOTTIA_MEMORY_ENABLED=true`                             |
+| `Memory operation requires skills.memory.enabled=true` | Memory is disabled                                    | `modules.memory.enabled: true` or `NEOTTIA_MEMORY_ENABLED=true`                            |
 | `Config requires an explicit 'version: 1'`             | Missing version key in the config file                | Add `version: 1` at the top                                                                |
 | `Memory backend 'postgres' connection failed`          | PostgreSQL is unavailable or credentials are invalid  | Verify host, port, database, and credentials; retry when the database is reachable         |
 | `summary has N Unicode characters; limit is 240`       | Compactness violation                                 | Shorten the summary (details: 2000 chars / 12 lines)                                       |

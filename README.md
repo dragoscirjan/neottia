@@ -80,7 +80,7 @@ This updates `packages/release/package.json` and `packages/release/release-manif
 
 ## Memory
 
-Install `@neottia/memory-core` for the library, `@neottia/memory-mcp` for an MCP server, or the `@neottia/pi-memory` / `@neottia/opencode-memory` extensions for in-process harness tools. Configure the `skills.memory` shard in `.neottia/config.yml`; the user-facing setup and operations guide is [here](docs/memory/). Filesystem domains share the crash-recoverable primitives documented in the [repository-store guide](docs/repository-store.md). Track the canonical YAML files, but ignore `.neottia/memory/index.db` and its `-wal` and `-shm` cache sidecars.
+Install `@neottia/memory-core` for the library, `@neottia/memory-mcp` for an MCP server, or the `@neottia/pi-memory` / `@neottia/opencode-memory` extensions for in-process harness tools. Configure the canonical `modules.memory` shard in `.neottia/config.yml` (`skills.memory` remains a deprecated compatibility alias); the user-facing setup and operations guide is [here](docs/memory/). Filesystem domains share the crash-recoverable primitives documented in the [repository-store guide](docs/repository-store.md). Track the canonical YAML files, but ignore `.neottia/memory/index.db` and its `-wal` and `-shm` cache sidecars.
 
 ## Issues
 

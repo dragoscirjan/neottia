@@ -68,6 +68,7 @@ const moduleContribution = defineConfigContribution({
   },
   environment: [
     { kind: 'integer', names: ['EXAMPLE_COUNT'], path: ['count'] },
+    { kind: 'boolean', names: ['EXAMPLE_ENABLED'], path: ['enabled'] },
     { kind: 'string', names: ['EXAMPLE_VALUE', 'LEGACY_VALUE'], path: ['nested', 'value'] },
   ],
   legacyPaths: [['skills', 'example']],
@@ -132,7 +133,8 @@ profiles:
     const projectFile = writeYaml(
       cwd,
       'project.yml',
-      `modules:
+      `version: 1
+modules:
   example:
     nested:
       projectWins: project
@@ -214,7 +216,7 @@ profiles:
     const countedRegistry = createConfigRegistry([countedContribution]);
     patchParses = 0;
     resolvedParses = 0;
-    const projectFile = writeYaml(cwd, 'counted.yml', 'modules:\n  counted:\n    enabled: true\n');
+    const projectFile = writeYaml(cwd, 'counted.yml', 'version: 1\nmodules:\n  counted:\n    enabled: true\n');
 
     const snapshot = resolveConfig(countedRegistry, { cwd, env: {}, globalFile: false, projectFile });
 
@@ -228,7 +230,8 @@ profiles:
     const globalFile = writeYaml(
       cwd,
       'global.yml',
-      `modules:
+      `version: 1
+modules:
   example:
     nested:
       list: [global-one, global-two]
@@ -239,7 +242,8 @@ profiles:
     const projectFile = writeYaml(
       cwd,
       'project.yml',
-      `modules:
+      `version: 1
+modules:
   example:
     nested:
       list: [project-only]
@@ -266,9 +270,24 @@ profiles:
     expect(error.diagnostics).toMatchObject([{ code: 'IO' }]);
   });
 
+  it('requires exact version 1 in every present configuration document', () => {
+    const cwd = temporaryDirectory();
+    const missingVersion = writeYaml(cwd, 'missing-version.yml', 'modules:\n  example:\n    count: 2\n');
+    const invalidVersion = writeYaml(cwd, 'invalid-version.yml', 'version: "1"\n');
+
+    expect(
+      resolutionError(() => resolveConfig(registry, { cwd, env: {}, globalFile: false, projectFile: missingVersion }))
+        .diagnostics,
+    ).toMatchObject([{ code: 'VERSION', path: ['version'] }]);
+    expect(
+      resolutionError(() => resolveConfig(registry, { cwd, env: {}, globalFile: invalidVersion, projectFile: false }))
+        .diagnostics,
+    ).toMatchObject([{ code: 'VERSION', path: ['version'] }]);
+  });
+
   it('discovers the project file from the injected invocation cwd', () => {
     const cwd = temporaryDirectory();
-    writeYaml(cwd, '.neottia/config.yml', 'modules:\n  example:\n    count: 9\n');
+    writeYaml(cwd, '.neottia/config.yml', 'version: 1\nmodules:\n  example:\n    count: 9\n');
 
     const config = resolveConfig(registry, { cwd, env: {}, globalFile: false }).get(moduleContribution);
 
@@ -280,7 +299,7 @@ profiles:
     const projectFile = writeYaml(
       cwd,
       'project.yml',
-      'modules:\n  example:\n    unknown: lower-secret-value\nunknownRoot:\n  ignored: false\n',
+      'version: 1\nmodules:\n  example:\n    unknown: lower-secret-value\nunknownRoot:\n  ignored: false\n',
     );
     const error = resolutionError(() =>
       resolveConfig(registry, {
@@ -295,6 +314,41 @@ profiles:
     expect(error.diagnostics.map(({ code }) => code)).toEqual(expect.arrayContaining(['PATH', 'SCHEMA']));
     expect(JSON.stringify(error)).not.toContain('lower-secret-value');
   });
+
+  it('can ignore only unregistered paths for deprecated standalone wrappers', () => {
+    const cwd = temporaryDirectory();
+    const projectFile = writeYaml(
+      cwd,
+      'compatibility.yml',
+      'version: 1\nmodules:\n  example:\n    count: 4\n  another:\n    enabled: true\nlegacyHost:\n  command: ignored\n',
+    );
+
+    const snapshot = resolveConfig(registry, {
+      compatibility: { ignoreUnregisteredPaths: true },
+      cwd,
+      env: {},
+      globalFile: false,
+      projectFile,
+    });
+
+    expect(snapshot.get(moduleContribution).count).toBe(4);
+
+    const invalidOwnedShard = writeYaml(
+      cwd,
+      'invalid-owned.yml',
+      'version: 1\nmodules:\n  example:\n    unknown: true\n  another:\n    ignored: true\n',
+    );
+    const error = resolutionError(() =>
+      resolveConfig(registry, {
+        compatibility: { ignoreUnregisteredPaths: true },
+        cwd,
+        env: {},
+        globalFile: false,
+        projectFile: invalidOwnedShard,
+      }),
+    );
+    expect(error.diagnostics).toMatchObject([{ code: 'SCHEMA', path: ['modules', 'example', 'unknown'] }]);
+  });
 });
 
 describe('profiles and source collisions', () => {
@@ -303,7 +357,8 @@ describe('profiles and source collisions', () => {
     const globalFile = writeYaml(
       cwd,
       'global.yml',
-      `profiles:
+      `version: 1
+profiles:
   selected:
     modules:
       example:
@@ -319,7 +374,8 @@ describe('profiles and source collisions', () => {
     const projectFile = writeYaml(
       cwd,
       'project.yml',
-      `profiles:
+      `version: 1
+profiles:
   selected:
     modules:
       example:
@@ -343,7 +399,7 @@ describe('profiles and source collisions', () => {
 
   it('rejects missing profiles and invalid unselected profile fragments', () => {
     const cwd = temporaryDirectory();
-    const validFile = writeYaml(cwd, 'valid.yml', 'modules:\n  example:\n    count: 2\n');
+    const validFile = writeYaml(cwd, 'valid.yml', 'version: 1\nmodules:\n  example:\n    count: 2\n');
     expect(
       resolutionError(() =>
         resolveConfig(registry, { cwd, env: {}, globalFile: false, profile: 'missing', projectFile: validFile }),
@@ -353,7 +409,7 @@ describe('profiles and source collisions', () => {
     const invalidFile = writeYaml(
       cwd,
       'invalid.yml',
-      'profiles:\n  unused:\n    modules:\n      not_registered:\n        enabled: true\n',
+      'version: 1\nprofiles:\n  unused:\n    modules:\n      not_registered:\n        enabled: true\n',
     );
     const error = resolutionError(() =>
       resolveConfig(registry, { cwd, env: {}, globalFile: false, projectFile: invalidFile }),
@@ -363,7 +419,11 @@ describe('profiles and source collisions', () => {
 
   it('rejects duplicate YAML keys and canonical-plus-legacy shard declarations', () => {
     const cwd = temporaryDirectory();
-    const duplicateFile = writeYaml(cwd, 'duplicate.yml', 'modules:\n  example:\n    count: 2\n    count: 3\n');
+    const duplicateFile = writeYaml(
+      cwd,
+      'duplicate.yml',
+      'version: 1\nmodules:\n  example:\n    count: 2\n    count: 3\n',
+    );
     expect(
       resolutionError(() => resolveConfig(registry, { cwd, env: {}, globalFile: false, projectFile: duplicateFile }))
         .diagnostics,
@@ -372,7 +432,7 @@ describe('profiles and source collisions', () => {
     const collisionFile = writeYaml(
       cwd,
       'collision.yml',
-      'modules:\n  example:\n    count: 2\nskills:\n  example:\n    count: 3\n',
+      'version: 1\nmodules:\n  example:\n    count: 2\nskills:\n  example:\n    count: 3\n',
     );
     const collision = resolutionError(() =>
       resolveConfig(registry, { cwd, env: {}, globalFile: false, projectFile: collisionFile }),
@@ -382,6 +442,29 @@ describe('profiles and source collisions', () => {
 });
 
 describe('environment values, secrets, and safe diagnostics', () => {
+  it('preserves legacy boolean environment spellings through generic coercion', () => {
+    const cwd = temporaryDirectory();
+
+    for (const value of ['true', ' TRUE ', '1']) {
+      const snapshot = resolveConfig(registry, {
+        cwd,
+        env: { EXAMPLE_ENABLED: value },
+        globalFile: false,
+        projectFile: false,
+      });
+      expect(snapshot.get(moduleContribution).enabled).toBe(true);
+    }
+    for (const value of ['false', ' FALSE ', '0']) {
+      const snapshot = resolveConfig(registry, {
+        cwd,
+        env: { EXAMPLE_ENABLED: value },
+        globalFile: false,
+        projectFile: false,
+      });
+      expect(snapshot.get(moduleContribution).enabled).toBe(false);
+    }
+  });
+
   it('uses the first populated environment alias and reports invalid coercion without its value', () => {
     const cwd = temporaryDirectory();
     const snapshot = resolveConfig(registry, {
@@ -408,14 +491,18 @@ describe('environment values, secrets, and safe diagnostics', () => {
   it('rejects file secret literals and unresolved exact references without leaking either value', () => {
     const cwd = temporaryDirectory();
     const literal = 'literal-super-secret';
-    const literalFile = writeYaml(cwd, 'literal.yml', `modules:\n  example:\n    secret: ${literal}\n`);
+    const literalFile = writeYaml(cwd, 'literal.yml', `version: 1\nmodules:\n  example:\n    secret: ${literal}\n`);
     const literalError = resolutionError(() =>
       resolveConfig(registry, { cwd, env: {}, globalFile: false, projectFile: literalFile }),
     );
     expect(literalError.diagnostics.some(({ code }) => code === 'SECRET')).toBe(true);
     expect(JSON.stringify(literalError)).not.toContain(literal);
 
-    const referenceFile = writeYaml(cwd, 'reference.yml', 'modules:\n  example:\n    secret: ${MISSING_SECRET}\n');
+    const referenceFile = writeYaml(
+      cwd,
+      'reference.yml',
+      'version: 1\nmodules:\n  example:\n    secret: ${MISSING_SECRET}\n',
+    );
     const referenceError = resolutionError(() =>
       resolveConfig(registry, { cwd, env: {}, globalFile: false, projectFile: referenceFile }),
     );
@@ -425,7 +512,11 @@ describe('environment values, secrets, and safe diagnostics', () => {
 
   it('resolves a winning exact reference once, redacts serialization, and retains only source metadata', () => {
     const cwd = temporaryDirectory();
-    const projectFile = writeYaml(cwd, 'project.yml', 'modules:\n  example:\n    secret: ${FIRST_SECRET}\n');
+    const projectFile = writeYaml(
+      cwd,
+      'project.yml',
+      'version: 1\nmodules:\n  example:\n    secret: ${FIRST_SECRET}\n',
+    );
     const resolvedValue = '${SECOND_SECRET}';
     const snapshot = resolveConfig(registry, {
       cwd,
@@ -443,7 +534,7 @@ describe('environment values, secrets, and safe diagnostics', () => {
 
   it('lets environment fallback and explicit runtime literals override file references', () => {
     const cwd = temporaryDirectory();
-    const projectFile = writeYaml(cwd, 'project.yml', 'modules:\n  example:\n    secret: ${FILE_SECRET}\n');
+    const projectFile = writeYaml(cwd, 'project.yml', 'version: 1\nmodules:\n  example:\n    secret: ${FILE_SECRET}\n');
     const fallback = resolveConfig(registry, {
       cwd,
       env: { EXAMPLE_SECRET_FALLBACK: 'fallback-secret', FILE_SECRET: 'file-secret' },
@@ -466,10 +557,24 @@ describe('environment values, secrets, and safe diagnostics', () => {
     expect(override.get(moduleContribution).secret).toBe('trusted-runtime-secret');
   });
 
+  it('can resolve an override reference once for deprecated standalone wrappers', () => {
+    const cwd = temporaryDirectory();
+    const snapshot = resolveConfig(registry, {
+      compatibility: { resolveOverrideSecretReferences: true },
+      cwd,
+      env: { FIRST_SECRET: '${SECOND_SECRET}', SECOND_SECRET: 'must-not-be-used' },
+      globalFile: false,
+      overrides: { modules: { example: { secret: '${FIRST_SECRET}' } } },
+      projectFile: false,
+    });
+
+    expect(snapshot.get(moduleContribution).secret).toBe('${SECOND_SECRET}');
+  });
+
   it('bounds diagnostics and freezes their structured metadata', () => {
     const cwd = temporaryDirectory();
     const unknowns = Array.from({ length: 70 }, (_, index) => `unknown_${index}: true`).join('\n');
-    const projectFile = writeYaml(cwd, 'many.yml', `${unknowns}\n`);
+    const projectFile = writeYaml(cwd, 'many.yml', `version: 1\n${unknowns}\n`);
     const error = resolutionError(() => resolveConfig(registry, { cwd, env: {}, globalFile: false, projectFile }));
 
     expect(error.diagnostics).toHaveLength(MAX_CONFIG_DIAGNOSTICS);
