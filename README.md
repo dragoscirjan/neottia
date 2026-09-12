@@ -41,9 +41,12 @@ Common tasks:
 ```bash
 mise run run             # Run @neottia/core
 mise run build           # Build all modules
-mise run test            # Test all modules
-mise run test:coverage   # Generate aggregate coverage
-mise run format          # Format the repository
+mise run test                     # Test all modules
+mise run test:harness             # Run deterministic harness contracts
+mise run test:harness:live        # Run optional live LLM acceptance
+mise run test:memory:postgres     # Run the disposable PostgreSQL memory contract
+mise run test:coverage            # Generate aggregate coverage
+mise run format                   # Format the repository
 mise run lint            # Lint and fix the repository
 mise run docs            # Build user documentation
 mise run docs:serve      # Serve user documentation locally
@@ -71,7 +74,7 @@ This updates `packages/release/package.json` and `packages/release/release-manif
 
 ## Memory
 
-Install `@neottia/memory-core` for the library, `@neottia/memory-mcp` for an MCP server, or the `@neottia/pi-memory` / `@neottia/opencode-memory` extensions for in-process harness tools. Configure the `skills.memory` shard in `.neottia/config.yml`; the user-facing setup and operations guide is [here](docs/memory/). Filesystem domains share the crash-recoverable primitives documented in the [repository-store guide](docs/repository-store.md).
+Install `@neottia/memory-core` for the library, `@neottia/memory-mcp` for an MCP server, or the `@neottia/pi-memory` / `@neottia/opencode-memory` extensions for in-process harness tools. Configure the `skills.memory` shard in `.neottia/config.yml`; the user-facing setup and operations guide is [here](docs/memory/). Filesystem domains share the crash-recoverable primitives documented in the [repository-store guide](docs/repository-store.md). Track the canonical YAML files, but ignore `.neottia/memory/index.db` and its `-wal` and `-shm` cache sidecars.
 
 ## Issues
 

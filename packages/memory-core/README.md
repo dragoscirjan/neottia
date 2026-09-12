@@ -60,18 +60,19 @@ const config = loadMemoryConfig(process.cwd(), {
 // 2. Create a store scoped to the working directory.
 const store = MemoryStore.fromConfig(config, process.cwd());
 
-// 3. Remember something.
-const record = await store.store({
-  memory_type: "semantic", // what kind of knowledge
-  record_type: "fact", // must pair with memory_type (see below)
+// 3. Remember something. Keep the input so a correction can reuse it.
+const fact = {
+  memory_type: "semantic" as const, // what kind of knowledge
+  record_type: "fact" as const, // must pair with memory_type (see below)
   summary: "The site is deployed with pnpm, never npm",
   details: null,
   topic: "tooling",
-  source: { kind: "user-confirmed", ref: null, revision: null },
+  source: { kind: "user-confirmed" as const, ref: null, revision: null },
   created_by: "agent:pi",
-  confidence: "confirmed",
+  confidence: "confirmed" as const,
   tags: ["packaging"],
-});
+};
+const record = await store.store(fact);
 
 // 4. Retrieve it.
 await store.get(record.id); // by ULID
@@ -79,13 +80,13 @@ await store.list({ topic: "tooling" }); // newest first
 await store.search({ query: "deploy packaging" }); // BM25-ranked
 
 // 5. Correct it later (the old record stays, referenced and inactive).
-await store.supersede(record.id, {
+const replacement = await store.supersede(record.id, {
   ...fact,
   summary: "The site is deployed with pnpm; npm is blocked via packageManager",
 });
 
-// 6. Or retire it entirely (a tombstone is written; nothing is deleted).
-await store.delete(record.id, "No longer applicable", record.source, "agent:pi");
+// 6. Retire the active replacement (a tombstone is written; nothing is deleted).
+await store.delete(replacement.id, "No longer applicable", replacement.source, "agent:pi");
 ```
 
 Without any configuration file this works because the overrides above enable it. Without overrides, memory is **disabled by default** — see [Configuration](#configuration).
@@ -125,7 +126,7 @@ A record is _active_ when nothing supersedes it and no tombstone targets it. Pas
 
 ### Namespaces and shards
 
-Every record carries `organization_id` and `project_id` from configuration. Writes whose namespace does not match the configured one are rejected. A third, optional dimension — `namespace.scope` (for example a branch or workspace id, default `global`) — identifies the _shard_: the unit of locking and (in remote backends) of data separation. Each git worktree naturally has its own memory root, so different branches never collide on the filesystem.
+Every record carries `organization_id` and `project_id` from configuration. Writes whose namespace does not match the configured one are rejected. PostgreSQL also uses `namespace.scope` as a shard key. The filesystem backend ignores scope because its canonical data and repository authority lease belong to the configured root. Give each branch or workspace a separate root, normally by using a separate git worktree.
 
 ### Canonical files and the index cache
 
@@ -144,6 +145,7 @@ Every record carries `organization_id` and `project_id` from configuration. Writ
 - The index is refreshed automatically when its content hash diverges from the canonical files or when it ages past `cache.max_age_ms`, subject to `cache.stale_policy`.
 - A corrupt `index.db` is detected and rebuilt from the canonical files on the next operation.
 - Deleting `index.db` is always safe.
+- Ignore `index.db`, `index.db-wal`, and `index.db-shm` in consumer repositories. Keep the YAML directories tracked.
 
 An example record file:
 
@@ -172,7 +174,7 @@ tags:
 
 ## Configuration
 
-Memory follows Neottia's sharded configuration model: this module owns the `skills.memory` section of a shared config object, and every value can be overridden by an environment variable or by code.
+Memory follows Neottia's sharded configuration model. This module owns the `skills.memory` section of a shared config object. Code can override every value. Environment variables override only the leaves listed below.
 
 ### Where configuration is read from
 
@@ -181,15 +183,19 @@ Memory follows Neottia's sharded configuration model: this module owns the `skil
 | Config file | `NEOTTIA_CONFIG_FILE` → `NEOTTIA_MEMORY_CONFIG_FILE` → `<cwd>/.neottia/config.yml` | The project config file                                              |
 | Shard path  | `NEOTTIA_CONFIG_MEMORY_PATH`                                                       | `skills.memory` (the section of the config object this module reads) |
 
-The config file must declare `version: 1` at its root. Other modules' sections are ignored by this module. If the file or the shard is missing, defaults are used — the module works standalone with zero configuration.
+The config file must declare `version: 1` at its root. Other modules' sections are ignored by this module. If the file or the shard is missing, defaults are used.
+
+`root` accepts relative, POSIX absolute, and drive absolute paths. Use one separator style and nonempty components. Dot components, repeated or trailing separators, and mixed slash styles are rejected.
 
 ### Resolution order
 
-For every value:
+For a listed environment binding:
 
 ```text
-explicit argument in code  >  environment variable  >  config file  >  built-in default
+explicit argument in code  >  listed environment variable  >  config file  >  built-in default
 ```
+
+Values without a listed binding resolve from code, the config file, and defaults. `security.secret_patterns` and every `security.limits` leaf are intentionally file/code-only. This keeps the ordered pattern list and the security limit group reviewable in one configuration document.
 
 ### Config file example
 

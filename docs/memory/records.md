@@ -114,4 +114,16 @@ A record is **active** when nothing supersedes it and no tombstone targets it. `
 - **Portable**: no server, no credentials, no vendor.
 - **Durable**: the YAML files are the truth; the search index can be deleted and rebuilt at any time.
 
-The SQLite index exists purely for fast, ranked search. See [Configuration](./configuration.md#cache-policy) for how staleness is handled.
+The SQLite index exists only for fast, ranked search. See [Configuration](./configuration.md#cache-policy) for how staleness is handled.
+
+## Ignore the disposable cache
+
+Track the YAML directories because they are the canonical memory. Add these exact entries to the consumer project's `.gitignore`:
+
+```gitignore
+.neottia/memory/index.db
+.neottia/memory/index.db-wal
+.neottia/memory/index.db-shm
+```
+
+Do not ignore `.neottia/memory/` as a whole. Deleting any of the three SQLite files is safe because memory rebuilds them from YAML.

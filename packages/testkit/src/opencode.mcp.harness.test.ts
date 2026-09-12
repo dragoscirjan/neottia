@@ -1,8 +1,8 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import {
-  assertHarnessSuccess,
+  assertHarnessConclusive,
   createTempProject,
   ensureMemoryDistBuilt,
   memoryMcpEntry,
@@ -32,6 +32,8 @@ beforeAll(() => {
   ensureMemoryDistBuilt(repoRoot());
 }, 180_000);
 
+afterEach(() => project?.cleanup());
+
 describe.skipIf(!enabled)('opencode drives the memory MCP server', () => {
   it('stores a memory through a natural-language prompt', async () => {
     project = createTempProject();
@@ -50,10 +52,11 @@ describe.skipIf(!enabled)('opencode drives the memory MCP server', () => {
       cwd: project.cwd,
       xdgDataDir: project.xdgDataDir,
       xdgConfigDir: project.xdgConfigDir,
+      homeDir: project.cwd,
       prompt:
         'Call the tool named memory_store to remember the following fact, then confirm in one short sentence: the release codename is PAPYRUS.',
     });
-    assertHarnessSuccess(run);
+    assertHarnessConclusive(run);
 
     // Deterministic check: the YAML canonical store must contain the codename.
     const factsDir = join(project.memoryRoot, 'facts');
@@ -90,10 +93,11 @@ describe.skipIf(!enabled)('opencode drives the memory MCP server', () => {
       cwd: project.cwd,
       xdgDataDir: project.xdgDataDir,
       xdgConfigDir: project.xdgConfigDir,
+      homeDir: project.cwd,
       prompt:
         'Call the tool named memory_search (the Neottia memory MCP server) with the query "deployment codename", then answer with only the codename from the results.',
     });
-    assertHarnessSuccess(run);
+    assertHarnessConclusive(run);
     expect(run.stdout).toMatch(/WATERFALL/u);
   }, 300_000);
 });

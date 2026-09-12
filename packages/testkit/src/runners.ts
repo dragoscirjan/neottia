@@ -211,6 +211,7 @@ export function runOpencode(options: HarnessRunOptions): HarnessRunResult {
     env.XDG_DATA_HOME = options.xdgDataDir;
   }
   if (options.xdgConfigDir) env.XDG_CONFIG_HOME = options.xdgConfigDir;
+  if (options.homeDir) env.HOME = options.homeDir;
   const result = spawnSync(opencodePath, ['run', '--model', model, prompt], {
     cwd,
     encoding: 'utf8',
@@ -282,6 +283,22 @@ export function runPiWithModelFallback(
     last = runPi({ ...options, modelId });
   }
   return { result: last, modelId };
+}
+
+/**
+ * Requires a live harness attempt to reach a conclusive provider outcome.
+ * Exhausted transient providers fail the optional live task instead of
+ * turning its acceptance cases into passing dynamic skips.
+ */
+export function assertHarnessConclusive(result: HarnessRunResult): void {
+  if (isTransientModelError(result)) {
+    throw new Error(
+      `Live harness acceptance was inconclusive after transient provider failures:\n${(
+        result.stderr + result.stdout
+      ).slice(-2000)}`,
+    );
+  }
+  assertHarnessSuccess(result);
 }
 
 /** Throws with a tail of stderr when a harness run failed. */

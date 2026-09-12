@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { registerImportLifecycleContract } from '../import-lifecycle.spec-helper.js';
 import {
   MemoryConflictError,
   MemoryError,
@@ -167,6 +168,7 @@ describe('postgres backend bounded waits', () => {
 
 describe.skipIf(!enabled)('postgres backend (docker pg_textsearch)', () => {
   const shard = defaultNamespace;
+  const initializedContractShards = new Set<string>();
   let store: MemoryStore;
 
   beforeEach(async () => {
@@ -539,5 +541,15 @@ describe.skipIf(!enabled)('postgres backend (docker pg_textsearch)', () => {
     } finally {
       await backend.close();
     }
+  });
+
+  registerImportLifecycleContract('PostgreSQL', async (caseId) => {
+    const scope = `contract-${caseId}`;
+    const namespace = { ...defaultNamespace, scope };
+    if (!initializedContractShards.has(scope)) {
+      await wipeShard(namespace);
+      initializedContractShards.add(scope);
+    }
+    return pgStore({ scope });
   });
 });

@@ -1,17 +1,16 @@
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  assertHarnessSuccess,
+  assertHarnessConclusive,
   createTempProject,
   ensureDesignDocsDistBuilt,
-  isTransientModelError,
   openrouterApiKey,
   opencodeReady,
   repoRoot,
   runOpencodeWithModelFallback,
   type TempProject,
 } from '@neottia/testkit';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const apiKey = openrouterApiKey();
 const enabled = process.env.NEOTTIA_TEST_HARNESS === '1' && opencodeReady();
@@ -28,17 +27,20 @@ beforeAll(() => {
   );
 });
 
+afterAll(() => project?.cleanup());
+
 describe.skipIf(!enabled)('OpenCode uses Design Docs in process', () => {
-  it('creates a canonical draft in the active temporary project', async (context) => {
+  it('creates a canonical draft in the active temporary project', async () => {
     const run = runOpencodeWithModelFallback({
       cwd: project.cwd,
       xdgDataDir: project.xdgDataDir,
+      xdgConfigDir: project.xdgConfigDir,
+      homeDir: project.cwd,
       prompt:
         'You MUST call document_create to create an lld titled OpenCode Routing with body "Temporary project only".',
       apiKey,
     }).result;
-    if (isTransientModelError(run)) return context.skip();
-    assertHarnessSuccess(run);
+    assertHarnessConclusive(run);
     const files = readdirSync(project.designDocsRoot).filter((name) => name.endsWith('.md'));
     expect(files).toHaveLength(1);
     expect(readFileSync(join(project.designDocsRoot, files[0] as string), 'utf8')).toContain('OpenCode Routing');

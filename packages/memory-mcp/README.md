@@ -168,7 +168,7 @@ The `env` blocks in the examples above are the primary configuration channel for
 | `NEOTTIA_MEMORY_ENABLED`                   | Master switch — the server refuses operations while `false` | `false`                                     |
 | `NEOTTIA_MEMORY_NAMESPACE_ORGANIZATION_ID` | Organization namespace                                      | `local`                                     |
 | `NEOTTIA_MEMORY_NAMESPACE_PROJECT_ID`      | Project namespace                                           | `project`                                   |
-| `NEOTTIA_MEMORY_NAMESPACE_SCOPE`           | Shard scope (branch/workspace)                              | `global`                                    |
+| `NEOTTIA_MEMORY_NAMESPACE_SCOPE`           | PostgreSQL shard scope; ignored by filesystem storage       | `global`                                    |
 | `NEOTTIA_MEMORY_ROOT`                      | Memory storage root                                         | `.neottia/memory`                           |
 | `NEOTTIA_MEMORY_RETRIEVAL_LIMIT`           | Default result count                                        | `8`                                         |
 | `NEOTTIA_MEMORY_CACHE_STALE_POLICY`        | Stale-index behavior                                        | `prompt` → **downgraded to `rebuild` here** |
@@ -176,9 +176,9 @@ The `env` blocks in the examples above are the primary configuration channel for
 
 The full table, including config-file paths and Postgres connection variables, is documented in [`@neottia/memory-core`](../memory-core#environment-variable-reference).
 
-### A file-and-env split that works well
+### A file-and-env split for PostgreSQL
 
-Keep the shared settings in the committed config file and only the identity in env vars:
+Keep shared PostgreSQL settings in the committed config file and set the deployment scope through the server environment:
 
 ```yaml
 # .neottia/config.yml (committed)
@@ -194,6 +194,8 @@ skills:
 ```json
 { "env": { "NEOTTIA_MEMORY_NAMESPACE_SCOPE": "${branch}" } }
 ```
+
+This scope separates PostgreSQL rows and locks. The filesystem backend ignores it. Filesystem deployments that must isolate branches need distinct `NEOTTIA_MEMORY_ROOT` values or separate worktrees. Two processes that use the same filesystem root share canonical YAML and the repository authority lease.
 
 ## Non-interactive behavior
 
@@ -226,7 +228,7 @@ Full input and return descriptions: the [tool contract](https://github.com/drago
 | Tools succeed but nothing is found later          | The server's working directory differs from your project | Check that the harness launches the server with the project as `cwd`, or set an absolute `NEOTTIA_MEMORY_ROOT` |
 | `Cannot open memory index` repeatedly             | Broken index that cannot be rebuilt                      | Delete `.neottia/memory/index.db`; it is rebuilt from YAML                                                     |
 | `no such module: fts5` at startup                 | Node < 22.16 running the server                          | Upgrade Node on the host that spawns the server                                                                |
-| Memories from two branches mix                    | Shared root without scopes                               | Give each workspace its own `NEOTTIA_MEMORY_NAMESPACE_SCOPE`                                                   |
+| Memories from two filesystem branches mix         | Both branches use the same memory root                   | Give each branch a separate `NEOTTIA_MEMORY_ROOT` or use separate worktrees; scope only separates PostgreSQL   |
 
 ## License
 

@@ -22,6 +22,7 @@ const state = {
 };
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.clearAllMocks();
 });
 
@@ -55,5 +56,43 @@ describe('Memory SQLite cache lifecycle', () => {
 
     await expect(openMemoryCache(root, lease, state, 1_000)).resolves.toBeUndefined();
     expect(close).toHaveBeenCalledOnce();
+  });
+
+  it('treats a zero max age as stale in the rebuild millisecond', async () => {
+    const now = new Date('2026-09-12T00:00:00.000Z');
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+    const close = vi.fn().mockResolvedValue(undefined);
+    repositoryStore.openDisposableSqliteCache.mockResolvedValue({
+      state: 'ready',
+      database: {
+        prepare: vi.fn().mockResolvedValue({
+          get: vi.fn().mockResolvedValue({ value: now.toISOString() }),
+        }),
+      },
+      close,
+    });
+
+    await expect(openMemoryCache(root, lease, state, 0)).resolves.toBeUndefined();
+    expect(close).toHaveBeenCalledOnce();
+  });
+
+  it('keeps a positive max-age boundary inclusive', async () => {
+    const now = new Date('2026-09-12T00:00:01.000Z');
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+    const opened = {
+      state: 'ready',
+      database: {
+        prepare: vi.fn().mockResolvedValue({
+          get: vi.fn().mockResolvedValue({ value: new Date(now.getTime() - 1_000).toISOString() }),
+        }),
+      },
+      close: vi.fn().mockResolvedValue(undefined),
+    };
+    repositoryStore.openDisposableSqliteCache.mockResolvedValue(opened);
+
+    await expect(openMemoryCache(root, lease, state, 1_000)).resolves.toBe(opened);
+    expect(opened.close).not.toHaveBeenCalled();
   });
 });

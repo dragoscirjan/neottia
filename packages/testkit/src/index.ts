@@ -29,6 +29,7 @@ export {
 } from './mcp-config.js';
 
 export {
+  assertHarnessConclusive,
   assertHarnessSuccess,
   binExists,
   piBin,

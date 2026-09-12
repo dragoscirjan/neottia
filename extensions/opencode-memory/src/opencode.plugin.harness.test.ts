@@ -1,18 +1,17 @@
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  assertHarnessSuccess,
+  assertHarnessConclusive,
   createTempProject,
   ensureMemoryDistBuilt,
   openrouterApiKey,
   opencodeReady,
   repoRoot,
-  isTransientModelError,
   runOpencodeWithModelFallback,
   seedMemory,
   type TempProject,
 } from '@neottia/testkit';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /**
  * Integration test: the real OpenCode CLI loads the real plugin (project-local
@@ -47,21 +46,23 @@ beforeAll(() => {
   // import chain: the repo node_modules provides it through the re-export.
 }, 180_000);
 
+afterAll(() => project?.cleanup());
+
 describe.skipIf(!enabled)('opencode uses the memory plugin in-process', () => {
   const runCodename = `PAPYRUS-${randomSuffix()}`;
   const seedCodename = `WATERFALL-${randomSuffix()}`;
 
-  it('stores a memory through a natural-language prompt', async (ctx) => {
+  it('stores a memory through a natural-language prompt', async () => {
     const fallback = runOpencodeWithModelFallback({
       cwd: project.cwd,
       xdgDataDir: project.xdgDataDir,
+      xdgConfigDir: project.xdgConfigDir,
+      homeDir: project.cwd,
       prompt: `You MUST call the memory_store tool now to remember the following fact, then confirm in one short sentence: the release codename is ${runCodename}.`,
       apiKey: apiKey,
     });
     const run = fallback.result;
-    // Free-pool congestion is transient: skip instead of failing the suite.
-    if (isTransientModelError(run)) return ctx.skip();
-    assertHarnessSuccess(run);
+    assertHarnessConclusive(run);
 
     const factsDir = join(project.memoryRoot, 'facts');
     const files = readdirSync(factsDir).filter((name) => name.endsWith('.yaml'));
@@ -70,7 +71,7 @@ describe.skipIf(!enabled)('opencode uses the memory plugin in-process', () => {
     expect(contents).toContain(runCodename);
   }, 300_000);
 
-  it('recalls a seeded memory via memory_search', async (ctx) => {
+  it('recalls a seeded memory via memory_search', async () => {
     await seedMemory(project, [
       {
         memory_type: 'semantic',
@@ -85,13 +86,13 @@ describe.skipIf(!enabled)('opencode uses the memory plugin in-process', () => {
     const fallback = runOpencodeWithModelFallback({
       cwd: project.cwd,
       xdgDataDir: project.xdgDataDir,
+      xdgConfigDir: project.xdgConfigDir,
+      homeDir: project.cwd,
       prompt: `You MUST call the memory_search tool with the query "deployment codename", then answer with only the codename from the results.`,
       apiKey: apiKey,
     });
     const run = fallback.result;
-    // Free-pool congestion is transient: skip instead of failing the suite.
-    if (isTransientModelError(run)) return ctx.skip();
-    assertHarnessSuccess(run);
+    assertHarnessConclusive(run);
     expect(run.stdout).toContain(seedCodename);
   }, 300_000);
 });

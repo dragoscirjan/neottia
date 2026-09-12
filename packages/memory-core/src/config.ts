@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { isAbsolute, join, resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { parseDocument } from 'yaml';
 import { z } from 'zod';
 import { ConfigError, formatSchemaError } from './errors.js';
@@ -28,8 +28,13 @@ export const DEFAULT_SHARD_PATH = 'skills.memory';
 export const DEFAULT_CONFIG_FILE = '.neottia/config.yml';
 
 const CREDENTIAL_REFERENCE_PATTERN = /^\$\{[A-Za-z_][A-Za-z0-9_]*\}$/u;
-const MEMORY_ROOT_PATTERN =
-  /^(?![\s\S]*[\r\n\u2028\u2029])(?:\/[^\0]*|[A-Za-z]:[\\/][^\0]*|(?!\.{1,2}(?:[\\/]|$))(?!.*(?:^|[\\/])\.{1,2}(?:[\\/]|$))[^\\/\0]+(?:[\\/][^\\/\0]+)*)$/u;
+// Every path form uses one separator and nonempty, non-dot components. This
+// keeps relative, POSIX-absolute, and drive-absolute contracts equivalent.
+const MEMORY_PATH_COMPONENT = String.raw`(?!\.{1,2}(?:[\\/]|$))[^\\/\0\r\n\u2028\u2029]+`;
+const MEMORY_ROOT_PATTERN = new RegExp(
+  String.raw`^(?:${MEMORY_PATH_COMPONENT}(?:/${MEMORY_PATH_COMPONENT})*|${MEMORY_PATH_COMPONENT}(?:\\${MEMORY_PATH_COMPONENT})*|/${MEMORY_PATH_COMPONENT}(?:/${MEMORY_PATH_COMPONENT})*|[A-Za-z]:/${MEMORY_PATH_COMPONENT}(?:/${MEMORY_PATH_COMPONENT})*|[A-Za-z]:\\${MEMORY_PATH_COMPONENT}(?:\\${MEMORY_PATH_COMPONENT})*)$`,
+  'u',
+);
 const nonemptyString = z.string().min(1).regex(/\S/, 'must not be blank');
 
 /**
@@ -41,9 +46,8 @@ const memoryRootPath = z
   .string()
   .min(1)
   .max(1024)
-  // Keep the safety rule representable in the generated JSON Schema.
-  .regex(MEMORY_ROOT_PATTERN, 'must be a safe relative path or an absolute path')
-  .refine((value) => isAbsolute(value) || /^[A-Za-z]:[\\/]/u.test(value) || value !== '.');
+  // Keep the complete safety rule representable in the generated JSON Schema.
+  .regex(MEMORY_ROOT_PATTERN, 'must be a safe relative path or an absolute path');
 
 const credentialValue = z.string().min(1, 'must not be empty');
 const credentialReference = z.string().regex(CREDENTIAL_REFERENCE_PATTERN, 'must be an exact ${ENV_VAR} reference');

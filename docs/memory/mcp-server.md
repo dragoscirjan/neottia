@@ -153,6 +153,8 @@ An MCP server cannot prompt you, so:
 | Every tool returns `…skills.memory.enabled=true…` | Memory disabled                                   | Add `NEOTTIA_MEMORY_ENABLED: "true"` to the server env                     |
 | Tools succeed but data is not found later         | Server working directory differs from the project | Launch with the project as `cwd`, or set an absolute `NEOTTIA_MEMORY_ROOT` |
 | `no such module: fts5` at startup                 | Node < 22.16 on the host                          | Upgrade Node where the server runs                                         |
-| Memories from two branches mix                    | Shared root without scopes                        | Give each workspace its own `NEOTTIA_MEMORY_NAMESPACE_SCOPE`               |
+| Memories from two filesystem branches mix         | Both branches use the same memory root            | Set a distinct `NEOTTIA_MEMORY_ROOT` per branch or use separate worktrees  |
+
+The filesystem backend ignores `namespace.scope`. Processes that use one filesystem root share its canonical YAML and repository authority lease. Scope separates PostgreSQL shards only.
 
 More causes and fixes: [operations troubleshooting](./operations#troubleshooting).

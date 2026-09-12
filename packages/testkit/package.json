@@ -18,7 +18,8 @@
   },
   "scripts": {
     "test": "vitest run --root ../.. packages/testkit/src",
-    "test:harness": "NEOTTIA_TEST_HARNESS=1 vitest run --root ../.. packages/testkit/src",
+    "test:harness": "vitest run --root ../.. packages/testkit/src/testkit.spec.ts",
+    "test:harness:live": "NEOTTIA_TEST_HARNESS=1 vitest run --root ../.. --pool forks --maxWorkers 1 --no-file-parallelism --testTimeout 300000 --hookTimeout 300000 packages/testkit/src/opencode.mcp.harness.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
