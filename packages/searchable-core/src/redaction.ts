@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer';
 import type { SearchableConfig } from './config.js';
 import { SearchableError } from './errors.js';
 
@@ -29,9 +30,36 @@ export function redactDiagnosticUrl(value: string): string {
 export function redactDiagnosticText(value: string, credentials: readonly string[] = []): string {
   let safe = value.replace(URL_PATTERN, (url) => redactDiagnosticUrl(url));
   for (const credential of credentials) {
-    if (credential) safe = safe.replaceAll(credential, '<redacted>');
+    if (!credential) continue;
+    const encodedPattern = encodedCredentialPattern(credential);
+    safe = encodedPattern ? safe.replace(encodedPattern, '<redacted>') : safe.replaceAll(credential, '<redacted>');
   }
   return safe;
+}
+
+/** Matches a credential with any UTF-8 character either raw or percent-encoded. */
+function encodedCredentialPattern(credential: string): RegExp | undefined {
+  const pattern = [...credential]
+    .map((character) => {
+      const raw = character.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+      const encoded = [...Buffer.from(character, 'utf8')]
+        .map((byte) => {
+          const hex = byte.toString(16).toUpperCase().padStart(2, '0');
+          const caseInsensitiveHex = [...hex]
+            .map((digit) => (/[A-F]/u.test(digit) ? `[${digit}${digit.toLowerCase()}]` : digit))
+            .join('');
+          return `%${caseInsensitiveHex}`;
+        })
+        .join('');
+      return `(?:${raw}|${encoded})`;
+    })
+    .join('');
+  try {
+    return new RegExp(pattern, 'gu');
+  } catch {
+    // Literal replacement remains fail-safe for malformed credential text.
+    return undefined;
+  }
 }
 
 /** Returns the resolved secrets that must never cross the service boundary. */

@@ -209,7 +209,15 @@ export type LoadSearchableConfigOptions = Partial<SearchableConfigInput> & { env
 export function loadSearchableConfig(cwd: string, options: LoadSearchableConfigOptions = {}): SearchableConfig {
   const env = options.env ?? process.env;
   const file = resolveConfigFile(cwd, env);
-  const shard = existsSync(file) ? readShard(file, resolveShardPath(env)) : {};
+  const configuredFile = env[SEARCHABLE_CONFIG_FILE_ENV] ?? env[SEARCHABLE_MODULE_CONFIG_FILE_ENV];
+  const fileExists = existsSync(file);
+  if (configuredFile && !fileExists)
+    throw new SearchableError(
+      'configuration',
+      'CONFIG_READ_FAILED',
+      `Unable to read explicitly selected Searchable config: ${file}`,
+    );
+  const shard = fileExists ? readShard(file, resolveShardPath(env)) : {};
   const fileResult = searchableConfigFileSchema.partial().safeParse(shard);
   if (!fileResult.success) throw configSchemaError('Invalid Searchable config file shard', fileResult.error);
 

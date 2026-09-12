@@ -134,6 +134,10 @@ describe('SEARCHABLE_TOOLS', () => {
       },
     };
 
+    await expect(tool('web_search').run(bounded, { query: '   x' })).rejects.toMatchObject({
+      code: 'RESOURCE_LIMIT_EXCEEDED',
+      paths: ['query'],
+    });
     await expect(tool('web_search').run(bounded, { query: 'éé' })).rejects.toMatchObject({
       code: 'RESOURCE_LIMIT_EXCEEDED',
     });
@@ -228,7 +232,15 @@ describe('SEARCHABLE_TOOLS', () => {
     controller.abort();
 
     await expect(
-      tool('web_search').run({ cwd: cwd, services: injected, signal: controller.signal }, { query: 'subject' }),
+      tool('web_search').run(
+        {
+          cwd: cwd,
+          services: injected,
+          signal: controller.signal,
+          configOverrides: { search: { limit: 0 } },
+        },
+        { query: 'subject' },
+      ),
     ).rejects.toMatchObject({ category: 'cancelled', code: 'OPERATION_CANCELLED' });
     expect(injected.search).not.toHaveBeenCalled();
   });
@@ -258,6 +270,37 @@ describe('SEARCHABLE_TOOLS', () => {
     expect(failure).toBeInstanceOf(SearchableError);
     expect((failure as Error).message).not.toMatch(/secret-token|password|api_key/u);
     expect((failure as Error).message).toContain('https://example.com/path');
+  });
+
+  it('redacts percent-encoded credentials from diagnostic URL paths', async () => {
+    const credential = 'key/part';
+    const partiallyEncoded = '%6bey%2Fpart';
+    const fullyEncoded = '%6B%65%79%2f%70%61%72%74';
+    const injected: SearchableServices = {
+      ...services(),
+      search: vi.fn(async () => {
+        throw new Error(`failed at https://example.com/${partiallyEncoded} and https://example.com/${fullyEncoded}`);
+      }),
+    };
+
+    let failure: unknown;
+    try {
+      await tool('web_search').run(
+        {
+          cwd,
+          services: injected,
+          configOverrides: { search: { credentials: { brave_api_key: credential } } },
+        },
+        { query: 'subject' },
+      );
+    } catch (error: unknown) {
+      failure = error;
+    }
+
+    expect(failure).toBeInstanceOf(SearchableError);
+    expect((failure as Error).message).not.toContain(partiallyEncoded);
+    expect((failure as Error).message).not.toContain(fullyEncoded);
+    expect((failure as Error).message).toContain('https://example.com/<redacted>');
   });
 
   it('recursively redacts every serialized field of structured service errors', async () => {

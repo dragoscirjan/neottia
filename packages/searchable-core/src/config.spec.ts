@@ -132,6 +132,20 @@ describe('loadSearchableConfig', () => {
     expect(() => searchableConfigFileSchema.parse({ fetch: { strategies: ['direct', 'direct'] } })).toThrow();
   });
 
+  it('rejects a missing explicitly selected configuration file', async () => {
+    const root = await project();
+
+    for (const name of ['NEOTTIA_CONFIG_FILE', 'NEOTTIA_SEARCHABLE_CONFIG_FILE']) {
+      let failure: unknown;
+      try {
+        loadSearchableConfig(root, { env: { [name]: 'missing.yml' } });
+      } catch (error: unknown) {
+        failure = error;
+      }
+      expect(failure).toMatchObject({ category: 'configuration', code: 'CONFIG_READ_FAILED' });
+    }
+  });
+
   it('strictly rejects unknown keys, wrong versions, and invalid limits', async () => {
     const unknown = await project();
     await writeConfig(unknown, 'version: 1\nskills:\n  searchable:\n    surprise: true\n');

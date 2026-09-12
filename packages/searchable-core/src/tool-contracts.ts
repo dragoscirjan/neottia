@@ -11,10 +11,10 @@ import {
 
 const query = z
   .string()
+  .max(16 * 1024)
   .trim()
   .min(1)
-  .regex(/\S/u, 'must not be blank')
-  .max(16 * 1024);
+  .regex(/\S/u, 'must not be blank');
 const limit = z.number().int().min(1).max(100);
 
 /** Marks an optional tool limit with its public default without resolving it early. */
@@ -44,10 +44,10 @@ export const searchableToolSchemas = {
         url: searchableHttpUrlSchema,
         title: z
           .string()
+          .max(4 * 1024)
           .trim()
           .min(1)
-          .regex(/\S/u, 'must not be blank')
-          .max(4 * 1024),
+          .regex(/\S/u, 'must not be blank'),
         // Validate nonblank content without transforming caller-owned page text.
         content: z
           .string()
@@ -60,10 +60,10 @@ export const searchableToolSchemas = {
           .optional(),
         siteName: z
           .string()
+          .max(4 * 1024)
           .trim()
           .min(1)
           .regex(/\S/u, 'must not be blank')
-          .max(4 * 1024)
           .optional(),
         source: webFetchSourceSchema.optional(),
       })

@@ -55,9 +55,11 @@ function makeTool<Name extends SearchableToolName>(
           `Invalid ${name} input: ${formatIssues(parsed.error)}`,
           parsed.error.issues.map((issue) => issue.path.join('.')),
         );
+      assertNotCancelled(context.signal);
       const config = loadSearchableConfig(context.cwd, context.configOverrides);
       try {
-        assertNotCancelled(context.signal);
+        // Check raw strings before schema trimming, then check normalized values.
+        assertInputBounds(name, input, config);
         const resolvedInput = resolveInputDefaults(name, parsed.data as SearchableToolInput<Name>, config);
         assertInputBounds(name, resolvedInput, config);
         const operation = {

@@ -22,6 +22,36 @@ describe('searchableToolSchemas', () => {
     expect(() => searchableToolSchemas.web_grep.input.parse({ query: 'cache', provider: 'duckduckgo' })).toThrow();
   });
 
+  it('enforces static limits against raw strings before trimming', () => {
+    const queryAtLimit = `x${' '.repeat(16 * 1024 - 1)}`;
+    const titleAtLimit = `x${' '.repeat(4 * 1024 - 1)}`;
+    expect(searchableToolSchemas.web_search.input.parse({ query: queryAtLimit })).toEqual({ query: 'x' });
+    expect(() => searchableToolSchemas.web_search.input.parse({ query: `${queryAtLimit} ` })).toThrow();
+    expect(
+      searchableToolSchemas.web_stash.input.parse({
+        url: 'https://example.com',
+        title: titleAtLimit,
+        content: 'Body',
+        siteName: titleAtLimit,
+      }),
+    ).toMatchObject({ title: 'x', siteName: 'x' });
+    expect(() =>
+      searchableToolSchemas.web_stash.input.parse({
+        url: 'https://example.com',
+        title: `${titleAtLimit} `,
+        content: 'Body',
+      }),
+    ).toThrow();
+    expect(() =>
+      searchableToolSchemas.web_stash.input.parse({
+        url: 'https://example.com',
+        title: 'Page',
+        content: 'Body',
+        siteName: `${titleAtLimit} `,
+      }),
+    ).toThrow();
+  });
+
   it('rejects non-HTTP URLs and blank stash content at runtime', () => {
     expect(() => searchableToolSchemas.web_fetch.input.parse({ url: 'file:///etc/passwd' })).toThrow();
     expect(() =>
