@@ -1,3 +1,11 @@
 # @neottia/opencode-issues
 
-OpenCode plugin exposing the seventeen canonical Neottia issue tools in-process. Add the package to OpenCode's `plugin` array and enable `skills.issues` in `.neottia/config.yml`. Calls use the active worktree and generated core Zod schemas. When both capabilities are enabled, the default plugin validates typed design-document links through `@neottia/issues-design-docs`; use `createIssuesPlugin({resolver})` to replace that resolver. Explicit `fail` cache policy is preserved.
+Native OpenCode plugin for the 17 Issues tools.
+
+```sh
+pnpm add -D @neottia/opencode-issues
+```
+
+Add `"@neottia/opencode-issues"` to the OpenCode `plugin` array, enable `skills.issues`, restart OpenCode, and verify that `issue_create` appears. The plugin uses `host.directory`, forwards an `AbortSignal`, uses non-interactive cache handling, and clears context on `dispose`. `createIssuesPlugin({resolver})` replaces the automatic Design Docs resolver.
+
+Read the [OpenCode guide](https://github.com/dragoscirjan/neottia/blob/main/docs/harnesses/opencode.md#issues) and [Issues tools](https://github.com/dragoscirjan/neottia/blob/main/docs/issues/tools.md).

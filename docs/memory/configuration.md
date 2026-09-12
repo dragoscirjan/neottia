@@ -1,6 +1,6 @@
 # Configuring memory
 
-Memory is configured through a **shard**: the `skills.memory` section of the project configuration file. Library users can override values in code, while environment variables override only the bindings explicitly listed below. You only need to configure what you want to change — everything else has a working default.
+Memory is configured through a **shard**: the `skills.memory` section of the project configuration file. Library users can override values in code, while environment variables override only the bindings explicitly listed below. Configure only the values you need to change. The schema supplies the remaining defaults.
 
 ## Where the configuration lives
 
@@ -76,7 +76,7 @@ All optional. Booleans accept `true/false/1/0`; integers accept plain digits. An
 
 | Variable                                                              | Sets                                  | Default                                   |
 | --------------------------------------------------------------------- | ------------------------------------- | ----------------------------------------- |
-| `NEOTTIA_CONFIG_FILE`                                                 | Location of the config file           | —                                         |
+| `NEOTTIA_CONFIG_FILE`                                                 | Location of the config file           | None                                      |
 | `NEOTTIA_MEMORY_CONFIG_FILE`                                          | Fallback location                     | `.neottia/config.yml`                     |
 | `NEOTTIA_CONFIG_MEMORY_PATH`                                          | Section path inside the config object | `skills.memory`                           |
 | `NEOTTIA_MEMORY_ENABLED`                                              | `enabled`                             | `false`                                   |
@@ -92,8 +92,8 @@ All optional. Booleans accept `true/false/1/0`; integers accept plain digits. An
 | `NEOTTIA_MEMORY_CACHE_MAX_AGE_MS`                                     | `cache.max_age_ms`                    | `300000`                                  |
 | `NEOTTIA_MEMORY_CACHE_STALE_POLICY`                                   | `cache.stale_policy`                  | `prompt`                                  |
 | `NEOTTIA_MEMORY_SECURITY_ENTROPY_HEURISTIC`                           | `security.entropy_heuristic`          | `true`                                    |
-| `NEOTTIA_MEMORY_DB_PG_USER`                                           | Postgres user fallback                | —                                         |
-| `NEOTTIA_MEMORY_DB_PG_PASSWORD`                                       | Postgres password fallback            | —                                         |
+| `NEOTTIA_MEMORY_DB_PG_USER`                                           | Postgres user fallback                | None                                      |
+| `NEOTTIA_MEMORY_DB_PG_PASSWORD`                                       | Postgres password fallback            | None                                      |
 | `NEOTTIA_MEMORY_DB_PG_HOST` / `..._PORT` / `..._DATABASE` / `..._SSL` | Postgres connection settings          | `localhost` / `5432` / `neottia` / `true` |
 
 This table is the complete environment-binding contract; names inferred from config paths are not supported. In particular, `security.secret_patterns` and every `security.limits` value are file/code-only. Secret patterns are an ordered array, and limits are a security-sensitive group that should remain reviewable in one configuration document; accepting invented scalar or encoded environment forms would make deployment behavior ambiguous.

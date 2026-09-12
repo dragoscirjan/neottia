@@ -11,7 +11,7 @@ Agents routinely see credentials. Memory **refuses to store** anything that look
 - Generic assignments: `password=…`, `api_key: …`, `token=…`
 - **Entropy heuristic**: any string of 32+ characters without spaces, mixing letters and digits, with Shannon entropy ≥ 4.2, is treated as a likely token even if its format is unknown
 
-Rejected writes fail with `Suspected secret at <path>; memory write rejected.` — the memory is **not** written, partially or otherwise.
+Rejected writes fail with `Suspected secret at <path>; memory write rejected.` The operation writes no memory data.
 
 Tuning (in `skills.memory.security`):
 
@@ -21,11 +21,11 @@ Tuning (in `skills.memory.security`):
 | `entropy_heuristic: false` | Disable the unknown-token heuristic if it false-positives on your data |
 | `limits.*`                 | Resource ceilings (see below)                                          |
 
-Credentials belong in environment variables, never in memory — and never in the config file either (see [Configuration](./configuration.md)).
+Credentials belong in environment variables. Do not store them in Memory or the config file (see [Configuration](./configuration.md)).
 
 ## Filesystem safety boundaries
 
-Canonical YAML and SQLite cache artifacts are rejected when they are links or unsafe file types. Final publication atomically evacuates an expected file, authenticates its exact identity and revision, and creates the new destination through an exclusive no-overwrite regular-file link. A replacement introduced in the final mutation window is restored without overwrite or retained as actionable recovery evidence.
+Canonical YAML and SQLite cache artifacts are rejected when they are links or unsafe file types. Final publication atomically moves the expected file aside, checks its identity and revision, and creates the new destination through an exclusive no-overwrite regular-file link. A replacement introduced in the final mutation window is restored without overwrite or retained as actionable recovery evidence.
 
 This protocol requires Linux x64 or arm64, the repository-store Node-API addon built with a C++17 compiler, Python, Make, and Linux development headers, kernel/libc `renameat2(..., RENAME_NOREPLACE)` support, and a recognized local ext4, XFS, Btrfs, tmpfs, or overlay filesystem with same-volume regular-file hard links. Repository authority acquisition fails with `UNSUPPORTED_RUNTIME` before creating claim or lease artifacts on macOS, Windows, shared/network filesystems, or when the addon is missing or unloadable; filesystem Memory cannot perform read-only leased operations there either. Protect the memory root with operating-system permissions because SQLite itself remains path-based. Filesystem Memory uses the repository authority lease and disposable-cache APIs exclusively; legacy `.locks`, shard barriers, and direct SQLite handles are not used.
 
@@ -45,7 +45,7 @@ Because agents write autonomously, hard ceilings protect the store from runaway 
 ## Path and content safety
 
 - Memory paths cannot escape the memory root (`..`, absolute paths, and drive letters are rejected).
-- Symbolic links are refused — for the files themselves and every ancestor directory.
+- Memory rejects symbolic links for files and every ancestor directory.
 - YAML is parsed strictly: duplicate keys are errors, aliases (`*ptr`) are refused, files must be valid UTF-8.
 - Every canonical file is re-validated on load; a hand-edited file with an invalid type pairing, broken `supersedes` reference, or foreign namespace makes the shard refuse operations until fixed (run `memory_validate` for the exact error).
 

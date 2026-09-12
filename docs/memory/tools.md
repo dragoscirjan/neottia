@@ -1,65 +1,23 @@
-# The tool contract
+# Memory tools
 
-Memory is exposed as **named tools** so an agent can call it without knowing anything about the implementation. The names, descriptions, and input contracts are identical across every surface: the MCP server, the pi and OpenCode extensions, and the library's tool layer.
+Every delivery method uses these names, strict inputs, and Zod-derived outputs.
 
-## Wiring the MCP server
+| Tool               | Exact input                                                                                                                | Exact output                      |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| `memory_store`     | `memory_type`, `record_type`, `summary`, `source`, `created_by`, and `confidence`; optional `topic`, `details`, and `tags` | stored record with generated ULID |
+| `memory_supersede` | every `memory_store` field plus the active `target_id`                                                                     | replacement record                |
+| `memory_delete`    | `target_id`, `reason`, `source`, and `created_by`                                                                          | tombstone                         |
+| `memory_get`       | Crockford ULID `id`                                                                                                        | record or tombstone               |
+| `memory_list`      | optional `topic`, `memory_type`, `limit` of 1-100, and `include_superseded`                                                | records newest first              |
+| `memory_search`    | `query`; optional `topic`, `memory_type`, `limit` of 1-100, `include_superseded`, and `max_chars` of 256-100000            | BM25-ranked records               |
+| `memory_validate`  | `{}`                                                                                                                       | validation and cache report       |
+| `memory_export`    | `{}`                                                                                                                       | JSONL string                      |
+| `memory_import`    | JSONL `content`; optional `preview`                                                                                        | import report                     |
 
-Add `@neottia/memory-mcp` to any harness that supports MCP:
+Store and supersede accept these type pairs: `semantic` with `fact`, `episodic` with `decision` or `event`, and `procedural` with `lesson`. Source has `kind: artifact | user-confirmed | discussion | tool-observation`, nullable `ref`, and nullable `revision`. Confidence is `confirmed | verified`. Tags must be unique. Summary is nonblank and at most 240 Unicode code points. Details is at most 2000 Unicode code points and 12 nonempty lines. Delete reasons are nonblank and at most 1000 characters.
 
-```json
-{
-  "mcpServers": {
-    "memory": {
-      "command": "pnpm",
-      "args": ["dlx", "@neottia/memory-mcp"],
-      "env": {
-        "NEOTTIA_MEMORY_ENABLED": "true",
-        "NEOTTIA_MEMORY_NAMESPACE_ORGANIZATION_ID": "acme",
-        "NEOTTIA_MEMORY_NAMESPACE_PROJECT_ID": "website",
-        "NEOTTIA_MEMORY_CACHE_STALE_POLICY": "rebuild"
-      }
-    }
-  }
-}
-```
+Search queries are limited to 16 KiB of UTF-8 and import/export content to 64 MiB. A validation report contains `valid`, record and tombstone counts, errors, and cache outcome/evidence. Import reports contain `valid`, record and tombstone counts, errors, and optional warnings.
 
-The server resolves configuration from the working directory of the harness (`.neottia/config.yml`) plus the environment above. It is **non-interactive**: a `stale_policy` of `prompt` is downgraded to `rebuild`; an explicit `fail` is respected.
+`memory_import` currently writes when `preview` is omitted. Always preview with `preview: true`, inspect `valid` and `errors`, then call with `preview: false`. Prefer supersession to deletion when the old fact has historical value. Set the source kind honestly. Use `verified` only for artifact or tool evidence.
 
-## The tools
-
-| Tool               | Input (essentials)                                                                                                                            | Returns                                                                                                           |
-| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `memory_store`     | `memory_type`, `record_type`, `summary`, `source {kind, ref, revision}`, `created_by`, `confidence`, plus optional `topic`, `details`, `tags` | The stored record, including its generated ID                                                                     |
-| `memory_supersede` | Everything `memory_store` takes, plus `target_id` (must be active)                                                                            | The replacement record                                                                                            |
-| `memory_delete`    | `target_id`, `reason`, `source`, `created_by`                                                                                                 | The tombstone                                                                                                     |
-| `memory_get`       | `id` (ULID)                                                                                                                                   | The record or tombstone                                                                                           |
-| `memory_list`      | optional `topic`, `memory_type`, `limit`, `include_superseded`                                                                                | Records, newest first                                                                                             |
-| `memory_search`    | `query` (required), optional `topic`, `memory_type`, `limit`, `max_chars`, `include_superseded`                                               | BM25-ranked records within the character budget                                                                   |
-| `memory_validate`  | none                                                                                                                                          | `{ valid, records, tombstones, errors, cache }` report                                                            |
-| `memory_export`    | none                                                                                                                                          | JSONL text of every record and tombstone                                                                          |
-| `memory_import`    | `content` (JSONL), optional `preview: true`                                                                                                   | `{ valid, records, tombstones, errors }`; committed imports may also return `warnings` if cache maintenance fails |
-
-> The packaged way to expose these tools to any harness is the [`@neottia/memory-mcp`](./mcp-server) server — with per-harness wiring examples for Claude Code, OpenCode, pi, Codex, Kiro, and VS Code.
-
-Errors are returned as tool errors with a human-readable message (for example `Memory record not found: …`, `summary has 241 Unicode characters; limit is 240`, `Suspected secret at $.summary`).
-
-## Input validation
-
-Every tool input is validated by a Zod schema before it reaches the store:
-
-- unknown keys are rejected,
-- IDs must be Crockford ULIDs,
-- enums are enforced (`memory_type`, `record_type`, `confidence`, `source.kind`),
-- numeric ranges are enforced (`limit` 1–100, `max_chars` 256–100000),
-- mutation text is compact (`summary` max 240 Unicode characters; `details` max 2000 characters and 12 non-empty lines),
-- query and import payloads are bounded at 16 KiB and 64 MiB respectively.
-
-The same schemas generate the `tools/list` JSON Schema that MCP clients display, so what a client sees is exactly what the store accepts.
-
-## Calling conventions for agents
-
-- Store **small, atomic** knowledge: one fact per record, ≤ 240 characters of summary. Use `details` for at most a dozen lines of supporting context.
-- Always set `source.kind` honestly: `user-confirmed` when a human stated it, `tool-observation` when an agent verified it, `artifact` when it was read from the repository. `verified` confidence is only valid for the latter two.
-- Prefer `memory_supersede` over `memory_delete` when the old memory still has historical value.
-- Use `topic` deliberately (for example `tooling`, `deployment`, `architecture`); it is the primary filter agents use to scope recall.
-- After storing something important, a follow-up `memory_search` confirms visibility.
+The library throws `MemoryError` subclasses for configuration, conflicts, locks, secrets, and schema failures. Tool hosts return those failures in their transport-specific error form. Common failures include an invalid ULID or enum, oversized text, duplicate tags, a suspected secret, a disabled shard, cache policy, or a configured storage limit.

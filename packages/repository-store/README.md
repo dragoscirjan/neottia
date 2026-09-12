@@ -2,6 +2,12 @@
 
 Hardened, domain-neutral persistence for canonical files and disposable SQLite caches inside a repository.
 
+```sh
+pnpm add @neottia/repository-store
+```
+
+Read the [complete Repository Store reference](https://github.com/dragoscirjan/neottia/blob/main/docs/repository-store.md).
+
 The package owns byte-safe paths, SHA-256 revisions, one cross-process authority lease, durable rollback journals, atomic publication, and Node/Bun SQLite adapters. It deliberately does **not** define YAML or Markdown codecs, record schemas, search text, SQLite DDL, or query languages. Domain packages validate their complete proposed state while holding the lease, then publish exact bytes.
 
 ## Requirements

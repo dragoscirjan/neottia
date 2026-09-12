@@ -1,5 +1,11 @@
 # @neottia/design-docs-mcp
 
-Generic non-interactive MCP stdio server exposing the exact `@neottia/design-docs` tool registry. Configure `skills.design_docs.enabled: true`, then run `design-docs-mcp` from the project root. A `prompt` cache policy resolves to `rebuild`; lifecycle approval still requires explicit caller intent/evidence and never implies human confirmation.
+Generic stdio MCP server for all 13 Design Docs tools. It requires Node.js 22.16 or newer and the supported filesystem platform.
 
-The server installs the real `@neottia/issues-design-docs` validator by default. Enable `skills.issues` to use `document_validate` with `cross_domain: true`. Embedders can provide `createDesignDocsServer({linkValidator})` to replace the default composition.
+```sh
+pnpm dlx @neottia/design-docs-mcp
+```
+
+Run it from the project CWD after enabling `skills.design_docs`. Use MCP `tools/list` to verify 13 tools, then call `document_create`. The server is non-interactive, forwards cancellation, exposes tools but no resources or prompts, and clears context on `server.close()`. Results and errors use structured JSON content. `createDesignDocsServer({linkValidator})` replaces the default Issues validator.
+
+Read the [Design Docs MCP guide](https://github.com/dragoscirjan/neottia/blob/main/docs/mcp/design-docs.md).

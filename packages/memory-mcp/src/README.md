@@ -1,6 +1,6 @@
 # @neottia/memory-mcp
 
-MCP stdio server exposing the Neottia memory tools. Tool names, descriptions, and input contracts are identical to the pi/OpenCode in-process extensions (source: [`@neottia/memory-core`](../memory-core)).
+MCP stdio server exposing the Neottia memory tools. Tool names, descriptions, and input contracts are identical to the Pi and OpenCode in-process extensions. See [`@neottia/memory-core`](../../memory-core).
 
 ## Usage
 
@@ -23,4 +23,4 @@ Tools: `memory_store`, `memory_supersede`, `memory_delete`, `memory_get`, `memor
 
 The server is non-interactive: a `stale_policy: prompt` in the config shard is downgraded to `rebuild`; an explicit `fail` is respected.
 
-Requires Node.js >= 22.16.0. MIT — see [LICENSE](./LICENSE).
+Requires Node.js 22.16.0 or newer. MIT. See [LICENSE](../LICENSE).

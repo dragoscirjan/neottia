@@ -1,0 +1,53 @@
+name: Documentation
+
+on:
+  pull_request:
+    paths:
+      - 'docs/**'
+      - '**/README.md'
+      - 'packages/*/package.json'
+      - 'extensions/*/package.json'
+      - 'packages/*/src/**'
+      - 'extensions/*/src/**'
+      - 'packages/*/config.schema.json'
+      - 'pnpm-workspace.yaml'
+      - 'scripts/documentation.spec.ts'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'mise.toml'
+      - 'vitest.config.js'
+      - '.github/workflows/documentation.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - '**/README.md'
+      - 'packages/*/package.json'
+      - 'extensions/*/package.json'
+      - 'packages/*/src/**'
+      - 'extensions/*/src/**'
+      - 'packages/*/config.schema.json'
+      - 'pnpm-workspace.yaml'
+      - 'scripts/documentation.spec.ts'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'mise.toml'
+      - 'vitest.config.js'
+      - '.github/workflows/documentation.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@v3
+        with:
+          install: true
+          cache: true
+      - run: mise run deps:sync:pnpm
+      - run: mise run validate

@@ -1,22 +1,32 @@
 # Neottia
 
-Neottia provides a shared software-development lifecycle for AI coding harnesses.
+Neottia stores software delivery records in formats that people and AI tools can inspect. Use Memory for project facts and decisions, Issues for work tracking, and Design Docs for reviewed technical records. Searchable is a foundation package for applications that supply their own search, fetch, storage, grep, and answer services.
 
-## Supported harnesses
+## Choose how to use Neottia
 
-- OpenCode
-- Pi
+- Use a [native Pi or OpenCode extension](/harnesses/) when you want tools inside either supported host.
+- Use a [generic MCP server](/mcp/) when your client can launch a stdio MCP process.
+- Use a [TypeScript library](/get-started/) when you are building an application or adapter.
 
-Support for additional harnesses will be added as their integrations become available.
+Read the [platform requirements](/get-started/requirements) before enabling a filesystem-backed capability.
+
+## Availability
+
+| Capability  | Library                | Native Pi | Native OpenCode | Generic MCP |
+| ----------- | ---------------------- | --------- | --------------- | ----------- |
+| Memory      | Yes                    | Yes       | Yes             | Yes         |
+| Issues      | Yes                    | Yes       | Yes             | Yes         |
+| Design Docs | Yes                    | Yes       | Yes             | Yes         |
+| Searchable  | Injected services only | No        | No              | No          |
 
 ## Modules
 
-Neottia ships independently versioned packages and extensions. A global Neottia release records the exact compatible version of every published module in `@neottia/release`.
+The [module catalog](/reference/modules) accounts for all 18 published and private workspaces and defines each status label.
 
-| Module                      | Purpose                                                       | Documentation                         |
-| --------------------------- | ------------------------------------------------------------- | ------------------------------------- |
-| `@neottia/design-docs`      | Versioned Markdown designs + SQLite BM25 search               | [Design Docs](/design-docs/)          |
-| `@neottia/design-docs-mcp`  | Generic MCP server exposing all Design Docs tools             | [Design Docs](/design-docs/)          |
-| `@neottia/memory-core`      | Durable agent memory: YAML records + SQLite BM25 search       | [Memory guide](/memory/)              |
-| `@neottia/memory-mcp`       | MCP server exposing the memory tools to any harness           | [Tool contract](/memory/tools)        |
-| `@neottia/repository-store` | Canonical files, leases, recovery, and SQLite cache lifecycle | [Repository store](/repository-store) |
+## Start a project
+
+1. Check [runtime and filesystem requirements](/get-started/requirements).
+2. Select a [delivery method](/get-started/).
+3. Create the [shared configuration file](/get-started/configuration).
+4. Complete a [first successful operation](/get-started/first-success).
+5. Add the recommended [Git tracking and ignore rules](/guides/repository-files).

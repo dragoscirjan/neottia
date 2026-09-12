@@ -1,5 +1,17 @@
 # @neottia/pi-design-docs
 
-Pi extension exposing all Design Docs tools in process. It routes each call to the active tool-context worktree, forwards cancellation, and installs real Issues link validation for `document_validate(cross_domain: true)`.
+Native Pi extension for the 13 Design Docs tools.
 
-Pi may ask before review/approval transitions; the canonical transition input still records caller-provided intent/evidence. With `cache.stale_policy: prompt`, Pi calls `ui.confirm` before replacing a stale search cache. Acceptance rebuilds it, while decline returns `CACHE_STALE_DECLINED` and preserves the existing cache. If no UI is available, the extension rebuilds. Embedders can override this behavior with `registerDesignDocsTools(pi, {onStaleCache})` and can inject a custom `linkValidator`.
+```sh
+pnpm add -D @neottia/pi-design-docs
+```
+
+Create `.pi/extensions/design-docs.ts`:
+
+```ts
+export { default } from "@neottia/pi-design-docs";
+```
+
+Enable `skills.design_docs`, restart Pi, and verify that `document_create` appears. Calls route by invocation CWD and forward cancellation. Pi may confirm stale-cache rebuilds and transitions to review or approved. Cleanup clears every routed context. The default Issues validator is automatic; `registerDesignDocsTools` accepts `linkValidator`, `onStaleCache`, and `confirmTransition`.
+
+Read the [Pi guide](https://github.com/dragoscirjan/neottia/blob/main/docs/harnesses/pi.md#design-docs) and [Design Docs tools](https://github.com/dragoscirjan/neottia/blob/main/docs/design-docs/tools.md).

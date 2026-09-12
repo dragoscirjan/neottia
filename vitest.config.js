@@ -8,10 +8,12 @@ const workspaceSourceAliases = {
   '@neottia/design-docs': resolve(__dirname, 'packages/design-docs/src/index.ts'),
   '@neottia/design-docs-mcp': resolve(__dirname, 'packages/design-docs-mcp/src/index.ts'),
   '@neottia/issues': resolve(__dirname, 'packages/issues/src/index.ts'),
+  '@neottia/issues-design-docs': resolve(__dirname, 'packages/issues-design-docs/src/index.ts'),
   '@neottia/issues-mcp': resolve(__dirname, 'packages/issues-mcp/src/index.ts'),
   '@neottia/memory-core': resolve(__dirname, 'packages/memory-core/src/index.ts'),
   '@neottia/memory-mcp': resolve(__dirname, 'packages/memory-mcp/src/index.ts'),
   '@neottia/repository-store': resolve(__dirname, 'packages/repository-store/src/index.ts'),
+  '@neottia/searchable-core': resolve(__dirname, 'packages/searchable-core/src/index.ts'),
   '@neottia/testkit': resolve(__dirname, 'packages/testkit/src/index.ts'),
 };
 

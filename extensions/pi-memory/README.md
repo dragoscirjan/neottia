@@ -1,18 +1,17 @@
 # @neottia/pi-memory
 
-Pi extension that registers Neottia's nine `memory_*` tools in-process:
-store, supersede, delete, get, list, search, validate, export, and import.
+Native Pi extension for the nine Memory tools.
 
-## Installation
+```sh
+pnpm add -D @neottia/pi-memory
+```
 
-Install the package in a Pi project and load `@neottia/pi-memory` as an extension. The extension reads the project's `.neottia/config.yml` and `NEOTTIA_MEMORY_*` environment variables. Memory files remain canonical YAML under the configured memory root.
+Create `.pi/extensions/memory.ts`:
 
-## Configuration
+```ts
+export { default } from "@neottia/pi-memory";
+```
 
-Use `backend: filesystem` for repository-local memory or `backend: postgres` for a shared PostgreSQL store. Pass `onStaleCache` when embedding the registration helper to confirm `cache.stale_policy: prompt` decisions; declining leaves the cache unchanged. Retain and await the cleanup function returned by `registerMemoryTools(...)` during host shutdown.
+Enable `skills.memory` in `.neottia/config.yml`, restart Pi, and verify that `memory_store` appears. Memory fixes CWD at registration, asks before a stale-cache rebuild when Pi provides `ui.confirm`, and currently ignores call cancellation. Keep and await the cleanup returned by `registerMemoryTools`; the default entry does this on session shutdown.
 
-See the [memory configuration guide](../../docs/memory/configuration.md) for the complete contract.
-
-## License
-
-MIT; see [LICENSE](./LICENSE).
+Read the [Pi guide](https://github.com/dragoscirjan/neottia/blob/main/docs/harnesses/pi.md#memory) and [Memory tools](https://github.com/dragoscirjan/neottia/blob/main/docs/memory/tools.md).

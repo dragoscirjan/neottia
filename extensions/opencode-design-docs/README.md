@@ -1,5 +1,11 @@
 # @neottia/opencode-design-docs
 
-OpenCode plugin exposing the shared `@neottia/design-docs` tools in process. Calls use the active plugin directory and do not pass through MCP. Each directory receives a real `@neottia/issues-design-docs` validator by default, so enabling both capabilities allows `document_validate(cross_domain: true)` to inspect stable issue links.
+Native OpenCode plugin for the 13 Design Docs tools.
 
-Use `createDesignDocsPlugin({linkValidator})` to inject a custom validator. OpenCode is non-interactive; a `prompt` stale-cache policy rebuilds automatically.
+```sh
+pnpm add -D @neottia/opencode-design-docs
+```
+
+Add `"@neottia/opencode-design-docs"` to the OpenCode `plugin` array, enable `skills.design_docs`, restart OpenCode, and verify that `document_create` appears. Calls use their directory or fall back to the plugin directory, forward abort, and use non-interactive cache handling. `dispose` clears context. `createDesignDocsPlugin({linkValidator})` replaces the automatic Issues validator.
+
+Read the [OpenCode guide](https://github.com/dragoscirjan/neottia/blob/main/docs/harnesses/opencode.md#design-docs) and [Design Docs tools](https://github.com/dragoscirjan/neottia/blob/main/docs/design-docs/tools.md).
