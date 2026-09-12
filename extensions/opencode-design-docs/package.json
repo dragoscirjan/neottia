@@ -22,10 +22,13 @@
   },
   "dependencies": {
     "@neottia/design-docs": "workspace:*",
+    "@neottia/issues-design-docs": "workspace:*",
     "@opencode-ai/plugin": "^1.18.29",
     "zod": "^4.5.4"
   },
   "devDependencies": {
+    "@neottia/issues": "workspace:*",
+    "@neottia/repository-store": "workspace:*",
     "@neottia/testkit": "workspace:*",
     "@templ-project/tsconfig": "^0.2.2",
     "@types/node": "^25.0.3",

@@ -39,13 +39,15 @@ Approval is terminal for that version. Approved bytes cannot be updated. `docume
 
 `document_search` uses FTS5/BM25 and supports kind, status, location, ID, current/all-version, and result-limit filters. Hits are deterministically ordered and hydrated from the same valid canonical snapshot; use `document_get` for full content. The cache at `.neottia/cache/design-docs.sqlite` can always be rebuilt and is never authority.
 
-Archive and restore require the latest revision and durably move the complete lineage in one recoverable repository-store batch. There is no physical-delete tool. Stable issue references use `{kind: design-doc, id, version?}`: omitted version resolves latest, pinned versions resolve exactly, and archived versions remain addressable. `resolveAddressesUnderLease` is the cycle-free composition seam; Design Docs does not import or mutate Issues.
+Archive and restore require the latest revision and durably move the complete lineage in one recoverable repository-store batch. There is no physical-delete tool. Stable issue references use `{kind: design-doc, id, version?}`: omitted version resolves latest, pinned versions resolve exactly, and archived versions remain addressable. `document_validate` with `cross_domain: true` checks links from active and archived canonical Issues. Shipped MCP, Pi, and OpenCode hosts install `@neottia/issues-design-docs` by default; library users can inject its `linkValidator` or a custom validator. Both capabilities must be enabled. `resolveAddressesUnderLease` is the cycle-free composition seam; Design Docs does not import or mutate Issues.
 
 `document_export` produces a deterministic, digested bundle containing exact canonical bytes. `document_import` defaults to preview and reports additions, conflicts, unsupported records, warnings, and legacy-to-Neottia path mappings before mutation. For `format: harnessctl-v2`, supply an explicit JSON `{version: 1, format: "harnessctl-v2-design-documents", documents: [{path, content, location?}]}` bundle of canonical legacy sources; the package never scans or mutates `.harnessctl` or `.specs`.
 
 ## Concurrency, recovery, and troubleshooting
 
 All reads and mutations use the repository authority lease. Mutations validate a complete proposed snapshot before publication; rename and lineage moves use exact-revision durable batches. Interrupted journals recover at the next lease. Symlinks, hard links, portable path collisions, stale revisions, split/gapped lineages, and operator-modified recovery artifacts fail closed.
+
+Every shared tool error contains `category`, `code`, `message`, `paths`, and `retryable`, plus optional bounded `details`. Repository-store retryability and diagnostic evidence survive translation to this contract. Tool results are measured as compact UTF-8 JSON after schema validation and rejected when they exceed `security.limits.max_result_bytes`; a successfully published mutation is not rolled back merely because its response is too large.
 
 If search reports a missing, corrupt, incompatible, stale, or contradictory cache, choose `rebuild`; canonical validation must pass first. If a revision mismatch occurs, fetch the latest record and intentionally retry. Never hand-edit an approved file or cache database.
 

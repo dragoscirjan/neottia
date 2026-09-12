@@ -1,0 +1,37 @@
+{
+  "name": "@neottia/issues-design-docs",
+  "version": "0.1.0",
+  "description": "Cycle-free composition between Neottia Issues and Design Docs",
+  "author": "Dragos Cirjan",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dragoscirjan/neottia.git",
+    "directory": "packages/issues-design-docs"
+  },
+  "publishConfig": { "access": "public" },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+  "files": ["dist", "README.md", "LICENSE"],
+  "engines": { "node": ">=22.16.0" },
+  "scripts": {
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
+    "pretest": "pnpm --filter @neottia/design-docs run build && pnpm --filter @neottia/issues run build && pnpm run build",
+    "test": "vitest run --root ../.. packages/issues-design-docs/src",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@neottia/design-docs": "workspace:^",
+    "@neottia/issues": "workspace:^",
+    "@neottia/repository-store": "workspace:^"
+  },
+  "devDependencies": {
+    "@templ-project/tsconfig": "^0.2.2",
+    "@types/node": "^25.0.3",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.11"
+  }
+}

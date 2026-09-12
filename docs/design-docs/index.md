@@ -9,6 +9,8 @@ Choose the library (`@neottia/design-docs`), generic MCP server (`@neottia/desig
 ```yaml
 version: 1
 skills:
+  issues:
+    enabled: true # required for cross-domain issue-link validation
   design_docs:
     enabled: true
     root: .neottia/design-docs
@@ -35,7 +37,7 @@ Canonical Markdown uses bounded YAML frontmatter, UTF-8/LF, a matching sole H1, 
 
 `document_list` filters metadata. `document_search` performs BM25-ranked FTS5 search with kind/status/location/ID/current-version filters and bounded snippets; every hit is hydrated from canonical Markdown. `document_get` returns full content.
 
-Archive/restore requires the latest exact revision and moves all lineage files atomically. Archived versions remain addressable. Issues should persist `{kind: design-doc, id, version?}` rather than paths. An omitted version means latest; a version pins exact history. The library exports an under-lease address resolver and never imports the Issues package.
+Archive/restore requires the latest exact revision and moves all lineage files atomically. Archived versions remain addressable. Issues should persist `{kind: design-doc, id, version?}` rather than paths. An omitted version means latest; a version pins exact history. Run `document_validate` with `cross_domain: true` to check links in active and archived Issues. Shipped hosts install the cycle-free composition automatically, but both `skills.design_docs` and `skills.issues` must be enabled. The library exports an under-lease address resolver and never imports the Issues package.
 
 ## Back up and migrate
 
@@ -45,4 +47,6 @@ Archive/restore requires the latest exact revision and moves all lineage files a
 
 Repository-store leases serialize writers, exact revisions reject stale edits, and durable journals recover interrupted multi-file publication. Symlinks, collisions, malformed canonical files, lineage gaps/splits, and operator-modified recovery artifacts fail closed.
 
-SQLite at `.neottia/cache/design-docs.sqlite` is disposable. Missing, corrupt, wrong-version, stale, or contradictory caches rebuild only from valid canonical Markdown. Use `stale_policy: fail` to require operator action; generic MCP maps `prompt` to `rebuild`. Cache failures never make cache rows authoritative or rewrite canonical documents.
+SQLite at `.neottia/cache/design-docs.sqlite` is disposable. Missing, corrupt, wrong-version, stale, or contradictory caches rebuild only from valid canonical Markdown. Use `stale_policy: fail` to require operator action. Pi asks before replacing an existing stale cache and preserves it when the user declines; generic MCP and OpenCode are non-interactive and map `prompt` to rebuild. Cache failures never make cache rows authoritative or rewrite canonical documents.
+
+Structured tool errors expose `category`, `code`, `message`, `paths`, `retryable`, and optional bounded diagnostic `details`. Repository-store retryability and evidence remain available across MCP, Pi, and OpenCode.

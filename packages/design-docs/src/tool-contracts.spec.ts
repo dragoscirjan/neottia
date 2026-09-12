@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DesignDocsError, serializeDesignDocsError } from './errors.js';
 import { designDocsToolJsonSchema, designDocsToolSchemas } from './tool-contracts.js';
 import { DESIGN_DOCS_TOOLS } from './tools.js';
 
@@ -23,7 +24,25 @@ describe('shared Design Docs tool registry', () => {
       expect(tool.inputSchema).toBe(designDocsToolSchemas[tool.name].input);
       expect(tool.errorSchema).toBe(designDocsToolSchemas[tool.name].error);
       expect(designDocsToolJsonSchema(tool.name, 'input')).toMatchObject({ type: 'object' });
+      expect(designDocsToolJsonSchema(tool.name, 'error')).toMatchObject({
+        properties: { retryable: { type: 'boolean' } },
+        required: expect.arrayContaining(['retryable']),
+      });
     }
+  });
+
+  it('accepts serialized retryability and evidence in every error contract', () => {
+    const serialized = serializeDesignDocsError(
+      new DesignDocsError(
+        'stale_revision',
+        'REVISION_MISMATCH',
+        'stale',
+        [],
+        { expected: 'v1:old', actual: 'v1:new' },
+        { retryable: true },
+      ),
+    );
+    for (const tool of DESIGN_DOCS_TOOLS) expect(tool.errorSchema.parse(serialized)).toEqual(serialized);
   });
 
   it('accepts metadata as an object and rejects JSON-inside-string', () => {

@@ -8,6 +8,7 @@ import {
   type IssueToolName,
   type DesignDocumentReferenceResolver,
 } from '@neottia/issues';
+import { createIssuesDesignDocsComposition } from '@neottia/issues-design-docs';
 import { Type, type TSchema } from 'typebox';
 
 /** Minimal Pi registration surface used by this extension. */
@@ -66,7 +67,7 @@ export function registerIssueTools(pi: PiExtensionApi, options: PiIssuesOptions 
               cwd,
               interactive: true,
               configOverrides: options.configOverrides,
-              resolver: options.resolver,
+              resolver: options.resolver ?? createIssuesDesignDocsComposition({ cwd }).resolver,
               storeKey: {},
             },
           };

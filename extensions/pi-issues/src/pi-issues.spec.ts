@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DesignDocumentStore, loadDesignDocsConfig } from '@neottia/design-docs';
 import { ISSUE_TOOLS, issueToolJsonSchema } from '@neottia/issues';
 import { afterEach, describe, expect, it } from 'vitest';
 import { issueToolParameters, registerIssueTools, type PiExtensionApi } from './index.js';
@@ -11,7 +12,10 @@ function project(): string {
   const cwd = mkdtempSync(join(tmpdir(), 'pi-issues-'));
   roots.push(cwd);
   mkdirSync(join(cwd, '.neottia'));
-  writeFileSync(join(cwd, '.neottia/config.yml'), 'version: 1\nskills:\n  issues:\n    enabled: true\n');
+  writeFileSync(
+    join(cwd, '.neottia/config.yml'),
+    'version: 1\nskills:\n  issues:\n    enabled: true\n  design_docs:\n    enabled: true\n',
+  );
   return cwd;
 }
 
@@ -34,6 +38,31 @@ describe('Pi issues adapter', () => {
     expect(firstList.content[0]?.text).not.toContain('Only second');
     expect(secondList.content[0]?.text).toContain('Only second');
     expect(secondList.content[0]?.text).not.toContain('Only first');
+    await close();
+  });
+
+  it('uses the real design-document resolver by default', async () => {
+    const registered: Array<Parameters<PiExtensionApi['registerTool']>[0]> = [];
+    const api: PiExtensionApi = { on: () => undefined, registerTool: (definition) => registered.push(definition) };
+    const close = registerIssueTools(api);
+    const cwd = project();
+    const documents = await DesignDocumentStore.fromConfig(loadDesignDocsConfig(cwd), cwd);
+    const document = await documents.create({ title: 'Pi target', kind: 'hld' });
+    const signal = new AbortController().signal;
+    const created = await registered
+      .find((tool) => tool.name === 'issue_create')!
+      .execute('1', { type: 'task', title: 'Linked' }, signal, () => undefined, { cwd });
+    const issue = created.details.result as { id: string; revision: string };
+    const linked = await registered
+      .find((tool) => tool.name === 'issue_link_document')!
+      .execute(
+        '2',
+        { id: issue.id, expected_revision: issue.revision, document_id: document.id },
+        signal,
+        () => undefined,
+        { cwd },
+      );
+    expect(linked.details.result).toMatchObject({ links: [{ id: document.id }] });
     await close();
   });
 

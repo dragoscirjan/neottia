@@ -9,12 +9,15 @@ import {
   serializeDesignDocsError,
   type DesignDocsToolContext,
   type DesignDocsToolName,
+  type DesignDocLinkValidator,
 } from '@neottia/design-docs';
+import { createIssuesDesignDocsComposition } from '@neottia/issues-design-docs';
 
 export interface CreateDesignDocsServerOptions {
   readonly cwd?: string;
   readonly name?: string;
   readonly version?: string;
+  readonly linkValidator?: DesignDocLinkValidator;
 }
 export function effectiveDesignDocsStalePolicy(cwd: string, env: NodeJS.ProcessEnv = process.env): 'rebuild' | 'fail' {
   const policy = loadDesignDocsConfig(cwd, { env }).cache.stale_policy;
@@ -32,6 +35,7 @@ export function createDesignDocsServer(options: CreateDesignDocsServerOptions = 
     cwd,
     interactive: false,
     configOverrides: { cache: { stale_policy: effectiveDesignDocsStalePolicy(cwd) } },
+    linkValidator: options.linkValidator ?? createIssuesDesignDocsComposition({ cwd }).linkValidator,
   };
   const originalClose = server.close.bind(server);
   server.close = async () => {

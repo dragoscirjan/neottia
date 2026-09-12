@@ -1,4 +1,5 @@
 import { computeByteRevision } from '@neottia/repository-store';
+import { Parser as CommonMarkParser } from 'commonmark';
 import { isAlias, isMap, isScalar, isSeq, parseDocument, type Node, type Scalar } from 'yaml';
 import type { DesignDocsLimits } from './config.js';
 import { DesignDocsError } from './errors.js';
@@ -50,7 +51,7 @@ export function encodeCanonicalDocument(
   limits: DesignDocsLimits,
 ): Uint8Array {
   validateMetadata(metadata, limits);
-  const body = canonicalDocumentBody(metadata.title, content);
+  const body = canonicalDocumentBody(metadata.title, content, limits.max_body_bytes);
   validateBody(metadata.title, body, limits);
   const source = [
     '---',
@@ -139,12 +140,19 @@ function decodeSource(source: string | Uint8Array, limits: DesignDocsLimits, har
   };
 }
 
-export function canonicalDocumentBody(title: string, content: string): string {
+export function canonicalDocumentBody(title: string, content: string, maximumBytes?: number): string {
   assertUnicode(content, 'document content');
-  const normalized = content.replaceAll('\r\n', '\n').replaceAll('\r', '\n').trim();
-  if (normalized.split('\n').some((line) => /^#(?:\s|$)/u.test(line)))
+  const lines = content.replaceAll('\r\n', '\n').replaceAll('\r', '\n').split('\n');
+  // Remove surrounding blank lines without erasing indentation from the first code line.
+  while (lines[0]?.trim() === '') lines.shift();
+  while (lines.at(-1)?.trim() === '') lines.pop();
+  const body = `# ${title}\n\n${lines.join('\n')}`;
+  // Reject oversized bodies before the CommonMark parser allocates its syntax tree.
+  if (maximumBytes !== undefined && encoder.encode(body).byteLength > maximumBytes)
+    limit('BODY_LIMIT', 'Document body byte limit exceeded.');
+  if (containsAdditionalH1(lines, true))
     fail('canonical_form', 'H1_ADDITIONAL', 'Document content must not contain a level-one heading.');
-  return `# ${title}\n\n${normalized}`;
+  return body;
 }
 
 function validateBody(title: string, body: string, limits: DesignDocsLimits, allowLegacySetext = false): void {
@@ -158,10 +166,7 @@ function validateBody(title: string, body: string, limits: DesignDocsLimits, all
   const lines = body.replace(/\n$/u, '').split('\n');
   if (lines[0] !== `# ${title}` || lines[1] !== '')
     fail('canonical_form', 'H1_INVALID', 'Document body must begin with one matching H1 followed by a blank line.');
-  if (
-    lines.slice(2).some((line) => /^#(?:\s|$)/u.test(line)) ||
-    (!allowLegacySetext && containsSetextH1(lines.slice(2)))
-  )
+  if (containsAdditionalH1(lines.slice(2), allowLegacySetext))
     fail('canonical_form', 'H1_ADDITIONAL', 'Additional level-one headings are not allowed.');
 }
 
@@ -171,7 +176,7 @@ function encodeHarnessctlDocument(
   limits: DesignDocsLimits,
 ): Uint8Array {
   validateMetadata(metadata, limits);
-  const body = canonicalDocumentBody(metadata.title, content);
+  const body = canonicalDocumentBody(metadata.title, content, limits.max_body_bytes);
   validateBody(metadata.title, body, limits, true);
   const source = [
     '---',
@@ -291,26 +296,15 @@ function validateJson(
   seen.delete(value);
 }
 
-function containsSetextH1(lines: readonly string[]): boolean {
-  let fence: '`' | '~' | undefined;
-  let fenceLength = 0;
-  for (let index = 0; index < lines.length; index++) {
-    const line = lines[index] as string;
-    const marker = /^ {0,3}(`{3,}|~{3,})/u.exec(line)?.[1];
-    if (marker) {
-      const kind = marker[0] as '`' | '~';
-      if (fence === undefined) {
-        fence = kind;
-        fenceLength = marker.length;
-      } else if (fence === kind && marker.length >= fenceLength) {
-        fence = undefined;
-        fenceLength = 0;
-      }
-      continue;
-    }
-    if (fence !== undefined || !/^ {0,3}=+\s*$/u.test(line) || index === 0) continue;
-    const previous = lines[index - 1] as string;
-    if (previous.trim() && !/^ {4}|\t/u.test(previous)) return true;
+const markdownParser = new CommonMarkParser();
+
+function containsAdditionalH1(lines: readonly string[], allowSetext: boolean): boolean {
+  const walker = markdownParser.parse(lines.join('\n')).walker();
+  for (let event = walker.next(); event !== null; event = walker.next()) {
+    if (!event.entering || event.node.type !== 'heading' || event.node.level !== 1) continue;
+    const [[startLine], [endLine]] = event.node.sourcepos;
+    // CommonMark Setext headings span source lines; legacy imports may retain those only.
+    if (!allowSetext || startLine === endLine) return true;
   }
   return false;
 }

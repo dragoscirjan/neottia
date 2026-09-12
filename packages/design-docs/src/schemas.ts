@@ -100,6 +100,7 @@ export const structuredErrorSchema = z
     code: z.string(),
     message: z.string(),
     paths: z.array(z.string()),
+    retryable: z.boolean(),
     details: z.record(z.string(), z.unknown()).optional(),
   })
   .strict();

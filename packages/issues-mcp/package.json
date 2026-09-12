@@ -37,9 +37,11 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
-    "@neottia/issues": "workspace:*"
+    "@neottia/issues": "workspace:*",
+    "@neottia/issues-design-docs": "workspace:*"
   },
   "devDependencies": {
+    "@neottia/design-docs": "workspace:*",
     "@neottia/testkit": "workspace:*",
     "@templ-project/tsconfig": "^0.2.2",
     "@types/node": "^25.0.3",
