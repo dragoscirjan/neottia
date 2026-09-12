@@ -367,6 +367,9 @@ importers:
 
   packages/design-docs:
     dependencies:
+      '@neottia/config':
+        specifier: workspace:^
+        version: link:../config
       '@neottia/repository-store':
         specifier: workspace:^
         version: link:../repository-store
@@ -457,6 +460,9 @@ importers:
 
   packages/issues-design-docs:
     dependencies:
+      '@neottia/config':
+        specifier: workspace:^
+        version: link:../config
       '@neottia/design-docs':
         specifier: workspace:^
         version: link:../design-docs

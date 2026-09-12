@@ -1,8 +1,10 @@
 import { resolve } from 'node:path';
+import { createConfigRegistry, resolveConfig, type ResolvedConfigSnapshot } from '@neottia/config';
 import {
   DesignDocsError,
   DesignDocumentStore,
-  loadDesignDocsConfig,
+  designDocsConfigContribution,
+  type DesignDocsConfig,
   type DesignDocsConfigInput,
   type DesignDocLinkValidator,
   type DocumentAddress,
@@ -11,7 +13,7 @@ import {
 import {
   inspectIssueCatalog,
   inspectIssueGraph,
-  loadIssueConfig,
+  issueConfigContribution,
   type DesignDocumentReferenceResolver,
   type IssueConfig,
   type IssueConfigInput,
@@ -25,7 +27,13 @@ import {
 
 export interface IssuesDesignDocsCompositionOptions {
   readonly cwd: string;
+  /** A pre-resolved multi-module snapshot supplied by a shared host. */
+  readonly snapshot?: ResolvedConfigSnapshot;
+  /** Explicit environment used only when this package resolves the shared snapshot. */
+  readonly env?: NodeJS.ProcessEnv;
+  /** Standalone runtime overrides resolved into the same snapshot as Design Docs. */
   readonly issuesConfigOverrides?: Partial<IssueConfigInput>;
+  /** Standalone runtime overrides resolved into the same snapshot as Issues. */
   readonly designDocsConfigOverrides?: Partial<DesignDocsConfigInput>;
 }
 
@@ -39,11 +47,12 @@ export function createIssuesDesignDocsComposition(
   options: IssuesDesignDocsCompositionOptions,
 ): IssuesDesignDocsComposition {
   const cwd = resolve(options.cwd);
+  const { designDocsConfig, issuesConfig } = captureConfigs(options, cwd);
   const resolver: DesignDocumentReferenceResolver = {
     async resolveMany(references, context) {
-      const config = loadDesignDocsConfig(cwd, options.designDocsConfigOverrides);
-      if (!config.enabled) return { status: 'target_disabled' };
-      const store = await DesignDocumentStore.fromConfig(config, cwd);
+      if (!designDocsConfig.enabled) return { status: 'target_disabled' };
+      const store = await DesignDocumentStore.fromConfig(designDocsConfig, cwd);
+      const config = designDocsConfig;
       const unique = new Map(references.map((reference) => [addressKey(reference), reference]));
       const resolvedByKey = new Map<string, DocumentAddressResult>();
       const distinct = [...unique.values()];
@@ -84,7 +93,7 @@ export function createIssuesDesignDocsComposition(
   };
 
   const linkValidator: DesignDocLinkValidator = async (snapshot, control = {}) => {
-    const config = loadIssueConfig(cwd, options.issuesConfigOverrides);
+    const config = issuesConfig;
     if (!config.enabled)
       return [
         {
@@ -162,6 +171,42 @@ export function createIssuesDesignDocsComposition(
   };
 
   return { resolver, linkValidator };
+}
+
+/** Captures both shards once so callbacks cannot observe separate file states. */
+function captureConfigs(
+  options: IssuesDesignDocsCompositionOptions,
+  cwd: string,
+): { readonly designDocsConfig: DesignDocsConfig; readonly issuesConfig: IssueConfig } {
+  if (options.snapshot !== undefined) {
+    if (
+      options.env !== undefined ||
+      options.issuesConfigOverrides !== undefined ||
+      options.designDocsConfigOverrides !== undefined
+    ) {
+      throw new TypeError('A supplied configuration snapshot cannot be combined with composition overrides.');
+    }
+    return {
+      designDocsConfig: options.snapshot.get(designDocsConfigContribution) as DesignDocsConfig,
+      issuesConfig: options.snapshot.get(issueConfigContribution) as IssueConfig,
+    };
+  }
+
+  const registry = createConfigRegistry([issueConfigContribution, designDocsConfigContribution]);
+  const snapshot = resolveConfig(registry, {
+    cwd,
+    env: options.env ?? process.env,
+    overrides: {
+      modules: {
+        issues: options.issuesConfigOverrides ?? {},
+        design_docs: options.designDocsConfigOverrides ?? {},
+      },
+    },
+  });
+  return {
+    designDocsConfig: snapshot.get(designDocsConfigContribution) as DesignDocsConfig,
+    issuesConfig: snapshot.get(issueConfigContribution) as IssueConfig,
+  };
 }
 
 function addressKey(address: { readonly id: string; readonly version?: number }): string {

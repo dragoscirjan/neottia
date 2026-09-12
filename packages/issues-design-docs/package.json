@@ -24,6 +24,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@neottia/config": "workspace:^",
     "@neottia/design-docs": "workspace:^",
     "@neottia/issues": "workspace:^",
     "@neottia/repository-store": "workspace:^"
