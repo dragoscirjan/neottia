@@ -13,4 +13,15 @@ Check [requirements](/get-started/requirements), then choose the [library](/issu
 - [Migrate data](/issues/migration)
 - [Operate and troubleshoot](/issues/operations)
 
+Enable the canonical shared shard:
+
+```yaml
+version: 1
+modules:
+  issues:
+    enabled: true
+```
+
+Install `@neottia/issues` for library access, `@neottia/issues-mcp` for generic stdio MCP, or `@neottia/pi-issues` / `@neottia/opencode-issues` for direct harness tools. The package exports `issueConfigContribution` for shared `@neottia/config` snapshots and keeps `loadIssueConfig()` for standalone compatibility.
+
 Track `.neottia/issues/**/*.yml`. Ignore `.neottia/cache/issues.sqlite` as described in [Repository files](/guides/repository-files).

@@ -84,7 +84,7 @@ Install `@neottia/memory-core` for the library, `@neottia/memory-mcp` for an MCP
 
 ## Issues
 
-Enable `skills.issues` to manage Git-trackable YAML issues with exact revisions, durable recursive archive/restore, typed design-document links, and a disposable ranked FTS5 cache. Use `@neottia/issues` directly, `@neottia/issues-mcp` over stdio, or the in-process Pi/OpenCode extensions. See the [Issues guide](docs/issues/).
+Enable `modules.issues` to manage Git-trackable YAML issues with exact revisions, durable recursive archive/restore, typed design-document links, and a disposable ranked FTS5 cache. `@neottia/issues` exports a shared configuration contribution while retaining `loadIssueConfig()` and the deprecated `skills.issues` alias for standalone compatibility. Use the package directly, `@neottia/issues-mcp` over stdio, or the in-process Pi/OpenCode extensions. See the [Issues guide](docs/issues/).
 
 ## Design Docs
 
