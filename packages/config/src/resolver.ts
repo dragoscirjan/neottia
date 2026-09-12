@@ -573,23 +573,31 @@ function applyEnvironment(
     for (const binding of contribution.environment ?? []) {
       const selected = firstPopulated(binding.names, env);
       if (selected === undefined) continue;
-      const coerced = coerceEnvironment(selected.value, binding.kind);
-      if (coerced === undefined) {
-        addDiagnostic(collector, {
-          code: 'ENVIRONMENT',
-          message: `environment variable must contain a valid ${binding.kind}`,
-          path: [...contribution.path, ...binding.path],
-          source: { environment: selected.name, kind: 'environment' },
-        });
+      const source: ConfigProvenance = { environment: selected.name, kind: 'environment' };
+      let coerced: unknown;
+      try {
+        coerced =
+          binding.parse === undefined ? coerceEnvironment(selected.value, binding.kind) : binding.parse(selected.value);
+      } catch {
+        addEnvironmentDiagnostic(collector, contribution, binding.path, source);
         continue;
       }
-      resolution.value = mergeValues(
-        resolution.value,
-        objectAtPath(binding.path, coerced),
-        [],
-        { environment: selected.name, kind: 'environment' },
-        resolution.provenance,
-      );
+      if (coerced === undefined) {
+        addEnvironmentDiagnostic(
+          collector,
+          contribution,
+          binding.path,
+          source,
+          binding.parse === undefined ? `environment variable must contain a valid ${binding.kind}` : undefined,
+        );
+        continue;
+      }
+      const patch = objectAtPath(binding.path, coerced);
+      if (binding.parse !== undefined && !contribution.runtimePatchSchema.safeParse(patch).success) {
+        addEnvironmentDiagnostic(collector, contribution, binding.path, source);
+        continue;
+      }
+      resolution.value = mergeValues(resolution.value, patch, [], source, resolution.provenance);
     }
     for (const secret of contribution.secrets ?? []) {
       if (secret.fallbackEnvironment === undefined) continue;
@@ -694,6 +702,22 @@ function serializeProvenance(
   return Object.fromEntries(
     [...resolutions].map(([id, resolution]) => [id, Object.fromEntries(resolution.provenance)]),
   );
+}
+
+/** Reports domain-specific and built-in environment conversion failures without raw values. */
+function addEnvironmentDiagnostic(
+  collector: MutableDiagnosticCollector,
+  contribution: UnknownConfigContribution,
+  pathSegments: readonly string[],
+  source: ConfigProvenance,
+  message = 'environment variable could not be converted to the registered setting',
+): void {
+  addDiagnostic(collector, {
+    code: 'ENVIRONMENT',
+    message,
+    path: [...contribution.path, ...pathSegments],
+    source,
+  });
 }
 
 /** Coerces only strict, unsurprising environment spellings. */

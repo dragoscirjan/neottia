@@ -488,6 +488,88 @@ describe('environment values, secrets, and safe diagnostics', () => {
     expect(JSON.stringify(error)).not.toContain(invalid);
   });
 
+  it('uses trusted environment parsers with canonical alias precedence', () => {
+    const cwd = temporaryDirectory();
+    const strategiesPatch = z.object({ strategies: z.array(z.string()).optional() }).strict();
+    const transformedContribution = defineConfigContribution({
+      id: 'transformed',
+      path: ['modules', 'transformed'],
+      filePatchSchema: strategiesPatch,
+      runtimePatchSchema: strategiesPatch,
+      resolvedSchema: z.object({ strategies: z.array(z.string()) }).strict(),
+      defaults: { strategies: ['default'] },
+      environment: [
+        {
+          kind: 'boolean',
+          names: ['CANONICAL_FALLBACK', 'LEGACY_FALLBACK'],
+          path: ['strategies'],
+          parse: (value) => (/^(?:true|1)$/iu.test(value.trim()) ? ['direct', 'fallback'] : ['direct']),
+        },
+      ],
+    });
+    const transformedRegistry = createConfigRegistry([transformedContribution]);
+
+    const snapshot = resolveConfig(transformedRegistry, {
+      cwd,
+      env: { CANONICAL_FALLBACK: 'true', LEGACY_FALLBACK: 'false' },
+      globalFile: false,
+      projectFile: false,
+    });
+
+    expect(snapshot.get(transformedContribution).strategies).toEqual(['direct', 'fallback']);
+    expect(snapshot.sourceOf(transformedContribution, ['strategies'])).toEqual({
+      environment: 'CANONICAL_FALLBACK',
+      kind: 'environment',
+    });
+  });
+
+  it('rejects invalid or throwing environment parsers without exposing raw values or failures', () => {
+    const cwd = temporaryDirectory();
+    const secretValue = 'raw-environment-secret';
+    const thrownValue = 'parser-internal-secret';
+    const parsedPatch = z.object({ count: z.number().int().optional() }).strict();
+    const parsedContribution = defineConfigContribution({
+      id: 'parsed',
+      path: ['modules', 'parsed'],
+      filePatchSchema: parsedPatch,
+      runtimePatchSchema: parsedPatch,
+      resolvedSchema: z.object({ count: z.number().int() }).strict(),
+      defaults: { count: 1 },
+      environment: [
+        {
+          kind: 'integer',
+          names: ['PARSED_COUNT'],
+          path: ['count'],
+          parse: (value) => {
+            if (value === secretValue) return 'not-an-integer';
+            throw new Error(thrownValue);
+          },
+        },
+      ],
+    });
+    const parsedRegistry = createConfigRegistry([parsedContribution]);
+
+    for (const value of [secretValue, 'throw']) {
+      const error = resolutionError(() =>
+        resolveConfig(parsedRegistry, {
+          cwd,
+          env: { PARSED_COUNT: value },
+          globalFile: false,
+          projectFile: false,
+        }),
+      );
+      expect(error.diagnostics).toMatchObject([
+        {
+          code: 'ENVIRONMENT',
+          path: ['modules', 'parsed', 'count'],
+          source: { environment: 'PARSED_COUNT', kind: 'environment' },
+        },
+      ]);
+      expect(JSON.stringify(error)).not.toContain(secretValue);
+      expect(JSON.stringify(error)).not.toContain(thrownValue);
+    }
+  });
+
   it('rejects file secret literals and unresolved exact references without leaking either value', () => {
     const cwd = temporaryDirectory();
     const literal = 'literal-super-secret';

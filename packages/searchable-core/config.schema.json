@@ -73,14 +73,14 @@
       "properties": {
         "strategies": {
           "default": ["direct", "jina", "wayback"],
-          "uniqueItems": true,
           "minItems": 1,
           "maxItems": 3,
           "type": "array",
           "items": {
             "type": "string",
             "enum": ["direct", "jina", "wayback"]
-          }
+          },
+          "uniqueItems": true
         },
         "timeout_ms": {
           "default": 10000,

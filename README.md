@@ -92,7 +92,7 @@ Install `@neottia/design-docs` for strict repository-local Markdown/YAML design 
 
 ## Searchable
 
-Enable `skills.searchable` to search DuckDuckGo, Google, Bing, or Brave; extract bounded Markdown; stash canonical page records; search them with a disposable FTS5 cache; and ask a local Ollama model grounded questions. Use `@neottia/searchable-core` directly, `@neottia/searchable-mcp` over stdio, or the native Pi/OpenCode extensions. See the [Searchable guide](docs/searchable/).
+Enable `modules.searchable` to search DuckDuckGo, Google, Bing, or Brave; extract bounded Markdown; stash canonical page records; search them with a disposable FTS5 cache; and ask a local Ollama model grounded questions. Use `@neottia/searchable-core` directly, `@neottia/searchable-mcp` over stdio, or the native Pi/OpenCode extensions. See the [Searchable guide](docs/searchable/).
 
 ## Delivery methods
 

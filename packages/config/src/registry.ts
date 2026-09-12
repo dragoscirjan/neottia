@@ -127,6 +127,7 @@ function freezeEnvironmentBinding(binding: EnvironmentBinding): EnvironmentBindi
     kind: binding.kind,
     names: Object.freeze([...binding.names]) as unknown as readonly [string, ...string[]],
     path: Object.freeze([...binding.path]),
+    parse: binding.parse,
   });
 }
 
@@ -299,7 +300,8 @@ function isEnvironmentBinding(binding: EnvironmentBinding): boolean {
     binding !== null &&
     isPath(binding.path) &&
     ['string', 'integer', 'boolean'].includes(binding.kind) &&
-    isNonEmptyNames(binding.names)
+    isNonEmptyNames(binding.names) &&
+    (binding.parse === undefined || typeof binding.parse === 'function')
   );
 }
 

@@ -52,6 +52,8 @@ export const registry = createConfigRegistry([exampleConfig]);
 
 Environment `names` are ordered from the preferred name to compatibility aliases. Empty values are unset. Secret and environment paths are relative to the contribution shard. `legacyPaths` identify deprecated source locations; snapshots and serialization always use the canonical path.
 
+A binding may declare a synchronous `parse(value)` hook when a legacy environment variable does not map directly to a string, integer, or boolean leaf. This hook runs as trusted module-contribution code and replaces built-in `kind` coercion. Its result must satisfy the contribution's runtime patch and resolved schemas. Thrown errors and invalid results produce value-free environment diagnostics; parser errors and raw environment text are never included.
+
 The configurable root sections are `modules`, `sdlc`, `connections`, `capabilities`, `agents`, `harnesses`, `assets`, and `templates`. `version` and `profiles` are document metadata. Registration rejects invalid metadata, duplicate IDs, exact duplicate paths, ancestor/descendant ownership, and canonical or legacy alias collisions.
 
 ## Resolve configuration
@@ -118,7 +120,7 @@ profiles:
 
 ### Environment values and secrets
 
-String, integer, and boolean environment bindings are supported. Integers use trimmed base-10 safe-integer syntax. For compatibility with existing Neottia modules, booleans accept case-insensitive, trimmed `true`, `false`, `1`, or `0`.
+String, integer, and boolean environment bindings are supported. Integers use trimmed base-10 safe-integer syntax. For compatibility with existing Neottia modules, booleans accept case-insensitive, trimmed `true`, `false`, `1`, or `0`. Domain-specific trusted parsers may map legacy text to a different schema-valid leaf shape; aliases and environment precedence remain unchanged.
 
 A secret in YAML must be one exact environment reference, such as `${EXAMPLE_TOKEN}`. Prefixes, suffixes, and literal file secrets are rejected. Only the winning file reference is resolved, and it is resolved once: if `EXAMPLE_TOKEN` itself contains `${OTHER_TOKEN}`, that text remains literal. Secret fallback environment bindings and explicit runtime overrides may supply trusted literal values.
 

@@ -39,6 +39,7 @@
   },
   "dependencies": {
     "@mozilla/readability": "^0.6.0",
+    "@neottia/config": "workspace:^",
     "@neottia/repository-store": "workspace:*",
     "jsdom": "^29.1.1",
     "turndown": "^7.2.4",

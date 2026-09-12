@@ -32,6 +32,11 @@ export interface EnvironmentBinding {
   readonly path: readonly string[];
   readonly names: readonly [string, ...string[]];
   readonly kind: EnvironmentValueKind;
+  /**
+   * Converts raw environment text for a domain-specific setting. This trusted,
+   * synchronous contribution hook replaces built-in `kind` coercion when set.
+   */
+  readonly parse?: (value: string) => unknown;
 }
 
 /** Marks a shard-relative field as secret and optionally supplies environment fallbacks. */
