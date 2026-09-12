@@ -35,4 +35,6 @@ links:
 
 Types are `initiative`, `epic`, `story`, `task`, and `bug`. Statuses are `open`, `in_progress`, `done`, and `closed`. Comments are append-only. Metadata values must be JSON-compatible.
 
-Children, `blocks`, `blocked_by`, and symmetric related views are derived and never stored. A revision is `v1:<sha256-of-exact-bytes>`. Manual edits change the revision; a write canonicalizes safe noncanonical YAML.
+Children, `blocks`, `blocked_by`, and symmetric related views are derived and never stored. For `relates_to`, only the lexically smaller issue ID stores the edge. The [relationship contract](/issues/relationships) covers ownership, hierarchy, cycle, target, and duplicate-edge validation across the complete active and archived graph.
+
+A revision is `v1:<sha256-of-exact-bytes>`. Mutations that require `expected_revision` reject stale revisions as described in the [lifecycle guide](/issues/lifecycle). When a requested mutation is a semantic no-op, Neottia still validates the graph and repairs safe noncanonical YAML. The issue meaning and `updated_at` stay unchanged, while canonical bytes—and therefore the revision—may change.
