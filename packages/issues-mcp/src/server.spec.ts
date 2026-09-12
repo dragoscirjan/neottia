@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { DesignDocumentStore, loadDesignDocsConfig } from '@neottia/design-docs';
 import { ISSUE_TOOLS, issueToolJsonSchema, type DesignDocumentReferenceResolver } from '@neottia/issues';
 import { afterEach, expect, it } from 'vitest';
 import { createIssueServer } from './server.js';
@@ -21,7 +22,7 @@ async function client(extraIssuesConfig = '', resolver?: DesignDocumentReference
   mkdirSync(join(cwd, '.neottia'), { recursive: true });
   writeFileSync(
     join(cwd, '.neottia/config.yml'),
-    `version: 1\nskills:\n  issues:\n    enabled: true\n${extraIssuesConfig}`,
+    `version: 1\nskills:\n  issues:\n    enabled: true\n${extraIssuesConfig}  design_docs:\n    enabled: true\n`,
   );
   const server = createIssueServer({ cwd, resolver });
   servers.push(server);
@@ -51,7 +52,22 @@ it('publishes all generated contracts and returns structured content/errors', as
   });
 });
 
-it('composes the optional design-document resolver through MCP', async () => {
+it('uses the real design-document resolver by default', async () => {
+  const connected = await client();
+  const cwd = roots.at(-1)!;
+  const documents = await DesignDocumentStore.fromConfig(loadDesignDocsConfig(cwd), cwd);
+  const document = await documents.create({ title: 'MCP target', kind: 'hld' });
+  const created = await connected.callTool({ name: 'issue_create', arguments: { type: 'task', title: 'Linked' } });
+  const issue = created.structuredContent as { id: string; revision: string };
+  const linked = await connected.callTool({
+    name: 'issue_link_document',
+    arguments: { id: issue.id, expected_revision: issue.revision, document_id: document.id },
+  });
+  expect(linked.isError).toBeFalsy();
+  expect(linked.structuredContent).toMatchObject({ links: [{ id: document.id }] });
+});
+
+it('composes an explicitly injected design-document resolver through MCP', async () => {
   const resolver: DesignDocumentReferenceResolver = {
     async resolveMany(references) {
       return {
@@ -61,7 +77,7 @@ it('composes the optional design-document resolver through MCP', async () => {
           reference,
           resolvedVersion: 1,
           location: 'active',
-          revision: `sha256:${'0'.repeat(64)}`,
+          revision: `v1:${'0'.repeat(64)}`,
         })),
       };
     },

@@ -185,7 +185,7 @@ describe('issue canonical lifecycle', () => {
             reference,
             resolvedVersion: 1,
             location: 'archive',
-            revision: `sha256:${'0'.repeat(64)}`,
+            revision: `v1:${'0'.repeat(64)}`,
           })),
         };
       },
@@ -353,7 +353,7 @@ describe('issue canonical lifecycle', () => {
             reference: item,
             resolvedVersion: 1,
             location: 'active' as const,
-            revision: `sha256:${'0'.repeat(64)}` as const,
+            revision: `v1:${'0'.repeat(64)}` as const,
           })),
         };
       },
@@ -383,7 +383,7 @@ describe('issue canonical lifecycle', () => {
             reference,
             resolvedVersion: reference.version ?? 1,
             location: 'active' as const,
-            revision: `sha256:${'0'.repeat(64)}` as const,
+            revision: `v1:${'0'.repeat(64)}` as const,
           })),
         };
       },
@@ -408,7 +408,7 @@ describe('issue canonical lifecycle', () => {
                   reference,
                   resolvedVersion: 1,
                   location: 'active' as const,
-                  revision: `sha256:${'0'.repeat(64)}` as const,
+                  revision: `v1:${'0'.repeat(64)}` as const,
                 },
           ),
         };
@@ -493,7 +493,7 @@ describe('issue canonical lifecycle', () => {
             reference: item,
             resolvedVersion: item.version ?? 1,
             location: 'active' as const,
-            revision: `sha256:${'0'.repeat(64)}` as const,
+            revision: `v1:${'0'.repeat(64)}` as const,
           })),
         };
       },

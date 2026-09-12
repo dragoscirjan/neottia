@@ -39,11 +39,13 @@
   },
   "dependencies": {
     "@neottia/repository-store": "workspace:^",
+    "commonmark": "^0.31.2",
     "yaml": "^2.9.0",
     "zod": "^4.5.4"
   },
   "devDependencies": {
     "@templ-project/tsconfig": "^0.2.2",
+    "@types/commonmark": "^0.27.10",
     "@types/node": "^25.0.3",
     "typescript": "^5.9.3",
     "vitest": "^4.1.11"

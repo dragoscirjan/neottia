@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { loadDesignDocsConfig, type DesignDocsConfigInput } from './config.js';
 import { DesignDocsError } from './errors.js';
-import { DesignDocumentStore } from './store.js';
+import { DesignDocumentStore, type DesignDocLinkValidator } from './store.js';
 import {
   designDocsToolSchemas,
   documentArchiveInputSchema,
@@ -26,6 +26,7 @@ export interface DesignDocsToolContext {
   readonly signal?: AbortSignal;
   readonly configOverrides?: Partial<DesignDocsConfigInput>;
   readonly onStaleCache?: () => boolean | Promise<boolean>;
+  readonly linkValidator?: DesignDocLinkValidator;
   readonly storeKey?: object;
 }
 export interface DesignDocsToolDefinition {
@@ -36,9 +37,14 @@ export interface DesignDocsToolDefinition {
   readonly errorSchema: z.ZodType;
   readonly run: (context: DesignDocsToolContext, input: unknown) => Promise<unknown>;
 }
-const contextStores = new WeakMap<object, Map<string, Promise<DesignDocumentStore>>>();
+interface RoutedStore {
+  readonly store: DesignDocumentStore;
+  readonly maxResultBytes: number;
+}
 
-function storeFor(context: DesignDocsToolContext): Promise<DesignDocumentStore> {
+const contextStores = new WeakMap<object, Map<string, Promise<RoutedStore>>>();
+
+function storeFor(context: DesignDocsToolContext): Promise<RoutedStore> {
   const key = context.storeKey ?? context;
   let stores = contextStores.get(key);
   if (!stores) {
@@ -48,7 +54,10 @@ function storeFor(context: DesignDocsToolContext): Promise<DesignDocumentStore> 
   let store = stores.get(context.cwd);
   if (!store) {
     const config = loadDesignDocsConfig(context.cwd, context.configOverrides);
-    store = DesignDocumentStore.fromConfig(config, context.cwd, { onStaleCache: context.onStaleCache });
+    store = DesignDocumentStore.fromConfig(config, context.cwd, {
+      onStaleCache: context.onStaleCache,
+      linkValidator: context.linkValidator,
+    }).then((resolved) => ({ store: resolved, maxResultBytes: config.security.limits.max_result_bytes }));
     stores.set(context.cwd, store);
   }
   return store;
@@ -81,13 +90,23 @@ function makeTool<I extends z.ZodObject, O extends z.ZodType>(
           'TOOL_INPUT_INVALID',
           `Invalid ${name} input: ${z.prettifyError(parsedInput.error)}`,
         );
-      const result = await handler(await storeFor(context), parsedInput.data, context);
+      const route = await storeFor(context);
+      const result = await handler(route.store, parsedInput.data, context);
       const parsedOutput = outputSchema.safeParse(result);
       if (!parsedOutput.success)
         throw new DesignDocsError(
           'schema',
           'TOOL_OUTPUT_INVALID',
           `Invalid ${name} output: ${z.prettifyError(parsedOutput.error)}`,
+        );
+      const actual = Buffer.byteLength(JSON.stringify(parsedOutput.data), 'utf8');
+      if (actual > route.maxResultBytes)
+        throw new DesignDocsError(
+          'resource_limit',
+          'TOOL_RESULT_LIMIT',
+          'Serialized tool output exceeds the configured byte limit.',
+          [],
+          { maximum: route.maxResultBytes, actual, tool: name },
         );
       return parsedOutput.data;
     },

@@ -9,6 +9,7 @@ import {
   type IssueToolContext,
   type DesignDocumentReferenceResolver,
 } from '@neottia/issues';
+import { createIssuesDesignDocsComposition } from '@neottia/issues-design-docs';
 
 export interface CreateIssueServerOptions {
   readonly cwd?: string;
@@ -20,10 +21,11 @@ export interface CreateIssueServerOptions {
 
 /** Creates a harness-neutral, non-interactive MCP server. */
 export function createIssueServer(options: CreateIssueServerOptions = {}): Server {
+  const cwd = options.cwd ?? process.cwd();
   const context: IssueToolContext = {
-    cwd: options.cwd ?? process.cwd(),
+    cwd,
     interactive: false,
-    resolver: options.resolver,
+    resolver: options.resolver ?? createIssuesDesignDocsComposition({ cwd }).resolver,
     storeKey: {},
   };
   const server = new Server(

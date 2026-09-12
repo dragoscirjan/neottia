@@ -31,15 +31,17 @@
   },
   "scripts": {
     "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
-    "pretest": "pnpm --filter @neottia/issues build && pnpm run build",
+    "pretest": "pnpm --filter @neottia/issues-mcp... --if-present run build",
     "test": "vitest run --root ../.. packages/issues-mcp/src",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
-    "@neottia/issues": "workspace:*"
+    "@neottia/issues": "workspace:*",
+    "@neottia/issues-design-docs": "workspace:*"
   },
   "devDependencies": {
+    "@neottia/design-docs": "workspace:*",
     "@neottia/testkit": "workspace:*",
     "@templ-project/tsconfig": "^0.2.2",
     "@types/node": "^25.0.3",

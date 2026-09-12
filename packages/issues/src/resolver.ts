@@ -1,4 +1,4 @@
-import type { ByteRevision, OperationControl, RepositoryLease } from '@neottia/repository-store';
+import type { OperationControl, RepositoryLease } from '@neottia/repository-store';
 import { z } from 'zod';
 import { designDocumentReferenceSchema, type DesignDocumentReference } from './schemas.js';
 
@@ -18,7 +18,7 @@ const referenceResultSchema = z.discriminatedUnion('status', [
       reference: designDocumentReferenceSchema,
       resolvedVersion: z.number().int().positive().safe(),
       location: z.enum(['active', 'archive']),
-      revision: z.string().regex(/^sha256:[0-9a-f]{64}$/u),
+      revision: z.string().regex(/^v1:[0-9a-f]{64}$/u),
     })
     .strict(),
   z
@@ -45,6 +45,9 @@ export interface DesignDocumentReferenceFinding {
   readonly version?: number;
 }
 
+/** Public revision returned by the Design Docs domain. */
+export type DesignDocumentRevision = `v1:${string}`;
+
 /** Canonical addressability result for one stable design-document reference. */
 export type DesignDocumentReferenceResult =
   | {
@@ -52,7 +55,7 @@ export type DesignDocumentReferenceResult =
       readonly reference: DesignDocumentReference;
       readonly resolvedVersion: number;
       readonly location: 'active' | 'archive';
-      readonly revision: ByteRevision;
+      readonly revision: DesignDocumentRevision;
     }
   | {
       readonly status: 'unresolved';

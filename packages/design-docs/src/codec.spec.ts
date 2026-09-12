@@ -41,11 +41,33 @@ describe('canonical Design Docs codec', () => {
     expect(() => decodeDocument(source, limits)).toThrow();
   });
 
-  it('rejects an ATX H1 injected after the canonical title', () => {
-    const source = Buffer.from(encodeCanonicalDocument(metadata, '## valid', limits))
-      .toString()
-      .replace('## valid', '# invalid');
-    expect(() => decodeDocument(source, limits)).toThrow(/level-one|canonical/u);
+  it.each([0, 1, 2, 3])('rejects an additional ATX H1 with %i leading spaces', (indent) => {
+    expect(() => encodeCanonicalDocument(metadata, `Ordinary content\n${' '.repeat(indent)}# invalid`, limits)).toThrow(
+      /level-one/u,
+    );
+  });
+
+  it.each(['> # quoted', '- # listed', '- nested\n  - # nested listed'])(
+    'rejects container-nested H1: %s',
+    (content) => {
+      expect(() => encodeCanonicalDocument(metadata, content, limits)).toThrow(/level-one/u);
+    },
+  );
+
+  it.each([
+    '    # indented code',
+    'Ordinary content\n    # indented code',
+    '```md\n# fenced code\n```',
+    '~~~md\n# fenced code\n~~~',
+    '   ```md\n# fenced code\n   ```',
+    '> ```md\n> # quoted fenced code\n> ```',
+    '- ```md\n  # listed fenced code\n  ```',
+    '## H2\n\n#not-a-heading',
+  ])('round-trips H1-like code or non-heading content: %s', (content) => {
+    const bytes = encodeCanonicalDocument(metadata, content, limits);
+    const decoded = decodeDocument(bytes, limits);
+    expect(decoded.content).toBe(content);
+    expect(encodeCanonicalDocument(decoded.metadata, decoded.content, limits)).toEqual(bytes);
   });
 
   it('rejects padded canonical fields and sorts nested metadata keys deterministically', () => {

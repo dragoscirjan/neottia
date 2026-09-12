@@ -76,12 +76,15 @@ export async function ensureDesignDocsCache(
       throw new DesignDocsError('cache', 'CACHE_STALE', 'Design Docs search cache is stale.');
     if (config.cache.stale_policy === 'prompt' && onStale && !(await onStale()))
       throw new DesignDocsError('cache', 'CACHE_STALE_DECLINED', 'Design Docs cache rebuild was declined.');
-  } else if (config.cache.stale_policy === 'fail') {
-    throw new DesignDocsError(
-      'cache',
-      'CACHE_REBUILD_REQUIRED',
-      `Design Docs cache requires rebuild: ${opened.reason}.`,
-    );
+  } else {
+    if (config.cache.stale_policy === 'fail')
+      throw new DesignDocsError(
+        'cache',
+        'CACHE_REBUILD_REQUIRED',
+        `Design Docs cache requires rebuild: ${opened.reason}.`,
+      );
+    if (opened.reason === 'stale-digest' && config.cache.stale_policy === 'prompt' && onStale && !(await onStale()))
+      throw new DesignDocsError('cache', 'CACHE_STALE_DECLINED', 'Design Docs cache rebuild was declined.');
   }
   return { cache: await rebuildDisposableSqliteCache(cacheRoot, lease, specification, control), rebuilt: true };
 }

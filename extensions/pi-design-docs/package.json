@@ -22,9 +22,11 @@
   },
   "dependencies": {
     "@neottia/design-docs": "workspace:*",
+    "@neottia/issues-design-docs": "workspace:*",
     "typebox": "^1.3.7"
   },
   "devDependencies": {
+    "@neottia/repository-store": "workspace:*",
     "@neottia/testkit": "workspace:*",
     "@templ-project/tsconfig": "^0.2.2",
     "@types/node": "^25.0.3",

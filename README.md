@@ -13,6 +13,7 @@ Neottia provides a shared SDLC that can be understood and used by multiple AI co
 │   ├── memory-core/     # Canonical memory library and config schema
 │   ├── memory-mcp/      # MCP memory server
 │   ├── issues/          # Canonical issue domain and tool registry
+│   ├── issues-design-docs/ # Cycle-free issue/design-document composition
 │   ├── issues-mcp/      # Generic MCP issue server
 │   ├── repository-store/# Canonical repository persistence primitives
 │   ├── searchable-core/ # Shared Searchable contracts and service registry
@@ -78,7 +79,7 @@ Enable `skills.issues` to manage Git-trackable YAML issues with exact revisions,
 
 ## Design Docs
 
-Install `@neottia/design-docs` for strict repository-local Markdown/YAML design records, `@neottia/design-docs-mcp` for generic stdio MCP, or the Pi/OpenCode extensions for in-process tools. Enable `skills.design_docs` in `.neottia/config.yml`. The [Design Docs guide](docs/design-docs/) covers authoring, approval, immutable versioning, BM25 search, archive/restore, stable issue references, migration, and recovery.
+Install `@neottia/design-docs` for strict repository-local Markdown/YAML design records, `@neottia/design-docs-mcp` for generic stdio MCP, or the Pi/OpenCode extensions for in-process tools. Enable `skills.design_docs` in `.neottia/config.yml`; enable `skills.issues` too for real stable-link validation through `@neottia/issues-design-docs`. The [Design Docs guide](docs/design-docs/) covers authoring, approval, immutable versioning, BM25 search, archive/restore, stable issue references, migration, and recovery.
 
 ## Searchable foundation
 

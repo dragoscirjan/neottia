@@ -11,6 +11,7 @@ license files are authoritative for distributed package contents:
 | `@neottia/design-docs` | MIT (`packages/design-docs/LICENSE`) |
 | `@neottia/design-docs-mcp` | MIT (`packages/design-docs-mcp/LICENSE`) |
 | `@neottia/issues` | MIT (`packages/issues/LICENSE`) |
+| `@neottia/issues-design-docs` | MIT (`packages/issues-design-docs/LICENSE`) |
 | `@neottia/issues-mcp` | MIT (`packages/issues-mcp/LICENSE`) |
 | `@neottia/memory-core` | MIT (`packages/memory-core/LICENSE`) |
 | `@neottia/memory-mcp` | MIT (`packages/memory-mcp/LICENSE`) |

@@ -4,6 +4,7 @@ import {
   type DesignDocumentReferenceResolver,
   type IssueToolContext,
 } from '@neottia/issues';
+import { createIssuesDesignDocsComposition } from '@neottia/issues-design-docs';
 import { tool, type Plugin } from '@opencode-ai/plugin';
 
 export type OpenCodeToolFactory = typeof tool;
@@ -40,7 +41,7 @@ export function createIssuesPlugin(options: OpenCodeIssuesOptions = {}): Plugin 
     const context: IssueToolContext = {
       cwd: host.directory,
       interactive: false,
-      resolver: options.resolver,
+      resolver: options.resolver ?? createIssuesDesignDocsComposition({ cwd: host.directory }).resolver,
       storeKey: {},
     };
     return { tool: buildIssueTools(context, tool), dispose: () => closeIssueToolContext(context) };

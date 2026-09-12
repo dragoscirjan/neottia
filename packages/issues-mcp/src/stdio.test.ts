@@ -170,6 +170,11 @@ function linkPackedDependencies(extractedPackage: string): void {
   mkdirSync(join(modules, '@modelcontextprotocol'), { recursive: true });
   symlinkSync(join(repoRoot(), 'packages', 'issues'), join(modules, '@neottia', 'issues'), 'dir');
   symlinkSync(
+    join(repoRoot(), 'packages', 'issues-design-docs'),
+    join(modules, '@neottia', 'issues-design-docs'),
+    'dir',
+  );
+  symlinkSync(
     join(repoRoot(), 'packages', 'issues-mcp', 'node_modules', '@modelcontextprotocol', 'sdk'),
     join(modules, '@modelcontextprotocol', 'sdk'),
     'dir',
