@@ -1,5 +1,41 @@
 import type { ByteRevision, OperationControl, RepositoryLease } from '@neottia/repository-store';
-import type { DesignDocumentReference } from './schemas.js';
+import { z } from 'zod';
+import { designDocumentReferenceSchema, type DesignDocumentReference } from './schemas.js';
+
+const referenceFindingSchema = z
+  .object({
+    code: z.string(),
+    message: z.string(),
+    id: z.string().optional(),
+    version: z.number().int().positive().safe().optional(),
+  })
+  .strict();
+
+const referenceResultSchema = z.discriminatedUnion('status', [
+  z
+    .object({
+      status: z.literal('resolved'),
+      reference: designDocumentReferenceSchema,
+      resolvedVersion: z.number().int().positive().safe(),
+      location: z.enum(['active', 'archive']),
+      revision: z.string().regex(/^sha256:[0-9a-f]{64}$/u),
+    })
+    .strict(),
+  z
+    .object({
+      status: z.literal('unresolved'),
+      reference: designDocumentReferenceSchema,
+      reason: z.enum(['id_not_found', 'version_not_found']),
+    })
+    .strict(),
+]);
+
+/** Runtime resolver contract used to fail closed on untyped host implementations. */
+export const designDocumentReferenceBatchSchema = z.discriminatedUnion('status', [
+  z.object({ status: z.literal('ok'), results: z.array(referenceResultSchema) }).strict(),
+  z.object({ status: z.literal('target_invalid'), findings: z.array(referenceFindingSchema) }).strict(),
+  z.object({ status: z.literal('target_disabled') }).strict(),
+]);
 
 /** A bounded diagnostic supplied when a design-doc snapshot is invalid. */
 export interface DesignDocumentReferenceFinding {

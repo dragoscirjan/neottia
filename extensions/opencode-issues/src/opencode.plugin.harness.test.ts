@@ -11,7 +11,7 @@ import {
   runOpencodeWithModelFallback,
   type TempIssueProject,
 } from '@neottia/testkit';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const apiKey = openrouterApiKey();
 const enabled = process.env.NEOTTIA_TEST_HARNESS === '1' && opencodeReady();
@@ -29,11 +29,14 @@ beforeAll(() => {
   );
 });
 
+afterAll(() => project?.cleanup());
+
 describe.skipIf(!enabled)('OpenCode uses Issues in process', () => {
   it('creates a canonical issue in the active temporary project', async (context) => {
     const run = runOpencodeWithModelFallback({
       cwd: project.cwd,
       xdgDataDir: project.xdgDataDir,
+      xdgConfigDir: project.xdgConfigDir,
       prompt: 'You MUST call issue_create to create a bug titled OpenCode Routing with body "Temporary project only".',
       apiKey,
     }).result;

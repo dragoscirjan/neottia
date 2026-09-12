@@ -12,7 +12,7 @@ import {
   runPiWithModelFallback,
   type TempIssueProject,
 } from '@neottia/testkit';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const apiKey = openrouterApiKey();
 const bin = piBin();
@@ -31,6 +31,8 @@ beforeAll(() => {
   );
 });
 
+afterAll(() => project?.cleanup());
+
 describe.skipIf(!enabled)('Pi uses Issues in process', () => {
   it('creates a canonical issue in the active temporary project', async (context) => {
     const run = runPiWithModelFallback({
@@ -38,6 +40,9 @@ describe.skipIf(!enabled)('Pi uses Issues in process', () => {
       prompt: 'Use issue_create to create a task titled Harness Routing with body "Temporary project only".',
       piPath: bin as string,
       apiKey,
+      xdgDataDir: project.xdgDataDir,
+      xdgConfigDir: project.xdgConfigDir,
+      homeDir: project.cwd,
     }).result;
     if (isTransientModelError(run)) return context.skip();
     assertHarnessSuccess(run);

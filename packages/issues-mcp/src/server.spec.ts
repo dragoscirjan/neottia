@@ -8,7 +8,13 @@ import { afterEach, expect, it } from 'vitest';
 import { createIssueServer } from './server.js';
 
 const roots: string[] = [];
-afterEach(() => roots.splice(0).forEach((root) => rmSync(root, { recursive: true, force: true })));
+const clients: Client[] = [];
+const servers: Array<ReturnType<typeof createIssueServer>> = [];
+afterEach(async () => {
+  await Promise.all(clients.splice(0).map((connected) => connected.close()));
+  await Promise.all(servers.splice(0).map((server) => server.close()));
+  roots.splice(0).forEach((root) => rmSync(root, { recursive: true, force: true }));
+});
 async function client(extraIssuesConfig = '', resolver?: DesignDocumentReferenceResolver): Promise<Client> {
   const cwd = mkdtempSync(join(tmpdir(), 'issues-mcp-'));
   roots.push(cwd);
@@ -18,7 +24,9 @@ async function client(extraIssuesConfig = '', resolver?: DesignDocumentReference
     `version: 1\nskills:\n  issues:\n    enabled: true\n${extraIssuesConfig}`,
   );
   const server = createIssueServer({ cwd, resolver });
+  servers.push(server);
   const result = new Client({ name: 'test', version: '1' });
+  clients.push(result);
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   await Promise.all([server.connect(serverTransport), result.connect(clientTransport)]);
   return result;
@@ -28,10 +36,11 @@ it('publishes all generated contracts and returns structured content/errors', as
   const connected = await client();
   const listed = await connected.listTools();
   expect(listed.tools.map((tool) => tool.name)).toEqual(ISSUE_TOOLS.map((tool) => tool.name));
-  for (const definition of ISSUE_TOOLS)
-    expect(listed.tools.find((tool) => tool.name === definition.name)?.inputSchema).toEqual(
-      issueToolJsonSchema(definition.name, 'input'),
-    );
+  for (const definition of ISSUE_TOOLS) {
+    const published = listed.tools.find((tool) => tool.name === definition.name);
+    expect(published?.inputSchema).toEqual(issueToolJsonSchema(definition.name, 'input'));
+    expect(published?.outputSchema).toEqual(issueToolJsonSchema(definition.name, 'output'));
+  }
   const created = await connected.callTool({ name: 'issue_create', arguments: { type: 'task', title: 'MCP issue' } });
   expect(created.isError).toBeFalsy();
   expect(created.structuredContent).toMatchObject({ title: 'MCP issue' });
@@ -73,5 +82,9 @@ it('preserves an explicit non-interactive stale_policy fail setting', async () =
   await connected.callTool({ name: 'issue_create', arguments: { type: 'task', title: 'No implicit rebuild' } });
   const search = await connected.callTool({ name: 'issue_search', arguments: { query: 'rebuild' } });
   expect(search.isError).toBe(true);
-  expect(String((search.content as Array<{ text: string }>)[0]?.text)).toContain('requires rebuild');
+  expect(JSON.parse(String((search.content as Array<{ text: string }>)[0]?.text))).toMatchObject({
+    category: 'storage',
+    code: 'ISSUE_CACHE_REBUILD_REQUIRED',
+    details: { reason: 'missing' },
+  });
 });

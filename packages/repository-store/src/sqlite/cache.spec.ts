@@ -15,7 +15,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
-import { DEFAULT_STORE_LIMITS, resolveManagedPath, resolveManagedRoot, withRepositoryLease } from '../index.js';
+import {
+  DEFAULT_STORE_LIMITS,
+  LeaseContentionError,
+  resolveManagedPath,
+  resolveManagedRoot,
+  withRepositoryLease,
+} from '../index.js';
 import type { SqliteAdapter } from './adapter.js';
 import {
   openDisposableSqliteCache,
@@ -465,6 +471,19 @@ describe('disposable SQLite cache', () => {
       expect(failure).toMatchObject({ code: 'IDENTITY_CHANGED' });
     });
     expect(readFileSync(activePath, 'utf8')).toBe('replacement');
+  });
+
+  it('preserves cancellation raised during a domain health check', async () => {
+    const { root, specification } = await newCacheFixture('neottia-cache-cancel-');
+    await withRepositoryLease(root, async (lease) => {
+      const cache = await rebuildDisposableSqliteCache(root, lease, specification);
+      await cache.close();
+      const cancelled = cacheSpecification(specification.path, specification.canonicalDigest);
+      cancelled.healthCheck = async () => {
+        throw new LeaseContentionError('cancelled health check', 'ABORTED');
+      };
+      await expect(openDisposableSqliteCache(root, lease, cancelled)).rejects.toMatchObject({ code: 'ABORTED' });
+    });
   });
 
   it.each(['', '-wal', '-shm'])('does not close SQLite over a %s replacement during verification', async (suffix) => {
