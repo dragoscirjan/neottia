@@ -7,6 +7,7 @@ license files are authoritative for distributed package contents:
 
 | Package | License |
 | --- | --- |
+| `@neottia/config` | MIT (`packages/config/LICENSE`) |
 | `@neottia/core` | MIT (`packages/core/LICENSE`) |
 | `@neottia/design-docs` | MIT (`packages/design-docs/LICENSE`) |
 | `@neottia/design-docs-mcp` | MIT (`packages/design-docs-mcp/LICENSE`) |
