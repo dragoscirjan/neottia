@@ -1,10 +1,9 @@
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  assertHarnessSuccess,
+  assertHarnessConclusive,
   createTempIssueProject,
   ensureIssuesDistBuilt,
-  isTransientModelError,
   openrouterApiKey,
   piBin,
   piReady,
@@ -34,7 +33,7 @@ beforeAll(() => {
 afterAll(() => project?.cleanup());
 
 describe.skipIf(!enabled)('Pi uses Issues in process', () => {
-  it('creates a canonical issue in the active temporary project', async (context) => {
+  it('creates a canonical issue in the active temporary project', async () => {
     const run = runPiWithModelFallback({
       cwd: project.cwd,
       prompt: 'Use issue_create to create a task titled Harness Routing with body "Temporary project only".',
@@ -44,8 +43,7 @@ describe.skipIf(!enabled)('Pi uses Issues in process', () => {
       xdgConfigDir: project.xdgConfigDir,
       homeDir: project.cwd,
     }).result;
-    if (isTransientModelError(run)) return context.skip();
-    assertHarnessSuccess(run);
+    assertHarnessConclusive(run);
     const files = readdirSync(project.issuesRoot).filter((name) => name.endsWith('.yml'));
     expect(files).toHaveLength(1);
     expect(readFileSync(join(project.issuesRoot, files[0] as string), 'utf8')).toContain('Harness Routing');

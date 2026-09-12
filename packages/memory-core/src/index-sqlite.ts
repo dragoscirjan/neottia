@@ -120,7 +120,9 @@ export async function openMemoryCache(
       await opened.database.prepare("SELECT value FROM neottia_repository_cache_meta WHERE key='rebuilt_at'")
     ).get<{ value: string }>();
     const rebuiltAt = Date.parse(rebuilt?.value ?? '');
-    fresh = Number.isFinite(rebuiltAt) && Date.now() - rebuiltAt <= maxAgeMs;
+    // A zero freshness window means "always stale", including a rebuild and
+    // freshness check that happen during the same clock millisecond.
+    fresh = maxAgeMs > 0 && Number.isFinite(rebuiltAt) && Date.now() - rebuiltAt <= maxAgeMs;
   } finally {
     // The caller cannot close a handle that fails validation before return.
     if (!fresh) await opened.close();

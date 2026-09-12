@@ -1,10 +1,9 @@
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  assertHarnessSuccess,
+  assertHarnessConclusive,
   createTempIssueProject,
   ensureIssuesDistBuilt,
-  isTransientModelError,
   openrouterApiKey,
   opencodeReady,
   repoRoot,
@@ -32,16 +31,16 @@ beforeAll(() => {
 afterAll(() => project?.cleanup());
 
 describe.skipIf(!enabled)('OpenCode uses Issues in process', () => {
-  it('creates a canonical issue in the active temporary project', async (context) => {
+  it('creates a canonical issue in the active temporary project', async () => {
     const run = runOpencodeWithModelFallback({
       cwd: project.cwd,
       xdgDataDir: project.xdgDataDir,
       xdgConfigDir: project.xdgConfigDir,
+      homeDir: project.cwd,
       prompt: 'You MUST call issue_create to create a bug titled OpenCode Routing with body "Temporary project only".',
       apiKey,
     }).result;
-    if (isTransientModelError(run)) return context.skip();
-    assertHarnessSuccess(run);
+    assertHarnessConclusive(run);
     const files = readdirSync(project.issuesRoot).filter((name) => name.endsWith('.yml'));
     expect(files).toHaveLength(1);
     expect(readFileSync(join(project.issuesRoot, files[0] as string), 'utf8')).toContain('OpenCode Routing');

@@ -8,15 +8,17 @@ import {
   resolveManagedRoot,
   withRepositoryLease,
 } from '@neottia/repository-store';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { stringify } from 'yaml';
 import type { ShardState } from './backend/types.js';
+import { registerImportLifecycleContract } from './import-lifecycle.spec-helper.js';
 import { memoryCacheSpecification } from './index-sqlite.js';
 import {
   MemoryConflictError,
   MemoryError,
   MemoryStore,
   MEMORY_TOOLS,
+  closeMemoryToolContext,
   createUlid,
   loadMemoryConfig,
   memoryToolJsonSchema,
@@ -82,6 +84,10 @@ async function expectImportRejectionWithoutMutation(
 }
 
 describe('memory store (filesystem + SQLite index)', () => {
+  registerImportLifecycleContract('filesystem and SQLite', (caseId) =>
+    storeFor(fixture(), { namespace: { scope: `contract-${caseId}` } }),
+  );
+
   it('rejects disabled operations before touching memory or cache state', async () => {
     const cwd = disabledFixture();
     await expect(storeFor(cwd).store(fact('Blocked memory write.'))).rejects.toThrow(
@@ -523,12 +529,13 @@ describe('memory store (filesystem + SQLite index)', () => {
     expect(readFileSync(cachePath, 'utf8')).toBe('corrupt-cache');
   });
 
-  it('shares the filesystem lock across ignored namespace scopes', async () => {
+  it('shares canonical filesystem records across ignored namespace scopes', async () => {
     const cwd = fixture();
-    const config = loadMemoryConfig(cwd, { namespace: { scope: 'feat/memory-core' } });
-    const store = MemoryStore.fromConfig(config, cwd);
-    await store.store(fact('Scoped fact'));
-    expect(await store.list()).toHaveLength(1);
+    const branchStore = storeFor(cwd, { namespace: { scope: 'branch-a' } });
+    const workspaceStore = storeFor(cwd, { namespace: { scope: 'branch-b' } });
+    const record = await branchStore.store(fact('Shared-root fact'));
+
+    expect(await workspaceStore.list()).toEqual([record]);
   });
 
   it('honors cache.stale_policy fail and the prompt host hook', async () => {
@@ -579,6 +586,33 @@ describe('memory store (filesystem + SQLite index)', () => {
 
     await expect(store.search({ query: 'Primary' })).rejects.toThrow('primary cache policy failure');
     expect(readFileSync(outside, 'utf8')).toBe('outside remains unchanged');
+  });
+
+  it('reuses one remote store per host context and closes it exactly once', async () => {
+    const cwd = fixture();
+    const close = vi.fn().mockResolvedValue(undefined);
+    const list = vi.fn().mockResolvedValue([]);
+    const store = { close, list } as unknown as MemoryStore;
+    const storeFactory = vi.fn(() => store);
+    const storeKey = {};
+    const firstContext = {
+      cwd,
+      interactive: false,
+      storeKey,
+      storeFactory,
+      configOverrides: { backend: 'postgres' as const },
+    };
+    const secondContext = { ...firstContext };
+    const listTool = MEMORY_TOOLS.find((tool) => tool.name === 'memory_list');
+
+    await expect(listTool?.run(firstContext, {})).resolves.toEqual([]);
+    await expect(listTool?.run(secondContext, {})).resolves.toEqual([]);
+    expect(storeFactory).toHaveBeenCalledOnce();
+    expect(list).toHaveBeenCalledTimes(2);
+
+    await closeMemoryToolContext(firstContext);
+    await closeMemoryToolContext(secondContext);
+    expect(close).toHaveBeenCalledOnce();
   });
 
   it('passes interactive stale-cache decisions through the tool context', async () => {

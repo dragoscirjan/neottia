@@ -1,9 +1,9 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { z } from 'zod';
 import { loadMemoryConfig } from './config.js';
-import type { MemoryConfigInput } from './config.js';
+import type { MemoryConfig, MemoryConfigInput } from './config.js';
 import { MemoryError } from './errors.js';
-import { MemoryStore, type SearchMemoryInput, type StoreMemoryInput } from './store.js';
+import { MemoryStore, type MemoryStoreOptions, type SearchMemoryInput, type StoreMemoryInput } from './store.js';
 import {
   deleteInputSchema,
   exportInputSchema,
@@ -34,6 +34,8 @@ export interface MemoryToolContext {
   readonly onStaleCache?: () => boolean | Promise<boolean>;
   /** Internal stable identity used when a host supplies call-local callbacks. */
   readonly storeKey?: object;
+  /** Injectable store constructor for deterministic host lifecycle tests. */
+  readonly storeFactory?: (config: MemoryConfig, cwd: string, options?: Partial<MemoryStoreOptions>) => MemoryStore;
 }
 
 export interface MemoryToolDefinition {
@@ -56,7 +58,8 @@ function storeFor(context: MemoryToolContext): MemoryStore {
   // Reuse one store per host context so remote backends do not create a new
   // PostgreSQL pool for every tool invocation. The callback is resolved from
   // async-local state so overlapping host calls keep their own UI context.
-  const store = MemoryStore.fromConfig(loadMemoryConfig(context.cwd, context.configOverrides), context.cwd, {
+  const createStore = context.storeFactory ?? MemoryStore.fromConfig;
+  const store = createStore(loadMemoryConfig(context.cwd, context.configOverrides), context.cwd, {
     onStaleCache: () => {
       const callback = staleCacheCallbacks.getStore() ?? context.onStaleCache;
       return callback ? callback() : true;

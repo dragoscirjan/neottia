@@ -10,8 +10,10 @@ import {
   MEMORY_CONFIG_FILE_ENV,
   MEMORY_SHARD_PATH_ENV,
   ConfigError,
+  MemoryStore,
   loadMemoryConfig,
   memoryConfigFileSchema,
+  memoryConfigSchema,
   resolveConfigFile,
   resolvePgSettings,
   resolveShardPath,
@@ -211,7 +213,7 @@ describe('memory config shard', () => {
     expect(published).toEqual(memoryConfigFileSchema.toJSONSchema({ io: 'input' }));
   });
 
-  it('keeps generated root and credential constraints semantically aligned with YAML loading', () => {
+  it('keeps generated root and credential constraints semantically aligned with YAML loading', async () => {
     const published = memoryConfigFileSchema.toJSONSchema({ io: 'input' }) as {
       properties: {
         root: { pattern: string };
@@ -223,8 +225,62 @@ describe('memory config shard', () => {
       published.properties.provider.properties.db.properties.pg.properties.user.pattern,
       'u',
     );
-    expect(rootPattern.test('.neottia/memory')).toBe(true);
-    expect(rootPattern.test('../escape')).toBe(false);
+    const validRoots = [
+      '.neottia/memory',
+      'nested/memory',
+      'nested\\memory',
+      '/tmp/memory',
+      'C:/temp/memory',
+      'C:\\temp\\memory',
+    ];
+    const invalidRoots = [
+      '.',
+      '..',
+      '../escape',
+      'nested/./memory',
+      'nested/../memory',
+      'nested//memory',
+      'nested\\\\memory',
+      'nested/mixed\\memory',
+      '/',
+      '/tmp/./memory',
+      '/tmp/../memory',
+      '/tmp//memory',
+      '/tmp/memory/',
+      'C:\\',
+      'C:\\temp\\..\\memory',
+      'C:\\temp\\\\memory',
+      'C:\\temp/memory',
+    ];
+
+    for (const root of validRoots) {
+      expect(rootPattern.test(root)).toBe(true);
+      expect(memoryConfigSchema.safeParse({ root }).success).toBe(true);
+      expect(memoryConfigFileSchema.safeParse({ root }).success).toBe(true);
+      const cwd = fixture();
+      try {
+        writeConfig(cwd, { version: 1, skills: { memory: { enabled: true, root } } });
+        const config = loadMemoryConfig(cwd, { env: {} });
+        expect(config.root).toBe(root);
+        await expect(MemoryStore.fromConfig(config, cwd).close()).resolves.toBeUndefined();
+      } finally {
+        rmSync(cwd, { recursive: true, force: true });
+      }
+    }
+
+    for (const root of invalidRoots) {
+      expect(rootPattern.test(root)).toBe(false);
+      expect(memoryConfigSchema.safeParse({ root }).success).toBe(false);
+      expect(memoryConfigFileSchema.safeParse({ root }).success).toBe(false);
+      const cwd = fixture();
+      try {
+        writeConfig(cwd, { version: 1, skills: { memory: { enabled: true, root } } });
+        expect(() => loadMemoryConfig(cwd, { env: {} })).toThrow(ConfigError);
+      } finally {
+        rmSync(cwd, { recursive: true, force: true });
+      }
+    }
+
     expect(credentialPattern.test('${PG_USER}')).toBe(true);
     expect(credentialPattern.test('literal-user')).toBe(false);
   });
@@ -260,6 +316,9 @@ describe('memory config shard', () => {
 
       for (const root of [
         '../escape',
+        '/tmp/../outside',
+        '/tmp//memory',
+        'C:\\temp\\..\\outside',
         'a\n/../../outside',
         'a\r/../outside',
         'a\u2028/../outside',

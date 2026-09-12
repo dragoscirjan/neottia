@@ -86,6 +86,9 @@ Thumbs.db
 .neottia/cache/design-docs.sqlite
 .neottia/cache/design-docs.sqlite-wal
 .neottia/cache/design-docs.sqlite-shm
+.neottia/memory/index.db
+.neottia/memory/index.db-wal
+.neottia/memory/index.db-shm
 *.pid
 *.pid.lock
 *.seed

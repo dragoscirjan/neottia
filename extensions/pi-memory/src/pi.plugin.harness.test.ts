@@ -1,18 +1,17 @@
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  assertHarnessSuccess,
+  assertHarnessConclusive,
   createTempProject,
   openrouterApiKey,
   piBin,
   piReady,
   repoRoot,
-  isTransientModelError,
   runPiWithModelFallback,
   seedMemory,
   type TempProject,
 } from '@neottia/testkit';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /**
  * Integration test: the real pi CLI loads the real extension (project-local
@@ -37,19 +36,22 @@ beforeAll(() => {
   writeFileSync(extensionPath, `export { default } from ${JSON.stringify(extensionSource)};\n`, 'utf8');
 }, 180_000);
 
+afterAll(() => project?.cleanup());
+
 describe.skipIf(!enabled)('pi uses the memory extension in-process', () => {
-  it('stores a memory through a natural-language prompt', async (ctx) => {
+  it('stores a memory through a natural-language prompt', async () => {
     const fallback = runPiWithModelFallback({
       cwd: project.cwd,
       prompt:
         'Use the memory_store tool to remember the following fact, then confirm in one short sentence: the release codename is SCROLL.',
       piPath: bin as string,
       apiKey: apiKey,
+      xdgDataDir: project.xdgDataDir,
+      xdgConfigDir: project.xdgConfigDir,
+      homeDir: project.cwd,
     });
     const run = fallback.result;
-    // Free-pool congestion is transient: skip instead of failing the suite.
-    if (isTransientModelError(run)) return ctx.skip();
-    assertHarnessSuccess(run);
+    assertHarnessConclusive(run);
 
     const factsDir = join(project.memoryRoot, 'facts');
     const files = readdirSync(factsDir).filter((name) => name.endsWith('.yaml'));
@@ -58,7 +60,7 @@ describe.skipIf(!enabled)('pi uses the memory extension in-process', () => {
     expect(contents).toMatch(/SCROLL/u);
   }, 300_000);
 
-  it('recalls a seeded memory via memory_search', async (ctx) => {
+  it('recalls a seeded memory via memory_search', async () => {
     await seedMemory(project, [
       {
         memory_type: 'semantic',
@@ -75,11 +77,12 @@ describe.skipIf(!enabled)('pi uses the memory extension in-process', () => {
       prompt: 'Use the memory_search tool to look up the deployment codename, then answer with only the codename.',
       piPath: bin as string,
       apiKey: apiKey,
+      xdgDataDir: project.xdgDataDir,
+      xdgConfigDir: project.xdgConfigDir,
+      homeDir: project.cwd,
     });
     const run = fallback.result;
-    // Free-pool congestion is transient: skip instead of failing the suite.
-    if (isTransientModelError(run)) return ctx.skip();
-    assertHarnessSuccess(run);
+    assertHarnessConclusive(run);
     expect(run.stdout).toMatch(/OBELISK/u);
   }, 300_000);
 });

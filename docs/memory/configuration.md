@@ -23,6 +23,8 @@ skills:
 
 That is enough for an agent to store and search memories in `.neottia/memory/` with the namespace `local/project`.
 
+`root` accepts a relative path, a POSIX absolute path, or a drive absolute path. Each path must use one separator style and contain nonempty components. `.` and `..` components, repeated separators, trailing separators, and mixed slash styles are rejected.
+
 ## Full reference
 
 ```yaml

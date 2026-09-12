@@ -36,8 +36,16 @@ description = "Run tests in all workspace modules"
 run = "pnpm run test"
 
 [tasks."test:harness"]
-description = "Run harness integration tests (needs OPENROUTER_API_KEY or opencode auth; uses free OpenRouter models)"
-run = "NEOTTIA_TEST_HARNESS=1 pnpm exec vitest run --root . packages/testkit/src extensions/pi-memory/src extensions/opencode-memory/src extensions/pi-issues/src extensions/opencode-issues/src extensions/pi-design-docs/src extensions/opencode-design-docs/src"
+description = "Run deterministic harness adapter, runner, and MCP transport contracts"
+run = "pnpm exec vitest run --root . packages/testkit/src/testkit.spec.ts extensions/pi-memory/src/pi-memory.spec.ts extensions/opencode-memory/src/opencode-memory.spec.ts packages/memory-mcp/src/server.spec.ts"
+
+[tasks."test:harness:live"]
+description = "Run optional live LLM harness acceptance; transient exhaustion exits inconclusive"
+run = "NEOTTIA_TEST_HARNESS=1 pnpm exec vitest run --root . --pool forks --maxWorkers 1 --no-file-parallelism --testTimeout 300000 --hookTimeout 300000 packages/testkit/src/opencode.mcp.harness.test.ts extensions/pi-memory/src/pi.plugin.harness.test.ts extensions/opencode-memory/src/opencode.plugin.harness.test.ts extensions/pi-issues/src/pi.plugin.harness.test.ts extensions/opencode-issues/src/opencode.plugin.harness.test.ts extensions/pi-design-docs/src/pi.plugin.harness.test.ts extensions/opencode-design-docs/src/opencode.plugin.harness.test.ts"
+
+[tasks."test:memory:postgres"]
+description = "Run the disposable PostgreSQL memory backend contract"
+run = "NEOTTIA_TEST_PG=1 pnpm exec vitest run --root . packages/memory-core/src/backend/postgres.test.ts"
 
 [tasks."test:coverage"]
 description = "Run tests and generate aggregate coverage"
