@@ -247,7 +247,18 @@ When behavior differs from the YAML file, inspect the effective host and its ove
 
 ## Embedding
 
-Register every module needed by the application, then resolve once for the effective working directory:
+Neottia hosts can resolve the complete official registry directly:
+
+```ts
+import { resolveHostConfigSnapshot } from "@neottia/config-registry";
+
+export const snapshot = resolveHostConfigSnapshot({
+  cwd: process.cwd(),
+  interactive: true,
+});
+```
+
+Custom applications can register only the modules they own, then resolve once for the effective working directory:
 
 ```ts
 import { createConfigRegistry, resolveConfig } from "@neottia/config";

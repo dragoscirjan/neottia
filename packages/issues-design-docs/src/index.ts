@@ -18,49 +18,12 @@ import {
   type IssueConfig,
   type IssueConfigInput,
 } from '@neottia/issues';
-import { memoryConfigContribution } from '@neottia/memory-core';
 import {
   DEFAULT_STORE_LIMITS,
   recoverCanonicalTransactions,
   resolveManagedRoot,
   type StoreLimits,
 } from '@neottia/repository-store';
-
-export interface HostConfigSnapshotOptions {
-  readonly cwd: string;
-  readonly interactive: boolean;
-  readonly env?: NodeJS.ProcessEnv;
-  readonly overrides?: Readonly<Record<string, unknown>>;
-  readonly snapshot?: ResolvedConfigSnapshot;
-}
-
-/** Resolves every hosted module once and derives non-interactive cache policy in memory. */
-export function resolveHostConfigSnapshot(options: HostConfigSnapshotOptions): ResolvedConfigSnapshot {
-  if (options.snapshot && (options.env || options.overrides))
-    throw new TypeError('A supplied host snapshot cannot be combined with configuration source options.');
-  const declared =
-    options.snapshot ??
-    resolveConfig(
-      createConfigRegistry([memoryConfigContribution, issueConfigContribution, designDocsConfigContribution]),
-      {
-        cwd: resolve(options.cwd),
-        env: options.env ?? process.env,
-        ...(options.overrides ? { overrides: options.overrides } : {}),
-      },
-    );
-  if (options.interactive) return declared;
-
-  const modules: Record<string, unknown> = {};
-  if (declared.get(memoryConfigContribution).cache.stale_policy === 'prompt')
-    modules['memory'] = { cache: { stale_policy: 'rebuild' } };
-  if (declared.get(issueConfigContribution).cache.stale_policy === 'prompt')
-    modules['issues'] = { cache: { stale_policy: 'rebuild' } };
-  if (declared.get(designDocsConfigContribution).cache.stale_policy === 'prompt')
-    modules['design_docs'] = { cache: { stale_policy: 'rebuild' } };
-  return Object.keys(modules).length === 0
-    ? declared
-    : declared.derive({ modules }, 'non-interactive host stale-cache policy');
-}
 
 export interface IssuesDesignDocsCompositionOptions {
   readonly cwd: string;

@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { resolve } from 'node:path';
+import { resolveHostConfigSnapshot } from '@neottia/config-registry';
 import {
   asDesignDocsError,
   closeDesignDocsToolContext,
@@ -12,7 +13,7 @@ import {
   type DesignDocsToolName,
   type DesignDocLinkValidator,
 } from '@neottia/design-docs';
-import { createIssuesDesignDocsComposition, resolveHostConfigSnapshot } from '@neottia/issues-design-docs';
+import { createIssuesDesignDocsComposition } from '@neottia/issues-design-docs';
 import { Type, type TSchema } from 'typebox';
 
 export interface PiExtensionApi {

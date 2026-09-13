@@ -1,4 +1,5 @@
 import { resolve } from 'node:path';
+import { resolveHostConfigSnapshot } from '@neottia/config-registry';
 import {
   closeDesignDocsToolContext,
   DESIGN_DOCS_TOOLS,
@@ -7,7 +8,7 @@ import {
   type DesignDocsToolContext,
   type DesignDocLinkValidator,
 } from '@neottia/design-docs';
-import { createIssuesDesignDocsComposition, resolveHostConfigSnapshot } from '@neottia/issues-design-docs';
+import { createIssuesDesignDocsComposition } from '@neottia/issues-design-docs';
 import { tool, type Plugin } from '@opencode-ai/plugin';
 
 export type OpenCodeToolFactory = typeof tool;

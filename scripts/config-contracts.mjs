@@ -8,21 +8,13 @@ const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const schemaFile = resolve(repositoryRoot, 'packages/config/config.schema.json');
 const writeSchema = process.argv.includes('--write');
 
-/** Loads built contributions without adding domain dependencies to @neottia/config. */
+/** Loads the generic generator and built official registry. */
 async function loadRegistry() {
   const configModule = await importBuiltModule('packages/config/dist/index.js');
-  const contributions = [];
-  for (const descriptor of OFFICIAL_CONFIG_CONTRIBUTIONS) {
-    const module = await importBuiltModule(descriptor.builtFile);
-    const contribution = module[descriptor.exportName];
-    if (contribution === undefined) {
-      throw new Error(`${descriptor.packageName} does not export ${descriptor.exportName}`);
-    }
-    contributions.push(contribution);
-  }
+  const registryModule = await importBuiltModule('packages/config-registry/dist/index.js');
   return {
     generate: configModule.generateConfigJsonSchema,
-    registry: configModule.createConfigRegistry(contributions),
+    registry: registryModule.officialConfigRegistry,
   };
 }
 

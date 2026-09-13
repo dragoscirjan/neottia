@@ -1,5 +1,5 @@
 import { resolve } from 'node:path';
-import { resolveHostConfigSnapshot } from '@neottia/issues-design-docs';
+import { resolveHostConfigSnapshot } from '@neottia/config-registry';
 import {
   closeMemoryToolContext,
   memoryConfigContribution,

@@ -38,6 +38,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@neottia/config": "workspace:^",
+    "@neottia/config-registry": "workspace:^",
     "@neottia/issues": "workspace:*",
     "@neottia/issues-design-docs": "workspace:*"
   },

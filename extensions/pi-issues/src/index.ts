@@ -1,4 +1,5 @@
 import { resolve } from 'node:path';
+import { resolveHostConfigSnapshot } from '@neottia/config-registry';
 import {
   closeIssueToolContext,
   issueConfigContribution,
@@ -9,7 +10,7 @@ import {
   type IssueToolName,
   type DesignDocumentReferenceResolver,
 } from '@neottia/issues';
-import { createIssuesDesignDocsComposition, resolveHostConfigSnapshot } from '@neottia/issues-design-docs';
+import { createIssuesDesignDocsComposition } from '@neottia/issues-design-docs';
 import { Type, type TSchema } from 'typebox';
 
 /** Minimal Pi registration surface used by this extension. */

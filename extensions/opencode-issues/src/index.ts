@@ -1,3 +1,4 @@
+import { resolveHostConfigSnapshot } from '@neottia/config-registry';
 import {
   closeIssueToolContext,
   issueConfigContribution,
@@ -5,7 +6,7 @@ import {
   type DesignDocumentReferenceResolver,
   type IssueToolContext,
 } from '@neottia/issues';
-import { createIssuesDesignDocsComposition, resolveHostConfigSnapshot } from '@neottia/issues-design-docs';
+import { createIssuesDesignDocsComposition } from '@neottia/issues-design-docs';
 import { tool, type Plugin } from '@opencode-ai/plugin';
 
 export type OpenCodeToolFactory = typeof tool;

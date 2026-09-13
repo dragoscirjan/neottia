@@ -45,7 +45,10 @@ function fact(summary: string) {
 describe('shared configuration fixtures', () => {
   it('covers every precedence layer and isolates multiple invocation directories', () => {
     const fixture = createConfigFixture({
-      global: { memory: { enabled: true, namespace: { organization_id: 'global' } } },
+      global: {
+        memory: { enabled: true, namespace: { organization_id: 'global' } },
+        searchable: { enabled: true },
+      },
       project: { memory: { retrieval: { limit: 3 } } },
       secondProject: { memory: { root: '.neottia/second-memory' } },
       profile: { name: 'ci', modules: { memory: { retrieval: { include_superseded: true } } } },
@@ -63,6 +66,7 @@ describe('shared configuration fixtures', () => {
       });
       expect(second.root).toBe('.neottia/second-memory');
       expect(first.root).toBe('.neottia/memory');
+      expect(fixture.resolve().toJSON()).toMatchObject({ modules: { searchable: { enabled: true } } });
     } finally {
       fixture.cleanup();
     }

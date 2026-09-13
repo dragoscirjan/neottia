@@ -1,6 +1,7 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import type { ResolvedConfigSnapshot } from '@neottia/config';
+import { resolveHostConfigSnapshot } from '@neottia/config-registry';
 import {
   closeIssueToolContext,
   findIssueTool,
@@ -12,7 +13,7 @@ import {
   type IssueToolContext,
   type DesignDocumentReferenceResolver,
 } from '@neottia/issues';
-import { createIssuesDesignDocsComposition, resolveHostConfigSnapshot } from '@neottia/issues-design-docs';
+import { createIssuesDesignDocsComposition } from '@neottia/issues-design-docs';
 
 export interface CreateIssueServerOptions {
   readonly cwd?: string;

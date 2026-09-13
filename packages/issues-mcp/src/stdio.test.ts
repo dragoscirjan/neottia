@@ -168,6 +168,7 @@ function linkPackedDependencies(extractedPackage: string): void {
   const modules = join(extractedPackage, 'node_modules');
   mkdirSync(join(modules, '@neottia'), { recursive: true });
   mkdirSync(join(modules, '@modelcontextprotocol'), { recursive: true });
+  symlinkSync(join(repoRoot(), 'packages', 'config-registry'), join(modules, '@neottia', 'config-registry'), 'dir');
   symlinkSync(join(repoRoot(), 'packages', 'issues'), join(modules, '@neottia', 'issues'), 'dir');
   symlinkSync(
     join(repoRoot(), 'packages', 'issues-design-docs'),

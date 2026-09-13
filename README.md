@@ -8,6 +8,7 @@ Neottia provides a shared SDLC that can be understood and used by multiple AI co
 ├── extensions/          # Independently versioned harness extensions
 ├── packages/
 │   ├── config/          # Shared layered configuration platform
+│   ├── config-registry/ # Official strict host contribution registry
 │   ├── core/            # Independently versioned core package
 │   ├── design-docs/     # Canonical design documents and shared tools
 │   ├── design-docs-mcp/ # Generic Design Docs MCP server
@@ -76,7 +77,7 @@ This updates `packages/release/package.json` and `packages/release/release-manif
 
 ## Configuration
 
-`@neottia/config` composes domain-owned schemas into one immutable snapshot. It loads optional global and project YAML, applies profiles, environment bindings, and explicit overrides in a fixed order, tracks value-free leaf provenance, and redacts declared secrets. Use the [unified configuration guide](docs/configuration.md) for files, profiles, precedence, secrets, diagnostics, embedding, and `skills.*` migration. The package publishes the complete editor schema as `@neottia/config/config.schema.json`.
+`@neottia/config` composes domain-owned schemas into one immutable snapshot. It loads optional global and project YAML, applies profiles, environment bindings, and explicit overrides in a fixed order, tracks value-free leaf provenance, and redacts declared secrets. `@neottia/config-registry` supplies the strict official registry used by Neottia hosts, so all published module shards can coexist in one root file. Use the [unified configuration guide](docs/configuration.md) for files, profiles, precedence, secrets, diagnostics, embedding, and `skills.*` migration. The config package publishes the complete editor schema as `@neottia/config/config.schema.json`.
 
 ## Memory
 

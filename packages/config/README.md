@@ -2,7 +2,7 @@
 
 `@neottia/config` is Neottia's domain-neutral configuration platform. Domain packages contribute their schemas, defaults, environment bindings, and secret fields. A registry resolves those contributions together, so every consumer receives one coherent immutable snapshot without `@neottia/config` importing a domain, MCP, or harness package.
 
-Read the [unified configuration guide](../../docs/configuration.md) to configure global and project files, profiles, secrets, migrated modules, diagnostics, and embedding. The complete strict editor schema is exported as `@neottia/config/config.schema.json`.
+Read the [unified configuration guide](../../docs/configuration.md) to configure global and project files, profiles, secrets, migrated modules, diagnostics, and embedding. The complete strict editor schema is exported as `@neottia/config/config.schema.json`. Neottia hosts use `@neottia/config-registry` to register every official module without adding domain dependencies to this generic package.
 
 ## Define and register a contribution
 

@@ -2,13 +2,14 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ResolvedConfigSnapshot } from '@neottia/config';
-import { resolveHostConfigSnapshot } from '@neottia/issues-design-docs';
+import { resolveHostConfigSnapshot } from '@neottia/config-registry';
 
 /** Module-shaped patch accepted by disposable unified configuration fixtures. */
 export interface ConfigFixtureModules {
   readonly memory?: Readonly<Record<string, unknown>>;
   readonly issues?: Readonly<Record<string, unknown>>;
   readonly designDocs?: Readonly<Record<string, unknown>>;
+  readonly searchable?: Readonly<Record<string, unknown>>;
 }
 
 export interface CreateConfigFixtureOptions {
@@ -87,5 +88,6 @@ function moduleDocument(modules: ConfigFixtureModules): Record<string, unknown> 
     ...(modules.memory ? { memory: modules.memory } : {}),
     ...(modules.issues ? { issues: modules.issues } : {}),
     ...(modules.designDocs ? { design_docs: modules.designDocs } : {}),
+    ...(modules.searchable ? { searchable: modules.searchable } : {}),
   };
 }
