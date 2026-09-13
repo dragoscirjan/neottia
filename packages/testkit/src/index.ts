@@ -31,6 +31,15 @@ export {
 } from './temp-project.js';
 
 export {
+  assertHarnessAdapterConformance,
+  createTempHarnessEnvironment,
+  materializeHostConfigPlan,
+  materializeProjectedFile,
+  resolveHarnessTarget,
+  type TempHarnessEnvironment,
+} from './harness-adapter.js';
+
+export {
   mcpServersDocument,
   writeMcpServersJsonFile,
   writeOpencodeMcpConfig,

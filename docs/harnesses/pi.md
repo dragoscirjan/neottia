@@ -1,18 +1,17 @@
 # Pi extensions
 
-Install the packages in the project where Pi runs:
+Install the self-describing Pi packages in the project where Pi runs:
 
 ```sh
-pnpm add -D @neottia/pi-memory @neottia/pi-issues @neottia/pi-design-docs @neottia/pi-searchable
+pi install -l npm:@neottia/pi-memory
+pi install -l npm:@neottia/pi-issues
+pi install -l npm:@neottia/pi-design-docs
+pi install -l npm:@neottia/pi-searchable
 ```
 
-Create project-local extension entry files. For example, `.pi/extensions/memory.ts` contains:
+Each package declares its extension entry point through `pi.extensions`. Pi records project packages in `.pi/settings.json` and installs missing packages after the project is trusted. Enable `modules.memory`, `modules.issues`, `modules.design_docs`, and `modules.searchable` in `.neottia/config.yml`. Restart Pi, then inspect its tool list for 9 `memory_*`, 17 `issue_*`, 13 `document_*`, and 5 `web_*` tools. Use the calls in [First success](/get-started/first-success) to verify each capability.
 
-```ts
-export { default } from "@neottia/pi-memory";
-```
-
-Create equivalent files for `@neottia/pi-issues`, `@neottia/pi-design-docs`, and `@neottia/pi-searchable`. Enable `modules.memory`, `modules.issues`, `modules.design_docs`, and `modules.searchable` in `.neottia/config.yml`. Restart Pi, then inspect its tool list for 9 `memory_*`, 17 `issue_*`, 13 `document_*`, and 5 `web_*` tools. Use the calls in [First success](/get-started/first-success) to verify each capability.
+Generated installers can use [`@neottia/pi-adapter`](/harnesses/adapters) to plan package entries and resource paths without hard-coding Pi paths.
 
 ## Memory
 
@@ -38,4 +37,4 @@ See [Searchable configuration](/searchable/configuration), [tools](/searchable/t
 
 The default link validator comes from `@neottia/issues-design-docs`. Embedders may pass `linkValidator` to `registerDesignDocsTools`. See [Design Docs configuration](/design-docs/configuration), [tools](/design-docs/tools), and [composition](/issues/design-docs).
 
-If tools are absent, confirm that the files are under the project's `.pi/extensions/` directory and restart Pi. If a call reports a disabled capability, enable the matching shard in the call's project directory.
+If tools are absent, run `pi list`, confirm that the package is present in project settings, and restart Pi. Local source extensions still belong under `.pi/extensions/`. If a call reports a disabled capability, enable the matching shard in the call's project directory.

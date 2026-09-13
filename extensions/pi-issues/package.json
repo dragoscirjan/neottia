@@ -20,6 +20,9 @@
     ".": "./src/index.ts"
   },
   "files": ["src", "README.md", "LICENSE"],
+  "pi": {
+    "extensions": ["./src/index.ts"]
+  },
   "engines": {
     "node": ">=22.16.0"
   },

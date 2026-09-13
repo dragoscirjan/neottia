@@ -16,6 +16,9 @@
     ".": "./src/index.ts"
   },
   "files": ["src", "README.md", "LICENSE"],
+  "pi": {
+    "extensions": ["./src/index.ts"]
+  },
   "scripts": {
     "test": "vitest run --root ../.. extensions/pi-memory/src",
     "typecheck": "tsc --noEmit"

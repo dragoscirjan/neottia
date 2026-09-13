@@ -1,12 +1,6 @@
 # OpenCode extensions
 
-Install the native plugins in your project:
-
-```sh
-pnpm add -D @neottia/opencode-memory @neottia/opencode-issues @neottia/opencode-design-docs @neottia/opencode-searchable
-```
-
-Add them to the OpenCode configuration:
+Add the native plugin packages to the OpenCode configuration:
 
 ```json
 {
@@ -20,7 +14,9 @@ Add them to the OpenCode configuration:
 }
 ```
 
-Enable the matching `modules.*` shards in `.neottia/config.yml`. Restart OpenCode and check for 9 `memory_*`, 17 `issue_*`, and 13 `document_*`, and 5 `web_*` tools. Run the calls in [First success](/get-started/first-success).
+OpenCode installs configured npm plugins through Bun during startup. Enable the matching `modules.*` shards in `.neottia/config.yml`. Restart OpenCode and check for 9 `memory_*`, 17 `issue_*`, and 13 `document_*`, and 5 `web_*` tools. Run the calls in [First success](/get-started/first-success).
+
+Generated installers can use [`@neottia/opencode-adapter`](/harnesses/adapters) to plan plugin, MCP, command, skill, and agent changes without hard-coding OpenCode paths.
 
 ## Memory
 

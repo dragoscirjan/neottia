@@ -12,6 +12,7 @@ This catalog distinguishes how each package is delivered.
 | `@neottia/core`                 | library/embedding | [Core](/reference/core)                                                                |
 | `@neottia/config`               | library/embedding | [Unified configuration](/configuration)                                                |
 | `@neottia/config-registry`      | library/embedding | [Official configuration registry](/configuration)                                      |
+| `@neottia/harness-adapter`      | library/embedding | [Harness adapter contract](/harnesses/adapters)                                        |
 | `@neottia/design-docs`          | library/embedding | [Design Docs library](/design-docs/library)                                            |
 | `@neottia/design-docs-mcp`      | generic MCP       | [Design Docs MCP](/mcp/design-docs)                                                    |
 | `@neottia/issues`               | library/embedding | [Issues library](/issues/library)                                                      |
@@ -25,10 +26,12 @@ This catalog distinguishes how each package is delivered.
 | `@neottia/searchable-mcp`       | generic MCP       | [Searchable MCP](/mcp/searchable)                                                      |
 | `@neottia/sdlc`                 | library/embedding | [SDLC provider selection](/configuration#sdlc-provider-selection)                      |
 | `@neottia/testkit`              | internal/private  | Private repository test helpers; packages/testkit/README.md is the internal reference. |
+| `@neottia/pi-adapter`           | library/embedding | [Harness adapter contract](/harnesses/adapters)                                        |
 | `@neottia/pi-memory`            | native extension  | [Pi Memory](/harnesses/pi#memory)                                                      |
 | `@neottia/pi-issues`            | native extension  | [Pi Issues](/harnesses/pi#issues)                                                      |
 | `@neottia/pi-design-docs`       | native extension  | [Pi Design Docs](/harnesses/pi#design-docs)                                            |
 | `@neottia/pi-searchable`        | native extension  | [Pi Searchable](/harnesses/pi#searchable)                                              |
+| `@neottia/opencode-adapter`     | library/embedding | [Harness adapter contract](/harnesses/adapters)                                        |
 | `@neottia/opencode-memory`      | native extension  | [OpenCode Memory](/harnesses/opencode#memory)                                          |
 | `@neottia/opencode-issues`      | native extension  | [OpenCode Issues](/harnesses/opencode#issues)                                          |
 | `@neottia/opencode-design-docs` | native extension  | [OpenCode Design Docs](/harnesses/opencode#design-docs)                                |
