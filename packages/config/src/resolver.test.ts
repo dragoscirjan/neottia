@@ -4,8 +4,12 @@ import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import {
+  CONFIG_ROOT_SECTIONS,
   ConfigResolutionError,
   MAX_CONFIG_DIAGNOSTICS,
+  MAX_CONFIG_FILE_BYTES,
+  MAX_CONFIG_YAML_DEPTH,
+  MAX_CONFIG_YAML_NODES,
   createConfigRegistry,
   defineConfigContribution,
   resolveConfig,
@@ -315,6 +319,44 @@ modules:
     expect(JSON.stringify(error)).not.toContain('lower-secret-value');
   });
 
+  it('accepts empty reserved roots and rejects their unowned descendants in files and profiles', () => {
+    const cwd = temporaryDirectory();
+    const emptyRoots = Object.fromEntries(CONFIG_ROOT_SECTIONS.map((section) => [section, {}]));
+    const validFile = writeYaml(
+      cwd,
+      'reserved-empty.yml',
+      JSON.stringify({ version: 1, ...emptyRoots, profiles: { empty: emptyRoots } }),
+    );
+
+    expect(() => resolveConfig(registry, { cwd, env: {}, globalFile: false, projectFile: validFile })).not.toThrow();
+
+    for (const section of CONFIG_ROOT_SECTIONS) {
+      const invalidBase = writeYaml(
+        cwd,
+        `reserved-${section}.yml`,
+        JSON.stringify({ version: 1, [section]: { unknown: {} } }),
+      );
+      expect(
+        resolutionError(() => resolveConfig(registry, { cwd, env: {}, globalFile: false, projectFile: invalidBase }))
+          .diagnostics,
+      ).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'PATH', path: [section, 'unknown'] })]));
+
+      const invalidProfile = writeYaml(
+        cwd,
+        `reserved-profile-${section}.yml`,
+        JSON.stringify({ version: 1, profiles: { invalid: { [section]: { unknown: {} } } } }),
+      );
+      expect(
+        resolutionError(() => resolveConfig(registry, { cwd, env: {}, globalFile: false, projectFile: invalidProfile }))
+          .diagnostics,
+      ).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ code: 'PROFILE', path: ['profiles', 'invalid', section, 'unknown'] }),
+        ]),
+      );
+    }
+  });
+
   it('can ignore only unregistered paths for deprecated standalone wrappers', () => {
     const cwd = temporaryDirectory();
     const projectFile = writeYaml(
@@ -488,6 +530,52 @@ describe('environment values, secrets, and safe diagnostics', () => {
     expect(JSON.stringify(error)).not.toContain(invalid);
   });
 
+  it('rejects schema-invalid built-in values before higher overrides can hide their source', () => {
+    const cwd = temporaryDirectory();
+    const constrainedPatch = z
+      .object({ count: z.number().int().min(1).max(10).optional(), mode: z.enum(['safe', 'strict']).optional() })
+      .strict();
+    const constrainedContribution = defineConfigContribution({
+      id: 'constrained',
+      path: ['modules', 'constrained'],
+      filePatchSchema: constrainedPatch,
+      runtimePatchSchema: constrainedPatch,
+      resolvedSchema: z.object({ count: z.number().int().min(1).max(10), mode: z.enum(['safe', 'strict']) }).strict(),
+      defaults: { count: 1, mode: 'safe' },
+      environment: [
+        { kind: 'integer', names: ['CONSTRAINED_COUNT'], path: ['count'] },
+        { kind: 'string', names: ['CONSTRAINED_MODE'], path: ['mode'] },
+      ],
+    });
+    const constrainedRegistry = createConfigRegistry([constrainedContribution]);
+
+    const error = resolutionError(() =>
+      resolveConfig(constrainedRegistry, {
+        cwd,
+        env: { CONSTRAINED_COUNT: '11', CONSTRAINED_MODE: 'unsafe' },
+        globalFile: false,
+        overrides: { modules: { constrained: { count: 2, mode: 'strict' } } },
+        projectFile: false,
+      }),
+    );
+
+    expect(error.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'ENVIRONMENT',
+          path: ['modules', 'constrained', 'count'],
+          source: { environment: 'CONSTRAINED_COUNT', kind: 'environment' },
+        }),
+        expect.objectContaining({
+          code: 'ENVIRONMENT',
+          path: ['modules', 'constrained', 'mode'],
+          source: { environment: 'CONSTRAINED_MODE', kind: 'environment' },
+        }),
+      ]),
+    );
+    expect(error.diagnostics.every(({ code }) => code === 'ENVIRONMENT')).toBe(true);
+  });
+
   it('uses trusted environment parsers with canonical alias precedence', () => {
     const cwd = temporaryDirectory();
     const strategiesPatch = z.object({ strategies: z.array(z.string()).optional() }).strict();
@@ -651,6 +739,36 @@ describe('environment values, secrets, and safe diagnostics', () => {
     });
 
     expect(snapshot.get(moduleContribution).secret).toBe('${SECOND_SECRET}');
+  });
+
+  it('rejects oversized and structurally excessive YAML before value conversion', () => {
+    const cwd = temporaryDirectory();
+    const oversized = writeYaml(cwd, 'oversized.yml', `#${'x'.repeat(MAX_CONFIG_FILE_BYTES)}\n`);
+    expect(
+      resolutionError(() => resolveConfig(registry, { cwd, env: {}, globalFile: false, projectFile: oversized }))
+        .diagnostics,
+    ).toMatchObject([{ code: 'LIMIT' }]);
+
+    let nested = 'leaf: true\n';
+    for (let depth = 0; depth <= MAX_CONFIG_YAML_DEPTH; depth += 1) {
+      nested = `level_${depth}:\n${nested
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => `  ${line}`)
+        .join('\n')}\n`;
+    }
+    const deep = writeYaml(cwd, 'deep.yml', `version: 1\n${nested}`);
+    expect(
+      resolutionError(() => resolveConfig(registry, { cwd, env: {}, globalFile: false, projectFile: deep }))
+        .diagnostics,
+    ).toMatchObject([{ code: 'LIMIT' }]);
+
+    const entries = Array.from({ length: MAX_CONFIG_YAML_NODES }, (_, index) => `key_${index}: true`).join('\n');
+    const wide = writeYaml(cwd, 'wide.yml', `version: 1\n${entries}\n`);
+    expect(
+      resolutionError(() => resolveConfig(registry, { cwd, env: {}, globalFile: false, projectFile: wide }))
+        .diagnostics,
+    ).toMatchObject([{ code: 'LIMIT' }]);
   });
 
   it('bounds diagnostics and freezes their structured metadata', () => {

@@ -15,7 +15,16 @@
               "type": "string",
               "minLength": 1,
               "maxLength": 1024,
-              "pattern": "^(?!\\.{1,2}(?:\\/|$))(?!.*(?:^|\\/)\\.{1,2}(?:\\/|$))(?!\\/)(?![A-Za-z]:)[^\\\\\\0\\r\\n]+$"
+              "allOf": [
+                {
+                  "type": "string",
+                  "pattern": "^(?!\\/)(?![A-Za-z]:)(?!.*(?:^|\\/)\\.{1,2}(?:\\/|$))(?!.*(?:^|\\/)(?:[cC][oO][nN]|[cC][oO][nN](?:[iI][nN]|[oO][uU][tT])\\$|[pP][rR][nN]|[aA][uU][xX]|[nN][uU][lL]|[cC][oO][mM][1-9¹²³]|[lL][pP][tT][1-9¹²³])(?:\\.[^/]*)?(?:\\/|$))(?!.*(?:^|\\/)[^/]*[. ](?:\\/|$))[^<>:\"|?*\\\\\\u0000-\\u001F\\u007F/]+(?:\\/[^<>:\"|?*\\\\\\u0000-\\u001F\\u007F/]+)*$"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(?!\\.[nN][eE][oO][tT][tT][iI][aA](?:$|\\/(?:[cC][aA][cC][hH][eE]|[rR][eE][pP][oO][sS][iI][tT][oO][rR][yY]-[sS][tT][oO][rR][eE])(?:\\/|$))).+$"
+                }
+              ]
             },
             "retrieval": {
               "type": "object",
@@ -73,7 +82,17 @@
               "type": "string",
               "minLength": 1,
               "maxLength": 1024,
-              "pattern": "^(?!\\.[nN][eE][oO][tT][tT][iI][aA](?:$|\\/(?:[cC][aA][cC][hH][eE]|[rR][eE][pP][oO][sS][iI][tT][oO][rR][yY]-[sS][tT][oO][rR][eE])(?:\\/|$)))(?!\\/)(?!.*(?:^|\\/)\\.\\.?(?:\\/|$))(?!.*(?:^|\\/)[^/]*\\.(?:\\/|$))(?!.*\\\\)[A-Za-z0-9._-]+(?:\\/[A-Za-z0-9._-]+)*$"
+              "allOf": [
+                {
+                  "type": "string",
+                  "pattern": "^(?!\\/)(?![A-Za-z]:)(?!.*(?:^|\\/)\\.{1,2}(?:\\/|$))(?!.*(?:^|\\/)(?:[cC][oO][nN]|[cC][oO][nN](?:[iI][nN]|[oO][uU][tT])\\$|[pP][rR][nN]|[aA][uU][xX]|[nN][uU][lL]|[cC][oO][mM][1-9¹²³]|[lL][pP][tT][1-9¹²³])(?:\\.[^/]*)?(?:\\/|$))(?!.*(?:^|\\/)[^/]*[. ](?:\\/|$))[^<>:\"|?*\\\\\\u0000-\\u001F\\u007F/]+(?:\\/[^<>:\"|?*\\\\\\u0000-\\u001F\\u007F/]+)*$"
+                },
+                { "type": "string", "pattern": "^[A-Za-z0-9._-]+(?:\\/[A-Za-z0-9._-]+)*$" },
+                {
+                  "type": "string",
+                  "pattern": "^(?!\\.[nN][eE][oO][tT][tT][iI][aA](?:$|\\/(?:[cC][aA][cC][hH][eE]|[rR][eE][pP][oO][sS][iI][tT][oO][rR][yY]-[sS][tT][oO][rR][eE])(?:\\/|$))).+$"
+                }
+              ]
             },
             "prefix": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}$" },
             "retrieval": {
@@ -226,7 +245,7 @@
                 "bing_api_endpoint": {
                   "type": "string",
                   "maxLength": 8192,
-                  "pattern": "^[hH][tT][tT][pP][sS]?:\\/\\/",
+                  "pattern": "^[hH][tT][tT][pP][sS]?:\\/\\/(?![^/?#]*@)[^?#]+$",
                   "format": "uri"
                 }
               },
@@ -270,7 +289,7 @@
                 "endpoint": {
                   "type": "string",
                   "maxLength": 8192,
-                  "pattern": "^[hH][tT][tT][pP][sS]?:\\/\\/",
+                  "pattern": "^[hH][tT][tT][pP][sS]?:\\/\\/(?![^/?#]*@)[^?#]+$",
                   "format": "uri"
                 },
                 "model": { "type": "string", "minLength": 1, "pattern": "\\S" },
@@ -372,7 +391,16 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 1024,
-                    "pattern": "^(?!\\.{1,2}(?:\\/|$))(?!.*(?:^|\\/)\\.{1,2}(?:\\/|$))(?!\\/)(?![A-Za-z]:)[^\\\\\\0\\r\\n]+$"
+                    "allOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^(?!\\/)(?![A-Za-z]:)(?!.*(?:^|\\/)\\.{1,2}(?:\\/|$))(?!.*(?:^|\\/)(?:[cC][oO][nN]|[cC][oO][nN](?:[iI][nN]|[oO][uU][tT])\\$|[pP][rR][nN]|[aA][uU][xX]|[nN][uU][lL]|[cC][oO][mM][1-9¹²³]|[lL][pP][tT][1-9¹²³])(?:\\.[^/]*)?(?:\\/|$))(?!.*(?:^|\\/)[^/]*[. ](?:\\/|$))[^<>:\"|?*\\\\\\u0000-\\u001F\\u007F/]+(?:\\/[^<>:\"|?*\\\\\\u0000-\\u001F\\u007F/]+)*$"
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^(?!\\.[nN][eE][oO][tT][tT][iI][aA](?:$|\\/(?:[cC][aA][cC][hH][eE]|[rR][eE][pP][oO][sS][iI][tT][oO][rR][yY]-[sS][tT][oO][rR][eE])(?:\\/|$))).+$"
+                      }
+                    ]
                   },
                   "retrieval": {
                     "type": "object",
@@ -450,7 +478,17 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 1024,
-                    "pattern": "^(?!\\.[nN][eE][oO][tT][tT][iI][aA](?:$|\\/(?:[cC][aA][cC][hH][eE]|[rR][eE][pP][oO][sS][iI][tT][oO][rR][yY]-[sS][tT][oO][rR][eE])(?:\\/|$)))(?!\\/)(?!.*(?:^|\\/)\\.\\.?(?:\\/|$))(?!.*(?:^|\\/)[^/]*\\.(?:\\/|$))(?!.*\\\\)[A-Za-z0-9._-]+(?:\\/[A-Za-z0-9._-]+)*$"
+                    "allOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^(?!\\/)(?![A-Za-z]:)(?!.*(?:^|\\/)\\.{1,2}(?:\\/|$))(?!.*(?:^|\\/)(?:[cC][oO][nN]|[cC][oO][nN](?:[iI][nN]|[oO][uU][tT])\\$|[pP][rR][nN]|[aA][uU][xX]|[nN][uU][lL]|[cC][oO][mM][1-9¹²³]|[lL][pP][tT][1-9¹²³])(?:\\.[^/]*)?(?:\\/|$))(?!.*(?:^|\\/)[^/]*[. ](?:\\/|$))[^<>:\"|?*\\\\\\u0000-\\u001F\\u007F/]+(?:\\/[^<>:\"|?*\\\\\\u0000-\\u001F\\u007F/]+)*$"
+                      },
+                      { "type": "string", "pattern": "^[A-Za-z0-9._-]+(?:\\/[A-Za-z0-9._-]+)*$" },
+                      {
+                        "type": "string",
+                        "pattern": "^(?!\\.[nN][eE][oO][tT][tT][iI][aA](?:$|\\/(?:[cC][aA][cC][hH][eE]|[rR][eE][pP][oO][sS][iI][tT][oO][rR][yY]-[sS][tT][oO][rR][eE])(?:\\/|$))).+$"
+                      }
+                    ]
                   },
                   "prefix": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}$" },
                   "retrieval": {
@@ -603,7 +641,7 @@
                       "bing_api_endpoint": {
                         "type": "string",
                         "maxLength": 8192,
-                        "pattern": "^[hH][tT][tT][pP][sS]?:\\/\\/",
+                        "pattern": "^[hH][tT][tT][pP][sS]?:\\/\\/(?![^/?#]*@)[^?#]+$",
                         "format": "uri"
                       }
                     },
@@ -647,7 +685,7 @@
                       "endpoint": {
                         "type": "string",
                         "maxLength": 8192,
-                        "pattern": "^[hH][tT][tT][pP][sS]?:\\/\\/",
+                        "pattern": "^[hH][tT][tT][pP][sS]?:\\/\\/(?![^/?#]*@)[^?#]+$",
                         "format": "uri"
                       },
                       "model": { "type": "string", "minLength": 1, "pattern": "\\S" },

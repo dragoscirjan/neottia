@@ -195,6 +195,12 @@ describe('root JSON Schema generation', () => {
     expect(modules.additionalProperties).toBe(false);
     expect(Object.keys(profileModules.properties ?? {})).toEqual(['issues', 'memory']);
     expect(profileModules.additionalProperties).toBe(false);
+    for (const section of CONFIG_ROOT_SECTIONS) {
+      const baseSection = schema.properties?.[section] as { additionalProperties?: boolean };
+      const profileSection = profiles.additionalProperties?.properties?.[section] as { additionalProperties?: boolean };
+      expect(baseSection.additionalProperties).toBe(false);
+      expect(profileSection.additionalProperties).toBe(false);
+    }
   });
 
   it('rejects registries not created by the package', () => {

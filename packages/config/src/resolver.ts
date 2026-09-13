@@ -1,19 +1,26 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { closeSync, existsSync, fstatSync, openSync, readSync } from 'node:fs';
 import { homedir as systemHomedir } from 'node:os';
 import path from 'node:path';
-import { parseDocument } from 'yaml';
-import type {
-  ConfigDiagnostic,
-  ConfigProvenance,
-  ConfigRegistry,
-  ResolvedConfigSnapshot,
-  UnknownConfigContribution,
+import { isMap, isSeq, parseDocument, type Node } from 'yaml';
+import {
+  CONFIG_ROOT_SECTIONS,
+  type ConfigDiagnostic,
+  type ConfigProvenance,
+  type ConfigRegistry,
+  type ResolvedConfigSnapshot,
+  type UnknownConfigContribution,
 } from './contracts.js';
 import { getRegistryState } from './registry.js';
 import { createResolvedConfigSnapshotWithMetadata } from './snapshot.js';
 
 /** The maximum number of diagnostics retained by one failed resolution. */
 export const MAX_CONFIG_DIAGNOSTICS = 50;
+/** Maximum UTF-8 bytes accepted from one configuration file. */
+export const MAX_CONFIG_FILE_BYTES = 1024 * 1024;
+/** Maximum nested YAML collection depth accepted before value conversion. */
+export const MAX_CONFIG_YAML_DEPTH = 64;
+/** Maximum YAML scalar and collection nodes accepted before value conversion. */
+export const MAX_CONFIG_YAML_NODES = 10_000;
 
 /** Inputs whose explicit values remain isolated from ambient process state. */
 export interface ResolveConfigOptions {
@@ -233,6 +240,57 @@ function selectFiles(
   return selections;
 }
 
+/** Reads at most the published byte limit from one regular file descriptor. */
+function readBoundedConfigFile(
+  file: string,
+): { readonly kind: 'success'; readonly yaml: string } | { readonly kind: 'io' | 'limit' } {
+  let descriptor: number | undefined;
+  try {
+    descriptor = openSync(file, 'r');
+    const metadata = fstatSync(descriptor);
+    if (!metadata.isFile()) return { kind: 'io' };
+    if (metadata.size > MAX_CONFIG_FILE_BYTES) return { kind: 'limit' };
+
+    const buffer = Buffer.allocUnsafe(MAX_CONFIG_FILE_BYTES + 1);
+    let bytesRead = 0;
+    while (bytesRead < buffer.byteLength) {
+      const count = readSync(descriptor, buffer, bytesRead, buffer.byteLength - bytesRead, null);
+      if (count === 0) break;
+      bytesRead += count;
+    }
+    if (bytesRead > MAX_CONFIG_FILE_BYTES) return { kind: 'limit' };
+    return { kind: 'success', yaml: buffer.subarray(0, bytesRead).toString('utf8') };
+  } catch {
+    return { kind: 'io' };
+  } finally {
+    if (descriptor !== undefined) {
+      try {
+        closeSync(descriptor);
+      } catch {
+        // The read result already captures the actionable file failure.
+      }
+    }
+  }
+}
+
+/** Checks collection depth and node count before aliases can expand during conversion. */
+function yamlStructureWithinLimits(root: Node | null | undefined): boolean {
+  let nodes = 0;
+  const visit = (node: Node | null | undefined, depth: number): boolean => {
+    if (node === null || node === undefined) return true;
+    nodes += 1;
+    if (nodes > MAX_CONFIG_YAML_NODES || depth > MAX_CONFIG_YAML_DEPTH) return false;
+    if (isSeq(node)) return node.items.every((item) => visit(item as Node | null, depth + 1));
+    if (isMap(node)) {
+      return node.items.every(
+        (pair) => visit(pair.key as Node | null, depth + 1) && visit(pair.value as Node | null, depth + 1),
+      );
+    }
+    return true;
+  };
+  return visit(root, 0);
+}
+
 /** Reads and parses a selected YAML document once, then validates every fragment once. */
 function loadDocument(
   registry: ConfigRegistry,
@@ -254,25 +312,36 @@ function loadDocument(
 
   let root = parsedFiles.get(selection.file);
   if (!parsedFiles.has(selection.file)) {
-    let yaml: string;
-    try {
-      yaml = readFileSync(selection.file, 'utf8');
-    } catch {
+    const source: ConfigProvenance = { file: selection.file, kind: selection.kind };
+    const loaded = readBoundedConfigFile(selection.file);
+    if (loaded.kind !== 'success') {
       addDiagnostic(collector, {
-        code: 'IO',
-        message: 'configuration file could not be read',
-        source: { file: selection.file, kind: selection.kind },
+        code: loaded.kind === 'limit' ? 'LIMIT' : 'IO',
+        message:
+          loaded.kind === 'limit'
+            ? 'configuration file exceeds the maximum byte size'
+            : 'configuration file could not be read as a regular file',
+        source,
       });
       parsedFiles.set(selection.file, undefined);
       return undefined;
     }
     try {
-      const document = parseDocument(yaml, { prettyErrors: false, uniqueKeys: true });
+      const document = parseDocument(loaded.yaml, { prettyErrors: false, uniqueKeys: true });
       if (document.errors.length > 0 || document.warnings.length > 0) {
         addDiagnostic(collector, {
           code: 'YAML',
           message: 'configuration file contains invalid or duplicate YAML mapping keys',
-          source: { file: selection.file, kind: selection.kind },
+          source,
+        });
+        parsedFiles.set(selection.file, undefined);
+        return undefined;
+      }
+      if (!yamlStructureWithinLimits(document.contents)) {
+        addDiagnostic(collector, {
+          code: 'LIMIT',
+          message: 'configuration YAML exceeds the maximum depth or node count',
+          source,
         });
         parsedFiles.set(selection.file, undefined);
         return undefined;
@@ -284,7 +353,7 @@ function loadDocument(
       addDiagnostic(collector, {
         code: 'YAML',
         message: 'configuration file could not be decoded as bounded YAML data',
-        source: { file: selection.file, kind: selection.kind },
+        source,
       });
       parsedFiles.set(selection.file, undefined);
       return undefined;
@@ -456,7 +525,8 @@ function validateOwnedTree(
   for (const [key, child] of Object.entries(candidate)) {
     const childPath = [...currentPath, key];
     const possible = ownedPaths.filter((ownedPath) => isPrefix(childPath, ownedPath));
-    if (possible.length === 0) {
+    const reservedRoot = currentPath.length === 0 && CONFIG_ROOT_SECTIONS.some((section) => section === key);
+    if (possible.length === 0 && !reservedRoot) {
       if (!ignoreUnregisteredPaths) {
         addDiagnostic(collector, {
           code: source.kind === 'profile' ? 'PROFILE' : 'PATH',
@@ -593,7 +663,7 @@ function applyEnvironment(
         continue;
       }
       const patch = objectAtPath(binding.path, coerced);
-      if (binding.parse !== undefined && !contribution.runtimePatchSchema.safeParse(patch).success) {
+      if (!contribution.runtimePatchSchema.safeParse(patch).success) {
         addEnvironmentDiagnostic(collector, contribution, binding.path, source);
         continue;
       }

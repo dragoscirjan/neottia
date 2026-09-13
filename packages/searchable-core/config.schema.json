@@ -61,7 +61,7 @@
           "default": "https://api.bing.microsoft.com/v7.0/search",
           "type": "string",
           "maxLength": 8192,
-          "pattern": "^[hH][tT][tT][pP][sS]?:\\/\\/",
+          "pattern": "^[hH][tT][tT][pP][sS]?:\\/\\/(?![^/?#]*@)[^?#]+$",
           "format": "uri"
         }
       },
@@ -149,7 +149,7 @@
           "default": "http://localhost:11434",
           "type": "string",
           "maxLength": 8192,
-          "pattern": "^[hH][tT][tT][pP][sS]?:\\/\\/",
+          "pattern": "^[hH][tT][tT][pP][sS]?:\\/\\/(?![^/?#]*@)[^?#]+$",
           "format": "uri"
         },
         "model": {

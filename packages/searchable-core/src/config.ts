@@ -8,7 +8,7 @@ import {
 } from '@neottia/config';
 import { z } from 'zod';
 import { SearchableError } from './errors.js';
-import { searchableHttpUrlSchema } from './schemas.js';
+import { searchableEndpointUrlSchema } from './schemas.js';
 
 /** Shared project config-file override used by every Neottia module. */
 export const SEARCHABLE_CONFIG_FILE_ENV = 'NEOTTIA_CONFIG_FILE';
@@ -55,7 +55,7 @@ function createSearchableConfigSchema(credential: z.ZodString) {
             })
             .strict()
             .prefault({}),
-          bing_api_endpoint: searchableHttpUrlSchema.default('https://api.bing.microsoft.com/v7.0/search'),
+          bing_api_endpoint: searchableEndpointUrlSchema.default('https://api.bing.microsoft.com/v7.0/search'),
         })
         .strict()
         .prefault({}),
@@ -89,7 +89,7 @@ function createSearchableConfigSchema(credential: z.ZodString) {
         .prefault({}),
       ollama: z
         .object({
-          endpoint: searchableHttpUrlSchema.default('http://localhost:11434'),
+          endpoint: searchableEndpointUrlSchema.default('http://localhost:11434'),
           model: nonblank.default('llama3'),
           timeout_ms: positiveIntegerAtMost(600_000).default(60_000),
         })
@@ -142,7 +142,7 @@ function createSearchableConfigPatchSchema(credential: z.ZodString) {
             })
             .strict()
             .optional(),
-          bing_api_endpoint: searchableHttpUrlSchema.optional(),
+          bing_api_endpoint: searchableEndpointUrlSchema.optional(),
         })
         .strict()
         .optional(),
@@ -176,7 +176,7 @@ function createSearchableConfigPatchSchema(credential: z.ZodString) {
         .optional(),
       ollama: z
         .object({
-          endpoint: searchableHttpUrlSchema.optional(),
+          endpoint: searchableEndpointUrlSchema.optional(),
           model: nonblank.optional(),
           timeout_ms: positiveIntegerAtMost(600_000).optional(),
         })

@@ -22,6 +22,7 @@ export {
 } from './lease.js';
 export { DEFAULT_STORE_LIMITS, type StoreLimits } from './limits.js';
 export {
+  PORTABLE_RELATIVE_PATH_PATTERN,
   resolveManagedPath,
   resolveManagedRoot,
   validateRelativePath,

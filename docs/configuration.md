@@ -30,6 +30,8 @@ The optional global file depends on the operating system:
 
 Set `NEOTTIA_GLOBAL_CONFIG_FILE` or `NEOTTIA_CONFIG_FILE` to select a different global or project file. A relative selected path resolves against the invocation working directory. Default files are optional. A path selected through an environment variable or resolver option must exist.
 
+Each file must be a regular file no larger than 1 MiB. YAML can contain at most 10,000 scalar and collection nodes with a maximum collection depth of 64. Files above these limits fail with a `LIMIT` diagnostic before the resolver converts YAML to JavaScript values.
+
 Every present file must have the exact integer `version: 1`. The supported root keys are `version`, `modules`, `sdlc`, `connections`, `capabilities`, `agents`, `harnesses`, `assets`, `templates`, and `profiles`. A root section can contain only registered paths. The current published schema registers the four paths below.
 
 | Module      | Canonical path        | Module reference                                                                                                 |

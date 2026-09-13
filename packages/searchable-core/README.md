@@ -27,7 +27,7 @@ modules:
       provider: duckduckgo
 ```
 
-DuckDuckGo requires no key. Google needs `google_api_key` and `google_cse_id`; Bing and Brave need their API keys. YAML credential values must use exact `${ENV_NAME}` references. The resolver expands only the winning reference and redacts all provider credentials from snapshots, provenance, and diagnostics. See [`config.schema.json`](./config.schema.json) for the complete standalone shard.
+DuckDuckGo requires no key. Google needs `google_api_key` and `google_cse_id`; Bing and Brave need their API keys. YAML credential values must use exact `${ENV_NAME}` references. The resolver expands only the winning reference and redacts all provider credentials from snapshots, provenance, and diagnostics. Service endpoints must use HTTP or HTTPS and cannot contain user information, a query string, or a fragment. See [`config.schema.json`](./config.schema.json) for the complete standalone shard.
 
 ## Use the concrete runtime
 

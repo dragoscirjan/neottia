@@ -6,6 +6,7 @@ import {
   resolveConfig,
   type ConfigDiagnosticCode,
 } from '@neottia/config';
+import { PORTABLE_RELATIVE_PATH_PATTERN } from '@neottia/repository-store';
 import { z } from 'zod';
 import { DesignDocsError } from './errors.js';
 
@@ -20,7 +21,8 @@ export const DEFAULT_DESIGN_DOCS_SHARD_PATH = 'skills.design_docs';
 /** Default project config location, relative to the working directory. */
 export const DEFAULT_DESIGN_DOCS_CONFIG_FILE = '.neottia/config.yml';
 
-const SAFE_RELATIVE_PATH = /^(?!\.{1,2}(?:\/|$))(?!.*(?:^|\/)\.{1,2}(?:\/|$))(?!\/)(?![A-Za-z]:)[^\\\0\r\n]+$/u;
+const ALLOWED_DESIGN_DOCS_ROOT_PATTERN =
+  /^(?!\.[nN][eE][oO][tT][tT][iI][aA](?:$|\/(?:[cC][aA][cC][hH][eE]|[rR][eE][pP][oO][sS][iI][tT][oO][rR][yY]-[sS][tT][oO][rR][eE])(?:\/|$))).+$/u;
 const positive = z.number().int().positive();
 
 /** Complete strict runtime schema for resolved config and direct store values. */
@@ -134,18 +136,15 @@ function createDesignDocsConfigPatchSchema() {
     .strict();
 }
 
-/** Returns the shared portable-path constraint for resolved and patch schemas. */
+/** Returns schema-visible portable and reserved-path constraints. */
 function designDocsRootSchema() {
   return z
     .string()
     .min(1)
     .max(1024)
-    .regex(SAFE_RELATIVE_PATH)
-    .refine(
-      (value) => value.split('/').every((part) => part && !part.endsWith('.') && !part.endsWith(' ')),
-      'must use portable path components',
-    )
-    .refine((value) => !overlapsReservedPath(value), 'must not overlap .neottia/cache or .neottia/repository-store');
+    .regex(PORTABLE_RELATIVE_PATH_PATTERN, 'must use portable path components')
+    .regex(ALLOWED_DESIGN_DOCS_ROOT_PATTERN, 'must not overlap reserved .neottia paths')
+    .refine((value) => !overlapsReservedPath(value), 'must not normalize to a reserved .neottia path');
 }
 
 export type DesignDocsConfig = z.output<typeof designDocsConfigSchema>;
@@ -286,6 +285,7 @@ function resolutionDesignDocsCode(code: ConfigDiagnosticCode | undefined): strin
   return 'CONFIG_SCHEMA_INVALID';
 }
 
+/** Rejects compatibility spellings that normalize to a reserved path. */
 function overlapsReservedPath(value: string): boolean {
   const normalized = value.normalize('NFKC').toLocaleLowerCase('en-US').replace(/\/+$/u, '');
   return ['.neottia/cache', '.neottia/repository-store'].some(

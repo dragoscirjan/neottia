@@ -1,7 +1,7 @@
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createConfigRegistry, defineConfigContribution, resolveConfig } from '@neottia/config';
+import { ConfigResolutionError, createConfigRegistry, defineConfigContribution, resolveConfig } from '@neottia/config';
 import { afterEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import {
@@ -282,6 +282,37 @@ modules:
     ).toThrowError(expect.objectContaining({ code: 'CONFIG_ENV_INVALID' }));
   });
 
+  it('rejects credentials and secret-bearing suffixes in configured service endpoints', async () => {
+    const rejected = [
+      'https://user:endpoint-password@example.test/search',
+      'https://example.test/search?api_key=endpoint-query-secret',
+      'http://example.test/model#endpoint-fragment-secret',
+    ];
+
+    for (const endpoint of rejected) {
+      const root = await project();
+      const projectFile = await writeConfig(
+        root,
+        JSON.stringify({ version: 1, modules: { searchable: { search: { bing_api_endpoint: endpoint } } } }),
+      );
+      let error: unknown;
+      try {
+        resolveConfig(createConfigRegistry([searchableConfigContribution]), {
+          cwd: root,
+          env: {},
+          globalFile: false,
+          projectFile,
+        });
+      } catch (caught) {
+        error = caught;
+      }
+
+      expect(error).toBeInstanceOf(ConfigResolutionError);
+      expect(error).toMatchObject({ diagnostics: [expect.objectContaining({ code: 'SCHEMA' })] });
+      expect(JSON.stringify(error)).not.toContain(endpoint);
+    }
+  });
+
   it('allows only exact file credential references and trusted runtime literals', async () => {
     const root = await project();
     await writeConfig(
@@ -323,11 +354,11 @@ modules:
     expect(searchableConfigFilePatchSchema.parse({ grep: { limit: 9 } })).toEqual({ grep: { limit: 9 } });
     expect(searchProperties['bing_api_endpoint']).toMatchObject({
       format: 'uri',
-      pattern: '^[hH][tT][tT][pP][sS]?:\\/\\/',
+      pattern: '^[hH][tT][tT][pP][sS]?:\\/\\/(?![^/?#]*@)[^?#]+$',
     });
     expect(ollamaProperties['endpoint']).toMatchObject({
       format: 'uri',
-      pattern: '^[hH][tT][tT][pP][sS]?:\\/\\/',
+      pattern: '^[hH][tT][tT][pP][sS]?:\\/\\/(?![^/?#]*@)[^?#]+$',
     });
     expect(fetchProperties['strategies']?.['uniqueItems']).toBe(true);
   });

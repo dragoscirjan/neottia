@@ -106,6 +106,8 @@ The default project file is `<cwd>/.neottia/config.yml`. The optional default gl
 
 `NEOTTIA_GLOBAL_CONFIG_FILE` and `NEOTTIA_CONFIG_FILE` explicitly select the global and project files. `globalFile` and `projectFile` options take precedence; use `false` to disable a source. Missing default files are optional. A missing path selected by an option or environment variable is an error.
 
+The resolver accepts regular files up to `MAX_CONFIG_FILE_BYTES`, currently 1 MiB. It also limits YAML to `MAX_CONFIG_YAML_NODES`, currently 10,000 scalar and collection nodes, and `MAX_CONFIG_YAML_DEPTH`, currently 64 collection levels. It reports `LIMIT` before converting YAML that exceeds these limits.
+
 ### Profiles
 
 Profiles are root-shaped configuration fragments under `profiles.<name>`:

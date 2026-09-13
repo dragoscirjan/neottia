@@ -1,7 +1,12 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createConfigRegistry, defineConfigContribution, resolveConfig } from '@neottia/config';
+import {
+  createConfigRegistry,
+  defineConfigContribution,
+  generateConfigJsonSchema,
+  resolveConfig,
+} from '@neottia/config';
 import { afterEach, describe, expect, it } from 'vitest';
 import { stringify } from 'yaml';
 import { z } from 'zod';
@@ -29,6 +34,19 @@ function fixture(): string {
   const directory = mkdtempSync(join(tmpdir(), 'design-docs-config-'));
   roots.add(directory);
   return directory;
+}
+
+/** Evaluates the generated string bounds used by the root-path schemas. */
+function generatedStringSchemaAccepts(schema: Record<string, unknown>, value: string): boolean {
+  if (typeof schema['minLength'] === 'number' && value.length < schema['minLength']) return false;
+  if (typeof schema['maxLength'] === 'number' && value.length > schema['maxLength']) return false;
+  if (typeof schema['pattern'] === 'string' && !new RegExp(schema['pattern'], 'u').test(value)) return false;
+  if (Array.isArray(schema['allOf'])) {
+    return schema['allOf'].every(
+      (part) => typeof part === 'object' && part !== null && generatedStringSchemaAccepts(part, value),
+    );
+  }
+  return true;
 }
 
 function writeConfig(cwd: string, config: unknown, file = '.neottia/config.yml'): string {
@@ -195,12 +213,33 @@ describe('Design Docs configuration contribution', () => {
   });
 
   it('keeps runtime, file, generated-schema, and contribution schemas aligned', () => {
-    const generated = designDocsConfigFileSchema.toJSONSchema({ io: 'input' });
+    const generated = designDocsConfigFileSchema.toJSONSchema({ io: 'input' }) as Record<string, unknown>;
     const published = JSON.parse(readFileSync(new URL('../config.schema.json', import.meta.url), 'utf8')) as unknown;
     expect(published).toEqual(generated);
     expect(designDocsConfigContribution.filePatchSchema).toBe(designDocsConfigFilePatchSchema);
     expect(designDocsConfigFilePatchSchema.safeParse({ retrieval: { limit: 9 } }).success).toBe(true);
-    expect(designDocsConfigSchema.safeParse({ root: 'nested/docs' }).success).toBe(true);
+
+    const standaloneRoot = (generated['properties'] as Record<string, Record<string, unknown>>)['root'];
+    const complete = generateConfigJsonSchema(createConfigRegistry([designDocsConfigContribution]));
+    const completeRoot = (
+      ((complete['properties'] as Record<string, unknown>)['modules'] as Record<string, unknown>)[
+        'properties'
+      ] as Record<string, Record<string, unknown>>
+    )['design_docs']['properties'] as Record<string, Record<string, unknown>>;
+    const completeRootSchema = completeRoot['root'];
+    const candidates = [
+      ['nested/docs', true],
+      ['.neottia/cache', false],
+      ['docs.', false],
+      ['docs:stream', false],
+      ['CON', false],
+      ['nested/lpt9.txt', false],
+    ] as const;
+    for (const [root, accepted] of candidates) {
+      expect(designDocsConfigSchema.safeParse({ root }).success).toBe(accepted);
+      expect(generatedStringSchemaAccepts(standaloneRoot, root)).toBe(accepted);
+      expect(generatedStringSchemaAccepts(completeRootSchema, root)).toBe(accepted);
+    }
   });
 
   it('loads paths, retrieval, cache, and every security limit through the shared resolver', () => {

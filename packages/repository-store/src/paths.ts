@@ -11,6 +11,15 @@ import {
 } from './internal/model.js';
 import { DEFAULT_STORE_LIMITS, type StoreLimits } from './limits.js';
 
+/**
+ * Portable relative paths exclude traversal, Windows-invalid characters and
+ * device names, empty components, and components ending in a dot or space.
+ */
+// The control-character ranges must remain visible in the generated JSON Schema.
+export const PORTABLE_RELATIVE_PATH_PATTERN =
+  // eslint-disable-next-line no-control-regex
+  /^(?!\/)(?![A-Za-z]:)(?!.*(?:^|\/)\.{1,2}(?:\/|$))(?!.*(?:^|\/)(?:[cC][oO][nN]|[cC][oO][nN](?:[iI][nN]|[oO][uU][tT])\$|[pP][rR][nN]|[aA][uU][xX]|[nN][uU][lL]|[cC][oO][mM][1-9¹²³]|[lL][pP][tT][1-9¹²³])(?:\.[^/]*)?(?:\/|$))(?!.*(?:^|\/)[^/]*[. ](?:\/|$))[^<>:"|?*\\\u0000-\u001F\u007F/]+(?:\/[^<>:"|?*\\\u0000-\u001F\u007F/]+)*$/u;
+
 /** Options binding a managed subtree to its lease authority. */
 export interface ManagedRootOptions {
   readonly authorityRoot: string;
@@ -50,24 +59,9 @@ export function resolveManagedPath(root: ManagedRoot, relativePath: string): Man
 
 /** Validates the portable canonical path spelling shared by all domains. */
 export function validateRelativePath(value: string): string {
-  if (
-    !value ||
-    [...value].some((character) => character.charCodeAt(0) <= 31 || character.charCodeAt(0) === 127) ||
-    value.includes('\\') ||
-    value.startsWith('/') ||
-    /^[A-Za-z]:/u.test(value) ||
-    value.startsWith('//')
-  )
+  if (!PORTABLE_RELATIVE_PATH_PATTERN.test(value))
     throw new PathSafetyError(`Invalid managed relative path: ${JSON.stringify(value)}`);
-  const components = value.split('/');
-  if (
-    components.some(
-      (component) =>
-        !component || component === '.' || component === '..' || component.endsWith('.') || component.endsWith(' '),
-    )
-  )
-    throw new PathSafetyError(`Invalid managed relative path: ${JSON.stringify(value)}`);
-  return components.join('/');
+  return value;
 }
 
 /** Portable key used to reject NFKC/case-equivalent catalog entries. */

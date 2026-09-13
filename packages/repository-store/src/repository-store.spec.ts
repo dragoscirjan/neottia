@@ -97,10 +97,33 @@ describe('repository canonical store', () => {
     ).rejects.toMatchObject({ code: 'PATH_INVALID' });
   });
 
-  it('enforces portable trailing-period and trailing-space path components', () => {
-    for (const path of ['record.', 'dir./record', 'dir/record.', 'record ', 'dir /record'])
+  it('enforces portable path components on every supported platform', () => {
+    for (const path of [
+      'record.',
+      'dir./record',
+      'dir/record.',
+      'record ',
+      'dir /record',
+      'docs:stream',
+      'a<b',
+      'a>b',
+      'a"b',
+      'a|b',
+      'a?b',
+      'a*b',
+      'CON',
+      'con.txt',
+      'CONIN$',
+      'conout$.txt',
+      'nested/AuX.yaml',
+      'COM1',
+      'COM¹',
+      'lpt9.log',
+    ]) {
       expect(() => validateRelativePath(path)).toThrow(PathSafetyError);
+    }
     expect(validateRelativePath('dir/record.name')).toBe('dir/record.name');
+    expect(validateRelativePath('unicode/文件.yml')).toBe('unicode/文件.yml');
   });
 
   it('applies exact write, replacement, move, and removal operations', async () => {

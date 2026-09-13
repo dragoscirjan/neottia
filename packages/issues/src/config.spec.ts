@@ -178,14 +178,16 @@ describe('Issues configuration contribution', () => {
 
   it('keeps runtime, file, generated-schema, and backend root constraints aligned', () => {
     const generated = issueConfigFileSchema.toJSONSchema() as {
-      properties: { root: { pattern: string } };
+      properties: { root: { allOf?: Array<{ pattern: string }>; pattern?: string } };
     };
     const published = JSON.parse(readFileSync(new URL('../config.schema.json', import.meta.url), 'utf8')) as unknown;
     expect(published).toEqual(generated);
     expect(issueConfigContribution.filePatchSchema).toBe(issueConfigFilePatchSchema);
     expect(issueConfigFilePatchSchema.safeParse({ retrieval: { limit: 9 } }).success).toBe(true);
 
-    const pattern = new RegExp(generated.properties.root.pattern, 'u');
+    const patterns = (generated.properties.root.allOf ?? [generated.properties.root]).map(
+      ({ pattern }) => new RegExp(pattern ?? '', 'u'),
+    );
     const valid = [
       '.neottia/issues',
       'issues',
@@ -208,17 +210,21 @@ describe('Issues configuration contribution', () => {
       '../outside',
       '/absolute',
       'a\\b',
+      'docs:stream',
+      'a<b',
+      'CON',
+      'nested/lpt9.txt',
     ];
     for (const root of valid) {
       expect(issueConfigSchema.safeParse({ root }).success).toBe(true);
       expect(issueConfigFileSchema.safeParse({ root }).success).toBe(true);
-      expect(pattern.test(root)).toBe(true);
+      expect(patterns.every((pattern) => pattern.test(root))).toBe(true);
       expect(validateRelativePath(root)).toBe(root);
     }
     for (const root of invalid) {
       expect(issueConfigSchema.safeParse({ root }).success).toBe(false);
       expect(issueConfigFileSchema.safeParse({ root }).success).toBe(false);
-      expect(pattern.test(root)).toBe(false);
+      expect(patterns.every((pattern) => pattern.test(root))).toBe(false);
     }
     for (const root of ['issues.', 'nested/issues.']) expect(() => validateRelativePath(root)).toThrow();
   });

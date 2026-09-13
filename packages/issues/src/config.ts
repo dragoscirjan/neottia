@@ -6,6 +6,7 @@ import {
   resolveConfig,
   type ConfigDiagnosticCode,
 } from '@neottia/config';
+import { PORTABLE_RELATIVE_PATH_PATTERN } from '@neottia/repository-store';
 import { z } from 'zod';
 import { IssueError } from './errors.js';
 
@@ -20,16 +21,18 @@ export const DEFAULT_ISSUE_SHARD_PATH = 'skills.issues';
 /** Default project config location, relative to the working directory. */
 export const DEFAULT_ISSUE_CONFIG_FILE = '.neottia/config.yml';
 
-// One schema-visible expression keeps runtime, generated JSON Schema, and the
-// repository-store path grammar aligned for reserved roots and trailing dots.
+const ALLOWED_ISSUES_ROOT_PATTERN =
+  /^(?!\.[nN][eE][oO][tT][tT][iI][aA](?:$|\/(?:[cC][aA][cC][hH][eE]|[rR][eE][pP][oO][sS][iI][tT][oO][rR][yY]-[sS][tT][oO][rR][eE])(?:\/|$))).+$/u;
+const ISSUE_ROOT_CHARACTERS_PATTERN = /^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/u;
+// These expressions survive JSON Schema generation and keep configured roots
+// aligned with repository-store checks without widening the existing grammar.
 const relativeRoot = z
   .string()
   .min(1)
   .max(1024)
-  .regex(
-    /^(?!\.[nN][eE][oO][tT][tT][iI][aA](?:$|\/(?:[cC][aA][cC][hH][eE]|[rR][eE][pP][oO][sS][iI][tT][oO][rR][yY]-[sS][tT][oO][rR][eE])(?:\/|$)))(?!\/)(?!.*(?:^|\/)\.\.?(?:\/|$))(?!.*(?:^|\/)[^/]*\.(?:\/|$))(?!.*\\)[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/u,
-    'must be a safe non-reserved project-relative path with no trailing-period component',
-  );
+  .regex(PORTABLE_RELATIVE_PATH_PATTERN, 'must use portable path components')
+  .regex(ISSUE_ROOT_CHARACTERS_PATTERN, 'must use letters, numbers, dots, underscores, hyphens, and slashes')
+  .regex(ALLOWED_ISSUES_ROOT_PATTERN, 'must not overlap reserved .neottia paths');
 const positive = z.number().int().positive();
 
 /** Complete strict runtime schema for resolved config and direct IssueStore values. */
