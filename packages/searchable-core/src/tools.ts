@@ -1,4 +1,5 @@
 import { Buffer } from 'node:buffer';
+import type { DeepReadonly } from '@neottia/config';
 import { z } from 'zod';
 import { loadSearchableConfig, type SearchableConfig, type SearchableConfigInput } from './config.js';
 import { SearchableError } from './errors.js';
@@ -17,6 +18,9 @@ export interface SearchableToolContext {
   readonly cwd: string;
   readonly services: SearchableServices;
   readonly signal?: AbortSignal;
+  /** A shard from a shared snapshot; when supplied, no configuration source is reread. */
+  readonly config?: DeepReadonly<SearchableConfig>;
+  /** Standalone compatibility overrides used only when `config` is absent. */
   readonly configOverrides?: Partial<SearchableConfigInput>;
   /** Interactive confirmation used by concrete cache-backed services. */
   readonly onStaleCache?: () => boolean | Promise<boolean>;
@@ -58,13 +62,13 @@ function makeTool<Name extends SearchableToolName>(
           parsed.error.issues.map((issue) => issue.path.join('.')),
         );
       assertNotCancelled(context.signal);
-      const config = loadSearchableConfig(context.cwd, context.configOverrides);
+      const config = context.config ?? loadSearchableConfig(context.cwd, context.configOverrides);
       try {
         if (!config.enabled)
           throw new SearchableError(
             'configuration',
             'CAPABILITY_DISABLED',
-            'Searchable operation requires skills.searchable.enabled=true; the capability is disabled.',
+            'Searchable operation requires modules.searchable.enabled=true; the capability is disabled.',
           );
         // Check raw strings before schema trimming, then check normalized values.
         assertInputBounds(name, input, config);
@@ -125,7 +129,7 @@ export function findSearchableTool(name: string): SearchableToolDefinition | und
 function resolveInputDefaults<Name extends SearchableToolName>(
   name: Name,
   input: SearchableToolInput<Name>,
-  config: SearchableConfig,
+  config: DeepReadonly<SearchableConfig>,
 ): ResolvedSearchableToolInput<Name> {
   const value = input as Record<string, unknown>;
   let resolved: Record<string, unknown> = value;
@@ -141,7 +145,7 @@ function resolveInputDefaults<Name extends SearchableToolName>(
 }
 
 /** Enforces configured UTF-8 and result-count limits before calling a service. */
-function assertInputBounds(name: SearchableToolName, input: unknown, config: SearchableConfig): void {
+function assertInputBounds(name: SearchableToolName, input: unknown, config: DeepReadonly<SearchableConfig>): void {
   const value = input as Record<string, unknown>;
   if (typeof value['query'] === 'string') assertBytes('query', value['query'], config.security.limits.max_query_bytes);
   if (typeof value['question'] === 'string')
@@ -159,7 +163,7 @@ function assertInputBounds(name: SearchableToolName, input: unknown, config: Sea
 }
 
 /** Enforces configured field and aggregate bounds after output schema validation. */
-function assertOutputBounds(name: SearchableToolName, output: unknown, config: SearchableConfig): void {
+function assertOutputBounds(name: SearchableToolName, output: unknown, config: DeepReadonly<SearchableConfig>): void {
   const value = output as Record<string, unknown>;
   const rows = Array.isArray(value['results']) ? value['results'] : [value];
   if (Array.isArray(value['results']) && value['results'].length > config.security.limits.max_results)
@@ -177,7 +181,7 @@ function assertOutputBounds(name: SearchableToolName, output: unknown, config: S
 }
 
 /** Applies configured bounds to known object-root output string fields. */
-function assertOutputRecord(value: Record<string, unknown>, config: SearchableConfig): void {
+function assertOutputRecord(value: Record<string, unknown>, config: DeepReadonly<SearchableConfig>): void {
   for (const field of ['url'] as const)
     if (typeof value[field] === 'string') assertBytes(field, value[field], config.security.limits.max_url_bytes);
   for (const field of ['title', 'siteName'] as const)

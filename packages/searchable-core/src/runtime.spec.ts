@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSyn
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { searchableConfigSchema } from './config.js';
 import { assertPublicAddress, type SearchableHttpRequest, type SearchableHttpTransport } from './http.js';
 import { createSearchableRuntime } from './runtime.js';
 import type { StashedPageRecord } from './stash.js';
@@ -55,6 +56,17 @@ class FixtureTransport implements SearchableHttpTransport {
 }
 
 describe('concrete Searchable runtime', () => {
+  it('uses an injected immutable config without reading a project file', async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'neottia-searchable-injected-'));
+    roots.push(cwd);
+    const config = Object.freeze(searchableConfigSchema.parse({ enabled: true, root: 'searchable-data' }));
+    const runtime = createSearchableRuntime({ cwd, config, transport: new FixtureTransport() });
+
+    expect(runtime.store.config).toBe(config);
+    expect(() => createSearchableRuntime({ cwd, config, configOverrides: { enabled: false } })).toThrow(TypeError);
+    await runtime.close();
+  });
+
   it('runs provider search, bounded extraction, canonical stash, grep, and Ollama ask', async () => {
     const cwd = project();
     const transport = new FixtureTransport();

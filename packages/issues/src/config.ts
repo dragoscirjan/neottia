@@ -1,69 +1,148 @@
-import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { parseDocument } from 'yaml';
+import {
+  ConfigResolutionError,
+  createConfigRegistry,
+  defineConfigContribution,
+  resolveConfig,
+  type ConfigDiagnosticCode,
+} from '@neottia/config';
+import { PORTABLE_RELATIVE_PATH_PATTERN } from '@neottia/repository-store';
 import { z } from 'zod';
 import { IssueError } from './errors.js';
 
-// One schema-visible expression keeps runtime, generated JSON Schema, and the
-// repository-store path grammar aligned for reserved roots and trailing dots.
+/** Env var holding the project config location, checked before the Issues-only alias. */
+export const ISSUE_CONFIG_FILE_ENV = 'NEOTTIA_CONFIG_FILE';
+/** Deprecated Issues-only project config location. */
+export const ISSUE_LEGACY_CONFIG_FILE_ENV = 'NEOTTIA_ISSUES_CONFIG_FILE';
+/** Deprecated env var overriding the path of the Issues shard. */
+export const ISSUE_SHARD_PATH_ENV = 'NEOTTIA_CONFIG_ISSUES_PATH';
+/** Deprecated shard path retained by the standalone compatibility wrapper. */
+export const DEFAULT_ISSUE_SHARD_PATH = 'skills.issues';
+/** Default project config location, relative to the working directory. */
+export const DEFAULT_ISSUE_CONFIG_FILE = '.neottia/config.yml';
+
+const ALLOWED_ISSUES_ROOT_PATTERN =
+  /^(?!\.[nN][eE][oO][tT][tT][iI][aA](?:$|\/(?:[cC][aA][cC][hH][eE]|[rR][eE][pP][oO][sS][iI][tT][oO][rR][yY]-[sS][tT][oO][rR][eE])(?:\/|$))).+$/u;
+const ISSUE_ROOT_CHARACTERS_PATTERN = /^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/u;
+// These expressions survive JSON Schema generation and keep configured roots
+// aligned with repository-store checks without widening the existing grammar.
 const relativeRoot = z
   .string()
   .min(1)
   .max(1024)
-  .regex(
-    /^(?!\.[nN][eE][oO][tT][tT][iI][aA](?:$|\/(?:[cC][aA][cC][hH][eE]|[rR][eE][pP][oO][sS][iI][tT][oO][rR][yY]-[sS][tT][oO][rR][eE])(?:\/|$)))(?!\/)(?!.*(?:^|\/)\.\.?(?:\/|$))(?!.*(?:^|\/)[^/]*\.(?:\/|$))(?!.*\\)[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/u,
-    'must be a safe non-reserved project-relative path with no trailing-period component',
-  );
+  .regex(PORTABLE_RELATIVE_PATH_PATTERN, 'must use portable path components')
+  .regex(ISSUE_ROOT_CHARACTERS_PATTERN, 'must use letters, numbers, dots, underscores, hyphens, and slashes')
+  .regex(ALLOWED_ISSUES_ROOT_PATTERN, 'must not overlap reserved .neottia paths');
 const positive = z.number().int().positive();
 
-/** Complete strict skills.issues configuration shard. */
-export const issueConfigSchema = z
-  .object({
-    enabled: z.boolean().default(false),
-    root: relativeRoot.default('.neottia/issues'),
-    prefix: z
-      .string()
-      .regex(/^[a-z][a-z0-9-]{0,31}$/u)
-      .default('issue-'),
-    retrieval: z
-      .object({
-        limit: z.number().int().min(1).max(100).default(20),
-        max_bytes: z
-          .number()
-          .int()
-          .min(1024)
-          .max(16 * 1024 * 1024)
-          .default(1024 * 1024),
-      })
-      .prefault({}),
-    cache: z
-      .object({
-        max_age_ms: z.number().int().nonnegative().default(300_000),
-        stale_policy: z.enum(['prompt', 'rebuild', 'fail']).default('prompt'),
-      })
-      .prefault({}),
-    lock: z
-      .object({ wait_ms: z.number().int().nonnegative().default(10_000), stale_ms: positive.default(60_000) })
-      .prefault({}),
-    security: z
-      .object({
-        max_file_bytes: positive.default(1024 * 1024),
-        max_files: positive.default(10_000),
-        max_total_bytes: positive.default(64 * 1024 * 1024),
-        max_batch_paths: positive.default(1000),
-        max_query_bytes: positive.default(16 * 1024),
-        max_query_rows: positive.default(10_000),
-        max_result_bytes: positive.default(16 * 1024 * 1024),
-      })
-      .prefault({}),
-  })
-  .strict();
+/** Complete strict runtime schema for resolved config and direct IssueStore values. */
+export const issueConfigSchema = createResolvedIssueConfigSchema();
+/** Complete default-bearing schema used by standalone YAML shard tooling. */
+export const issueConfigFileSchema = createResolvedIssueConfigSchema();
+/** Default-free schema applied independently to every YAML and profile source layer. */
+export const issueConfigFilePatchSchema = createIssueConfigPatchSchema();
+/** Default-free schema applied to trusted explicit runtime override layers. */
+export const issueConfigRuntimePatchSchema = createIssueConfigPatchSchema();
+
+/** Builds the complete Issues schema while preserving all established defaults and limits. */
+function createResolvedIssueConfigSchema() {
+  return z
+    .object({
+      enabled: z.boolean().default(false),
+      root: relativeRoot.default('.neottia/issues'),
+      prefix: z
+        .string()
+        .regex(/^[a-z][a-z0-9-]{0,31}$/u)
+        .default('issue-'),
+      retrieval: z
+        .object({
+          limit: z.number().int().min(1).max(100).default(20),
+          max_bytes: z
+            .number()
+            .int()
+            .min(1024)
+            .max(16 * 1024 * 1024)
+            .default(1024 * 1024),
+        })
+        .prefault({}),
+      cache: z
+        .object({
+          max_age_ms: z.number().int().nonnegative().default(300_000),
+          stale_policy: z.enum(['prompt', 'rebuild', 'fail']).default('prompt'),
+        })
+        .prefault({}),
+      lock: z
+        .object({ wait_ms: z.number().int().nonnegative().default(10_000), stale_ms: positive.default(60_000) })
+        .prefault({}),
+      security: z
+        .object({
+          max_file_bytes: positive.default(1024 * 1024),
+          max_files: positive.default(10_000),
+          max_total_bytes: positive.default(64 * 1024 * 1024),
+          max_batch_paths: positive.default(1000),
+          max_query_bytes: positive.default(16 * 1024),
+          max_query_rows: positive.default(10_000),
+          max_result_bytes: positive.default(16 * 1024 * 1024),
+        })
+        .prefault({}),
+    })
+    .strict();
+}
+
+/** Builds a deep optional source schema without allowing one layer to inject defaults. */
+function createIssueConfigPatchSchema() {
+  return z
+    .object({
+      enabled: z.boolean().optional(),
+      root: relativeRoot.optional(),
+      prefix: z
+        .string()
+        .regex(/^[a-z][a-z0-9-]{0,31}$/u)
+        .optional(),
+      retrieval: z
+        .object({
+          limit: z.number().int().min(1).max(100).optional(),
+          max_bytes: z
+            .number()
+            .int()
+            .min(1024)
+            .max(16 * 1024 * 1024)
+            .optional(),
+        })
+        .strict()
+        .optional(),
+      cache: z
+        .object({
+          max_age_ms: z.number().int().nonnegative().optional(),
+          stale_policy: z.enum(['prompt', 'rebuild', 'fail']).optional(),
+        })
+        .strict()
+        .optional(),
+      lock: z
+        .object({ wait_ms: z.number().int().nonnegative().optional(), stale_ms: positive.optional() })
+        .strict()
+        .optional(),
+      security: z
+        .object({
+          max_file_bytes: positive.optional(),
+          max_files: positive.optional(),
+          max_total_bytes: positive.optional(),
+          max_batch_paths: positive.optional(),
+          max_query_bytes: positive.optional(),
+          max_query_rows: positive.optional(),
+          max_result_bytes: positive.optional(),
+        })
+        .strict()
+        .optional(),
+    })
+    .strict();
+}
 
 export type IssueConfig = z.output<typeof issueConfigSchema>;
 export type IssueConfigInput = z.input<typeof issueConfigSchema>;
 export type LoadIssueConfigOptions = Partial<IssueConfigInput> & { env?: NodeJS.ProcessEnv };
 
-/** Every supported env leaf, resolved after file values and before explicit overrides. */
+/** Every supported env leaf, retained in its established public tuple format. */
 export const ISSUE_ENV_BINDINGS = [
   ['enabled', 'NEOTTIA_ISSUES_ENABLED', 'boolean'],
   ['root', 'NEOTTIA_ISSUES_ROOT', 'string'],
@@ -83,94 +162,117 @@ export const ISSUE_ENV_BINDINGS = [
   ['security.max_result_bytes', 'NEOTTIA_ISSUES_MAX_RESULT_BYTES', 'integer'],
 ] as const;
 
-/** Loads skills.issues with explicit > env > file > defaults precedence. */
+/** Complete defaults contributed at the lowest shared-resolution precedence. */
+const ISSUE_CONFIG_DEFAULTS: IssueConfig = issueConfigSchema.parse({});
+
+/** Issues' typed contribution to a shared multi-module configuration registry. */
+export const issueConfigContribution = defineConfigContribution({
+  id: 'issues',
+  path: ['modules', 'issues'],
+  legacyPaths: [['skills', 'issues']],
+  filePatchSchema: issueConfigFilePatchSchema,
+  runtimePatchSchema: issueConfigRuntimePatchSchema,
+  resolvedSchema: issueConfigSchema,
+  defaults: ISSUE_CONFIG_DEFAULTS,
+  environment: ISSUE_ENV_BINDINGS.map(([path, name, kind]) => ({
+    kind,
+    names: [name],
+    path: path.split('.'),
+  })),
+});
+
+/**
+ * Resolves Issues through @neottia/config while retaining deprecated standalone
+ * file and shard aliases. Shared hosts should register issueConfigContribution
+ * once alongside their other modules instead.
+ */
 export function loadIssueConfig(cwd: string, options: LoadIssueConfigOptions = {}): IssueConfig {
   const env = options.env ?? process.env;
-  const file = resolve(cwd, env.NEOTTIA_CONFIG_FILE ?? env.NEOTTIA_ISSUES_CONFIG_FILE ?? '.neottia/config.yml');
-  let shard: Record<string, unknown> = {};
-  if (existsSync(file)) {
-    const document = parseDocument(readFileSync(file, 'utf8'), { uniqueKeys: true, strict: true });
-    if (document.errors.length)
-      throw new IssueError(`Malformed YAML in ${file}.`, 'configuration', 'CONFIG_YAML_INVALID');
-    const root = document.toJS() as unknown;
-    if (!isMapping(root) || root.version !== 1)
-      throw new IssueError(`Configuration requires version: 1 (${file}).`, 'configuration', 'CONFIG_VERSION');
-    const path = env.NEOTTIA_CONFIG_ISSUES_PATH ?? 'skills.issues';
-    if (!path.trim() || path.split('.').some((part) => !part))
-      throw new IssueError('NEOTTIA_CONFIG_ISSUES_PATH must be a non-empty dot-path.', 'configuration', 'CONFIG_PATH');
-    let current: unknown = root;
-    for (const segment of path.split('.')) {
-      if (!isMapping(current))
-        throw new IssueError(`Config shard path collides at ${path}.`, 'configuration', 'CONFIG_PATH');
-      current = current[segment];
-      if (current === undefined) {
-        current = {};
-        break;
-      }
-    }
-    if (!isMapping(current))
-      throw new IssueError(`Config shard ${path} must be a mapping.`, 'configuration', 'CONFIG_SHARD');
-    shard = current;
+  const contribution = compatibilityContribution(env);
+  const registry = createConfigRegistry([contribution]);
+  const { env: _envOption, ...issueOverrides } = options;
+  void _envOption;
+
+  try {
+    const snapshot = resolveConfig(registry, {
+      compatibility: { ignoreUnregisteredPaths: true },
+      cwd,
+      env,
+      overrides: { modules: { issues: issueOverrides } },
+      // The shared file variable is discovered by the resolver; this preserves the Issues-only fallback.
+      projectFile:
+        env[ISSUE_CONFIG_FILE_ENV] === undefined && env[ISSUE_LEGACY_CONFIG_FILE_ENV] !== undefined
+          ? resolveIssueConfigFile(cwd, env)
+          : undefined,
+    });
+    return snapshot.get(contribution) as IssueConfig;
+  } catch (error) {
+    if (!(error instanceof ConfigResolutionError)) throw error;
+    throw translateResolutionError(error);
   }
-  const fileParsed = issueConfigSchema.partial().safeParse(shard);
-  if (!fileParsed.success) throw configSchemaError(fileParsed.error);
-  const envValues: Record<string, unknown> = {};
-  for (const [path, name, kind] of ISSUE_ENV_BINDINGS) {
-    const raw = env[name];
-    if (raw === undefined || raw === '') continue;
-    let value: unknown = raw;
-    if (kind === 'integer') {
-      if (!/^\d+$/u.test(raw.trim()))
-        throw new IssueError(`${name} must be an integer.`, 'configuration', 'CONFIG_ENV');
-      value = Number(raw);
-    } else if (kind === 'boolean') {
-      if (/^(true|1)$/iu.test(raw.trim())) value = true;
-      else if (/^(false|0)$/iu.test(raw.trim())) value = false;
-      else throw new IssueError(`${name} must be a boolean.`, 'configuration', 'CONFIG_ENV');
-    }
-    assign(envValues, path, value);
-  }
-  const { env: _ignored, ...explicit } = options;
-  void _ignored;
-  const result = issueConfigSchema.safeParse(merge(fileParsed.data, envValues, explicit));
-  if (!result.success) throw configSchemaError(result.error);
-  return result.data;
 }
 
-/** Returns the resolved config file path for diagnostics and hosts. */
+/** Returns the resolved project config file path for diagnostics and compatibility hosts. */
 export function resolveIssueConfigFile(cwd: string, env: NodeJS.ProcessEnv = process.env): string {
-  return join(cwd, env.NEOTTIA_CONFIG_FILE ?? env.NEOTTIA_ISSUES_CONFIG_FILE ?? '.neottia/config.yml');
+  const configured = env[ISSUE_CONFIG_FILE_ENV] ?? env[ISSUE_LEGACY_CONFIG_FILE_ENV];
+  return configured ? resolve(cwd, configured) : join(cwd, DEFAULT_ISSUE_CONFIG_FILE);
 }
 
-function configSchemaError(error: z.ZodError): IssueError {
-  return new IssueError(
-    `Invalid issues config: ${error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; ')}`,
-    'configuration',
-    'CONFIG_INVALID',
-  );
-}
-function isMapping(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-function merge(
-  base: Record<string, unknown>,
-  ...layers: ReadonlyArray<Record<string, unknown>>
-): Record<string, unknown> {
-  const result = structuredClone(base);
-  for (const layer of layers)
-    for (const [key, value] of Object.entries(layer))
-      result[key] =
-        isMapping(result[key]) && isMapping(value)
-          ? merge(result[key] as Record<string, unknown>, value)
-          : structuredClone(value);
-  return result;
-}
-function assign(target: Record<string, unknown>, path: string, value: unknown): void {
-  const pieces = path.split('.');
-  let current = target;
-  for (const piece of pieces.slice(0, -1)) {
-    if (!isMapping(current[piece])) current[piece] = {};
-    current = current[piece] as Record<string, unknown>;
+/** Builds a contribution that recognizes one deprecated arbitrary standalone shard path. */
+function compatibilityContribution(env: NodeJS.ProcessEnv): typeof issueConfigContribution {
+  const shardPath = resolveIssueShardPath(env).split('.');
+  if (
+    pathsEqual(shardPath, issueConfigContribution.path) ||
+    issueConfigContribution.legacyPaths?.some((path) => pathsEqual(path, shardPath)) === true
+  ) {
+    return issueConfigContribution;
   }
-  current[pieces.at(-1) as string] = value;
+  return defineConfigContribution({
+    ...issueConfigContribution,
+    legacyPaths: [shardPath],
+  }) as typeof issueConfigContribution;
+}
+
+/** Validates the deprecated standalone shard-path override before registration. */
+function resolveIssueShardPath(env: NodeJS.ProcessEnv): string {
+  const configured = env[ISSUE_SHARD_PATH_ENV];
+  if (configured !== undefined && (!configured.trim() || configured.split('.').some((part) => !part))) {
+    throw new IssueError(`${ISSUE_SHARD_PATH_ENV} must be a non-empty dot-path.`, 'configuration', 'CONFIG_PATH');
+  }
+  return configured ?? DEFAULT_ISSUE_SHARD_PATH;
+}
+
+/** Translates value-free shared diagnostics into the established IssueError surface. */
+function translateResolutionError(error: ConfigResolutionError): IssueError {
+  const first = error.diagnostics[0];
+  const code = resolutionIssueCode(first?.code);
+  const details = error.diagnostics.map((diagnostic) => {
+    const path = diagnostic.path === undefined ? '' : ` at ${diagnostic.path.join('.')}`;
+    const environment = diagnostic.source?.environment === undefined ? '' : ` (${diagnostic.source.environment})`;
+    const file = diagnostic.source?.file === undefined ? '' : ` in ${diagnostic.source.file}`;
+    return `${diagnostic.message}${path}${environment}${file}`;
+  });
+  return new IssueError(`Invalid issues config: ${details.join('; ')}`, 'configuration', code, {
+    cause: error,
+    details: {
+      diagnostics: error.diagnostics.map((diagnostic) => ({
+        code: diagnostic.code,
+        ...(diagnostic.path === undefined ? {} : { path: diagnostic.path.join('.') }),
+      })),
+    },
+  });
+}
+
+/** Keeps historical configuration error codes where shared categories have direct equivalents. */
+function resolutionIssueCode(code: ConfigDiagnosticCode | undefined): string {
+  if (code === 'YAML') return 'CONFIG_YAML_INVALID';
+  if (code === 'VERSION') return 'CONFIG_VERSION';
+  if (code === 'PATH' || code === 'MERGE') return 'CONFIG_PATH';
+  if (code === 'ENVIRONMENT') return 'CONFIG_ENV';
+  return 'CONFIG_INVALID';
+}
+
+/** Compares configuration paths without interpreting dots inside segments. */
+function pathsEqual(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((segment, index) => segment === right[index]);
 }

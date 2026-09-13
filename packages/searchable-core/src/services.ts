@@ -1,3 +1,4 @@
+import type { DeepReadonly } from '@neottia/config';
 import type { SearchableConfig } from './config.js';
 import type { SearchableDeadline } from './http.js';
 import type { ResolvedSearchableToolInput, SearchableToolOutput } from './tool-contracts.js';
@@ -5,7 +6,7 @@ import type { ResolvedSearchableToolInput, SearchableToolOutput } from './tool-c
 /** Invocation controls passed unchanged to caller-owned implementations. */
 export interface SearchableOperationContext {
   readonly cwd: string;
-  readonly config: SearchableConfig;
+  readonly config: DeepReadonly<SearchableConfig>;
   readonly signal?: AbortSignal;
   /** Absolute Unix epoch deadline shared by all work in one tool call. */
   readonly deadline?: number;

@@ -21,6 +21,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@neottia/config-registry": "workspace:^",
     "@neottia/memory-core": "workspace:*",
     "@opencode-ai/plugin": "^1.18.29",
     "zod": "^4.5.4"

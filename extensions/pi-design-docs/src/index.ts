@@ -1,9 +1,11 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { resolve } from 'node:path';
+import { resolveHostConfigSnapshot } from '@neottia/config-registry';
 import {
   asDesignDocsError,
   closeDesignDocsToolContext,
   DESIGN_DOCS_TOOLS,
+  designDocsConfigContribution,
   DesignDocsError,
   designDocsToolJsonSchema,
   type DesignDocsConfigInput,
@@ -36,6 +38,7 @@ export interface DesignDocsExtensionOptions {
   readonly confirmTransition?: (target: 'review' | 'approved') => boolean | Promise<boolean>;
   readonly onStaleCache?: () => boolean | Promise<boolean>;
   readonly linkValidator?: DesignDocLinkValidator;
+  readonly env?: NodeJS.ProcessEnv;
 }
 export const designDocsToolParameters = Object.fromEntries(
   DESIGN_DOCS_TOOLS.map((definition) => [
@@ -65,11 +68,18 @@ export function registerDesignDocsTools(
         const cwd = resolve(invocation.cwd ?? defaultCwd);
         let context = contexts.get(cwd);
         if (!context) {
-          const linkValidator = options.linkValidator ?? createIssuesDesignDocsComposition({ cwd }).linkValidator;
+          const snapshot = resolveHostConfigSnapshot({
+            cwd,
+            interactive: true,
+            env: options.env ?? process.env,
+            ...(options.configOverrides ? { overrides: { modules: { design_docs: options.configOverrides } } } : {}),
+          });
+          const linkValidator =
+            options.linkValidator ?? createIssuesDesignDocsComposition({ cwd, snapshot }).linkValidator;
           context = {
             cwd,
             interactive: true,
-            configOverrides: options.configOverrides,
+            config: snapshot.get(designDocsConfigContribution),
             linkValidator,
             storeKey: {},
             onStaleCache:

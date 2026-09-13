@@ -85,6 +85,9 @@ importers:
 
   extensions/opencode-design-docs:
     dependencies:
+      '@neottia/config-registry':
+        specifier: workspace:^
+        version: link:../../packages/config-registry
       '@neottia/design-docs':
         specifier: workspace:*
         version: link:../../packages/design-docs
@@ -122,6 +125,9 @@ importers:
 
   extensions/opencode-issues:
     dependencies:
+      '@neottia/config-registry':
+        specifier: workspace:^
+        version: link:../../packages/config-registry
       '@neottia/issues':
         specifier: workspace:*
         version: link:../../packages/issues
@@ -153,6 +159,9 @@ importers:
 
   extensions/opencode-memory:
     dependencies:
+      '@neottia/config-registry':
+        specifier: workspace:^
+        version: link:../../packages/config-registry
       '@neottia/memory-core':
         specifier: workspace:*
         version: link:../../packages/memory-core
@@ -181,6 +190,12 @@ importers:
 
   extensions/opencode-searchable:
     dependencies:
+      '@neottia/config':
+        specifier: workspace:^
+        version: link:../../packages/config
+      '@neottia/config-registry':
+        specifier: workspace:^
+        version: link:../../packages/config-registry
       '@neottia/searchable-core':
         specifier: workspace:*
         version: link:../../packages/searchable-core
@@ -206,6 +221,9 @@ importers:
 
   extensions/pi-design-docs:
     dependencies:
+      '@neottia/config-registry':
+        specifier: workspace:^
+        version: link:../../packages/config-registry
       '@neottia/design-docs':
         specifier: workspace:*
         version: link:../../packages/design-docs
@@ -237,6 +255,9 @@ importers:
 
   extensions/pi-issues:
     dependencies:
+      '@neottia/config-registry':
+        specifier: workspace:^
+        version: link:../../packages/config-registry
       '@neottia/issues':
         specifier: workspace:*
         version: link:../../packages/issues
@@ -268,6 +289,9 @@ importers:
 
   extensions/pi-memory:
     dependencies:
+      '@neottia/config-registry':
+        specifier: workspace:^
+        version: link:../../packages/config-registry
       '@neottia/memory-core':
         specifier: workspace:*
         version: link:../../packages/memory-core
@@ -293,6 +317,12 @@ importers:
 
   extensions/pi-searchable:
     dependencies:
+      '@neottia/config':
+        specifier: workspace:^
+        version: link:../../packages/config
+      '@neottia/config-registry':
+        specifier: workspace:^
+        version: link:../../packages/config-registry
       '@neottia/searchable-core':
         specifier: workspace:*
         version: link:../../packages/searchable-core
@@ -303,6 +333,59 @@ importers:
       '@neottia/testkit':
         specifier: workspace:*
         version: link:../../packages/testkit
+      '@templ-project/tsconfig':
+        specifier: ^0.2.2
+        version: 0.2.2(@types/node@25.9.5)(@vitest/coverage-v8@4.1.11)(jsdom@29.1.1)(vite@7.3.6(@types/node@25.9.5)(tsx@4.23.13)(yaml@2.9.0))
+      '@types/node':
+        specifier: ^25.0.3
+        version: 25.9.5
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@types/node@25.9.5)(@vitest/coverage-v8@4.1.11)(jsdom@29.1.1)(vite@7.3.6(@types/node@25.9.5)(tsx@4.23.13)(yaml@2.9.0))
+
+  packages/config:
+    dependencies:
+      yaml:
+        specifier: ^2.9.0
+        version: 2.9.0
+      zod:
+        specifier: ^4.5.4
+        version: 4.5.4
+    devDependencies:
+      '@templ-project/tsconfig':
+        specifier: ^0.2.2
+        version: 0.2.2(@types/node@25.9.5)(@vitest/coverage-v8@4.1.11)(jsdom@29.1.1)(vite@7.3.6(@types/node@25.9.5)(tsx@4.23.13)(yaml@2.9.0))
+      '@types/node':
+        specifier: ^25.0.3
+        version: 25.9.5
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@types/node@25.9.5)(@vitest/coverage-v8@4.1.11)(jsdom@29.1.1)(vite@7.3.6(@types/node@25.9.5)(tsx@4.23.13)(yaml@2.9.0))
+
+  packages/config-registry:
+    dependencies:
+      '@neottia/config':
+        specifier: workspace:^
+        version: link:../config
+      '@neottia/design-docs':
+        specifier: workspace:^
+        version: link:../design-docs
+      '@neottia/issues':
+        specifier: workspace:^
+        version: link:../issues
+      '@neottia/memory-core':
+        specifier: workspace:^
+        version: link:../memory-core
+      '@neottia/searchable-core':
+        specifier: workspace:^
+        version: link:../searchable-core
+    devDependencies:
       '@templ-project/tsconfig':
         specifier: ^0.2.2
         version: 0.2.2(@types/node@25.9.5)(@vitest/coverage-v8@4.1.11)(jsdom@29.1.1)(vite@7.3.6(@types/node@25.9.5)(tsx@4.23.13)(yaml@2.9.0))
@@ -345,6 +428,9 @@ importers:
 
   packages/design-docs:
     dependencies:
+      '@neottia/config':
+        specifier: workspace:^
+        version: link:../config
       '@neottia/repository-store':
         specifier: workspace:^
         version: link:../repository-store
@@ -379,6 +465,12 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.30.0
         version: 1.30.0(zod@4.5.4)
+      '@neottia/config':
+        specifier: workspace:^
+        version: link:../config
+      '@neottia/config-registry':
+        specifier: workspace:^
+        version: link:../config-registry
       '@neottia/design-docs':
         specifier: workspace:*
         version: link:../design-docs
@@ -407,6 +499,9 @@ importers:
 
   packages/issues:
     dependencies:
+      '@neottia/config':
+        specifier: workspace:^
+        version: link:../config
       '@neottia/repository-store':
         specifier: workspace:^
         version: link:../repository-store
@@ -432,6 +527,9 @@ importers:
 
   packages/issues-design-docs:
     dependencies:
+      '@neottia/config':
+        specifier: workspace:^
+        version: link:../config
       '@neottia/design-docs':
         specifier: workspace:^
         version: link:../design-docs
@@ -460,6 +558,12 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.30.0
         version: 1.30.0(zod@4.5.4)
+      '@neottia/config':
+        specifier: workspace:^
+        version: link:../config
+      '@neottia/config-registry':
+        specifier: workspace:^
+        version: link:../config-registry
       '@neottia/issues':
         specifier: workspace:*
         version: link:../issues
@@ -488,6 +592,9 @@ importers:
 
   packages/memory-core:
     dependencies:
+      '@neottia/config':
+        specifier: workspace:^
+        version: link:../config
       '@neottia/repository-store':
         specifier: workspace:^
         version: link:../repository-store
@@ -522,6 +629,12 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.30.0
         version: 1.30.0(zod@4.5.4)
+      '@neottia/config':
+        specifier: workspace:^
+        version: link:../config
+      '@neottia/config-registry':
+        specifier: workspace:^
+        version: link:../config-registry
       '@neottia/memory-core':
         specifier: workspace:*
         version: link:../memory-core
@@ -575,6 +688,9 @@ importers:
       '@mozilla/readability':
         specifier: ^0.6.0
         version: 0.6.0
+      '@neottia/config':
+        specifier: workspace:^
+        version: link:../config
       '@neottia/repository-store':
         specifier: workspace:*
         version: link:../repository-store
@@ -615,6 +731,12 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.30.0
         version: 1.30.0(zod@4.5.4)
+      '@neottia/config':
+        specifier: workspace:^
+        version: link:../config
+      '@neottia/config-registry':
+        specifier: workspace:^
+        version: link:../config-registry
       '@neottia/searchable-core':
         specifier: workspace:*
         version: link:../searchable-core
@@ -637,6 +759,12 @@ importers:
 
   packages/testkit:
     dependencies:
+      '@neottia/config':
+        specifier: workspace:^
+        version: link:../config
+      '@neottia/config-registry':
+        specifier: workspace:^
+        version: link:../config-registry
       '@neottia/design-docs':
         specifier: workspace:*
         version: link:../design-docs

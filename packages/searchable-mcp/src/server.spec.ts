@@ -3,13 +3,17 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { resolveHostConfigSnapshot } from '@neottia/config-registry';
 import {
   createSearchableRuntime,
   searchableToolJsonSchema,
   SEARCHABLE_TOOLS,
+  searchableConfigContribution,
   type SearchableHttpTransport,
+  type SearchableRuntime,
+  type SearchableRuntimeOptions,
 } from '@neottia/searchable-core';
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import { createSearchableServer } from './server.js';
 
 const roots: string[] = [];
@@ -25,16 +29,19 @@ it('publishes shared schemas and executes stash and grep through MCP', async () 
   const cwd = mkdtempSync(join(tmpdir(), 'searchable-mcp-'));
   roots.push(cwd);
   mkdirSync(join(cwd, '.neottia'));
-  writeFileSync(join(cwd, '.neottia/config.yml'), 'version: 1\nskills:\n  searchable:\n    enabled: true\n');
+  writeFileSync(join(cwd, '.neottia/config.yml'), 'version: 1\nmodules:\n  searchable:\n    enabled: true\n');
   const transport: SearchableHttpTransport = {
     async request(input) {
       return { status: 200, headers: {}, bytes: Buffer.from('{}'), finalUrl: input.url };
     },
   };
-  const server = createSearchableServer({
-    cwd,
-    runtimeFactory: (options) => createSearchableRuntime({ ...options, transport }),
-  });
+  const runtimeFactory = vi.fn((options: SearchableRuntimeOptions) =>
+    createSearchableRuntime({ ...options, transport }),
+  );
+  const server = createSearchableServer({ cwd, env: {}, runtimeFactory });
+  expect(runtimeFactory).toHaveBeenCalledWith(
+    expect.objectContaining({ cwd, config: expect.objectContaining({ enabled: true }) }),
+  );
   servers.push(server);
   const client = new Client({ name: 'test', version: '1' });
   clients.push(client);
@@ -62,3 +69,76 @@ it('publishes shared schemas and executes stash and grep through MCP', async () 
     code: 'TOOL_INPUT_INVALID',
   });
 });
+
+it('applies every shared source layer and can reuse an injected snapshot without rereading files', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'searchable-mcp-config-'));
+  roots.push(root);
+  const cwd = join(root, 'project');
+  const globalRoot = join(root, 'global');
+  mkdirSync(join(cwd, '.neottia'), { recursive: true });
+  mkdirSync(join(globalRoot, 'neottia'), { recursive: true });
+  writeFileSync(
+    join(globalRoot, 'neottia/config.yml'),
+    'version: 1\nmodules:\n  searchable:\n    search:\n      provider: brave\n',
+  );
+  const projectFile = join(cwd, '.neottia/config.yml');
+  writeFileSync(
+    projectFile,
+    `version: 1
+modules:
+  searchable:
+    enabled: true
+    fetch:
+      timeout_ms: 1111
+profiles:
+  selected:
+    modules:
+      searchable:
+        grep:
+          limit: 7
+`,
+  );
+  const env = {
+    XDG_CONFIG_HOME: globalRoot,
+    NEOTTIA_PROFILE: 'selected',
+    NEOTTIA_SEARCHABLE_SEARCH_LIMIT: '8',
+  };
+  const runtime = fakeRuntime();
+  const runtimeFactory = vi.fn(() => runtime);
+  const server = createSearchableServer({
+    cwd,
+    env,
+    configOverrides: { ask: { limit: 9 } },
+    runtimeFactory,
+  });
+  servers.push(server);
+  const resolved = runtimeFactory.mock.calls[0]?.[0]?.config;
+  expect(resolved).toMatchObject({
+    enabled: true,
+    search: { provider: 'brave', limit: 8 },
+    fetch: { timeout_ms: 1111 },
+    grep: { limit: 7 },
+    ask: { limit: 9 },
+    cache: { stale_policy: 'rebuild' },
+  });
+
+  const snapshot = resolveHostConfigSnapshot({ cwd, env, interactive: false });
+  rmSync(projectFile);
+  const injectedFactory = vi.fn(() => fakeRuntime());
+  const injectedServer = createSearchableServer({ cwd, snapshot, runtimeFactory: injectedFactory });
+  servers.push(injectedServer);
+  expect(injectedFactory.mock.calls[0]?.[0]?.config).toBe(snapshot.get(searchableConfigContribution));
+});
+
+/** Minimal runtime used to inspect host configuration without service work. */
+function fakeRuntime(): SearchableRuntime {
+  return {
+    search: vi.fn(),
+    fetch: vi.fn(),
+    stash: vi.fn(),
+    grep: vi.fn(),
+    ask: vi.fn(),
+    close: vi.fn(async () => undefined),
+    store: {},
+  } as unknown as SearchableRuntime;
+}

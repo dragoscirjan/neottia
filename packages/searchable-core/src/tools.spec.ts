@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { searchableConfigSchema } from './config.js';
 import { SearchableError, serializeSearchableError } from './errors.js';
 import type { SearchableServices } from './services.js';
 import { findSearchableTool, SEARCHABLE_TOOLS } from './tools.js';
@@ -108,6 +109,31 @@ describe('SEARCHABLE_TOOLS', () => {
     expect(injected.grep).toHaveBeenNthCalledWith(2, { query: 'explicit', limit: 3 }, expect.any(Object));
     expect(injected.ask).toHaveBeenNthCalledWith(1, { question: 'configured', limit: 7 }, expect.any(Object));
     expect(injected.ask).toHaveBeenNthCalledWith(2, { question: 'explicit', limit: 4 }, expect.any(Object));
+  });
+
+  it('uses an injected resolved shard without rereading standalone configuration', async () => {
+    const injected = services();
+    const config = searchableConfigSchema.parse({
+      enabled: true,
+      search: { provider: 'brave', limit: 9 },
+      grep: { limit: 8 },
+      ask: { limit: 7 },
+    });
+
+    await tool('web_search').run(
+      {
+        cwd,
+        services: injected,
+        config,
+        configOverrides: { search: { provider: 'google', limit: 1 } },
+      },
+      { query: 'shared snapshot' },
+    );
+
+    expect(injected.search).toHaveBeenCalledWith(
+      { query: 'shared snapshot', provider: 'brave', limit: 9 },
+      expect.objectContaining({ config }),
+    );
   });
 
   it('rejects invalid input before service execution, including web_grep.provider', async () => {

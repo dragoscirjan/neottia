@@ -35,9 +35,9 @@ export interface TempProject {
 }
 
 export interface CreateTempProjectOptions {
-  /** Extra values merged into the `skills.memory` config shard. */
+  /** Extra values merged into the `modules.memory` config shard. */
   memory?: Partial<MemoryConfigInput>;
-  /** Extra values merged into the `skills.design_docs` config shard. */
+  /** Extra values merged into the `modules.design_docs` config shard. */
   designDocs?: Partial<DesignDocsConfigInput>;
 }
 
@@ -52,7 +52,7 @@ export interface TempIssueProject {
 }
 
 export interface CreateTempIssueProjectOptions {
-  /** Extra values merged into the enabled `skills.issues` shard. */
+  /** Extra values merged into the enabled `modules.issues` shard. */
   readonly issues?: Partial<IssueConfigInput>;
 }
 
@@ -69,7 +69,7 @@ export function createTempProject(options: CreateTempProjectOptions = {}): TempP
   const designDocsShard = { enabled: true, ...(options.designDocs ?? {}) };
   writeFileSync(
     configPath,
-    `version: 1\nskills:\n  memory:\n${yamlShard(memoryShard)}  design_docs:\n${yamlShard(designDocsShard)}`,
+    `version: 1\nmodules:\n  memory:\n${yamlShard(memoryShard)}  design_docs:\n${yamlShard(designDocsShard)}`,
     'utf8',
   );
 
@@ -99,7 +99,7 @@ export function createTempIssueProject(options: CreateTempIssueProjectOptions = 
   mkdirSync(join(configPath, '..'), { recursive: true });
   writeFileSync(
     configPath,
-    `version: 1\nskills:\n  issues:\n${yamlShard({ enabled: true, ...(options.issues ?? {}) })}`,
+    `version: 1\nmodules:\n  issues:\n${yamlShard({ enabled: true, ...(options.issues ?? {}) })}`,
     'utf8',
   );
   const xdgDataDir = join(cwd, '.xdg-data');

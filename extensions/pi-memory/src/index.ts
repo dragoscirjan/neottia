@@ -1,5 +1,8 @@
+import { resolve } from 'node:path';
+import { resolveHostConfigSnapshot } from '@neottia/config-registry';
 import {
   closeMemoryToolContext,
+  memoryConfigContribution,
   memoryToolJsonSchema,
   MEMORY_TOOLS,
   type MemoryToolContext,
@@ -30,7 +33,7 @@ export interface PiExtensionApi {
       params: Record<string, unknown>,
       signal: AbortSignal,
       onUpdate: (update: unknown) => void,
-      ctx: unknown,
+      ctx: { cwd?: string; ui?: { confirm: (title: string, message: string) => Promise<boolean> } },
     ) => Promise<{ content: Array<{ type: 'text'; text: string }>; details: Record<string, never> }>;
   }) => unknown;
 }
@@ -42,6 +45,8 @@ export interface MemoryExtensionOptions {
   readonly configOverrides?: Record<string, unknown>;
   /** Optional confirmation callback for stale-cache rebuilds. */
   readonly onStaleCache?: () => boolean | Promise<boolean>;
+  /** Explicit environment for deterministic embedding and tests. */
+  readonly env?: NodeJS.ProcessEnv;
 }
 
 /** Pi parameters generated losslessly from the core Zod contracts. */
@@ -54,13 +59,8 @@ export const memoryToolParameters = Object.fromEntries(
  * Exported separately from `default` so tests can drive it with a fake API.
  */
 export function registerMemoryTools(pi: PiExtensionApi, options: MemoryExtensionOptions = {}): () => Promise<void> {
-  const storeKey = {};
-  const context: MemoryToolContext = {
-    cwd: options.cwd ?? process.cwd(),
-    interactive: true,
-    configOverrides: options.configOverrides,
-    storeKey,
-  };
+  const contexts = new Map<string, MemoryToolContext>();
+  const defaultCwd = resolve(options.cwd ?? process.cwd());
 
   for (const tool of MEMORY_TOOLS) {
     const parameters = memoryToolParameters[tool.name];
@@ -72,13 +72,29 @@ export function registerMemoryTools(pi: PiExtensionApi, options: MemoryExtension
         .replace(/(^|_)([a-z])/gu, (_, __, character: string) => character.toUpperCase()),
       description: tool.description,
       parameters,
-      async execute(_toolCallId, params, _signal, _onUpdate, toolContext) {
-        const uiContext = toolContext as { ui?: { confirm: (title: string, message: string) => Promise<boolean> } };
+      async execute(_toolCallId, params, _signal, _onUpdate, toolContext = {}) {
+        const cwd = resolve(toolContext.cwd ?? defaultCwd);
+        let context = contexts.get(cwd);
+        if (!context) {
+          const snapshot = resolveHostConfigSnapshot({
+            cwd,
+            interactive: true,
+            env: options.env ?? process.env,
+            ...(options.configOverrides ? { overrides: { modules: { memory: options.configOverrides } } } : {}),
+          });
+          context = {
+            cwd,
+            interactive: true,
+            config: snapshot.get(memoryConfigContribution),
+            storeKey: {},
+          };
+          contexts.set(cwd, context);
+        }
         const callContext: MemoryToolContext = {
           ...context,
           onStaleCache:
             options.onStaleCache ??
-            (() => uiContext.ui?.confirm('Memory cache is stale', 'Rebuild the memory search cache now?') ?? true),
+            (() => toolContext.ui?.confirm('Memory cache is stale', 'Rebuild the memory search cache now?') ?? true),
         };
         const result = await tool.run(callContext, params);
         return {
@@ -88,7 +104,10 @@ export function registerMemoryTools(pi: PiExtensionApi, options: MemoryExtension
       },
     });
   }
-  return () => closeMemoryToolContext(context);
+  return async () => {
+    await Promise.all([...contexts.values()].map(closeMemoryToolContext));
+    contexts.clear();
+  };
 }
 
 /** pi extension entry point. */

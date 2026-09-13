@@ -16,7 +16,7 @@ Rotate provider credentials through their source environment variables and resta
 
 ## Failure triage
 
-- `CAPABILITY_DISABLED`: set `skills.searchable.enabled: true` in the active CWD.
+- `CAPABILITY_DISABLED`: set `modules.searchable.enabled: true` in the active CWD.
 - `PROVIDER_CREDENTIAL_MISSING`: configure the selected API provider or use DuckDuckGo.
 - `NETWORK_DESTINATION_BLOCKED`: choose a public HTTP(S) URL; local services are intentionally unreachable through fetch.
 - `STASH_CACHE_REBUILD_REQUIRED`: permit a rebuild or switch policy to `rebuild`.

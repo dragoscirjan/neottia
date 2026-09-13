@@ -12,18 +12,22 @@ Node.js 22.16 or newer is required. Canonical stash files and the SQLite FTS cac
 
 ## Configure
 
+Searchable contributes the canonical `modules.searchable` shard to `@neottia/config`. Hosts resolve the official registry once and pass the immutable shard to the runtime and tool context. `loadSearchableConfig()` remains available for standalone use and accepts the deprecated `skills.searchable` path.
+
+See the [unified configuration guide](../../docs/configuration.md) for shared files, profiles, precedence, secret handling, diagnostics, and migration. Configuration resolves in this order: defaults, global file, project file, selected global profile, selected project profile, environment bindings, and explicit runtime overrides. The YAML root must contain `version: 1`.
+
 Create `.neottia/config.yml` in the project working directory:
 
 ```yaml
 version: 1
-skills:
+modules:
   searchable:
     enabled: true
     search:
       provider: duckduckgo
 ```
 
-DuckDuckGo requires no key. Google needs `google_api_key` and `google_cse_id`; Bing and Brave need their API keys. YAML credential values must use `${ENV_NAME}` references. See [`config.schema.json`](./config.schema.json) for the complete shard.
+DuckDuckGo requires no key. Google needs `google_api_key` and `google_cse_id`; Bing and Brave need their API keys. YAML credential values must use exact `${ENV_NAME}` references. The resolver expands only the winning reference and redacts all provider credentials from snapshots, provenance, and diagnostics. Service endpoints must use HTTP or HTTPS and cannot contain user information, a query string, or a fragment. See [`config.schema.json`](./config.schema.json) for the complete standalone shard.
 
 ## Use the concrete runtime
 
@@ -48,7 +52,7 @@ The shared registry exposes `web_search`, `web_fetch`, `web_stash`, `web_grep`, 
 - Stash writes canonical JSON records below `.neottia/searchable/pages/`. `.neottia/cache/searchable.sqlite` is a disposable FTS5 index with a separate limit of eight times the canonical quota plus 8 MiB.
 - Grep treats query text as bounded literal terms. It reloads canonical records before returning titles, URLs, and snippets.
 - Ask selects canonical stash context and calls the configured Ollama `/api/generate` endpoint. It parses newline-delimited JSON incrementally, bounds frames and the cumulative answer, and returns the source URLs.
-- `skills.searchable.enabled` must resolve to `true` before any service runs.
+- `modules.searchable.enabled` must resolve to `true` before any service runs.
 
 Call `close()` when the host shuts down. Closing aborts new work and closes the injected transport.
 

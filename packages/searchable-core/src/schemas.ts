@@ -6,10 +6,17 @@ export const searchableProviderSchema = z.enum(['duckduckgo', 'google', 'bing', 
 export const webFetchSourceSchema = z.enum(['direct', 'jina', 'wayback']);
 
 const HTTP_URL_PATTERN = /^[hH][tT][tT][pP][sS]?:\/\//u;
+const SAFE_HTTP_ENDPOINT_PATTERN = /^[hH][tT][tT][pP][sS]?:\/\/(?![^/?#]*@)[^?#]+$/u;
 /** HTTP(S)-only URL schema whose protocol constraint survives JSON Schema generation. */
 export const searchableHttpUrlSchema = z
   .url()
   .regex(HTTP_URL_PATTERN, 'must use HTTP(S)')
+  .max(8 * 1024)
+  .meta({ format: 'uri' });
+/** Service endpoint URL that cannot embed credentials or secret-bearing suffixes. */
+export const searchableEndpointUrlSchema = z
+  .url()
+  .regex(SAFE_HTTP_ENDPOINT_PATTERN, 'must not contain user information, a query, or a fragment')
   .max(8 * 1024)
   .meta({ format: 'uri' });
 const title = z

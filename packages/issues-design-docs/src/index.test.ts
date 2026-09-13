@@ -1,8 +1,9 @@
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { DesignDocumentStore, loadDesignDocsConfig } from '@neottia/design-docs';
-import { decodeIssue, encodeIssue, IssueStore, loadIssueConfig } from '@neottia/issues';
+import { createConfigRegistry, resolveConfig } from '@neottia/config';
+import { DesignDocumentStore, designDocsConfigContribution, loadDesignDocsConfig } from '@neottia/design-docs';
+import { decodeIssue, encodeIssue, IssueStore, issueConfigContribution, loadIssueConfig } from '@neottia/issues';
 import { DEFAULT_STORE_LIMITS, resolveManagedRoot, withRepositoryLease } from '@neottia/repository-store';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createIssuesDesignDocsComposition } from './index.js';
@@ -14,15 +15,21 @@ describe('Issues and Design Docs composition', () => {
   it('resolves real stable links and validates them under one repository lease', async () => {
     const cwd = await mkdtemp(join(tmpdir(), 'neottia-composition-'));
     roots.push(cwd);
-    const composition = createIssuesDesignDocsComposition({
+    const registry = createConfigRegistry([issueConfigContribution, designDocsConfigContribution]);
+    const snapshot = resolveConfig(registry, {
       cwd,
-      issuesConfigOverrides: { enabled: true },
-      designDocsConfigOverrides: { enabled: true },
+      env: {},
+      globalFile: false,
+      projectFile: false,
+      overrides: {
+        modules: { issues: { enabled: true }, design_docs: { enabled: true } },
+      },
     });
-    const documents = await DesignDocumentStore.fromConfig(loadDesignDocsConfig(cwd, { enabled: true }), cwd, {
+    const composition = createIssuesDesignDocsComposition({ cwd, snapshot });
+    const documents = await DesignDocumentStore.fromConfig(snapshot.get(designDocsConfigContribution), cwd, {
       linkValidator: composition.linkValidator,
     });
-    const issues = new IssueStore(loadIssueConfig(cwd, { enabled: true }), cwd, {
+    const issues = new IssueStore(snapshot.get(issueConfigContribution), cwd, {
       resolver: composition.resolver,
     });
     const original = await documents.create({ title: 'Stable architecture', kind: 'hld', body: 'Decision.' });
@@ -89,7 +96,7 @@ describe('Issues and Design Docs composition', () => {
     expect(batch.results.filter((result) => result.status === 'resolved')).toHaveLength(69);
   });
 
-  it('reloads the Design Docs store after configuration changes', async () => {
+  it('pins both domains to one snapshot while a new composition observes file changes', async () => {
     const cwd = await mkdtemp(join(tmpdir(), 'neottia-composition-config-'));
     roots.push(cwd);
     await mkdir(join(cwd, '.neottia'));
@@ -109,10 +116,16 @@ describe('Issues and Design Docs composition', () => {
     await writeConfig('docs-b');
     const secondStore = await DesignDocumentStore.fromConfig(loadDesignDocsConfig(cwd), cwd);
     const second = await secondStore.create({ title: 'Second root', kind: 'hld' });
-    const secondResult = await withRepositoryLease(authority, (lease) =>
+    const pinnedResult = await withRepositoryLease(authority, (lease) =>
       composition.resolver.resolveMany([{ kind: 'design-doc', id: second.id }], { lease }),
     );
-    expect(secondResult).toMatchObject({ status: 'ok', results: [{ status: 'resolved' }] });
+    expect(pinnedResult).toMatchObject({ status: 'ok', results: [{ status: 'unresolved' }] });
+
+    const refreshed = createIssuesDesignDocsComposition({ cwd });
+    const refreshedResult = await withRepositoryLease(authority, (lease) =>
+      refreshed.resolver.resolveMany([{ kind: 'design-doc', id: second.id }], { lease }),
+    );
+    expect(refreshedResult).toMatchObject({ status: 'ok', results: [{ status: 'resolved' }] });
   });
 
   it('reports missing stable IDs and pinned versions from canonical Issues', async () => {

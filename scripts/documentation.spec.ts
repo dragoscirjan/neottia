@@ -4,6 +4,7 @@ import { basename, dirname, extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { resolveHostConfigSnapshot } from '@neottia/config-registry';
 import {
   closeDesignDocsToolContext,
   designDocsConfigSchema,
@@ -20,6 +21,7 @@ import {
   createSearchableRuntime,
   findSearchableTool,
   SEARCHABLE_TOOLS,
+  searchableConfigContribution,
   searchableConfigFileSchema,
   type SearchableRuntime,
 } from '@neottia/searchable-core';
@@ -242,10 +244,16 @@ describe('documentation contracts', () => {
           else {
             const document = parseDocument(block.content, { strict: true, uniqueKeys: true });
             if (document.errors.length) throw new Error(document.errors.map((error) => error.message).join('; '));
-            const value = document.toJS() as { version?: unknown; skills?: Record<string, unknown> } | undefined;
-            if (value?.skills || value?.version !== undefined) {
+            const value = document.toJS() as
+              | {
+                  version?: unknown;
+                  modules?: Record<string, unknown>;
+                  skills?: Record<string, unknown>;
+                }
+              | undefined;
+            if (value?.modules || value?.skills || value?.version !== undefined) {
               if (value.version !== 1) throw new Error('configuration root must use version: 1');
-              const skills = value.skills ?? {};
+              const shards = value.modules ?? value.skills ?? {};
               const checks = [
                 ['memory', memoryConfigFileSchema.partial()],
                 ['issues', issueConfigSchema.partial()],
@@ -253,8 +261,8 @@ describe('documentation contracts', () => {
                 ['searchable', searchableConfigFileSchema.partial()],
               ] as const;
               for (const [name, schema] of checks) {
-                if (skills[name] === undefined) continue;
-                const result = schema.safeParse(skills[name]);
+                if (shards[name] === undefined) continue;
+                const result = schema.safeParse(shards[name]);
                 if (!result.success) throw new Error(`${name}: ${result.error.message}`);
               }
             }
@@ -325,10 +333,17 @@ describe('documentation contracts', () => {
 
   it('runs documented first success and the complete composition workflow in a temporary project', async () => {
     const cwd = mkdtempSync(join(tmpdir(), 'neottia-documentation-'));
+    mkdirSync(join(cwd, '.neottia'), { recursive: true });
+    writeFileSync(
+      join(cwd, '.neottia/config.yml'),
+      'version: 1\nmodules:\n  memory:\n    enabled: true\n  issues:\n    enabled: true\n  design_docs:\n    enabled: true\n  searchable:\n    enabled: true\n',
+    );
+    const snapshot = resolveHostConfigSnapshot({ cwd, interactive: false, env: {} });
     const memoryContext = { cwd, interactive: false, storeKey: {} };
-    const composition = createIssuesDesignDocsComposition({ cwd });
+    const composition = createIssuesDesignDocsComposition({ cwd, snapshot });
     const issueContext = { cwd, interactive: false, storeKey: {}, resolver: composition.resolver };
     const documentContext = { cwd, interactive: false, storeKey: {}, linkValidator: composition.linkValidator };
+    const searchableConfig = snapshot.get(searchableConfigContribution);
     let searchableRuntime: SearchableRuntime | undefined;
     const runMemory = async (name: string, input: unknown) => {
       const tool = findMemoryTool(name);
@@ -346,11 +361,6 @@ describe('documentation contracts', () => {
       return tool.run(documentContext, input);
     };
     try {
-      mkdirSync(join(cwd, '.neottia'), { recursive: true });
-      writeFileSync(
-        join(cwd, '.neottia/config.yml'),
-        'version: 1\nskills:\n  memory:\n    enabled: true\n  issues:\n    enabled: true\n  design_docs:\n    enabled: true\n  searchable:\n    enabled: true\n',
-      );
       const inputs = fencedBlocks(readFileSync(join(docs, 'get-started/first-success.md'), 'utf8'))
         .filter((block) => block.language === 'json')
         .map((block) => JSON.parse(block.content) as Record<string, unknown>);
@@ -370,12 +380,17 @@ describe('documentation contracts', () => {
         ),
       ).toBe(true);
       expect(existsSync(join(cwd, draft.path))).toBe(true);
-      searchableRuntime = createSearchableRuntime({ cwd });
+      searchableRuntime = createSearchableRuntime({ cwd, config: searchableConfig });
       const stashTool = findSearchableTool('web_stash');
       const grepTool = findSearchableTool('web_grep');
       if (!stashTool || !grepTool) throw new Error('Missing Searchable first-success tools.');
-      await stashTool.run({ cwd, services: searchableRuntime }, inputs[3]);
-      expect(await grepTool.run({ cwd, services: searchableRuntime }, { query: 'status endpoint' })).toMatchObject({
+      await stashTool.run({ cwd, services: searchableRuntime, config: searchableConfig }, inputs[3]);
+      expect(
+        await grepTool.run(
+          { cwd, services: searchableRuntime, config: searchableConfig },
+          { query: 'status endpoint' },
+        ),
+      ).toMatchObject({
         results: [{ url: 'https://example.com/deployment-guide' }],
       });
 

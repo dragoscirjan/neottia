@@ -7,6 +7,20 @@
     "issue": 107
   },
   {
+    "name": "@neottia/config",
+    "manifest": "packages/config/package.json",
+    "classification": "library/embedding",
+    "route": "/configuration",
+    "issue": 111
+  },
+  {
+    "name": "@neottia/config-registry",
+    "manifest": "packages/config-registry/package.json",
+    "classification": "library/embedding",
+    "route": "/configuration",
+    "issue": 111
+  },
+  {
     "name": "@neottia/design-docs",
     "manifest": "packages/design-docs/package.json",
     "classification": "library/embedding",

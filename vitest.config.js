@@ -1,10 +1,11 @@
 import { resolve } from 'node:path';
 import { defineConfig } from 'vitest/config';
 
-// Workspace packages resolve to SOURCE in tests: dist builds must never be a
-// precondition for running the suite. (The harness E2E tests still build dist
-// explicitly — they spawn the compiled MCP server.)
+// Vitest resolves workspace packages to source. The root test still builds
+// dist because Bun and child-process suites execute package entry points.
 const workspaceSourceAliases = {
+  '@neottia/config': resolve(__dirname, 'packages/config/src/index.ts'),
+  '@neottia/config-registry': resolve(__dirname, 'packages/config-registry/src/index.ts'),
   '@neottia/design-docs': resolve(__dirname, 'packages/design-docs/src/index.ts'),
   '@neottia/design-docs-mcp': resolve(__dirname, 'packages/design-docs-mcp/src/index.ts'),
   '@neottia/issues': resolve(__dirname, 'packages/issues/src/index.ts'),
@@ -14,6 +15,7 @@ const workspaceSourceAliases = {
   '@neottia/memory-mcp': resolve(__dirname, 'packages/memory-mcp/src/index.ts'),
   '@neottia/repository-store': resolve(__dirname, 'packages/repository-store/src/index.ts'),
   '@neottia/searchable-core': resolve(__dirname, 'packages/searchable-core/src/index.ts'),
+  '@neottia/searchable-mcp': resolve(__dirname, 'packages/searchable-mcp/src/index.ts'),
   '@neottia/testkit': resolve(__dirname, 'packages/testkit/src/index.ts'),
 };
 

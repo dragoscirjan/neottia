@@ -1,4 +1,10 @@
-import { closeMemoryToolContext, MEMORY_TOOLS, type MemoryToolContext } from '@neottia/memory-core';
+import { resolveHostConfigSnapshot } from '@neottia/config-registry';
+import {
+  closeMemoryToolContext,
+  memoryConfigContribution,
+  MEMORY_TOOLS,
+  type MemoryToolContext,
+} from '@neottia/memory-core';
 import { tool, type Plugin } from '@opencode-ai/plugin';
 
 /**
@@ -42,11 +48,16 @@ export function buildMemoryTools(
 
 /** OpenCode plugin entry point. */
 export const NeottiaMemoryPlugin: Plugin = async (ctx) => {
+  const effective = resolveHostConfigSnapshot({
+    cwd: ctx.directory,
+    env: process.env,
+    interactive: false,
+  });
   const context: MemoryToolContext = {
     cwd: ctx.directory,
-    // OpenCode has no stable confirmation API in the plugin contract; the
-    // default plugin therefore follows the non-interactive rebuild behavior.
+    // OpenCode has no stable confirmation API in the plugin contract.
     interactive: false,
+    config: effective.get(memoryConfigContribution),
   };
   return {
     tool: buildMemoryTools(context, tool),

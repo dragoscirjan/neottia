@@ -1,106 +1,115 @@
 # Configuring memory
 
-Memory is configured through a **shard**: the `skills.memory` section of the project configuration file. Library users can override values in code, while environment variables override only the bindings explicitly listed below. Configure only the values you need to change. The schema supplies the remaining defaults.
+Memory contributes the canonical `modules.memory` shard to `@neottia/config`. The deprecated `skills.memory` location remains accepted by `loadMemoryConfig` during migration. New hosts should register `memoryConfigContribution`, resolve one multi-module snapshot for the effective working directory, and pass `snapshot.get(memoryConfigContribution)` to `MemoryStore.fromConfig`.
 
-## Where the configuration lives
+## Where configuration is read from
 
-| What                     | Resolution                                                                             | Default                 |
-| ------------------------ | -------------------------------------------------------------------------------------- | ----------------------- |
-| Config file              | `NEOTTIA_CONFIG_FILE` → `NEOTTIA_MEMORY_CONFIG_FILE` → `<project>/.neottia/config.yml` | The project config file |
-| Memory section inside it | `NEOTTIA_CONFIG_MEMORY_PATH`                                                           | `skills.memory`         |
+The shared resolver reads optional global and project documents:
 
-The file must start with `version: 1`. Sections belonging to other modules are ignored by memory. A generated [JSON Schema](https://github.com/dragoscirjan/neottia/blob/main/packages/memory-core/config.schema.json) is included with `@neottia/memory-core` for editor completion and CI validation.
+- Linux: `$XDG_CONFIG_HOME/neottia/config.yml`, or `~/.config/neottia/config.yml`;
+- macOS: `$XDG_CONFIG_HOME/neottia/config.yml`, or `~/Library/Application Support/neottia/config.yml`;
+- Windows: `%APPDATA%\neottia\config.yml`;
+- project: `<cwd>/.neottia/config.yml`.
 
-## Minimal setup
+`NEOTTIA_GLOBAL_CONFIG_FILE` and `NEOTTIA_CONFIG_FILE` select explicit files. Relative project paths resolve against `cwd`. Every present file must contain the exact integer `version: 1`; missing default files are optional, while a missing explicitly selected file is an error.
+
+`loadMemoryConfig` also retains `NEOTTIA_MEMORY_CONFIG_FILE` and `NEOTTIA_CONFIG_MEMORY_PATH` for standalone compatibility. Their defaults are `.neottia/config.yml` and the deprecated `skills.memory` path. Unrelated roots and shards are ignored only by this compatibility wrapper; a shared multi-module registry validates the complete root strictly. The package includes `config.schema.json`, generated from the standalone file-facing shard schema, for editor completion and CI validation.
+
+`root` accepts relative, POSIX absolute, and drive absolute paths. Use one separator style and nonempty components. Dot components, repeated or trailing separators, and mixed slash styles are rejected.
+
+## Resolution order
+
+Configuration resolves once in this fixed order:
+
+```text
+built-in defaults < global file < project file < selected global profile
+< selected project profile < environment bindings < explicit runtime overrides
+```
+
+Select one profile with `NEOTTIA_PROFILE` or the shared resolver's `profile` option. Environment variables override only the leaves listed below. Values without a listed environment binding resolve from defaults, files, profiles, and explicit runtime overrides. `security.secret_patterns` and every `security.limits` leaf are intentionally file/code-only.
+
+## Config file example
 
 ```yaml
 # .neottia/config.yml
 version: 1
-skills:
+modules:
   memory:
     enabled: true
-```
-
-That is enough for an agent to store and search memories in `.neottia/memory/` with the namespace `local/project`.
-
-`root` accepts a relative path, a POSIX absolute path, or a drive absolute path. Each path must use one separator style and contain nonempty components. `.` and `..` components, repeated separators, trailing separators, and mixed slash styles are rejected.
-
-## Full reference
-
-```yaml
-version: 1
-skills:
-  memory:
-    enabled: true # master switch; every operation refuses to run while false
-    root: .neottia/memory # where memory files (and the index) are stored, relative to the project
-
+    root: .neottia/memory
     backend: filesystem # or postgres for a shared PostgreSQL memory store
-
-    namespace: # identity of this memory shard
-      organization_id: acme # who owns the project
-      project_id: website # which project
-      default_topic: general # topic used when a record does not specify one
-      scope: global # optional third dimension: branch / workspace id
-
-    retrieval: # defaults for list and search
-      limit: 8 # maximum results returned (1–100)
-      max_chars: 12000 # search result budget in JSON characters (256–100000)
-      include_superseded: false # whether corrected records show up by default
-
-    cache: # the SQLite index is a disposable cache of the YAML files
-      max_age_ms: 300000 # index considered stale after this long (0 = always stale)
-      stale_policy: prompt # what to do when stale: prompt | rebuild | fail
-
+    namespace:
+      organization_id: acme
+      project_id: website
+      default_topic: general
+      scope: global # e.g. a branch or workspace id
+    retrieval:
+      limit: 8 # default result count for list/search
+      max_chars: 12000 # search result budget, in JSON characters
+      include_superseded: false
+    cache:
+      max_age_ms: 300000 # index considered stale after 5 minutes
+      stale_policy: prompt # prompt | rebuild | fail
     security:
-      secret_patterns: [] # extra regexes; a match rejects the write
+      secret_patterns: [] # extra regexes treated as secrets
       entropy_heuristic: true # reject high-entropy strings (likely tokens)
       limits:
-        max_file_bytes: 16777216 # largest single memory file (16 MiB)
-        max_files: 10000 # maximum number of memory files
-        max_total_bytes: 268435456 # aggregate size cap (256 MiB)
+        max_file_bytes: 16777216 # 16 MiB per memory file
+        max_files: 10000 # total memory files
+        max_total_bytes: 268435456 # 256 MiB aggregate
 ```
 
-## Resolution order
+To migrate, move the existing mapping without changing its fields:
 
-Each explicitly environment-bound value resolves in this order:
-
-```text
-code override (library users)  >  listed environment binding  >  config file  >  default
+```yaml
+# Deprecated
+version: 1
+skills:
+  memory: { enabled: true }
 ```
 
-Values without a listed binding resolve from code, the config file, and defaults; similarly named environment variables have no effect.
+```yaml
+# Canonical
+version: 1
+modules:
+  memory: { enabled: true }
+```
 
-## Environment variables
+Do not declare both paths in one source; the resolver reports the collision instead of guessing.
 
-All optional. Booleans accept `true/false/1/0`; integers accept plain digits. An invalid value fails with the variable name in the message.
+## Environment variable reference
 
-| Variable                                                              | Sets                                  | Default                                   |
-| --------------------------------------------------------------------- | ------------------------------------- | ----------------------------------------- |
-| `NEOTTIA_CONFIG_FILE`                                                 | Location of the config file           | None                                      |
-| `NEOTTIA_MEMORY_CONFIG_FILE`                                          | Fallback location                     | `.neottia/config.yml`                     |
-| `NEOTTIA_CONFIG_MEMORY_PATH`                                          | Section path inside the config object | `skills.memory`                           |
-| `NEOTTIA_MEMORY_ENABLED`                                              | `enabled`                             | `false`                                   |
-| `NEOTTIA_MEMORY_ROOT`                                                 | `root`                                | `.neottia/memory`                         |
-| `NEOTTIA_MEMORY_BACKEND`                                              | `backend`                             | `filesystem`                              |
-| `NEOTTIA_MEMORY_NAMESPACE_ORGANIZATION_ID`                            | `namespace.organization_id`           | `local`                                   |
-| `NEOTTIA_MEMORY_NAMESPACE_PROJECT_ID`                                 | `namespace.project_id`                | `project`                                 |
-| `NEOTTIA_MEMORY_NAMESPACE_DEFAULT_TOPIC`                              | `namespace.default_topic`             | `general`                                 |
-| `NEOTTIA_MEMORY_NAMESPACE_SCOPE`                                      | `namespace.scope`                     | `global`                                  |
-| `NEOTTIA_MEMORY_RETRIEVAL_LIMIT`                                      | `retrieval.limit`                     | `8`                                       |
-| `NEOTTIA_MEMORY_RETRIEVAL_MAX_CHARS`                                  | `retrieval.max_chars`                 | `12000`                                   |
-| `NEOTTIA_MEMORY_RETRIEVAL_INCLUDE_SUPERSEDED`                         | `retrieval.include_superseded`        | `false`                                   |
-| `NEOTTIA_MEMORY_CACHE_MAX_AGE_MS`                                     | `cache.max_age_ms`                    | `300000`                                  |
-| `NEOTTIA_MEMORY_CACHE_STALE_POLICY`                                   | `cache.stale_policy`                  | `prompt`                                  |
-| `NEOTTIA_MEMORY_SECURITY_ENTROPY_HEURISTIC`                           | `security.entropy_heuristic`          | `true`                                    |
-| `NEOTTIA_MEMORY_DB_PG_USER`                                           | Postgres user fallback                | None                                      |
-| `NEOTTIA_MEMORY_DB_PG_PASSWORD`                                       | Postgres password fallback            | None                                      |
-| `NEOTTIA_MEMORY_DB_PG_HOST` / `..._PORT` / `..._DATABASE` / `..._SSL` | Postgres connection settings          | `localhost` / `5432` / `neottia` / `true` |
+All environment variables are optional. Booleans accept trimmed, case-insensitive `true`/`false` and `1`/`0`; integers accept trimmed base-10 digits. Invalid values fail with the variable name.
 
-This table is the complete environment-binding contract; names inferred from config paths are not supported. In particular, `security.secret_patterns` and every `security.limits` value are file/code-only. Secret patterns are an ordered array, and limits are a security-sensitive group that should remain reviewable in one configuration document; accepting invented scalar or encoded environment forms would make deployment behavior ambiguous.
+| Variable                                      | Config path                               | Default               |
+| --------------------------------------------- | ----------------------------------------- | --------------------- |
+| `NEOTTIA_GLOBAL_CONFIG_FILE`                  | _(global file location)_                  | Platform default      |
+| `NEOTTIA_CONFIG_FILE`                         | _(project file location)_                 | —                     |
+| `NEOTTIA_MEMORY_CONFIG_FILE`                  | _(deprecated project fallback)_           | `.neottia/config.yml` |
+| `NEOTTIA_CONFIG_MEMORY_PATH`                  | _(deprecated standalone shard path)_      | `skills.memory`       |
+| `NEOTTIA_MEMORY_ENABLED`                      | `memory.enabled`                          | `false`               |
+| `NEOTTIA_MEMORY_ROOT`                         | `memory.root`                             | `.neottia/memory`     |
+| `NEOTTIA_MEMORY_BACKEND`                      | `memory.backend`                          | `filesystem`          |
+| `NEOTTIA_MEMORY_NAMESPACE_ORGANIZATION_ID`    | `memory.namespace.organization_id`        | `local`               |
+| `NEOTTIA_MEMORY_NAMESPACE_PROJECT_ID`         | `memory.namespace.project_id`             | `project`             |
+| `NEOTTIA_MEMORY_NAMESPACE_DEFAULT_TOPIC`      | `memory.namespace.default_topic`          | `general`             |
+| `NEOTTIA_MEMORY_NAMESPACE_SCOPE`              | `memory.namespace.scope`                  | `global`              |
+| `NEOTTIA_MEMORY_RETRIEVAL_LIMIT`              | `memory.retrieval.limit`                  | `8`                   |
+| `NEOTTIA_MEMORY_RETRIEVAL_MAX_CHARS`          | `memory.retrieval.max_chars`              | `12000`               |
+| `NEOTTIA_MEMORY_RETRIEVAL_INCLUDE_SUPERSEDED` | `memory.retrieval.include_superseded`     | `false`               |
+| `NEOTTIA_MEMORY_CACHE_MAX_AGE_MS`             | `memory.cache.max_age_ms`                 | `300000`              |
+| `NEOTTIA_MEMORY_CACHE_STALE_POLICY`           | `memory.cache.stale_policy`               | `prompt`              |
+| `NEOTTIA_MEMORY_SECURITY_ENTROPY_HEURISTIC`   | `memory.security.entropy_heuristic`       | `true`                |
+| `NEOTTIA_MEMORY_DB_PG_USER`                   | `memory.provider.db.pg.user` fallback     | —                     |
+| `NEOTTIA_MEMORY_DB_PG_PASSWORD`               | `memory.provider.db.pg.password` fallback | —                     |
 
-### PostgreSQL credentials
+PostgreSQL host, port, database, and TLS settings use `NEOTTIA_MEMORY_DB_PG_HOST`, `NEOTTIA_MEMORY_DB_PG_PORT`, `NEOTTIA_MEMORY_DB_PG_DATABASE`, and `NEOTTIA_MEMORY_DB_PG_SSL`.
 
-YAML credential fields must be absent or contain one exact environment reference, such as `user: "${PG_USER}"`. `loadMemoryConfig` expands that reference once. If `PG_USER` itself contains text such as `${SECOND_VAR}`, that text is passed literally to PostgreSQL rather than expanded again. When the fields are absent, `NEOTTIA_MEMORY_DB_PG_USER` and `NEOTTIA_MEMORY_DB_PG_PASSWORD` remain the defaults. Literal credentials in YAML are rejected.
+## Credentials
+
+`provider.db.pg.user` and `provider.db.pg.password` in YAML must be omitted or use one exact `${ENV_VAR}` reference. The shared resolver expands only the winning file/profile reference and does so exactly once. If the referenced variable contains `${SECOND_VAR}`, that text is passed literally to PostgreSQL. Missing referenced variables fail without placing credential values in diagnostics or provenance. Snapshot serialization replaces both credential fields with `[REDACTED]`.
+
+When a credential field is omitted, `NEOTTIA_MEMORY_DB_PG_USER` or `NEOTTIA_MEMORY_DB_PG_PASSWORD` supplies a trusted literal fallback. Explicit typed runtime configuration may also contain resolved literals. The compatibility wrapper continues expanding exact references supplied through its historical override API once.
 
 ## Cache policy
 

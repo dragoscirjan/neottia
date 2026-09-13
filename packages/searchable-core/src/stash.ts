@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
+import type { DeepReadonly } from '@neottia/config';
 import {
   DEFAULT_STORE_LIMITS,
   applyCanonicalBatch,
@@ -101,12 +102,12 @@ export class SearchableStore {
   private cacheRootPromise?: Promise<ManagedRoot>;
 
   public constructor(
-    public readonly config: SearchableConfig,
+    public readonly config: DeepReadonly<SearchableConfig>,
     public readonly cwd: string,
   ) {}
 
   /** Creates a store from already resolved configuration. */
-  public static fromConfig(config: SearchableConfig, cwd: string): SearchableStore {
+  public static fromConfig(config: DeepReadonly<SearchableConfig>, cwd: string): SearchableStore {
     return new SearchableStore(config, cwd);
   }
 
@@ -375,7 +376,7 @@ export class SearchableStore {
       throw new SearchableError(
         'configuration',
         'CAPABILITY_DISABLED',
-        'Searchable requires skills.searchable.enabled=true.',
+        'Searchable requires modules.searchable.enabled=true.',
       );
   }
 }
@@ -422,7 +423,7 @@ export function encodePage(record: StashedPageRecord): Uint8Array {
 async function loadCatalog(
   root: ManagedRoot,
   lease: RepositoryLease,
-  config: SearchableConfig,
+  config: DeepReadonly<SearchableConfig>,
   control: StoreOperationControl,
 ): Promise<Map<string, CatalogPage>> {
   const files = await scanManagedFiles(root, lease, {
@@ -451,7 +452,7 @@ async function reloadCandidatePages(
   lease: RepositoryLease,
   catalog: ReadonlyMap<string, CatalogPage>,
   candidates: readonly { readonly id: string }[],
-  config: SearchableConfig,
+  config: DeepReadonly<SearchableConfig>,
   control: StoreOperationControl,
 ): Promise<Map<string, CatalogPage>> {
   const refreshed = new Map<string, CatalogPage>();
@@ -561,7 +562,7 @@ function catalogDigest(catalog: ReadonlyMap<string, CatalogPage>): string {
   return hash.digest('hex');
 }
 
-function validateCatalog(catalog: ReadonlyMap<string, CatalogPage>, config: SearchableConfig): void {
+function validateCatalog(catalog: ReadonlyMap<string, CatalogPage>, config: DeepReadonly<SearchableConfig>): void {
   let total = 0;
   for (const page of catalog.values()) {
     const size = encodePage(page.record).byteLength;
@@ -577,19 +578,23 @@ function validateCatalog(catalog: ReadonlyMap<string, CatalogPage>, config: Sear
     );
 }
 
-function storeLimits(config: SearchableConfig): StoreLimits {
+function storeLimits(config: DeepReadonly<SearchableConfig>): StoreLimits {
   const maxFile = config.security.limits.max_content_bytes + config.security.limits.max_title_bytes + 128 * 1024;
   return storeLimitsForBytes(config, maxFile, config.security.limits.max_storage_bytes);
 }
 
 /** Gives the disposable FTS cache a bound independent of canonical authority. */
-function cacheStoreLimits(config: SearchableConfig): StoreLimits {
+function cacheStoreLimits(config: DeepReadonly<SearchableConfig>): StoreLimits {
   const maximum =
     config.security.limits.max_storage_bytes * SEARCHABLE_CACHE_STORAGE_MULTIPLIER + SEARCHABLE_CACHE_FIXED_BYTES;
   return storeLimitsForBytes(config, maximum, maximum);
 }
 
-function storeLimitsForBytes(config: SearchableConfig, maxFile: number, maxTotalBytes: number): StoreLimits {
+function storeLimitsForBytes(
+  config: DeepReadonly<SearchableConfig>,
+  maxFile: number,
+  maxTotalBytes: number,
+): StoreLimits {
   const projectionBytes =
     config.security.limits.max_content_bytes + config.security.limits.max_title_bytes + 128 * 1024;
   return {

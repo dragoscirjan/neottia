@@ -1,11 +1,14 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import type { ResolvedConfigSnapshot } from '@neottia/config';
+import { resolveHostConfigSnapshot } from '@neottia/config-registry';
 import {
   createSearchableRuntime,
   findSearchableTool,
   searchableToolJsonSchema,
   SEARCHABLE_TOOLS,
   SearchableError,
+  searchableConfigContribution,
   serializeSearchableError,
   type SearchableConfigInput,
   type SearchableRuntime,
@@ -17,6 +20,8 @@ export interface CreateSearchableServerOptions {
   readonly cwd?: string;
   readonly name?: string;
   readonly version?: string;
+  readonly snapshot?: ResolvedConfigSnapshot;
+  readonly env?: NodeJS.ProcessEnv;
   readonly configOverrides?: Partial<SearchableConfigInput>;
   readonly runtimeFactory?: SearchableRuntimeFactory;
 }
@@ -24,10 +29,15 @@ export interface CreateSearchableServerOptions {
 /** Creates a tools-only server backed by one owned runtime. */
 export function createSearchableServer(options: CreateSearchableServerOptions = {}): Server {
   const cwd = options.cwd ?? process.cwd();
-  const runtime: SearchableRuntime = (options.runtimeFactory ?? createSearchableRuntime)({
+  const snapshot = resolveHostConfigSnapshot({
+    interactive: false,
     cwd,
-    configOverrides: options.configOverrides,
+    ...(options.snapshot ? { snapshot: options.snapshot } : {}),
+    ...(options.env ? { env: options.env } : {}),
+    ...(options.configOverrides ? { overrides: { modules: { searchable: options.configOverrides } } } : {}),
   });
+  const config = snapshot.get(searchableConfigContribution);
+  const runtime: SearchableRuntime = (options.runtimeFactory ?? createSearchableRuntime)({ cwd, config });
   const server = new Server(
     { name: options.name ?? '@neottia/searchable-mcp', version: options.version ?? '0.1.0' },
     { capabilities: { tools: {} } },
@@ -63,7 +73,7 @@ export function createSearchableServer(options: CreateSearchableServerOptions = 
       return toolError(new SearchableError('validation', 'TOOL_NOT_FOUND', `Unknown tool: ${request.params.name}`));
     try {
       const result = await definition.run(
-        { cwd, services: runtime, signal: extra.signal, configOverrides: options.configOverrides },
+        { cwd, services: runtime, signal: extra.signal, config },
         request.params.arguments ?? {},
       );
       const structured = result as Record<string, unknown>;

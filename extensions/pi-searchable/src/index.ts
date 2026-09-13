@@ -1,8 +1,12 @@
 import { resolve } from 'node:path';
+import type { DeepReadonly } from '@neottia/config';
+import { resolveHostConfigSnapshot } from '@neottia/config-registry';
 import {
   createSearchableRuntime,
   searchableToolJsonSchema,
   SEARCHABLE_TOOLS,
+  searchableConfigContribution,
+  type SearchableConfig,
   type SearchableConfigInput,
   type SearchableRuntime,
   type SearchableRuntimeFactory,
@@ -31,6 +35,7 @@ export interface PiExtensionApi {
 /** Host options for CWD routing, configuration, and deterministic runtime tests. */
 export interface SearchableExtensionOptions {
   readonly cwd?: string;
+  readonly env?: NodeJS.ProcessEnv;
   readonly configOverrides?: Partial<SearchableConfigInput>;
   readonly runtimeFactory?: SearchableRuntimeFactory;
   readonly onStaleCache?: () => boolean | Promise<boolean>;
@@ -44,12 +49,17 @@ export const searchableToolParameters = Object.fromEntries(
   ]),
 ) as unknown as Record<SearchableToolName, TSchema>;
 
-/** Registers all Searchable tools and owns one runtime per invocation CWD. */
+interface SearchableHostContext {
+  readonly config: DeepReadonly<SearchableConfig>;
+  readonly runtime: SearchableRuntime;
+}
+
+/** Registers all Searchable tools and owns one resolved context per invocation CWD. */
 export function registerSearchableTools(
   pi: PiExtensionApi,
   options: SearchableExtensionOptions = {},
 ): () => Promise<void> {
-  const runtimes = new Map<string, SearchableRuntime>();
+  const contexts = new Map<string, SearchableHostContext>();
   const defaultCwd = resolve(options.cwd ?? process.cwd());
   for (const definition of SEARCHABLE_TOOLS)
     pi.registerTool({
@@ -61,20 +71,27 @@ export function registerSearchableTools(
       parameters: searchableToolParameters[definition.name],
       async execute(_callId, params, signal, _onUpdate, invocation) {
         const cwd = resolve(invocation.cwd ?? defaultCwd);
-        let runtime = runtimes.get(cwd);
-        if (!runtime) {
-          runtime = (options.runtimeFactory ?? createSearchableRuntime)({
+        let context = contexts.get(cwd);
+        if (!context) {
+          const snapshot = resolveHostConfigSnapshot({
             cwd,
-            configOverrides: options.configOverrides,
+            interactive: true,
+            env: options.env ?? process.env,
+            ...(options.configOverrides ? { overrides: { modules: { searchable: options.configOverrides } } } : {}),
           });
-          runtimes.set(cwd, runtime);
+          const config = snapshot.get(searchableConfigContribution);
+          context = {
+            config,
+            runtime: (options.runtimeFactory ?? createSearchableRuntime)({ cwd, config }),
+          };
+          contexts.set(cwd, context);
         }
         const result = await definition.run(
           {
             cwd,
-            services: runtime,
+            services: context.runtime,
             signal,
-            configOverrides: options.configOverrides,
+            config: context.config,
             onStaleCache:
               options.onStaleCache ??
               (() =>
@@ -89,8 +106,8 @@ export function registerSearchableTools(
       },
     });
   return async () => {
-    const results = await Promise.allSettled([...runtimes.values()].map((runtime) => runtime.close()));
-    runtimes.clear();
+    const results = await Promise.allSettled([...contexts.values()].map(({ runtime }) => runtime.close()));
+    contexts.clear();
     const errors = results.flatMap((result) => (result.status === 'rejected' ? [result.reason] : []));
     if (errors.length) throw new AggregateError(errors, 'Searchable Pi shutdown failed.');
   };

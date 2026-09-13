@@ -1,11 +1,14 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import type { ResolvedConfigSnapshot } from '@neottia/config';
+import { resolveHostConfigSnapshot } from '@neottia/config-registry';
 import {
   closeMemoryToolContext,
   findMemoryTool,
-  loadMemoryConfig,
+  memoryConfigContribution,
   memoryToolJsonSchema,
   MEMORY_TOOLS,
+  type MemoryConfigInput,
   type MemoryToolContext,
   type MemoryToolName,
 } from '@neottia/memory-core';
@@ -25,14 +28,17 @@ export interface CreateMemoryServerOptions {
   readonly cwd?: string;
   /** Interactive hosts may prompt; the MCP surface never does. */
   readonly interactive?: boolean;
+  /** Optional coherent snapshot supplied by an embedding host. */
+  readonly snapshot?: ResolvedConfigSnapshot;
+  readonly env?: NodeJS.ProcessEnv;
+  readonly configOverrides?: Partial<MemoryConfigInput>;
   readonly name?: string;
   readonly version?: string;
 }
 
 /** Non-interactive hosts get a silent rebuild instead of a prompt policy. */
 export function effectiveStalePolicy(cwd: string, env: NodeJS.ProcessEnv = process.env): 'rebuild' | 'fail' | 'prompt' {
-  const config = loadMemoryConfig(cwd, { env });
-  return config.cache.stale_policy === 'prompt' ? 'rebuild' : config.cache.stale_policy;
+  return resolveHostConfigSnapshot({ cwd, env, interactive: false }).get(memoryConfigContribution).cache.stale_policy;
 }
 
 export function createMemoryServer(options: CreateMemoryServerOptions = {}): Server {
@@ -43,11 +49,20 @@ export function createMemoryServer(options: CreateMemoryServerOptions = {}): Ser
     { capabilities: { tools: {} } },
   );
 
-  // Downgrade 'prompt' to 'rebuild' only when the user did not choose a
-  // policy explicitly; 'fail' is respected everywhere.
-  const configOverrides: { cache?: { stale_policy: 'rebuild' } } = {};
-  if (effectiveStalePolicy(cwd) === 'rebuild') configOverrides.cache = { stale_policy: 'rebuild' };
-  const context: MemoryToolContext = { cwd, interactive, configOverrides };
+  // Resolve declared sources once, then derive host policy in memory without
+  // mutating or rereading the user's configuration.
+  const effectiveSnapshot = resolveHostConfigSnapshot({
+    cwd,
+    interactive,
+    ...(options.snapshot ? { snapshot: options.snapshot } : {}),
+    ...(options.env ? { env: options.env } : {}),
+    ...(options.configOverrides ? { overrides: { modules: { memory: options.configOverrides } } } : {}),
+  });
+  const context: MemoryToolContext = {
+    cwd,
+    interactive,
+    config: effectiveSnapshot.get(memoryConfigContribution),
+  };
   const closeServer = server.close.bind(server);
   server.close = async () => {
     let cleanupError: unknown;

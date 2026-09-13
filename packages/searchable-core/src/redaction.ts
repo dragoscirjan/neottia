@@ -1,4 +1,5 @@
 import { Buffer } from 'node:buffer';
+import type { DeepReadonly } from '@neottia/config';
 import type { SearchableConfig } from './config.js';
 import { SearchableError } from './errors.js';
 
@@ -72,12 +73,12 @@ function encodedCredentialPattern(credential: string): RegExp | undefined {
 }
 
 /** Returns the resolved secrets that must never cross the service boundary. */
-export function searchableCredentialValues(config: SearchableConfig): readonly string[] {
+export function searchableCredentialValues(config: DeepReadonly<SearchableConfig>): readonly string[] {
   return Object.values(config.search.credentials).filter((value): value is string => Boolean(value));
 }
 
 /** Converts any service exception without allowing hostile details to replace it. */
-export function asRedactedSearchableError(error: unknown, config: SearchableConfig): SearchableError {
+export function asRedactedSearchableError(error: unknown, config: DeepReadonly<SearchableConfig>): SearchableError {
   try {
     const credentials = searchableCredentialValues(config);
     if (error instanceof SearchableError)

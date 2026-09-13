@@ -23,11 +23,11 @@ console.log(document.id, document.revision);
 
 ## Configuration
 
-Enable the strict shard in `.neottia/config.yml`:
+Enable the strict canonical shard in `.neottia/config.yml`:
 
 ```yaml
 version: 1
-skills:
+modules:
   design_docs:
     enabled: true
     root: .neottia/design-docs
@@ -40,7 +40,9 @@ skills:
       stale_policy: prompt # prompt | rebuild | fail
 ```
 
-`root` must be a safe project-relative path. Environment overrides include `NEOTTIA_DESIGN_DOCS_ENABLED`, `NEOTTIA_DESIGN_DOCS_ROOT`, `NEOTTIA_DESIGN_DOCS_RETRIEVAL_LIMIT`, `NEOTTIA_DESIGN_DOCS_SNIPPET_BYTES`, `NEOTTIA_DESIGN_DOCS_ALL_VERSIONS`, `NEOTTIA_DESIGN_DOCS_CACHE_MAX_AGE_MS`, and `NEOTTIA_DESIGN_DOCS_CACHE_STALE_POLICY`. Explicit library overrides take precedence over environment values, which take precedence over file leaves and defaults. Security limits are documented by the published `config.schema.json`.
+`root` must be a safe project-relative path. Portable Unicode directory names are valid. Actual `.neottia/cache` and `.neottia/repository-store` paths remain reserved. Environment overrides include `NEOTTIA_DESIGN_DOCS_ENABLED`, `NEOTTIA_DESIGN_DOCS_ROOT`, `NEOTTIA_DESIGN_DOCS_RETRIEVAL_LIMIT`, `NEOTTIA_DESIGN_DOCS_SNIPPET_BYTES`, `NEOTTIA_DESIGN_DOCS_ALL_VERSIONS`, `NEOTTIA_DESIGN_DOCS_CACHE_MAX_AGE_MS`, and `NEOTTIA_DESIGN_DOCS_CACHE_STALE_POLICY`. Shared resolution applies defaults, global configuration, project configuration, the selected profile, environment values, and explicit runtime overrides in that order. Security limits are documented by the published `config.schema.json`.
+
+The exported `designDocsConfigContribution` composes Design Docs into a shared `@neottia/config` registry. `loadDesignDocsConfig()` remains available for standalone use and returns the same typed configuration. Its deprecated compatibility mode accepts `skills.design_docs`, `NEOTTIA_DESIGN_DOCS_CONFIG_FILE`, and `NEOTTIA_CONFIG_DESIGN_DOCS_PATH`; new shared hosts should use `modules.design_docs` and resolve one snapshot for all participating domains. See the [unified configuration guide](../../docs/configuration.md) for file discovery, profiles, precedence, provenance, diagnostics, and migration.
 
 ## Authority and authoring
 

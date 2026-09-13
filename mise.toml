@@ -86,6 +86,14 @@ run = "pnpm run docs"
 description = "Validate documentation catalogs, links, examples, schemas, and tool references"
 run = "pnpm run docs:check"
 
+[tasks."config:schema:generate"]
+description = "Generate the published complete Neottia configuration schema"
+run = "node scripts/config-contracts.mjs --write"
+
+[tasks."config:contracts"]
+description = "Check configuration schema freshness, module coverage, host resolution, and parser ownership"
+run = "node scripts/config-contracts.mjs"
+
 [tasks."docs:serve"]
 description = "Serve the VitePress documentation site locally"
 run = "pnpm run serve"
@@ -148,6 +156,7 @@ run = [
   "mise run docs:check",
   "mise run clean",
   "mise run build",
+  "mise run config:contracts",
   "mise run lint:check",
   "mise run duplicate-check",
   "mise run test",

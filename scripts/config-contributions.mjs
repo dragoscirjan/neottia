@@ -1,0 +1,31 @@
+/** Official module contributions included in the published root configuration schema. */
+export const OFFICIAL_CONFIG_CONTRIBUTIONS = Object.freeze([
+  Object.freeze({
+    exportName: 'memoryConfigContribution',
+    packageName: '@neottia/memory-core',
+    sourceFile: 'packages/memory-core/src/config.ts',
+    builtFile: 'packages/memory-core/dist/config.js',
+    path: Object.freeze(['modules', 'memory']),
+  }),
+  Object.freeze({
+    exportName: 'issueConfigContribution',
+    packageName: '@neottia/issues',
+    sourceFile: 'packages/issues/src/config.ts',
+    builtFile: 'packages/issues/dist/config.js',
+    path: Object.freeze(['modules', 'issues']),
+  }),
+  Object.freeze({
+    exportName: 'designDocsConfigContribution',
+    packageName: '@neottia/design-docs',
+    sourceFile: 'packages/design-docs/src/config.ts',
+    builtFile: 'packages/design-docs/dist/config.js',
+    path: Object.freeze(['modules', 'design_docs']),
+  }),
+  Object.freeze({
+    exportName: 'searchableConfigContribution',
+    packageName: '@neottia/searchable-core',
+    sourceFile: 'packages/searchable-core/src/config.ts',
+    builtFile: 'packages/searchable-core/dist/config.js',
+    path: Object.freeze(['modules', 'searchable']),
+  }),
+]);

@@ -61,7 +61,7 @@
           "default": "https://api.bing.microsoft.com/v7.0/search",
           "type": "string",
           "maxLength": 8192,
-          "pattern": "^[hH][tT][tT][pP][sS]?:\\/\\/",
+          "pattern": "^[hH][tT][tT][pP][sS]?:\\/\\/(?![^/?#]*@)[^?#]+$",
           "format": "uri"
         }
       },
@@ -73,14 +73,14 @@
       "properties": {
         "strategies": {
           "default": ["direct", "jina", "wayback"],
-          "uniqueItems": true,
           "minItems": 1,
           "maxItems": 3,
           "type": "array",
           "items": {
             "type": "string",
             "enum": ["direct", "jina", "wayback"]
-          }
+          },
+          "uniqueItems": true
         },
         "timeout_ms": {
           "default": 10000,
@@ -149,7 +149,7 @@
           "default": "http://localhost:11434",
           "type": "string",
           "maxLength": 8192,
-          "pattern": "^[hH][tT][tT][pP][sS]?:\\/\\/",
+          "pattern": "^[hH][tT][tT][pP][sS]?:\\/\\/(?![^/?#]*@)[^?#]+$",
           "format": "uri"
         },
         "model": {

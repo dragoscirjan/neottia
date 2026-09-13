@@ -6,7 +6,7 @@ Private test infrastructure for Neottia. This workspace is not published for use
 
 Repository discovery exports MCP entry paths and build checks for Memory, Issues, Design Docs, and Searchable. Use `requireSearchableDistBuilt` in live tests so the test fails instead of building inside the repository worktree.
 
-Temporary fixture exports are `createTempProject`, `createTempIssueProject`, `seedMemory`, `seedIssues`, `seedDesignDocs`, `CreateTempProjectOptions`, `CreateTempIssueProjectOptions`, `TempProject`, and `TempIssueProject`. Fixture cleanup removes only its temporary tree.
+Temporary fixture exports are `createConfigFixture`, `createTempProject`, `createTempIssueProject`, `seedMemory`, `seedIssues`, `seedDesignDocs`, `CreateTempProjectOptions`, `CreateTempIssueProjectOptions`, `TempProject`, and `TempIssueProject`. `createConfigFixture` supplies isolated global and project files, profiles, environment values, explicit overrides, and two CWD routes for shared snapshot tests. Fixture cleanup removes only its temporary tree.
 
 MCP configuration exports are `mcpServersDocument`, `writeMcpServersJsonFile`, `writeOpencodeMcpConfig`, `writeServersMcpConfig`, and `McpServerDefinition`.
 

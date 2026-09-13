@@ -23,9 +23,11 @@ console.log(issue.id, issue.revision);
 
 ## Configure
 
+Issues contributes `modules.issues` to the shared `@neottia/config` platform:
+
 ```yaml
 version: 1
-skills:
+modules:
   issues:
     enabled: true
     root: .neottia/issues
@@ -33,6 +35,8 @@ skills:
     cache:
       stale_policy: rebuild
 ```
+
+Register `issueConfigContribution` in a multi-module registry and pass the immutable shard to `new IssueStore(snapshot.get(issueConfigContribution), cwd)`. Direct typed `IssueConfig` values remain supported. `loadIssueConfig()` is the synchronous standalone compatibility wrapper; it still accepts the deprecated `skills.issues` path, Issues-only file/path variables, all `NEOTTIA_ISSUES_*` value bindings, and explicit overrides. Resolution order is defaults, global file, project file, selected global/project profile, environment, then explicit overrides. See the [Issues configuration guide](../../docs/issues/configuration) for module settings and the [unified configuration guide](../../docs/configuration.md) for shared files, profiles, provenance, and migration.
 
 Use `IssueStore` directly or `ISSUE_TOOLS` for the shared Zod-validated 17-tool surface. Mutations use repository-wide leases, durable batches, exact `v1:<sha256>` byte revisions, and complete graph validation. Explicit no-op writes repair noncanonical YAML without changing `updated_at`. Update/transition/archive/restore and destructive relation/link calls require the latest revision. Search clamps caller budgets to security ceilings, uses BM25, and rereads canonical YAML before returning results. Its disposable cache health-checks structured metadata, hierarchy, relationships, comments, links, and revision projections without making them authority.
 

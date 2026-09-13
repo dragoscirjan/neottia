@@ -7,6 +7,8 @@ Neottia provides a shared SDLC that can be understood and used by multiple AI co
 ```text
 ├── extensions/          # Independently versioned harness extensions
 ├── packages/
+│   ├── config/          # Shared layered configuration platform
+│   ├── config-registry/ # Official strict host contribution registry
 │   ├── core/            # Independently versioned core package
 │   ├── design-docs/     # Canonical design documents and shared tools
 │   ├── design-docs-mcp/ # Generic Design Docs MCP server
@@ -73,21 +75,25 @@ mise run release:global -- 1.0.0
 
 This updates `packages/release/package.json` and `packages/release/release-manifest.json`. The published `@neottia/release` package converts exact `workspace:` references into exact registry versions, making the global release reproducible.
 
+## Configuration
+
+`@neottia/config` composes domain-owned schemas into one immutable snapshot. It loads optional global and project YAML, applies profiles, environment bindings, and explicit overrides in a fixed order, tracks value-free leaf provenance, and redacts declared secrets. `@neottia/config-registry` supplies the strict official registry used by Neottia hosts, so all published module shards can coexist in one root file. Use the [unified configuration guide](docs/configuration.md) for files, profiles, precedence, secrets, diagnostics, embedding, and `skills.*` migration. The config package publishes the complete editor schema as `@neottia/config/config.schema.json`.
+
 ## Memory
 
-Install `@neottia/memory-core` for the library, `@neottia/memory-mcp` for an MCP server, or the `@neottia/pi-memory` / `@neottia/opencode-memory` extensions for in-process harness tools. Configure the `skills.memory` shard in `.neottia/config.yml`; the user-facing setup and operations guide is [here](docs/memory/). Filesystem domains share the crash-recoverable primitives documented in the [repository-store guide](docs/repository-store.md). Track the canonical YAML files, but ignore `.neottia/memory/index.db` and its `-wal` and `-shm` cache sidecars.
+Install `@neottia/memory-core` for the library, `@neottia/memory-mcp` for an MCP server, or the `@neottia/pi-memory` / `@neottia/opencode-memory` extensions for in-process harness tools. Configure the canonical `modules.memory` shard in `.neottia/config.yml` (`skills.memory` remains a deprecated compatibility alias); the user-facing setup and operations guide is [here](docs/memory/). Filesystem domains share the crash-recoverable primitives documented in the [repository-store guide](docs/repository-store.md). Track the canonical YAML files, but ignore `.neottia/memory/index.db` and its `-wal` and `-shm` cache sidecars.
 
 ## Issues
 
-Enable `skills.issues` to manage Git-trackable YAML issues with exact revisions, durable recursive archive/restore, typed design-document links, and a disposable ranked FTS5 cache. Use `@neottia/issues` directly, `@neottia/issues-mcp` over stdio, or the in-process Pi/OpenCode extensions. See the [Issues guide](docs/issues/).
+Enable `modules.issues` to manage Git-trackable YAML issues with exact revisions, durable recursive archive/restore, typed design-document links, and a disposable ranked FTS5 cache. `@neottia/issues` exports a shared configuration contribution while retaining `loadIssueConfig()` and the deprecated `skills.issues` alias for standalone compatibility. Use the package directly, `@neottia/issues-mcp` over stdio, or the in-process Pi/OpenCode extensions. See the [Issues guide](docs/issues/).
 
 ## Design Docs
 
-Install `@neottia/design-docs` for strict repository-local Markdown/YAML design records, `@neottia/design-docs-mcp` for generic stdio MCP, or the Pi/OpenCode extensions for in-process tools. Enable `skills.design_docs` in `.neottia/config.yml`; enable `skills.issues` too for real stable-link validation through `@neottia/issues-design-docs`. The [Design Docs guide](docs/design-docs/) covers authoring, approval, immutable versioning, BM25 search, archive/restore, stable issue references, migration, and recovery.
+Install `@neottia/design-docs` for strict repository-local Markdown/YAML design records, `@neottia/design-docs-mcp` for generic stdio MCP, or the Pi/OpenCode extensions for in-process tools. Enable `modules.design_docs` in `.neottia/config.yml`; enable `modules.issues` too for real stable-link validation through `@neottia/issues-design-docs`. Design Docs roots use safe project-relative paths and may contain Unicode directory names. The [Design Docs guide](docs/design-docs/) covers authoring, approval, immutable versioning, BM25 search, archive/restore, stable issue references, migration, and recovery.
 
 ## Searchable
 
-Enable `skills.searchable` to search DuckDuckGo, Google, Bing, or Brave; extract bounded Markdown; stash canonical page records; search them with a disposable FTS5 cache; and ask a local Ollama model grounded questions. Use `@neottia/searchable-core` directly, `@neottia/searchable-mcp` over stdio, or the native Pi/OpenCode extensions. See the [Searchable guide](docs/searchable/).
+Enable `modules.searchable` to search DuckDuckGo, Google, Bing, or Brave; extract bounded Markdown; stash canonical page records; search them with a disposable FTS5 cache; and ask a local Ollama model grounded questions. Use `@neottia/searchable-core` directly, `@neottia/searchable-mcp` over stdio, or the native Pi/OpenCode extensions. See the [Searchable guide](docs/searchable/).
 
 ## Delivery methods
 

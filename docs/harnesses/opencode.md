@@ -20,7 +20,7 @@ Add them to the OpenCode configuration:
 }
 ```
 
-Enable the matching shards in `.neottia/config.yml`. Restart OpenCode and check for 9 `memory_*`, 17 `issue_*`, and 13 `document_*`, and 5 `web_*` tools. Run the calls in [First success](/get-started/first-success).
+Enable the matching `modules.*` shards in `.neottia/config.yml`. Restart OpenCode and check for 9 `memory_*`, 17 `issue_*`, and 13 `document_*`, and 5 `web_*` tools. Run the calls in [First success](/get-started/first-success).
 
 ## Memory
 
@@ -32,7 +32,7 @@ Enable the matching shards in `.neottia/config.yml`. Restart OpenCode and check 
 
 ## Searchable
 
-`@neottia/opencode-searchable` uses `host.directory`, forwards `invocation.abort` when it is an `AbortSignal`, and closes its runtime on `dispose`. Its non-interactive cache policy rebuilds when `stale_policy` is `prompt`.
+`@neottia/opencode-searchable` resolves one official shared snapshot for `host.directory`, passes its immutable Searchable shard to the runtime and tools, forwards `invocation.abort` when it is an `AbortSignal`, and closes its runtime on `dispose`. Its non-interactive cache policy rebuilds when `stale_policy` is `prompt`.
 
 See [Searchable configuration](/searchable/configuration), [tools](/searchable/tools), and [operations](/searchable/operations).
 

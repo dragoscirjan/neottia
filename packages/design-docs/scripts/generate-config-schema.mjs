@@ -1,9 +1,9 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { designDocsConfigSchema } from '../dist/config.js';
+import { designDocsConfigFileSchema } from '../dist/config.js';
 
-/** Publishes the exact input schema accepted by skills.design_docs. */
+/** Publishes the complete standalone file-facing Design Docs shard schema. */
 const output = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'config.schema.json');
 mkdirSync(dirname(output), { recursive: true });
-writeFileSync(output, `${JSON.stringify(designDocsConfigSchema.toJSONSchema({ io: 'input' }), null, 2)}\n`, 'utf8');
+writeFileSync(output, `${JSON.stringify(designDocsConfigFileSchema.toJSONSchema({ io: 'input' }), null, 2)}\n`, 'utf8');
