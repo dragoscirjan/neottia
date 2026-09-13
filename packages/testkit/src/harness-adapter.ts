@@ -91,10 +91,16 @@ export function assertHarnessAdapterConformance(adapter: HarnessAdapter): void {
     };
     const firstPrompt = adapter.projectPrompt(promptRequest);
     const secondPrompt = adapter.projectPrompt(promptRequest);
+    const promptAvailable = supportsProjection(adapter, 'asset.prompt', promptRequest.scope);
     assert.deepEqual(firstPrompt, secondPrompt);
-    assert.equal(firstPrompt.diagnostics.length, 0);
-    assert.ok(firstPrompt.value?.content.endsWith(promptRequest.body));
-    assert.equal(Object.isFrozen(firstPrompt.value), true);
+    if (promptAvailable) {
+      assert.equal(firstPrompt.diagnostics.length, 0);
+      assert.ok(firstPrompt.value?.content.endsWith(promptRequest.body));
+      assert.equal(Object.isFrozen(firstPrompt.value), true);
+    } else {
+      assert.equal(firstPrompt.value, undefined);
+      assert.ok(firstPrompt.diagnostics.length > 0);
+    }
 
     const skillRequest = {
       id: 'code-review',
@@ -104,12 +110,20 @@ export function assertHarnessAdapterConformance(adapter: HarnessAdapter): void {
       metadata: { owner: 'neottia' },
     };
     const skill = adapter.projectSkill(skillRequest);
-    assert.equal(skill.diagnostics.length, 0);
-    assert.ok(skill.value?.content.endsWith(skillRequest.body));
+    const skillAvailable = supportsProjection(adapter, 'asset.skill', skillRequest.scope);
+    if (skillAvailable) {
+      assert.equal(skill.diagnostics.length, 0);
+      assert.ok(skill.value?.content.endsWith(skillRequest.body));
+    } else {
+      assert.equal(skill.value, undefined);
+      assert.ok(skill.diagnostics.length > 0);
+    }
 
-    const unsafe = adapter.projectPrompt({ ...promptRequest, id: '../plan' });
-    assert.equal(unsafe.value, undefined);
-    assert.ok(unsafe.diagnostics.some((diagnostic) => diagnostic.code === 'INVALID_ASSET_ID'));
+    if (promptAvailable) {
+      const unsafe = adapter.projectPrompt({ ...promptRequest, id: '../plan' });
+      assert.equal(unsafe.value, undefined);
+      assert.ok(unsafe.diagnostics.some((diagnostic) => diagnostic.code === 'INVALID_ASSET_ID'));
+    }
     assert.deepEqual(tree(environment.root), before, 'Adapter methods must not mutate the filesystem.');
 
     if (firstPrompt.value !== undefined) {
@@ -128,6 +142,16 @@ export function assertHarnessAdapterConformance(adapter: HarnessAdapter): void {
   } finally {
     environment.cleanup();
   }
+}
+
+/** Checks whether one feature is declared available in a requested scope. */
+function supportsProjection(
+  adapter: HarnessAdapter,
+  feature: (typeof HOST_FEATURES)[number],
+  scope: HarnessScope,
+): boolean {
+  const support = adapter.declaration.features[feature];
+  return support.status === 'supported' && support.scopes.includes(scope);
 }
 
 /** Verifies every supported target feature at one scope. */

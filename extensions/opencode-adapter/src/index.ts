@@ -375,21 +375,23 @@ function validateLocalMcp(scope: HarnessScope, server: LocalMcpDeclaration): Pro
   return invalidMcp('config.mcp.local', scope);
 }
 
-/** Validates a remote MCP declaration and limits URLs to HTTP transports. */
+/** Validates remote MCP transport without exposing headers over plaintext HTTP. */
 function validateRemoteMcp(scope: HarnessScope, server: RemoteMcpDeclaration): ProjectionDiagnostic | undefined {
-  let validUrl = false;
+  let protocol: string | undefined;
   try {
-    validUrl = ['http:', 'https:'].includes(new URL(server.url).protocol);
+    protocol = new URL(server.url).protocol;
   } catch {
-    validUrl = false;
+    protocol = undefined;
   }
   const validHeaders =
     server.headers === undefined ||
     Object.entries(server.headers).every(([key, value]) => nonblank(key) && safeText(key) && safeText(value));
+  const secureHeaders = server.headers === undefined || protocol === 'https:';
   if (
     invalidAssetId('opencode', 'config.mcp.remote', scope, server.name) === undefined &&
-    validUrl &&
+    (protocol === 'http:' || protocol === 'https:') &&
     validHeaders &&
+    secureHeaders &&
     (server.oauth === undefined || server.oauth === false) &&
     validTimeout(server.timeout)
   ) {

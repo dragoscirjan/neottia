@@ -135,6 +135,26 @@ describe('OpenCode harness adapter', () => {
         oauth: false,
       },
     });
+
+    const insecureHeaders = opencodeHarnessAdapter.planHostConfiguration({
+      kind: 'mcp.remote',
+      scope: 'project',
+      server: {
+        name: 'insecure-docs',
+        url: 'http://example.test/mcp',
+        headers: { Authorization: 'Bearer {env:DOCS_TOKEN}' },
+      },
+    });
+    expect(insecureHeaders.value).toBeUndefined();
+    expect(insecureHeaders.diagnostics).toMatchObject([{ code: 'INVALID_MCP_DECLARATION' }]);
+
+    expect(
+      opencodeHarnessAdapter.planHostConfiguration({
+        kind: 'mcp.remote',
+        scope: 'project',
+        server: { name: 'public-docs', url: 'http://example.test/mcp' },
+      }).value,
+    ).toBeDefined();
   });
 
   it('preserves unrelated config during test-only materialization', () => {
