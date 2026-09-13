@@ -28,4 +28,25 @@ export const OFFICIAL_CONFIG_CONTRIBUTIONS = Object.freeze([
     builtFile: 'packages/searchable-core/dist/config.js',
     path: Object.freeze(['modules', 'searchable']),
   }),
+  Object.freeze({
+    exportName: 'issuesCapabilityConfigContribution',
+    packageName: '@neottia/sdlc',
+    sourceFile: 'packages/sdlc/src/config.ts',
+    builtFile: 'packages/sdlc/dist/config.js',
+    path: Object.freeze(['capabilities', 'issues']),
+  }),
+  Object.freeze({
+    exportName: 'documentsCapabilityConfigContribution',
+    packageName: '@neottia/sdlc',
+    sourceFile: 'packages/sdlc/src/config.ts',
+    builtFile: 'packages/sdlc/dist/config.js',
+    path: Object.freeze(['capabilities', 'documents']),
+  }),
+  Object.freeze({
+    exportName: 'sourceControlCapabilityConfigContribution',
+    packageName: '@neottia/sdlc',
+    sourceFile: 'packages/sdlc/src/config.ts',
+    builtFile: 'packages/sdlc/dist/config.js',
+    path: Object.freeze(['capabilities', 'source_control']),
+  }),
 ]);

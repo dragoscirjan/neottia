@@ -29,6 +29,7 @@ license files are authoritative for distributed package contents:
 | `@neottia/repository-store` | MIT (`packages/repository-store/LICENSE`) |
 | `@neottia/searchable-core` | MIT (`packages/searchable-core/LICENSE`) |
 | `@neottia/searchable-mcp` | MIT (`packages/searchable-mcp/LICENSE`) |
+| `@neottia/sdlc` | MIT (`packages/sdlc/LICENSE`) |
 
 Copyright (c) 2025 Templ Project applies to portions bootstrapped from the
 upstream template where the original attribution remains present.

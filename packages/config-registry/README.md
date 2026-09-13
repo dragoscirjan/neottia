@@ -1,6 +1,6 @@
 # @neottia/config-registry
 
-`@neottia/config-registry` composes the official Memory, Issues, Design Docs, and Searchable contributions into the strict registry used by Neottia hosts. Use it when a host must accept the complete root configuration even if that host exposes tools for only one module.
+`@neottia/config-registry` composes the official Memory, Issues, Design Docs, Searchable, and SDLC capability contributions into the strict registry used by Neottia hosts. Use it when a host must accept the complete root configuration even if that host exposes tools for only one module.
 
 ```ts
 import { resolveHostConfigSnapshot } from "@neottia/config-registry";
@@ -13,7 +13,7 @@ const snapshot = resolveHostConfigSnapshot({
 export const memory = snapshot.get(memoryConfigContribution);
 ```
 
-`officialConfigContributions` exposes the immutable contribution list, and `officialConfigRegistry` exposes its validated registry. Root files remain strict: unknown modules fail validation, while every module published in the [unified configuration guide](../../docs/configuration.md) can coexist in one file.
+`officialConfigContributions` exposes the immutable contribution list, and `officialConfigRegistry` exposes its validated registry. Root files remain strict: unknown module and capability keys fail validation, while every shard published in the [unified configuration guide](../../docs/configuration.md) can coexist in one file.
 
 Set `interactive: false` for MCP and OpenCode hosts. The resolver derives Memory, Issues, and Design Docs `prompt` cache policies to `rebuild` without mutating the declared snapshot or rereading configuration. Pi hosts use `interactive: true` and should cache snapshots by canonical invocation cwd.
 

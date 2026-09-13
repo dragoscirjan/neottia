@@ -93,21 +93,31 @@ function checkSearchableHostResolution() {
   }
 }
 
-/** Confirms that the schema exposes every official canonical module and rejects unknown keys. */
+/** Returns the JSON Schema node at one canonical contribution path. */
+function schemaAtPath(schema, path) {
+  let current = schema;
+  for (const segment of path) current = current?.properties?.[segment];
+  return current;
+}
+
+/** Confirms that the schema exposes every official contribution and rejects unknown keys. */
 function checkSchemaCoverage(schema) {
-  const expected = OFFICIAL_CONFIG_CONTRIBUTIONS.map(({ path }) => path[1]).sort();
-  const modules = schema.properties?.modules;
-  const profileModules = schema.properties?.profiles?.additionalProperties?.properties?.modules;
-  const actual = Object.keys(modules?.properties ?? {}).sort();
-  const profileActual = Object.keys(profileModules?.properties ?? {}).sort();
-  if (
-    JSON.stringify(actual) !== JSON.stringify(expected) ||
-    JSON.stringify(profileActual) !== JSON.stringify(expected)
-  ) {
-    throw new Error('generated root schema does not cover every official module in base and profile configuration');
+  const profile = schema.properties?.profiles?.additionalProperties;
+  for (const contribution of OFFICIAL_CONFIG_CONTRIBUTIONS) {
+    if (
+      schemaAtPath(schema, contribution.path) === undefined ||
+      schemaAtPath(profile, contribution.path) === undefined
+    ) {
+      throw new Error(`generated root schema does not cover ${contribution.path.join('.')} in base and profiles`);
+    }
   }
-  if (schema.additionalProperties !== false || modules?.additionalProperties !== false) {
-    throw new Error('generated root schema must reject unknown root and module keys');
+  if (schema.additionalProperties !== false) {
+    throw new Error('generated root schema must reject unknown root keys');
+  }
+  for (const section of new Set(OFFICIAL_CONFIG_CONTRIBUTIONS.map(({ path }) => path[0]))) {
+    if (schema.properties?.[section]?.additionalProperties !== false) {
+      throw new Error(`generated root schema must reject unknown ${section} keys`);
+    }
   }
 }
 

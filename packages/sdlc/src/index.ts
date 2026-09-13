@@ -1,0 +1,30 @@
+/** Public compile-time SDLC configuration contracts. */
+export {
+  DOCUMENT_PROVIDERS,
+  documentsCapabilityConfigContribution,
+  documentsCapabilityConfigPatchSchema,
+  documentsCapabilityConfigSchema,
+  ISSUE_PROVIDERS,
+  issuesCapabilityConfigContribution,
+  issuesCapabilityConfigPatchSchema,
+  issuesCapabilityConfigSchema,
+  LOCAL_SOURCE_CONTROL_PROVIDERS,
+  REMOTE_SOURCE_CONTROL_PROVIDERS,
+  sourceControlCapabilityConfigContribution,
+  sourceControlCapabilityConfigPatchSchema,
+  sourceControlCapabilityConfigSchema,
+  type DocumentProvider,
+  type DocumentsCapabilityConfig,
+  type IssueProvider,
+  type IssuesCapabilityConfig,
+  type LocalSourceControlProvider,
+  type RemoteSourceControlProvider,
+  type SourceControlCapabilityConfig,
+} from './config.js';
+export {
+  createSdlcCompilerContext,
+  SdlcConfigError,
+  type SdlcCompilerContext,
+  type SdlcConfigProblem,
+  type SdlcConfigProblemCode,
+} from './compiler-context.js';

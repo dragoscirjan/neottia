@@ -98,6 +98,13 @@
     "issue": 93
   },
   {
+    "name": "@neottia/sdlc",
+    "manifest": "packages/sdlc/package.json",
+    "classification": "library/embedding",
+    "route": "/configuration#sdlc-provider-selection",
+    "issue": 112
+  },
+  {
     "name": "@neottia/testkit",
     "manifest": "packages/testkit/package.json",
     "classification": "internal/private",
