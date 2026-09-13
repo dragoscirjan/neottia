@@ -3,6 +3,11 @@ import { createConfigRegistry, resolveConfig, type ResolvedConfigSnapshot } from
 import { designDocsConfigContribution } from '@neottia/design-docs';
 import { issueConfigContribution } from '@neottia/issues';
 import { memoryConfigContribution } from '@neottia/memory-core';
+import {
+  documentsCapabilityConfigContribution,
+  issuesCapabilityConfigContribution,
+  sourceControlCapabilityConfigContribution,
+} from '@neottia/sdlc';
 import { searchableConfigContribution } from '@neottia/searchable-core';
 
 /** Official contributions accepted by every Neottia host configuration. */
@@ -11,6 +16,9 @@ export const officialConfigContributions = Object.freeze([
   issueConfigContribution,
   designDocsConfigContribution,
   searchableConfigContribution,
+  issuesCapabilityConfigContribution,
+  documentsCapabilityConfigContribution,
+  sourceControlCapabilityConfigContribution,
 ] as const);
 
 /** Strict registry shared by Neottia's MCP and harness hosts. */

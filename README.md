@@ -20,6 +20,7 @@ Neottia provides a shared SDLC that can be understood and used by multiple AI co
 │   ├── repository-store/# Canonical repository persistence primitives
 │   ├── searchable-core/ # Searchable runtime and shared tool registry
 │   ├── searchable-mcp/  # Generic Searchable MCP server
+│   ├── sdlc/            # Compile-time SDLC provider configuration
 │   └── release/         # Global release bill of materials
 ├── docs/                # User documentation for VitePress
 ├── .changeset/          # Module release declarations
@@ -77,7 +78,7 @@ This updates `packages/release/package.json` and `packages/release/release-manif
 
 ## Configuration
 
-`@neottia/config` composes domain-owned schemas into one immutable snapshot. It loads optional global and project YAML, applies profiles, environment bindings, and explicit overrides in a fixed order, tracks value-free leaf provenance, and redacts declared secrets. `@neottia/config-registry` supplies the strict official registry used by Neottia hosts, so all published module shards can coexist in one root file. Use the [unified configuration guide](docs/configuration.md) for files, profiles, precedence, secrets, diagnostics, embedding, and `skills.*` migration. The config package publishes the complete editor schema as `@neottia/config/config.schema.json`.
+`@neottia/config` composes domain-owned schemas into one immutable snapshot. It loads optional global and project YAML, applies profiles, environment bindings, and explicit overrides in a fixed order, tracks value-free leaf provenance, and redacts declared secrets. `@neottia/config-registry` supplies the strict official registry used by Neottia hosts, so all published module and SDLC capability shards can coexist in one root file. `@neottia/sdlc` validates compile-time provider selections for Issues, Documents, and source control, then creates immutable input for the future prompt compiler. Use the [unified configuration guide](docs/configuration.md) for files, profiles, precedence, SDLC provider selection, secrets, diagnostics, embedding, and `skills.*` migration. The config package publishes the complete editor schema as `@neottia/config/config.schema.json`.
 
 ## Memory
 
@@ -105,7 +106,7 @@ Pi and OpenCode each have native Memory, Issues, Design Docs, and Searchable ext
 
 ## Documentation
 
-Start with the [delivery chooser](docs/get-started/) and [complete 21-module catalog](docs/reference/modules.md). User documentation is under [`docs/`](docs/) and built with VitePress. `mise run docs:check` validates catalog coverage, routes, links, configuration examples, and documented tool registries.
+Start with the [delivery chooser](docs/get-started/) and [complete module catalog](docs/reference/modules.md). User documentation is under [`docs/`](docs/) and built with VitePress. `mise run docs:check` validates catalog coverage, routes, links, configuration examples, and documented tool registries.
 
 ## License
 

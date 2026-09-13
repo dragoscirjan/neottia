@@ -346,7 +346,39 @@
     "capabilities": {
       "description": "Canonical capabilities configuration.",
       "type": "object",
-      "properties": {},
+      "properties": {
+        "documents": {
+          "type": "object",
+          "properties": {
+            "provider": {
+              "type": "string",
+              "enum": ["filesystem", "github", "gitlab", "gitea", "forgejo", "confluence"]
+            }
+          },
+          "additionalProperties": false
+        },
+        "issues": {
+          "type": "object",
+          "properties": {
+            "provider": { "type": "string", "enum": ["filesystem", "github", "gitlab", "gitea", "forgejo", "jira"] }
+          },
+          "additionalProperties": false
+        },
+        "source_control": {
+          "type": "object",
+          "properties": {
+            "local": { "type": "string", "enum": ["git", "jj"] },
+            "remote": {
+              "anyOf": [
+                { "type": "boolean", "const": false },
+                { "type": "string", "enum": ["github", "gitlab", "gitea", "forgejo", "bitbucket"] }
+              ]
+            },
+            "workspaces": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        }
+      },
       "additionalProperties": false
     },
     "agents": {
@@ -743,7 +775,42 @@
           "capabilities": {
             "description": "Canonical capabilities configuration.",
             "type": "object",
-            "properties": {},
+            "properties": {
+              "documents": {
+                "type": "object",
+                "properties": {
+                  "provider": {
+                    "type": "string",
+                    "enum": ["filesystem", "github", "gitlab", "gitea", "forgejo", "confluence"]
+                  }
+                },
+                "additionalProperties": false
+              },
+              "issues": {
+                "type": "object",
+                "properties": {
+                  "provider": {
+                    "type": "string",
+                    "enum": ["filesystem", "github", "gitlab", "gitea", "forgejo", "jira"]
+                  }
+                },
+                "additionalProperties": false
+              },
+              "source_control": {
+                "type": "object",
+                "properties": {
+                  "local": { "type": "string", "enum": ["git", "jj"] },
+                  "remote": {
+                    "anyOf": [
+                      { "type": "boolean", "const": false },
+                      { "type": "string", "enum": ["github", "gitlab", "gitea", "forgejo", "bitbucket"] }
+                    ]
+                  },
+                  "workspaces": { "type": "boolean" }
+                },
+                "additionalProperties": false
+              }
+            },
             "additionalProperties": false
           },
           "agents": {

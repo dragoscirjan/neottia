@@ -4,6 +4,12 @@ import { join } from 'node:path';
 import { designDocsConfigContribution } from '@neottia/design-docs';
 import { issueConfigContribution } from '@neottia/issues';
 import { memoryConfigContribution } from '@neottia/memory-core';
+import {
+  createSdlcCompilerContext,
+  documentsCapabilityConfigContribution,
+  issuesCapabilityConfigContribution,
+  sourceControlCapabilityConfigContribution,
+} from '@neottia/sdlc';
 import { searchableConfigContribution } from '@neottia/searchable-core';
 import { afterEach, describe, expect, it } from 'vitest';
 import { officialConfigContributions, officialConfigRegistry, resolveHostConfigSnapshot } from './index.js';
@@ -37,12 +43,28 @@ modules:
 
     const snapshot = resolveHostConfigSnapshot({ cwd, env: {}, interactive: true });
 
-    expect(officialConfigContributions.map(({ id }) => id)).toEqual(['memory', 'issues', 'design-docs', 'searchable']);
-    expect(officialConfigRegistry.contributions).toHaveLength(4);
+    expect(officialConfigContributions.map(({ id }) => id)).toEqual([
+      'memory',
+      'issues',
+      'design-docs',
+      'searchable',
+      'sdlc-issues-capability',
+      'sdlc-documents-capability',
+      'sdlc-source-control-capability',
+    ]);
+    expect(officialConfigRegistry.contributions).toHaveLength(7);
     expect(snapshot.get(memoryConfigContribution).enabled).toBe(true);
     expect(snapshot.get(issueConfigContribution).enabled).toBe(true);
     expect(snapshot.get(designDocsConfigContribution).enabled).toBe(true);
     expect(snapshot.get(searchableConfigContribution).enabled).toBe(true);
+    expect(snapshot.get(issuesCapabilityConfigContribution)).toEqual({ provider: 'filesystem' });
+    expect(snapshot.get(documentsCapabilityConfigContribution)).toEqual({ provider: 'filesystem' });
+    expect(snapshot.get(sourceControlCapabilityConfigContribution)).toEqual({
+      local: 'git',
+      remote: false,
+      workspaces: false,
+    });
+    expect(createSdlcCompilerContext(snapshot).issues.provider).toBe('filesystem');
   });
 
   it('rejects unknown modules even alongside official Searchable configuration', () => {

@@ -32,7 +32,7 @@ Set `NEOTTIA_GLOBAL_CONFIG_FILE` or `NEOTTIA_CONFIG_FILE` to select a different 
 
 Each file must be a regular file no larger than 1 MiB. YAML can contain at most 10,000 scalar and collection nodes with a maximum collection depth of 64. Files above these limits fail with a `LIMIT` diagnostic before the resolver converts YAML to JavaScript values.
 
-Every present file must have the exact integer `version: 1`. The supported root keys are `version`, `modules`, `sdlc`, `connections`, `capabilities`, `agents`, `harnesses`, `assets`, `templates`, and `profiles`. A root section can contain only registered paths. The current published schema registers the four paths below.
+Every present file must have the exact integer `version: 1`. The supported root keys are `version`, `modules`, `sdlc`, `connections`, `capabilities`, `agents`, `harnesses`, `assets`, `templates`, and `profiles`. A root section can contain only registered paths. The current published schema registers the paths below.
 
 | Module      | Canonical path        | Module reference                                                                                                 |
 | ----------- | --------------------- | ---------------------------------------------------------------------------------------------------------------- |
@@ -40,6 +40,12 @@ Every present file must have the exact integer `version: 1`. The supported root 
 | Issues      | `modules.issues`      | [Issues configuration](./issues/configuration.md)                                                                |
 | Design Docs | `modules.design_docs` | [Design Docs package guide](https://github.com/dragoscirjan/neottia/blob/main/packages/design-docs/README.md)    |
 | Searchable  | `modules.searchable`  | [Searchable package guide](https://github.com/dragoscirjan/neottia/blob/main/packages/searchable-core/README.md) |
+
+| SDLC selection     | Canonical path                | Reference                                           |
+| ------------------ | ----------------------------- | --------------------------------------------------- |
+| Issues provider    | `capabilities.issues`         | [SDLC provider selection](#sdlc-provider-selection) |
+| Documents provider | `capabilities.documents`      | [SDLC provider selection](#sdlc-provider-selection) |
+| Source control     | `capabilities.source_control` | [SDLC provider selection](#sdlc-provider-selection) |
 
 ## Project example
 
@@ -120,6 +126,58 @@ modules:
 ```
 
 Memory's PostgreSQL backend accepts `provider.db.pg` settings. Issues, Design Docs, Memory, and Searchable also have resource limits under their `security` settings. Design Docs roots accept portable Unicode directory names while reserving the actual `.neottia/cache` and `.neottia/repository-store` paths. Use editor completion from the complete schema or the linked module reference when setting those limits.
+
+## SDLC provider selection
+
+`@neottia/sdlc` adds compile-time provider choices to the same snapshot. The defaults select filesystem Issues, filesystem Documents, local Git, no remote source control, and no Git workspaces.
+
+Filesystem providers use the corresponding module settings. Enable both modules before creating compiler input:
+
+```yaml
+version: 1
+modules:
+  issues:
+    enabled: true
+  design_docs:
+    enabled: true
+capabilities:
+  issues:
+    provider: filesystem
+  documents:
+    provider: filesystem
+  source_control:
+    local: git
+    remote: false
+    workspaces: false
+```
+
+Remote names reserve stable compiler selections for provider instruction packages. Selecting a name does not install instructions, authenticate a provider, or grant access.
+
+| Capability            | Accepted selections                                                | Delivery status                                                                          |
+| --------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| Issues                | `filesystem`, `github`, `gitlab`, `gitea`, `forgejo`, `jira`       | Filesystem is available; remote instruction packages are planned in issues #116 and #117 |
+| Documents             | `filesystem`, `github`, `gitlab`, `gitea`, `forgejo`, `confluence` | Filesystem is available; remote instruction packages are planned in issues #116 and #117 |
+| Local source control  | `git`, `jj`                                                        | The selection contract is available; prompt compilation is planned in issue #115         |
+| Remote source control | `false`, `github`, `gitlab`, `gitea`, `forgejo`, `bitbucket`       | Disabled by default; instruction packages are planned in issues #116 and #117            |
+
+`remote` is one scalar. Set it to `false` or one supported forge:
+
+```yaml
+version: 1
+capabilities:
+  issues:
+    provider: jira
+  documents:
+    provider: confluence
+  source_control:
+    local: jj
+    remote: bitbucket
+    workspaces: false
+```
+
+The scalar remote selection replaces atomically across global, project, and profile layers. A profile can set `remote: false` without retaining a lower provider. Provider-specific URLs, credentials, and tool names remain outside this package.
+
+Git workspaces require `local: git`. `createSdlcCompilerContext(snapshot)` reports that conflict and disabled filesystem modules through typed, value-free `SdlcConfigError` problems. It reads only the supplied snapshot and returns a deeply frozen object for the future prompt compiler.
 
 ## Profiles
 
