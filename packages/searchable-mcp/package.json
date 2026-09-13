@@ -20,7 +20,7 @@
   "engines": { "node": ">=22.16.0" },
   "scripts": {
     "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
-    "pretest": "node scripts/ensure-config-registry.mjs && pnpm run build",
+    "pretest": "node ../../scripts/run-unless-workspace-prebuilt.mjs pnpm --filter @neottia/searchable-mcp... run build",
     "test": "vitest run --root ../.. packages/searchable-mcp/src",
     "typecheck": "tsc --noEmit"
   },

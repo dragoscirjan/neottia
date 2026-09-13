@@ -33,7 +33,7 @@
   },
   "scripts": {
     "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json && node scripts/generate-config-schema.mjs && pnpm exec prettier --write config.schema.json",
-    "pretest": "pnpm run build",
+    "pretest": "node ../../scripts/run-unless-workspace-prebuilt.mjs pnpm --filter @neottia/searchable-core... run build",
     "test": "vitest run --root ../.. packages/searchable-core/src",
     "typecheck": "tsc --noEmit"
   },

@@ -28,7 +28,7 @@
   },
   "scripts": {
     "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
-    "pretest": "pnpm --filter @neottia/design-docs run build && pnpm --filter @neottia/issues run build && pnpm run build",
+    "pretest": "node ../../scripts/run-unless-workspace-prebuilt.mjs pnpm --filter @neottia/issues-design-docs... run build",
     "test": "vitest run --root ../.. packages/issues-design-docs/src",
     "typecheck": "tsc --noEmit"
   },
