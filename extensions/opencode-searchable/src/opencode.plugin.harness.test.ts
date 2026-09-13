@@ -3,8 +3,8 @@ import { join } from 'node:path';
 import {
   assertHarnessConclusive,
   createTempProject,
-  ensureSearchableDistBuilt,
   opencodeReady,
+  requireSearchableDistBuilt,
   openrouterApiKey,
   repoRoot,
   runOpencodeWithModelFallback,
@@ -19,7 +19,7 @@ let project: TempProject;
 
 beforeAll(() => {
   if (!enabled) return;
-  ensureSearchableDistBuilt(repoRoot());
+  requireSearchableDistBuilt(repoRoot());
   project = createTempProject();
   writeFileSync(
     project.configPath,

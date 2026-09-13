@@ -5,6 +5,7 @@ import {
   applyCanonicalBatch,
   computeByteRevision,
   openDisposableSqliteCache,
+  readManagedFile,
   rebuildDisposableSqliteCache,
   resolveManagedPath,
   resolveManagedRoot,
@@ -13,6 +14,7 @@ import {
   type ByteRevision,
   type CanonicalOperation,
   type DisposableCacheSpecification,
+  type ManagedFile,
   type ManagedRoot,
   type OperationControl,
   type RepositoryLease,
@@ -240,7 +242,7 @@ export class SearchableStore {
           [ftsExpression(terms), input.limit],
           { maxRows: input.limit, maxBytes: this.config.security.limits.max_result_bytes },
         );
-        const refreshed = await loadCatalog(root, lease, this.config, control);
+        const refreshed = await reloadCandidatePages(root, lease, catalog, candidates, this.config, control);
         return {
           results: candidates.flatMap((candidate) => {
             const page = refreshed.get(candidate.id);
@@ -430,33 +432,72 @@ async function loadCatalog(
   });
   const catalog = new Map<string, CatalogPage>();
   for (const file of files) {
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(Buffer.from(file.bytes).toString('utf8')) as unknown;
-    } catch {
-      throw new SearchableError(
-        'service',
-        'STASH_RECORD_INVALID',
-        'A canonical Searchable page contains invalid JSON.',
-      );
-    }
-    const record = pageRecordSchema.parse(parsed);
-    if (pageId(normalizeStashUrl(record.url)) !== record.id || !file.path.relativePath.endsWith(`/${record.id}.json`))
-      throw new SearchableError(
-        'service',
-        'STASH_RECORD_INVALID',
-        'A canonical Searchable page has inconsistent identity.',
-      );
-    if (catalog.has(record.id))
+    const page = parseCatalogFile(file);
+    if (catalog.has(page.record.id))
       throw new SearchableError(
         'service',
         'STASH_RECORD_INVALID',
         'Canonical Searchable pages contain a duplicate identity.',
       );
-    catalog.set(record.id, { record, revision: file.revision, relativePath: file.path.relativePath });
+    catalog.set(page.record.id, page);
   }
   validateCatalog(catalog, config);
   return catalog;
+}
+
+/** Reloads only FTS candidates while retaining canonical revision and content checks. */
+async function reloadCandidatePages(
+  root: ManagedRoot,
+  lease: RepositoryLease,
+  catalog: ReadonlyMap<string, CatalogPage>,
+  candidates: readonly { readonly id: string }[],
+  config: SearchableConfig,
+  control: StoreOperationControl,
+): Promise<Map<string, CatalogPage>> {
+  const refreshed = new Map<string, CatalogPage>();
+  for (const candidate of candidates) {
+    if (refreshed.has(candidate.id)) continue;
+    const current = catalog.get(candidate.id);
+    if (!current) continue;
+    let file: ManagedFile;
+    try {
+      file = await readManagedFile(root, lease, resolveManagedPath(root, current.relativePath), control);
+    } catch (error: unknown) {
+      if (hasCode(error, 'ENOENT')) continue;
+      throw error;
+    }
+    const page = parseCatalogFile(file);
+    if (page.record.id !== candidate.id)
+      throw new SearchableError(
+        'service',
+        'STASH_RECORD_INVALID',
+        'A canonical Searchable page changed identity during search.',
+      );
+    refreshed.set(candidate.id, page);
+  }
+  validateCatalog(refreshed, config);
+  return refreshed;
+}
+
+function parseCatalogFile(file: ManagedFile): CatalogPage {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(Buffer.from(file.bytes).toString('utf8')) as unknown;
+  } catch {
+    throw new SearchableError('service', 'STASH_RECORD_INVALID', 'A canonical Searchable page contains invalid JSON.');
+  }
+  const record = pageRecordSchema.parse(parsed);
+  if (pageId(normalizeStashUrl(record.url)) !== record.id || !file.path.relativePath.endsWith(`/${record.id}.json`))
+    throw new SearchableError(
+      'service',
+      'STASH_RECORD_INVALID',
+      'A canonical Searchable page has inconsistent identity.',
+    );
+  return { record, revision: file.revision, relativePath: file.path.relativePath };
+}
+
+function hasCode(error: unknown, code: string): boolean {
+  return error instanceof Error && 'code' in error && error.code === code;
 }
 
 function cacheSpecification(

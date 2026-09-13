@@ -6,6 +6,7 @@ export {
   ensureSearchableDistBuilt,
   issuesMcpEntry,
   memoryMcpEntry,
+  requireSearchableDistBuilt,
   searchableMcpEntry,
   repoRoot,
 } from './repo.js';

@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
+import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -41,6 +41,34 @@ it('previews and explicitly imports an immutable legacy database', async () => {
     expect(await runtime.store.grep({ query: 'marker', limit: 5 })).toMatchObject({
       results: [{ url: 'https://example.com/legacy', title: 'Legacy page' }],
     });
+  } finally {
+    await runtime.close();
+  }
+});
+
+it('does not report failure after canonical publication if the legacy source changes', async () => {
+  const cwd = mkdtempSync(join(tmpdir(), 'searchable-migration-'));
+  roots.push(cwd);
+  const path = join(cwd, '.web_stash.db');
+  const database = new DatabaseSync(path);
+  database.exec('CREATE TABLE pages (url TEXT NOT NULL, title TEXT NOT NULL, content TEXT NOT NULL)');
+  database
+    .prepare('INSERT INTO pages(url,title,content) VALUES(?,?,?)')
+    .run('https://example.com/published', 'Published', 'published migration marker');
+  database.close();
+  const runtime = createSearchableRuntime({ cwd, configOverrides: { enabled: true } });
+  const importPages = runtime.store.importPages.bind(runtime.store);
+  vi.spyOn(runtime.store, 'importPages').mockImplementation(async (candidates, preview, context) => {
+    const result = await importPages(candidates, preview, context);
+    appendFileSync(path, Buffer.from([0]));
+    return result;
+  });
+  try {
+    const result = await importLegacySearchableDatabase(runtime.store, {
+      path: '.web_stash.db',
+      preview: false,
+    });
+    expect(result).toMatchObject({ preview: false, valid: true, planned: 1, imported: 1 });
   } finally {
     await runtime.close();
   }

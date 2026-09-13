@@ -100,7 +100,6 @@ export async function importLegacySearchableDatabase(
         transportDeadline: deadline,
         ...(context?.onStaleCache === undefined ? {} : { onStaleCache: context.onStaleCache }),
       });
-      await assertSourceIdentity(source, path, identity);
       return report(
         preview,
         imported.conflicts.length === 0,

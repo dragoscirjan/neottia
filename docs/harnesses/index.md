@@ -1,6 +1,6 @@
 # Native harness extensions
 
-Neottia ships native extensions for Pi and OpenCode. Each host has Memory, Issues, and Design Docs packages. Native means the host loads the package in process.
+Neottia ships native extensions for Pi and OpenCode. Each host has Memory, Issues, Design Docs, and Searchable packages. Native means the host loads the package in process.
 
 - [Configure Pi](/harnesses/pi)
 - [Configure OpenCode](/harnesses/opencode)

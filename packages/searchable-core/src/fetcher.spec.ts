@@ -53,28 +53,25 @@ describe('fetch strategies', () => {
     expect(transport.requests.map((request) => request.url.hostname)).toEqual(['example.com', 'r.jina.ai']);
   });
 
-  it('does not disclose query-bearing targets to Jina or Wayback', async () => {
-    const transport = new SequenceTransport([
-      response('', 'https://example.com/private?token=secret', 'text/html', 500),
-    ]);
-    await expect(
-      fetchPage(
-        transport,
-        new URL('https://example.com/private?token=secret'),
-        context({ strategies: ['direct', 'jina', 'wayback'] }),
-      ),
-    ).rejects.toMatchObject({
-      code: 'FETCH_FAILED',
-      details: {
-        strategies: [
-          'direct: FETCH_UPSTREAM_FAILED',
-          'jina: FALLBACK_DISCLOSURE_BLOCKED',
-          'wayback: FALLBACK_DISCLOSURE_BLOCKED',
-        ],
-      },
-    });
-    expect(transport.requests).toHaveLength(1);
-  });
+  it.each(['https://example.com/private?token=secret', 'https://example.com/private#token=secret'])(
+    'does not disclose sensitive target components to Jina or Wayback: %s',
+    async (url) => {
+      const transport = new SequenceTransport([response('', url, 'text/html', 500)]);
+      await expect(
+        fetchPage(transport, new URL(url), context({ strategies: ['direct', 'jina', 'wayback'] })),
+      ).rejects.toMatchObject({
+        code: 'FETCH_FAILED',
+        details: {
+          strategies: [
+            'direct: FETCH_UPSTREAM_FAILED',
+            'jina: FALLBACK_DISCLOSURE_BLOCKED',
+            'wayback: FALLBACK_DISCLOSURE_BLOCKED',
+          ],
+        },
+      });
+      expect(transport.requests).toHaveLength(1);
+    },
+  );
 
   it('rejects attacker-controlled Wayback snapshot origins', async () => {
     const transport = new SequenceTransport([

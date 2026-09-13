@@ -7,6 +7,7 @@ import {
   piBin,
   piReady,
   repoRoot,
+  requireSearchableDistBuilt,
   runPiWithModelFallback,
   type TempProject,
 } from '@neottia/testkit';
@@ -20,6 +21,7 @@ let project: TempProject;
 
 beforeAll(() => {
   if (!enabled) return;
+  requireSearchableDistBuilt(repoRoot());
   project = createTempProject();
   writeFileSync(
     project.configPath,

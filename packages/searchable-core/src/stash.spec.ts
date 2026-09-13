@@ -47,6 +47,26 @@ it('invalidates cache candidates when canonical content changes', async () => {
   expect(await stash.grep({ query: 'old', limit: 5 })).toEqual({ results: [] });
 });
 
+it('reloads only matching canonical records after the FTS query', async () => {
+  const stash = store();
+  await stash.stash({ url: 'https://example.com/candidate', title: 'Candidate', content: 'selective marker' });
+  const pages = join(stash.cwd, '.neottia', 'searchable', 'pages');
+  const unrelated = join(pages, `page-${'f'.repeat(64)}.json`);
+  const context = {
+    cwd: stash.cwd,
+    config: stash.config,
+    onStaleCache: async () => {
+      // Simulate an unrelated canonical write after the operation's initial catalog scan.
+      writeFileSync(unrelated, 'not json');
+      return true;
+    },
+  };
+
+  await expect(stash.grep({ query: 'selective', limit: 5 }, context)).resolves.toMatchObject({
+    results: [{ title: 'Candidate' }],
+  });
+});
+
 it('health-checks legal multi-page stashes without one aggregate result allocation', async () => {
   const stash = store({
     security: {

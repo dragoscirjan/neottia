@@ -52,6 +52,20 @@ export function searchableMcpEntry(root: string = repoRoot()): string {
   return join(root, 'packages', 'searchable-mcp', 'dist', 'cli.js');
 }
 
+/** Requires Searchable build output without modifying the repository worktree. */
+export function requireSearchableDistBuilt(root: string = repoRoot()): string {
+  const entry = searchableMcpEntry(root);
+  const required = [
+    join(root, 'packages', 'repository-store', 'dist', 'index.js'),
+    join(root, 'packages', 'searchable-core', 'dist', 'index.js'),
+    entry,
+  ];
+  const missing = required.filter((path) => !existsSync(path));
+  if (missing.length)
+    throw new Error(`Searchable build output is missing. Run mise run build first: ${missing.join(', ')}`);
+  return entry;
+}
+
 /** Builds Searchable output required by external harness runtimes. */
 export function ensureSearchableDistBuilt(root: string = repoRoot()): string {
   const entry = searchableMcpEntry(root);
@@ -62,8 +76,7 @@ export function ensureSearchableDistBuilt(root: string = repoRoot()): string {
     execFileSync('pnpm', ['--filter', '@neottia/repository-store', 'run', 'build'], options);
   if (!existsSync(coreDist)) execFileSync('pnpm', ['--filter', '@neottia/searchable-core', 'run', 'build'], options);
   if (!existsSync(entry)) execFileSync('pnpm', ['--filter', '@neottia/searchable-mcp', 'run', 'build'], options);
-  if (!existsSync(entry)) throw new Error(`searchable-mcp dist still missing after build: ${entry}`);
-  return entry;
+  return requireSearchableDistBuilt(root);
 }
 
 /** Entry point a harness must spawn to run the memory MCP server. */

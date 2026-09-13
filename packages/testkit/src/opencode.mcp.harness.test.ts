@@ -7,8 +7,8 @@ import {
   assertHarnessConclusive,
   createTempProject,
   ensureMemoryDistBuilt,
-  ensureSearchableDistBuilt,
   memoryMcpEntry,
+  requireSearchableDistBuilt,
   opencodeReady,
   repoRoot,
   runOpencode,
@@ -35,7 +35,7 @@ let packedSearchableEntry = '';
 beforeAll(() => {
   if (!enabled) return;
   ensureMemoryDistBuilt(repoRoot());
-  ensureSearchableDistBuilt(repoRoot());
+  requireSearchableDistBuilt(repoRoot());
   ({ root: packedSearchableRoot, entry: packedSearchableEntry } = installPackedSearchableMcp(repoRoot()));
 }, 180_000);
 

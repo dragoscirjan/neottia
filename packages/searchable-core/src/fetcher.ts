@@ -30,7 +30,7 @@ export async function fetchPage(
     checkOperation(context.signal, deadline);
     try {
       if (strategy === 'direct') return await directFetch(transport, requested, context, deadline, 'direct');
-      if (requested.search || requested.username || requested.password) {
+      if (requested.search || requested.hash || requested.username || requested.password) {
         failures.push(`${strategy}: FALLBACK_DISCLOSURE_BLOCKED`);
         continue;
       }

@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { assertPublicAddress, type SearchableHttpRequest, type SearchableHttpTransport } from './http.js';
 import { createSearchableRuntime } from './runtime.js';
+import type { StashedPageRecord } from './stash.js';
 import { findSearchableTool } from './tools.js';
 
 const roots: string[] = [];
@@ -109,6 +110,42 @@ describe('concrete Searchable runtime', () => {
     const request = transport.requests.find((value) => value.url.pathname === '/api/generate');
     expect(contextDeadline).toBeDefined();
     expect(request?.deadline).toBe(contextDeadline);
+    await runtime.close();
+  });
+
+  it('returns only the source URLs included in the bounded Ollama prompt', async () => {
+    const cwd = project('    ask:\n      context_bytes: 400\n');
+    const transport = new FixtureTransport();
+    const runtime = createSearchableRuntime({ cwd, transport });
+    const timestamp = new Date().toISOString();
+    const pages: StashedPageRecord[] = [
+      {
+        version: 1,
+        id: `page-${'a'.repeat(64)}`,
+        url: 'https://example.com/included',
+        title: 'Included',
+        content: 'included '.repeat(100),
+        created_at: timestamp,
+        updated_at: timestamp,
+      },
+      {
+        version: 1,
+        id: `page-${'b'.repeat(64)}`,
+        url: 'https://example.com/excluded',
+        title: 'Excluded',
+        content: 'excluded context',
+        created_at: timestamp,
+        updated_at: timestamp,
+      },
+    ];
+    vi.spyOn(runtime.store, 'context').mockResolvedValue(pages);
+
+    const answer = await tool('web_ask').run({ cwd, services: runtime }, { question: 'marker' });
+    expect(answer).toEqual({ answer: 'Grounded answer.', contextUrls: ['https://example.com/included'] });
+    const request = transport.requests.find((value) => value.url.pathname === '/api/generate');
+    const prompt = JSON.parse(Buffer.from(request?.body ?? []).toString('utf8')) as { prompt: string };
+    expect(prompt.prompt).toContain('https://example.com/included');
+    expect(prompt.prompt).not.toContain('https://example.com/excluded');
     await runtime.close();
   });
 

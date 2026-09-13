@@ -96,7 +96,7 @@ export function registerSearchableTools(
   };
 }
 
-/** Pi extension entry point. */
-export default function (pi: PiExtensionApi): void {
-  pi.on('session_shutdown', registerSearchableTools(pi));
+/** Pi extension entry point. Options support deterministic host lifecycle tests. */
+export default function (pi: PiExtensionApi, options: SearchableExtensionOptions = {}): void {
+  pi.on('session_shutdown', registerSearchableTools(pi, options));
 }

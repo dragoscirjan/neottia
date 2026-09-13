@@ -8,17 +8,20 @@ Stop the old MCP process first. Place the database directly in the selected proj
 import { createSearchableRuntime, importLegacySearchableDatabase } from "@neottia/searchable-core";
 
 const runtime = createSearchableRuntime({ cwd: process.cwd() });
-const preview = await importLegacySearchableDatabase(runtime.store, {
-  path: ".web_stash.db",
-});
-console.log(preview);
+try {
+  const preview = await importLegacySearchableDatabase(runtime.store, {
+    path: ".web_stash.db",
+  });
+  console.log(preview);
 
-const applied = await importLegacySearchableDatabase(runtime.store, {
-  path: ".web_stash.db",
-  preview: false,
-});
-console.log(applied);
-await runtime.close();
+  const applied = await importLegacySearchableDatabase(runtime.store, {
+    path: ".web_stash.db",
+    preview: false,
+  });
+  console.log(applied);
+} finally {
+  await runtime.close();
+}
 ```
 
 Before reading rows, the importer opens one no-follow descriptor, copies it to a private snapshot in bounded chunks, and verifies that neither the descriptor nor project path changed. Restricting the source to a direct child prevents ancestor symlinks from redirecting the open outside the project. A worker opens the copy read-only, runs `PRAGMA integrity_check`, validates the `pages` shape, and iterates rows. The importer waits for worker termination before it removes the snapshot or returns. Source bytes, row count, and imported UTF-8 bytes are capped. Pass an `AbortSignal` or absolute `deadline` to stop snapshot and worker work. The importer converts the epoch deadline once and uses a monotonic timer for later stages.
