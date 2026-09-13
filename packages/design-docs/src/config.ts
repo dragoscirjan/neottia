@@ -23,7 +23,6 @@ export const DEFAULT_DESIGN_DOCS_CONFIG_FILE = '.neottia/config.yml';
 
 const ALLOWED_DESIGN_DOCS_ROOT_PATTERN =
   /^(?!\.[nN][eE][oO][tT][tT][iI][aA](?:$|\/(?:[cC][aA][cC][hH][eE]|[rR][eE][pP][oO][sS][iI][tT][oO][rR][yY]-[sS][tT][oO][rR][eE])(?:\/|$))).+$/u;
-const PRINTABLE_ASCII_PATTERN = /^[\x20-\x7e]+$/u;
 const positive = z.number().int().positive();
 
 /** Complete strict runtime schema for resolved config and direct store values. */
@@ -143,10 +142,8 @@ function designDocsRootSchema() {
     .string()
     .min(1)
     .max(1024)
-    .regex(PRINTABLE_ASCII_PATTERN, 'must contain only printable ASCII characters')
     .regex(PORTABLE_RELATIVE_PATH_PATTERN, 'must use portable path components')
-    .regex(ALLOWED_DESIGN_DOCS_ROOT_PATTERN, 'must not overlap reserved .neottia paths')
-    .refine((value) => !overlapsReservedPath(value), 'must not normalize to a reserved .neottia path');
+    .regex(ALLOWED_DESIGN_DOCS_ROOT_PATTERN, 'must not overlap reserved .neottia paths');
 }
 
 export type DesignDocsConfig = z.output<typeof designDocsConfigSchema>;
@@ -285,15 +282,6 @@ function resolutionDesignDocsCode(code: ConfigDiagnosticCode | undefined): strin
   if (code === 'PATH' || code === 'MERGE') return 'CONFIG_SHARD_INVALID';
   if (code === 'ENVIRONMENT') return 'CONFIG_ENV_INVALID';
   return 'CONFIG_SCHEMA_INVALID';
-}
-
-/** Rejects compatibility spellings that normalize to a reserved path. */
-function overlapsReservedPath(value: string): boolean {
-  const normalized = value.normalize('NFKC').toLocaleLowerCase('en-US').replace(/\/+$/u, '');
-  return ['.neottia/cache', '.neottia/repository-store'].some(
-    (reserved) =>
-      normalized === reserved || normalized.startsWith(`${reserved}/`) || reserved.startsWith(`${normalized}/`),
-  );
 }
 
 /** Compares configuration paths without interpreting dots inside segments. */
