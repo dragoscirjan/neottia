@@ -133,6 +133,7 @@ function createSearchableConfigPatchSchema(credential: z.ZodString) {
         .object({
           provider: z.enum(['duckduckgo', 'google', 'bing', 'brave']).optional(),
           limit: z.number().int().min(1).max(100).optional(),
+          timeout_ms: z.number().int().positive().max(300_000).optional(),
           credentials: z
             .object({
               google_api_key: credential.optional(),

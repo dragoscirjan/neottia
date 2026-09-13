@@ -75,6 +75,24 @@ function checkNoModuleLocalRootParser() {
   }
 }
 
+/** Prevents Searchable delivery hosts from bypassing the official shared registry. */
+function checkSearchableHostResolution() {
+  const hosts = [
+    'packages/searchable-mcp/src/server.ts',
+    'extensions/pi-searchable/src/index.ts',
+    'extensions/opencode-searchable/src/index.ts',
+  ];
+  const violations = [];
+  for (const host of hosts) {
+    const content = readFileSync(resolve(repositoryRoot, host), 'utf8');
+    if (!content.includes('resolveHostConfigSnapshot') || content.includes('loadSearchableConfig'))
+      violations.push(host);
+  }
+  if (violations.length > 0) {
+    throw new Error(`Searchable hosts must resolve the official configuration registry: ${violations.join(', ')}`);
+  }
+}
+
 /** Confirms that the schema exposes every official canonical module and rejects unknown keys. */
 function checkSchemaCoverage(schema) {
   const expected = OFFICIAL_CONFIG_CONTRIBUTIONS.map(({ path }) => path[1]).sort();
@@ -97,6 +115,7 @@ const { generate, registry } = await loadRegistry();
 if (typeof generate !== 'function') throw new Error('@neottia/config does not export generateConfigJsonSchema');
 checkModuleCoverage();
 checkNoModuleLocalRootParser();
+checkSearchableHostResolution();
 const schema = generate(registry);
 checkSchemaCoverage(schema);
 const prettierConfig = (await resolvePrettierConfig(schemaFile)) ?? {};
@@ -109,5 +128,5 @@ if (writeSchema) {
   if (!existsSync(schemaFile) || readFileSync(schemaFile, 'utf8') !== serialized) {
     throw new Error('packages/config/config.schema.json is stale; run mise run config:schema:generate');
   }
-  process.stdout.write('configuration schema freshness, module coverage, and parser guard passed\n');
+  process.stdout.write('configuration schema freshness, module coverage, host resolution, and parser guard passed\n');
 }

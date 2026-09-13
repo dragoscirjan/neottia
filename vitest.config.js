@@ -15,6 +15,7 @@ const workspaceSourceAliases = {
   '@neottia/memory-mcp': resolve(__dirname, 'packages/memory-mcp/src/index.ts'),
   '@neottia/repository-store': resolve(__dirname, 'packages/repository-store/src/index.ts'),
   '@neottia/searchable-core': resolve(__dirname, 'packages/searchable-core/src/index.ts'),
+  '@neottia/searchable-mcp': resolve(__dirname, 'packages/searchable-mcp/src/index.ts'),
   '@neottia/testkit': resolve(__dirname, 'packages/testkit/src/index.ts'),
 };
 

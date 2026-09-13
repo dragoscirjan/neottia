@@ -6,7 +6,7 @@
 pnpm dlx @neottia/searchable-mcp
 ```
 
-Start it in the project directory containing `.neottia/config.yml`. A generic client entry is:
+Start it in the project directory containing `.neottia/config.yml` and enable `modules.searchable`. The server resolves the official shared configuration snapshot once at startup. A generic client entry is:
 
 ```json
 {

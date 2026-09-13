@@ -23,9 +23,11 @@ describe('memory documentation contracts', () => {
   });
 
   it('documents only the environment leaves that the loader binds', () => {
-    expect(packageReadme).toMatch(/Environment variables override only the leaves listed below/u);
     expect(packageReadme).toMatch(
-      /`security\.secret_patterns` and every `security\.limits` leaf are intentionally file\/code-only/u,
+      /Environment variables override only the leaves listed in the \[configuration reference\]/u,
+    );
+    expect(packageReadme).toMatch(
+      /`security\.secret_patterns` and every `security\.limits` leaf remain file\/code-only/u,
     );
     expect(packageReadme).not.toMatch(/every value can be overridden by an environment variable/u);
     expect(packageReadme).not.toMatch(/For every value:/u);

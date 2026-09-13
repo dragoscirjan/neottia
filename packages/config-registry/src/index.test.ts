@@ -69,9 +69,11 @@ modules:
     expect(declared.get(memoryConfigContribution).cache.stale_policy).toBe('prompt');
     expect(declared.get(issueConfigContribution).cache.stale_policy).toBe('prompt');
     expect(declared.get(designDocsConfigContribution).cache.stale_policy).toBe('prompt');
+    expect(declared.get(searchableConfigContribution).cache.stale_policy).toBe('prompt');
     expect(effective.get(memoryConfigContribution).cache.stale_policy).toBe('rebuild');
     expect(effective.get(issueConfigContribution).cache.stale_policy).toBe('rebuild');
     expect(effective.get(designDocsConfigContribution).cache.stale_policy).toBe('rebuild');
+    expect(effective.get(searchableConfigContribution).cache.stale_policy).toBe('rebuild');
     expect(effective.sourceOf(issueConfigContribution, ['cache', 'stale_policy'])).toEqual({
       kind: 'override',
       label: 'non-interactive host stale-cache policy',

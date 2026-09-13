@@ -49,6 +49,9 @@ export function resolveHostConfigSnapshot(options: HostConfigSnapshotOptions): R
   if (declared.get(designDocsConfigContribution).cache.stale_policy === 'prompt') {
     modules['design_docs'] = { cache: { stale_policy: 'rebuild' } };
   }
+  if (declared.get(searchableConfigContribution).cache.stale_policy === 'prompt') {
+    modules['searchable'] = { cache: { stale_policy: 'rebuild' } };
+  }
   return Object.keys(modules).length === 0
     ? declared
     : declared.derive({ modules }, 'non-interactive host stale-cache policy');

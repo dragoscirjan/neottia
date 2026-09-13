@@ -232,6 +232,7 @@
               "properties": {
                 "provider": { "type": "string", "enum": ["duckduckgo", "google", "bing", "brave"] },
                 "limit": { "type": "integer", "minimum": 1, "maximum": 100 },
+                "timeout_ms": { "type": "integer", "exclusiveMinimum": 0, "maximum": 300000 },
                 "credentials": {
                   "type": "object",
                   "properties": {
@@ -628,6 +629,7 @@
                     "properties": {
                       "provider": { "type": "string", "enum": ["duckduckgo", "google", "bing", "brave"] },
                       "limit": { "type": "integer", "minimum": 1, "maximum": 100 },
+                      "timeout_ms": { "type": "integer", "exclusiveMinimum": 0, "maximum": 300000 },
                       "credentials": {
                         "type": "object",
                         "properties": {

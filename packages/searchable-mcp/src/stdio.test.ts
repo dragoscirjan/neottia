@@ -16,31 +16,53 @@ let transport: StdioClientTransport | undefined;
 
 beforeAll(() => {
   packageRoot = mkdtempSync(join(tmpdir(), 'searchable-mcp-package-'));
-  const tarballs = {
-    'repository-store': pack('packages/repository-store'),
-    'searchable-core': pack('packages/searchable-core'),
-    'searchable-mcp': pack('packages/searchable-mcp'),
+  const packaged = [
+    ['@neottia/config', 'config', 'packages/config'],
+    ['@neottia/config-registry', 'config-registry', 'packages/config-registry'],
+    ['@neottia/design-docs', 'design-docs', 'packages/design-docs'],
+    ['@neottia/issues', 'issues', 'packages/issues'],
+    ['@neottia/memory-core', 'memory-core', 'packages/memory-core'],
+    ['@neottia/repository-store', 'repository-store', 'packages/repository-store'],
+    ['@neottia/searchable-core', 'searchable-core', 'packages/searchable-core'],
+    ['@neottia/searchable-mcp', 'searchable-mcp', 'packages/searchable-mcp'],
+  ] as const;
+  const tarballs = new Map<string, string>(packaged.map(([name, , workspacePath]) => [name, pack(workspacePath)]));
+  const adapterTarballs = {
     'pi-searchable': pack('extensions/pi-searchable'),
     'opencode-searchable': pack('extensions/opencode-searchable'),
   };
-  const mcpTarball = tarballs['searchable-mcp'];
+  const mcpTarball = tarballs.get('@neottia/searchable-mcp');
   if (!mcpTarball) throw new Error('pnpm pack did not produce a Searchable MCP tarball.');
   const entries = execFileSync('tar', ['-tzf', mcpTarball], { encoding: 'utf8' }).split('\n');
   if (!entries.includes('package/dist/cli.js')) throw new Error('Packed Searchable MCP omits dist/cli.js.');
   for (const name of ['pi-searchable', 'opencode-searchable'] as const) {
-    const adapterEntries = execFileSync('tar', ['-tzf', tarballs[name]], { encoding: 'utf8' }).split('\n');
+    const adapterEntries = execFileSync('tar', ['-tzf', adapterTarballs[name]], { encoding: 'utf8' }).split('\n');
     if (!adapterEntries.includes('package/src/index.ts'))
       throw new Error(`Packed ${name} omits its TypeScript entry point.`);
   }
   const extracted = join(packageRoot, 'extracted');
-  const packedRepositoryStore = extract(tarballs['repository-store'], join(extracted, 'repository-store'));
-  const packedCore = extract(tarballs['searchable-core'], join(extracted, 'searchable-core'));
-  const packedPackage = extract(mcpTarball, join(extracted, 'searchable-mcp'));
-  linkDependency(packedPackage, '@neottia/searchable-core', packedCore);
-  linkDependency(packedCore, '@neottia/repository-store', packedRepositoryStore);
-  for (const dependency of ['@mozilla/readability', 'jsdom', 'turndown', 'yaml', 'zod'])
-    linkWorkspaceDependency(packedCore, 'packages/searchable-core', dependency);
-  linkWorkspaceDependency(packedPackage, 'packages/searchable-mcp', '@modelcontextprotocol/sdk');
+  const extractedPackages = new Map<string, string>(
+    packaged.map(([name, directory]) => {
+      const tarball = tarballs.get(name);
+      if (!tarball) throw new Error(`pnpm pack did not produce ${name}.`);
+      return [name, extract(tarball, join(extracted, directory))];
+    }),
+  );
+  for (const [name, , workspacePath] of packaged) {
+    const packed = extractedPackages.get(name);
+    if (!packed) throw new Error(`Missing extracted package ${name}.`);
+    const manifest = JSON.parse(readFileSync(join(packed, 'package.json'), 'utf8')) as {
+      dependencies?: Record<string, string>;
+    };
+    for (const dependency of Object.keys(manifest.dependencies ?? {})) {
+      const packagedDependency = extractedPackages.get(dependency);
+      if (packagedDependency) linkDependency(packed, dependency, packagedDependency);
+      else linkWorkspaceDependency(packed, workspacePath, dependency);
+    }
+  }
+  const packedRepositoryStore = extractedPackages.get('@neottia/repository-store');
+  const packedPackage = extractedPackages.get('@neottia/searchable-mcp');
+  if (!packedRepositoryStore || !packedPackage) throw new Error('Required packed Searchable packages are absent.');
   execFileSync('node', ['scripts/install-native.mjs'], {
     cwd: packedRepositoryStore,
     stdio: 'inherit',
@@ -129,7 +151,7 @@ async function connect(): Promise<void> {
 function createProject(): string {
   const cwd = mkdtempSync(join(tmpdir(), 'searchable-mcp-project-'));
   mkdirSync(join(cwd, '.neottia'));
-  writeFileSync(join(cwd, '.neottia', 'config.yml'), 'version: 1\nskills:\n  searchable:\n    enabled: true\n');
+  writeFileSync(join(cwd, '.neottia', 'config.yml'), 'version: 1\nmodules:\n  searchable:\n    enabled: true\n');
   return cwd;
 }
 

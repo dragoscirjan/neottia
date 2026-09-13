@@ -12,7 +12,7 @@ Create project-local extension entry files. For example, `.pi/extensions/memory.
 export { default } from "@neottia/pi-memory";
 ```
 
-Create equivalent files for `@neottia/pi-issues`, `@neottia/pi-design-docs`, and `@neottia/pi-searchable`. Enable `skills.memory`, `skills.issues`, `skills.design_docs`, and `skills.searchable` in `.neottia/config.yml`. Restart Pi, then inspect its tool list for 9 `memory_*`, 17 `issue_*`, 13 `document_*`, and 5 `web_*` tools. Use the calls in [First success](/get-started/first-success) to verify each capability.
+Create equivalent files for `@neottia/pi-issues`, `@neottia/pi-design-docs`, and `@neottia/pi-searchable`. Enable `modules.memory`, `modules.issues`, `modules.design_docs`, and `modules.searchable` in `.neottia/config.yml`. Restart Pi, then inspect its tool list for 9 `memory_*`, 17 `issue_*`, 13 `document_*`, and 5 `web_*` tools. Use the calls in [First success](/get-started/first-success) to verify each capability.
 
 ## Memory
 
@@ -28,7 +28,7 @@ The default resolver comes from `@neottia/issues-design-docs`. Embedders may pas
 
 ## Searchable
 
-`@neottia/pi-searchable` resolves `invocation.cwd` for every call, owns one runtime per directory, and forwards cancellation. Pi can confirm a stale-cache rebuild through `ui.confirm`. Cleanup closes every routed runtime during `session_shutdown`.
+`@neottia/pi-searchable` resolves an official shared snapshot for every `invocation.cwd`, owns one runtime and immutable Searchable shard per directory, and forwards cancellation. Pi can confirm a stale-cache rebuild through `ui.confirm`. Cleanup closes every routed runtime during `session_shutdown`.
 
 See [Searchable configuration](/searchable/configuration), [tools](/searchable/tools), and [operations](/searchable/operations).
 

@@ -1,10 +1,10 @@
 # Searchable configuration
 
-The strict `skills.searchable` shard defaults to disabled. Explicit library values override environment values, which override YAML and defaults.
+The strict `modules.searchable` shard defaults to disabled. Shared hosts resolve defaults, the global file, the project file, the selected profile, environment bindings, and explicit overrides in that order. `loadSearchableConfig()` retains `skills.searchable` only as a deprecated standalone compatibility path.
 
 ```yaml
 version: 1
-skills:
+modules:
   searchable:
     enabled: true
     root: .neottia/searchable
@@ -45,6 +45,6 @@ skills:
 
 YAML credentials must be exact environment references such as `${BRAVE_API_KEY}`. Credential leaves are `google_api_key`, `google_cse_id`, `bing_api_key`, and `brave_api_key`. Canonical environment names start with `NEOTTIA_SEARCHABLE_`, including `NEOTTIA_SEARCHABLE_SEARCH_TIMEOUT_MS`; the loader also accepts the legacy Google, Bing, Brave, `OLLAMA_URL`, and `OLLAMA_MODEL` names.
 
-`NEOTTIA_CONFIG_FILE`, `NEOTTIA_SEARCHABLE_CONFIG_FILE`, and `NEOTTIA_CONFIG_SEARCHABLE_PATH` select the file and shard. The [generated JSON Schema](https://github.com/dragoscirjan/neottia/blob/main/packages/searchable-core/config.schema.json) is the machine-readable reference.
+`NEOTTIA_CONFIG_FILE` selects the project file for shared hosts. `NEOTTIA_SEARCHABLE_CONFIG_FILE` and `NEOTTIA_CONFIG_SEARCHABLE_PATH` apply only to the standalone compatibility loader. The [generated JSON Schema](https://github.com/dragoscirjan/neottia/blob/main/packages/searchable-core/config.schema.json) is the machine-readable reference.
 
 Disabled calls fail with `CAPABILITY_DISABLED` before provider, network, storage, cache, or model work starts.

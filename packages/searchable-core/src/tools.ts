@@ -68,7 +68,7 @@ function makeTool<Name extends SearchableToolName>(
           throw new SearchableError(
             'configuration',
             'CAPABILITY_DISABLED',
-            'Searchable operation requires skills.searchable.enabled=true; the capability is disabled.',
+            'Searchable operation requires modules.searchable.enabled=true; the capability is disabled.',
           );
         // Check raw strings before schema trimming, then check normalized values.
         assertInputBounds(name, input, config);

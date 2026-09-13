@@ -56,6 +56,7 @@ describe('Searchable configuration contribution', () => {
       search: {
         provider: 'duckduckgo',
         limit: 5,
+        timeout_ms: 10_000,
         credentials: {},
         bing_api_endpoint: 'https://api.bing.microsoft.com/v7.0/search',
       },
@@ -95,6 +96,7 @@ modules:
     search:
       provider: bing
       limit: 6
+      timeout_ms: 12000
       bing_api_endpoint: https://example.com/search
     fetch:
       strategies: [direct, wayback]
@@ -129,7 +131,7 @@ modules:
     expect(loadSearchableConfig(root, { env: {} })).toMatchObject({
       enabled: true,
       root: 'work/searchable',
-      search: { provider: 'bing', limit: 6, bing_api_endpoint: 'https://example.com/search' },
+      search: { provider: 'bing', limit: 6, timeout_ms: 12_000, bing_api_endpoint: 'https://example.com/search' },
       fetch: {
         strategies: ['direct', 'wayback'],
         timeout_ms: 11_000,
@@ -242,6 +244,7 @@ modules:
         'NEOTTIA_SEARCHABLE_ROOT',
         'NEOTTIA_SEARCHABLE_PROVIDER',
         'NEOTTIA_SEARCHABLE_SEARCH_LIMIT',
+        'NEOTTIA_SEARCHABLE_SEARCH_TIMEOUT_MS',
         'NEOTTIA_SEARCHABLE_GOOGLE_API_KEY',
         'GOOGLE_API_KEY',
         'NEOTTIA_SEARCHABLE_GOOGLE_CSE_ID',
@@ -264,6 +267,7 @@ modules:
     const config = loadSearchableConfig(await project(), {
       env: {
         NEOTTIA_SEARCHABLE_ENABLED: 'true',
+        NEOTTIA_SEARCHABLE_SEARCH_TIMEOUT_MS: '12345',
         NEOTTIA_SEARCHABLE_GOOGLE_API_KEY: 'canonical-key',
         GOOGLE_API_KEY: 'legacy-key',
         OLLAMA_MODEL: 'qwen',
@@ -273,7 +277,7 @@ modules:
     });
     expect(config).toMatchObject({
       enabled: true,
-      search: { credentials: { google_api_key: 'canonical-key' } },
+      search: { timeout_ms: 12_345, credentials: { google_api_key: 'canonical-key' } },
       fetch: { strategies: ['direct'] },
       ollama: { model: 'qwen' },
     });

@@ -1,5 +1,6 @@
 import { StringDecoder } from 'node:string_decoder';
-import { loadSearchableConfig, type SearchableConfigInput } from './config.js';
+import type { DeepReadonly } from '@neottia/config';
+import { loadSearchableConfig, type SearchableConfig, type SearchableConfigInput } from './config.js';
 import { SearchableError } from './errors.js';
 import { fetchPage } from './fetcher.js';
 import {
@@ -14,9 +15,12 @@ import { SearchableStore, type StashedPageRecord } from './stash.js';
 import type { ResolvedSearchableToolInput, SearchableToolOutput } from './tool-contracts.js';
 import { truncateUtf8 } from './utf8.js';
 
-/** Construction seams for deterministic hosts and local network fixtures. */
+/** Construction seams for resolved hosts, standalone callers, and local fixtures. */
 export interface SearchableRuntimeOptions {
   readonly cwd: string;
+  /** Immutable shard from a shared host snapshot. */
+  readonly config?: DeepReadonly<SearchableConfig>;
+  /** Standalone compatibility overrides used only when `config` is absent. */
   readonly configOverrides?: Partial<SearchableConfigInput>;
   readonly transport?: SearchableHttpTransport;
   readonly dnsResolver?: SearchableDnsResolver;
@@ -33,7 +37,10 @@ export type SearchableRuntimeFactory = (options: SearchableRuntimeOptions) => Se
 
 /** Creates one concrete runtime for one project CWD. */
 export function createSearchableRuntime(options: SearchableRuntimeOptions): SearchableRuntime {
-  const config = loadSearchableConfig(options.cwd, options.configOverrides);
+  if (options.config && options.configOverrides) {
+    throw new TypeError('A resolved Searchable config cannot be combined with standalone overrides.');
+  }
+  const config = options.config ?? loadSearchableConfig(options.cwd, options.configOverrides);
   const transport = options.transport ?? new SafeHttpClient(options.dnsResolver);
   const store = SearchableStore.fromConfig(config, options.cwd);
   const shutdown = new AbortController();

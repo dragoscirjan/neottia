@@ -10,6 +10,8 @@ This catalog distinguishes how each package is delivered.
 | Module                          | Classification    | Canonical documentation                                                                |
 | ------------------------------- | ----------------- | -------------------------------------------------------------------------------------- |
 | `@neottia/core`                 | library/embedding | [Core](/reference/core)                                                                |
+| `@neottia/config`               | library/embedding | [Unified configuration](/configuration)                                                |
+| `@neottia/config-registry`      | library/embedding | [Official configuration registry](/configuration)                                      |
 | `@neottia/design-docs`          | library/embedding | [Design Docs library](/design-docs/library)                                            |
 | `@neottia/design-docs-mcp`      | generic MCP       | [Design Docs MCP](/mcp/design-docs)                                                    |
 | `@neottia/issues`               | library/embedding | [Issues library](/issues/library)                                                      |

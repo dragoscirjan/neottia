@@ -114,6 +114,7 @@ describe('SEARCHABLE_TOOLS', () => {
   it('uses an injected resolved shard without rereading standalone configuration', async () => {
     const injected = services();
     const config = searchableConfigSchema.parse({
+      enabled: true,
       search: { provider: 'brave', limit: 9 },
       grep: { limit: 8 },
       ask: { limit: 7 },

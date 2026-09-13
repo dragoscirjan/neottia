@@ -20,12 +20,14 @@
   "engines": { "node": ">=22.16.0" },
   "scripts": {
     "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
-    "pretest": "node -e \"const fs=require('node:fs');const cp=require('node:child_process');if(!fs.existsSync('../repository-store/dist/index.js'))cp.execFileSync('pnpm',['--filter','@neottia/repository-store','build'],{stdio:'inherit'})\" && pnpm --filter @neottia/searchable-core build && pnpm run build",
+    "pretest": "node scripts/ensure-config-registry.mjs && pnpm run build",
     "test": "vitest run --root ../.. packages/searchable-mcp/src",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
+    "@neottia/config": "workspace:^",
+    "@neottia/config-registry": "workspace:^",
     "@neottia/searchable-core": "workspace:*"
   },
   "devDependencies": {

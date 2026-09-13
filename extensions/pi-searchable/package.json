@@ -22,6 +22,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@neottia/config": "workspace:^",
+    "@neottia/config-registry": "workspace:^",
     "@neottia/searchable-core": "workspace:*",
     "typebox": "^1.0.63"
   },
