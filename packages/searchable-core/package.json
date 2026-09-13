@@ -1,7 +1,7 @@
 {
   "name": "@neottia/searchable-core",
   "version": "0.1.0",
-  "description": "Strict shared configuration and executable contracts for Searchable web tools",
+  "description": "Concrete runtime and shared contracts for Searchable web tools",
   "author": "Dragos Cirjan",
   "license": "MIT",
   "type": "module",
@@ -27,22 +27,29 @@
     },
     "./config.schema.json": "./config.schema.json"
   },
-  "files": ["dist", "README.md", "LICENSE", "config.schema.json"],
+  "files": ["dist", "README.md", "LICENSE", "NOTICE.md", "config.schema.json"],
   "engines": {
     "node": ">=22.16.0"
   },
   "scripts": {
     "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json && node scripts/generate-config-schema.mjs && pnpm exec prettier --write config.schema.json",
+    "pretest": "pnpm run build",
     "test": "vitest run --root ../.. packages/searchable-core/src",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@mozilla/readability": "^0.6.0",
+    "@neottia/repository-store": "workspace:*",
+    "jsdom": "^29.1.1",
+    "turndown": "^7.2.4",
     "yaml": "^2.9.0",
     "zod": "^4.5.4"
   },
   "devDependencies": {
     "@templ-project/tsconfig": "^0.2.2",
+    "@types/jsdom": "^27.0.0",
     "@types/node": "^25.0.3",
+    "@types/turndown": "^5.0.6",
     "typescript": "^5.9.3",
     "vitest": "^4.1.11"
   }

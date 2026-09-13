@@ -32,6 +32,7 @@ function createSearchableConfigSchema(credential: z.ZodString) {
         .object({
           provider: z.enum(['duckduckgo', 'google', 'bing', 'brave']).default('duckduckgo'),
           limit: z.number().int().min(1).max(100).default(5),
+          timeout_ms: z.number().int().positive().max(300_000).default(10_000),
           credentials: z
             .object({
               google_api_key: credential.optional(),
@@ -171,6 +172,7 @@ export const SEARCHABLE_ENV_BINDINGS: readonly EnvBinding[] = [
   { path: 'root', names: ['NEOTTIA_SEARCHABLE_ROOT'], kind: 'string' },
   { path: 'search.provider', names: ['NEOTTIA_SEARCHABLE_PROVIDER'], kind: 'string' },
   { path: 'search.limit', names: ['NEOTTIA_SEARCHABLE_SEARCH_LIMIT'], kind: 'integer' },
+  { path: 'search.timeout_ms', names: ['NEOTTIA_SEARCHABLE_SEARCH_TIMEOUT_MS'], kind: 'integer' },
   {
     path: 'search.credentials.google_api_key',
     names: ['NEOTTIA_SEARCHABLE_GOOGLE_API_KEY', 'GOOGLE_API_KEY'],

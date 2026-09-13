@@ -3,8 +3,10 @@ export {
   ensureDesignDocsDistBuilt,
   ensureIssuesDistBuilt,
   ensureMemoryDistBuilt,
+  ensureSearchableDistBuilt,
   issuesMcpEntry,
   memoryMcpEntry,
+  searchableMcpEntry,
   repoRoot,
 } from './repo.js';
 

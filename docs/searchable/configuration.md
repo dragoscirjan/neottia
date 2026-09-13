@@ -1,18 +1,17 @@
-# Searchable foundation configuration
+# Searchable configuration
 
-> Searchable is foundation-only. Configuration does not create providers, storage, extraction, or model clients.
-
-The strict `skills.searchable` shard defaults to disabled. Resolution is explicit override, environment, file, then default.
+The strict `skills.searchable` shard defaults to disabled. Explicit library values override environment values, which override YAML and defaults.
 
 ```yaml
 version: 1
 skills:
   searchable:
-    enabled: false
+    enabled: true
     root: .neottia/searchable
     search:
       provider: duckduckgo
       limit: 5
+      timeout_ms: 10000
       credentials: {}
       bing_api_endpoint: https://api.bing.microsoft.com/v7.0/search
     fetch:
@@ -44,8 +43,8 @@ skills:
         max_storage_bytes: 268435456
 ```
 
-Credential file values must be exact environment references. The credential leaves are `google_api_key`, `google_cse_id`, `bing_api_key`, and `brave_api_key`. Canonical bindings are `NEOTTIA_SEARCHABLE_ENABLED`, `NEOTTIA_SEARCHABLE_ROOT`, `NEOTTIA_SEARCHABLE_PROVIDER`, `NEOTTIA_SEARCHABLE_SEARCH_LIMIT`, the four `NEOTTIA_SEARCHABLE_*` credential names, `NEOTTIA_SEARCHABLE_BING_API_ENDPOINT`, `NEOTTIA_SEARCHABLE_GREP_LIMIT`, `NEOTTIA_SEARCHABLE_ASK_LIMIT`, `NEOTTIA_SEARCHABLE_OLLAMA_URL`, and `NEOTTIA_SEARCHABLE_OLLAMA_MODEL`. The loader also accepts the exported legacy Google, Bing, Brave, and Ollama aliases. `NEOTTIA_CONFIG_FILE`, `NEOTTIA_SEARCHABLE_CONFIG_FILE`, and `NEOTTIA_CONFIG_SEARCHABLE_PATH` select the source.
+YAML credentials must be exact environment references such as `${BRAVE_API_KEY}`. Credential leaves are `google_api_key`, `google_cse_id`, `bing_api_key`, and `brave_api_key`. Canonical environment names start with `NEOTTIA_SEARCHABLE_`, including `NEOTTIA_SEARCHABLE_SEARCH_TIMEOUT_MS`; the loader also accepts the legacy Google, Bing, Brave, `OLLAMA_URL`, and `OLLAMA_MODEL` names.
 
-Security defaults cap queries at 16,384 UTF-8 bytes, URLs at 8,192, titles at 4,096, content at 10,485,760, results at 100, serialized output at 4,194,304, and caller storage at 268,435,456 bytes. See the shipped [JSON Schema](https://github.com/dragoscirjan/neottia/blob/main/packages/searchable-core/config.schema.json).
+`NEOTTIA_CONFIG_FILE`, `NEOTTIA_SEARCHABLE_CONFIG_FILE`, and `NEOTTIA_CONFIG_SEARCHABLE_PATH` select the file and shard. The [generated JSON Schema](https://github.com/dragoscirjan/neottia/blob/main/packages/searchable-core/config.schema.json) is the machine-readable reference.
 
-The current tool registry does not gate service execution on `enabled`. The embedder must decide whether to reject a disabled configuration before invocation.
+Disabled calls fail with `CAPABILITY_DISABLED` before provider, network, storage, cache, or model work starts.

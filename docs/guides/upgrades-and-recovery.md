@@ -4,7 +4,7 @@ After an upgrade, validate each enabled domain. Confirm canonical counts, inspec
 
 For a stale revision, fetch current state, compare the competing change, and retry with the new revision. For lease contention, inspect the current owner evidence and wait for the owner to exit. Do not delete a live lease.
 
-For a corrupt or incompatible cache, remove the domain DB, WAL, and SHM files or choose the documented rebuild path. Canonical files recreate it. Under `stale_policy: fail`, run the domain validation tool to make the rebuild explicit.
+For a corrupt or incompatible cache, remove the domain DB, WAL, and SHM files or choose the documented rebuild path. Canonical files recreate it. Under `stale_policy: fail`, run the domain validation tool to make the rebuild explicit. Searchable library users can call `runtime.store.validate()`; MCP users may temporarily choose a reviewed `rebuild` policy.
 
 Repository Store recovers authenticated journals while acquiring a lease. If recovery fails closed, preserve the transaction directory and reported evidence before manual changes. A modified or ambiguous journal needs operator review.
 

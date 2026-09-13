@@ -5,4 +5,4 @@ Neottia ships native extensions for Pi and OpenCode. Each host has Memory, Issue
 - [Configure Pi](/harnesses/pi)
 - [Configure OpenCode](/harnesses/opencode)
 
-Other clients may use the [generic MCP servers](/mcp/) if they can launch a stdio MCP process. Searchable has no native extension or MCP server.
+Other clients may use the [generic MCP servers](/mcp/) if they can launch a stdio MCP process. Searchable is available through `@neottia/searchable-mcp` and the native `@neottia/pi-searchable` and `@neottia/opencode-searchable` adapters.

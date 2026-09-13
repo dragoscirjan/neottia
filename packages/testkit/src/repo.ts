@@ -47,6 +47,25 @@ export function ensureDesignDocsDistBuilt(root: string = repoRoot()): string {
   return entry;
 }
 
+/** Entry point a harness must spawn to run the Searchable MCP server. */
+export function searchableMcpEntry(root: string = repoRoot()): string {
+  return join(root, 'packages', 'searchable-mcp', 'dist', 'cli.js');
+}
+
+/** Builds Searchable output required by external harness runtimes. */
+export function ensureSearchableDistBuilt(root: string = repoRoot()): string {
+  const entry = searchableMcpEntry(root);
+  const repositoryStoreDist = join(root, 'packages', 'repository-store', 'dist', 'index.js');
+  const coreDist = join(root, 'packages', 'searchable-core', 'dist', 'index.js');
+  const options = { cwd: root, stdio: 'inherit' } as const;
+  if (!existsSync(repositoryStoreDist))
+    execFileSync('pnpm', ['--filter', '@neottia/repository-store', 'run', 'build'], options);
+  if (!existsSync(coreDist)) execFileSync('pnpm', ['--filter', '@neottia/searchable-core', 'run', 'build'], options);
+  if (!existsSync(entry)) execFileSync('pnpm', ['--filter', '@neottia/searchable-mcp', 'run', 'build'], options);
+  if (!existsSync(entry)) throw new Error(`searchable-mcp dist still missing after build: ${entry}`);
+  return entry;
+}
+
 /** Entry point a harness must spawn to run the memory MCP server. */
 export function memoryMcpEntry(root: string = repoRoot()): string {
   return join(root, 'packages', 'memory-mcp', 'dist', 'cli.js');

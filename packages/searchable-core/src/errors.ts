@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-/** Stable failure categories shared by every future Searchable adapter. */
+/** Stable failure categories shared by every Searchable adapter. */
 export const searchableErrorCategorySchema = z.enum([
   'configuration',
   'validation',

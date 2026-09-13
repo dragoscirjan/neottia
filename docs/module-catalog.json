@@ -72,9 +72,16 @@
   {
     "name": "@neottia/searchable-core",
     "manifest": "packages/searchable-core/package.json",
-    "classification": "foundation-only",
+    "classification": "library/embedding",
     "route": "/searchable/",
     "issue": 106
+  },
+  {
+    "name": "@neottia/searchable-mcp",
+    "manifest": "packages/searchable-mcp/package.json",
+    "classification": "generic MCP",
+    "route": "/mcp/searchable",
+    "issue": 93
   },
   {
     "name": "@neottia/testkit",
@@ -106,6 +113,13 @@
     "issue": 101
   },
   {
+    "name": "@neottia/pi-searchable",
+    "manifest": "extensions/pi-searchable/package.json",
+    "classification": "native extension",
+    "route": "/harnesses/pi#searchable",
+    "issue": 93
+  },
+  {
     "name": "@neottia/opencode-memory",
     "manifest": "extensions/opencode-memory/package.json",
     "classification": "native extension",
@@ -125,5 +139,12 @@
     "classification": "native extension",
     "route": "/harnesses/opencode#design-docs",
     "issue": 101
+  },
+  {
+    "name": "@neottia/opencode-searchable",
+    "manifest": "extensions/opencode-searchable/package.json",
+    "classification": "native extension",
+    "route": "/harnesses/opencode#searchable",
+    "issue": 93
   }
 ]

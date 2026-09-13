@@ -5,7 +5,6 @@ This catalog distinguishes how each package is delivered.
 - `library/embedding` is a public TypeScript API or published metadata package.
 - `native extension` loads in Pi or OpenCode in process.
 - `generic MCP` is a shipped stdio server for an MCP-compatible client. It does not imply a native client integration.
-- `foundation-only` provides contracts and validation but requires caller-owned implementations.
 - `internal/private` is not published for users.
 
 | Module                          | Classification    | Canonical documentation                                                                |
@@ -20,13 +19,16 @@ This catalog distinguishes how each package is delivered.
 | `@neottia/memory-mcp`           | generic MCP       | [Memory MCP](/mcp/memory)                                                              |
 | `@neottia/release`              | library/embedding | [Release metadata](/reference/release)                                                 |
 | `@neottia/repository-store`     | library/embedding | [Repository Store](/repository-store)                                                  |
-| `@neottia/searchable-core`      | foundation-only   | [Searchable](/searchable/)                                                             |
+| `@neottia/searchable-core`      | library/embedding | [Searchable](/searchable/)                                                             |
+| `@neottia/searchable-mcp`       | generic MCP       | [Searchable MCP](/mcp/searchable)                                                      |
 | `@neottia/testkit`              | internal/private  | Private repository test helpers; packages/testkit/README.md is the internal reference. |
 | `@neottia/pi-memory`            | native extension  | [Pi Memory](/harnesses/pi#memory)                                                      |
 | `@neottia/pi-issues`            | native extension  | [Pi Issues](/harnesses/pi#issues)                                                      |
 | `@neottia/pi-design-docs`       | native extension  | [Pi Design Docs](/harnesses/pi#design-docs)                                            |
+| `@neottia/pi-searchable`        | native extension  | [Pi Searchable](/harnesses/pi#searchable)                                              |
 | `@neottia/opencode-memory`      | native extension  | [OpenCode Memory](/harnesses/opencode#memory)                                          |
 | `@neottia/opencode-issues`      | native extension  | [OpenCode Issues](/harnesses/opencode#issues)                                          |
 | `@neottia/opencode-design-docs` | native extension  | [OpenCode Design Docs](/harnesses/opencode#design-docs)                                |
+| `@neottia/opencode-searchable`  | native extension  | [OpenCode Searchable](/harnesses/opencode#searchable)                                  |
 
 `docs/module-catalog.json` is the machine-readable copy checked against workspace manifests and this table.
