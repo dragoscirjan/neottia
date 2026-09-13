@@ -1,0 +1,35 @@
+{
+  "name": "@neottia/opencode-searchable",
+  "version": "0.1.0",
+  "description": "In-process OpenCode tools for Neottia Searchable",
+  "author": "Dragos Cirjan",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dragoscirjan/neottia.git",
+    "directory": "extensions/opencode-searchable"
+  },
+  "publishConfig": { "access": "public" },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": { ".": "./src/index.ts" },
+  "files": ["src", "README.md", "LICENSE"],
+  "engines": { "node": ">=22.16.0" },
+  "scripts": {
+    "test": "vitest run --root ../.. extensions/opencode-searchable/src",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@neottia/searchable-core": "workspace:*",
+    "@opencode-ai/plugin": "^1.2.27"
+  },
+  "devDependencies": {
+    "@neottia/testkit": "workspace:*",
+    "@templ-project/tsconfig": "^0.2.2",
+    "@types/node": "^25.0.3",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.11"
+  }
+}

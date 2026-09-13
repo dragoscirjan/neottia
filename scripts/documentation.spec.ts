@@ -16,7 +16,13 @@ import { createIssuesDesignDocsComposition } from '@neottia/issues-design-docs';
 import { createIssueServer } from '@neottia/issues-mcp';
 import { closeMemoryToolContext, findMemoryTool, memoryConfigFileSchema, MEMORY_TOOLS } from '@neottia/memory-core';
 import { createMemoryServer } from '@neottia/memory-mcp';
-import { SEARCHABLE_TOOLS, searchableConfigFileSchema } from '@neottia/searchable-core';
+import {
+  createSearchableRuntime,
+  findSearchableTool,
+  SEARCHABLE_TOOLS,
+  searchableConfigFileSchema,
+  type SearchableRuntime,
+} from '@neottia/searchable-core';
 import { afterEach, describe, expect, it } from 'vitest';
 import { parseDocument } from 'yaml';
 import { runSearchableMock } from '../docs/examples/searchable-mock.js';
@@ -288,7 +294,12 @@ describe('documentation contracts', () => {
       const markdown = readFileSync(file, 'utf8');
       for (const match of markdown.matchAll(/@neottia\/[a-z-]+-mcp/gu)) documented.add(match[0]);
     }
-    expect([...documented].sort()).toEqual(['@neottia/design-docs-mcp', '@neottia/issues-mcp', '@neottia/memory-mcp']);
+    expect([...documented].sort()).toEqual([
+      '@neottia/design-docs-mcp',
+      '@neottia/issues-mcp',
+      '@neottia/memory-mcp',
+      '@neottia/searchable-mcp',
+    ]);
     for (const name of documented) {
       const entry = catalog.find((candidate) => candidate.name === name);
       expect(entry?.classification).toBe('generic MCP');
@@ -318,6 +329,7 @@ describe('documentation contracts', () => {
     const composition = createIssuesDesignDocsComposition({ cwd });
     const issueContext = { cwd, interactive: false, storeKey: {}, resolver: composition.resolver };
     const documentContext = { cwd, interactive: false, storeKey: {}, linkValidator: composition.linkValidator };
+    let searchableRuntime: SearchableRuntime | undefined;
     const runMemory = async (name: string, input: unknown) => {
       const tool = findMemoryTool(name);
       if (!tool) throw new Error(`Missing Memory tool: ${name}`);
@@ -337,12 +349,12 @@ describe('documentation contracts', () => {
       mkdirSync(join(cwd, '.neottia'), { recursive: true });
       writeFileSync(
         join(cwd, '.neottia/config.yml'),
-        'version: 1\nskills:\n  memory:\n    enabled: true\n  issues:\n    enabled: true\n  design_docs:\n    enabled: true\n',
+        'version: 1\nskills:\n  memory:\n    enabled: true\n  issues:\n    enabled: true\n  design_docs:\n    enabled: true\n  searchable:\n    enabled: true\n',
       );
       const inputs = fencedBlocks(readFileSync(join(docs, 'get-started/first-success.md'), 'utf8'))
         .filter((block) => block.language === 'json')
         .map((block) => JSON.parse(block.content) as Record<string, unknown>);
-      expect(inputs).toHaveLength(3);
+      expect(inputs).toHaveLength(4);
       const memory = (await runMemory('memory_store', inputs[0])) as { id: string; summary: string };
       const issue = (await runIssue('issue_create', inputs[1])) as { id: string; revision: string; title: string };
       const draft = (await runDocument('document_create', inputs[2])) as {
@@ -358,6 +370,14 @@ describe('documentation contracts', () => {
         ),
       ).toBe(true);
       expect(existsSync(join(cwd, draft.path))).toBe(true);
+      searchableRuntime = createSearchableRuntime({ cwd });
+      const stashTool = findSearchableTool('web_stash');
+      const grepTool = findSearchableTool('web_grep');
+      if (!stashTool || !grepTool) throw new Error('Missing Searchable first-success tools.');
+      await stashTool.run({ cwd, services: searchableRuntime }, inputs[3]);
+      expect(await grepTool.run({ cwd, services: searchableRuntime }, { query: 'status endpoint' })).toMatchObject({
+        results: [{ url: 'https://example.com/deployment-guide' }],
+      });
 
       const linked = (await runIssue('issue_link_document', {
         id: issue.id,
@@ -426,6 +446,7 @@ describe('documentation contracts', () => {
       });
     } finally {
       await Promise.all([
+        searchableRuntime?.close(),
         closeMemoryToolContext(memoryContext),
         closeIssueToolContext(issueContext),
         closeDesignDocsToolContext(documentContext),
@@ -436,7 +457,7 @@ describe('documentation contracts', () => {
 
   it('keeps the root README capability and delivery summary present', () => {
     const readme = readFileSync(join(root, 'README.md'), 'utf8');
-    for (const capability of ['Memory', 'Issues', 'Design Docs', 'Searchable foundation']) {
+    for (const capability of ['Memory', 'Issues', 'Design Docs', 'Searchable']) {
       expect(readme).toContain(`## ${capability}`);
     }
     expect(readme).toContain('Pi and OpenCode each have native');

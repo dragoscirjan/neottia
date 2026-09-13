@@ -1,0 +1,38 @@
+{
+  "name": "@neottia/searchable-mcp",
+  "version": "0.1.0",
+  "description": "Generic MCP stdio server for Neottia Searchable",
+  "author": "Dragos Cirjan",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dragoscirjan/neottia.git",
+    "directory": "packages/searchable-mcp"
+  },
+  "publishConfig": { "access": "public" },
+  "bin": { "searchable-mcp": "./dist/cli.js" },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+  "files": ["dist", "README.md", "LICENSE"],
+  "engines": { "node": ">=22.16.0" },
+  "scripts": {
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
+    "pretest": "node -e \"const fs=require('node:fs');const cp=require('node:child_process');if(!fs.existsSync('../repository-store/dist/index.js'))cp.execFileSync('pnpm',['--filter','@neottia/repository-store','build'],{stdio:'inherit'})\" && pnpm --filter @neottia/searchable-core build && pnpm run build",
+    "test": "vitest run --root ../.. packages/searchable-mcp/src",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@neottia/searchable-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@templ-project/tsconfig": "^0.2.2",
+    "@neottia/testkit": "workspace:*",
+    "@types/node": "^25.0.3",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.11"
+  }
+}

@@ -16,7 +16,8 @@ Neottia provides a shared SDLC that can be understood and used by multiple AI co
 │   ├── issues-design-docs/ # Cycle-free issue/design-document composition
 │   ├── issues-mcp/      # Generic MCP issue server
 │   ├── repository-store/# Canonical repository persistence primitives
-│   ├── searchable-core/ # Shared Searchable contracts and service registry
+│   ├── searchable-core/ # Searchable runtime and shared tool registry
+│   ├── searchable-mcp/  # Generic Searchable MCP server
 │   └── release/         # Global release bill of materials
 ├── docs/                # User documentation for VitePress
 ├── .changeset/          # Module release declarations
@@ -84,13 +85,13 @@ Enable `skills.issues` to manage Git-trackable YAML issues with exact revisions,
 
 Install `@neottia/design-docs` for strict repository-local Markdown/YAML design records, `@neottia/design-docs-mcp` for generic stdio MCP, or the Pi/OpenCode extensions for in-process tools. Enable `skills.design_docs` in `.neottia/config.yml`; enable `skills.issues` too for real stable-link validation through `@neottia/issues-design-docs`. The [Design Docs guide](docs/design-docs/) covers authoring, approval, immutable versioning, BM25 search, archive/restore, stable issue references, migration, and recovery.
 
-## Searchable foundation
+## Searchable
 
-`@neottia/searchable-core` defines strict configuration, schemas, errors, injected service interfaces, and contracts for `web_search`, `web_fetch`, `web_stash`, `web_grep`, and `web_ask`. It is foundation-only. It has no provider, extraction, storage, Ollama, MCP, Pi, or OpenCode implementation. See the [Searchable guide](docs/searchable/).
+Enable `skills.searchable` to search DuckDuckGo, Google, Bing, or Brave; extract bounded Markdown; stash canonical page records; search them with a disposable FTS5 cache; and ask a local Ollama model grounded questions. Use `@neottia/searchable-core` directly, `@neottia/searchable-mcp` over stdio, or the native Pi/OpenCode extensions. See the [Searchable guide](docs/searchable/).
 
 ## Delivery methods
 
-Pi and OpenCode each have native Memory, Issues, and Design Docs extensions. Other MCP-compatible clients can launch the three generic stdio servers. TypeScript applications can embed the domain libraries directly. Searchable is available only through direct library injection.
+Pi and OpenCode each have native Memory, Issues, Design Docs, and Searchable extensions. Other MCP-compatible clients can launch the four generic stdio servers. TypeScript applications can embed the domain libraries directly.
 
 ## Supporting packages
 
@@ -98,7 +99,7 @@ Pi and OpenCode each have native Memory, Issues, and Design Docs extensions. Oth
 
 ## Documentation
 
-Start with the [delivery chooser](docs/get-started/) and [complete 18-module catalog](docs/reference/modules.md). User documentation is under [`docs/`](docs/) and built with VitePress. `mise run docs:check` validates catalog coverage, routes, links, configuration examples, and documented tool registries.
+Start with the [delivery chooser](docs/get-started/) and [complete 21-module catalog](docs/reference/modules.md). User documentation is under [`docs/`](docs/) and built with VitePress. `mise run docs:check` validates catalog coverage, routes, links, configuration examples, and documented tool registries.
 
 ## License
 

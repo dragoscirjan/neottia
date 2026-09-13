@@ -1,0 +1,6 @@
+{
+  "extends": "@templ-project/tsconfig/esm",
+  "compilerOptions": { "lib": ["ES2022"], "noEmit": true, "moduleResolution": "bundler", "types": ["node"] },
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/*.spec.ts"]
+}

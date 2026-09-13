@@ -1,0 +1,6 @@
+{
+  "extends": "@templ-project/tsconfig/esm",
+  "compilerOptions": { "lib": ["ES2022"], "noEmit": true, "types": ["node"], "rootDir": "src" },
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/*.spec.ts", "dist"]
+}

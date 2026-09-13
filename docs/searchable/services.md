@@ -1,38 +1,24 @@
-# Implement Searchable foundation services
+# Searchable library
 
-> Searchable is foundation-only. Your application owns every service and its cleanup.
-
-Each method receives resolved input and one `SearchableOperationContext` containing `cwd`, resolved `config`, and optional `signal`:
+`@neottia/searchable-core` exports the concrete runtime and the interfaces used for custom integrations.
 
 ```ts
-export interface SearchableServices {
-  search(
-    input: ResolvedSearchableToolInput<"web_search">,
-    context: SearchableOperationContext,
-  ): Promise<SearchableToolOutput<"web_search">>;
-  fetch(
-    input: ResolvedSearchableToolInput<"web_fetch">,
-    context: SearchableOperationContext,
-  ): Promise<SearchableToolOutput<"web_fetch">>;
-  stash(
-    input: ResolvedSearchableToolInput<"web_stash">,
-    context: SearchableOperationContext,
-  ): Promise<SearchableToolOutput<"web_stash">>;
-  grep(
-    input: ResolvedSearchableToolInput<"web_grep">,
-    context: SearchableOperationContext,
-  ): Promise<SearchableToolOutput<"web_grep">>;
-  ask(
-    input: ResolvedSearchableToolInput<"web_ask">,
-    context: SearchableOperationContext,
-  ): Promise<SearchableToolOutput<"web_ask">>;
-}
+import { createSearchableRuntime, findSearchableTool } from "@neottia/searchable-core";
+
+const cwd = process.cwd();
+const runtime = createSearchableRuntime({ cwd });
+const search = findSearchableTool("web_search");
+if (!search) throw new Error("web_search is not registered");
+
+const result = await search.run({ cwd, services: runtime }, { query: "Neottia" });
+console.log(result);
+await runtime.close();
 ```
 
-The checked example implements and invokes every method without network access:
+`createSearchableRuntime` implements `SearchableServices`. It owns the HTTP transport and `SearchableStore` for one working directory. Call `close()` during host shutdown. Closing is idempotent and rejects later work.
+
+Applications may inject their own `SearchableServices`, `SearchableHttpTransport`, or DNS resolver. The shared registry validates inputs and outputs around those implementations. A custom HTTP transport must implement `stream()` to support `web_ask`; Searchable does not fall back to a buffered Ollama response. The checked mock shows every service without network access:
 
 <<< ../examples/searchable-mock.ts
 
-Call `await runSearchableMock()` and inspect the printed search, fetch, stash, grep, and ask results.
-
-A production implementation must enforce request and overall deadlines, stop streamed bodies at byte limits, reject private or unsafe network destinations, apply storage quotas, define tenant ownership, honor cancellation during work, and close network, database, and model resources. Configuration values provide policy inputs but no implementation.
+Injected transports must preserve cancellation, deadlines, response byte limits, credential handling, and destination policy. Do not use a test transport to weaken production `web_fetch` controls.

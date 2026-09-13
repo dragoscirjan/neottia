@@ -1,6 +1,6 @@
 # First success
 
-Run a tool host with its working directory set to your project, such as `acme/website`. Enable the three shards as shown in [shared configuration](/get-started/configuration).
+Run a tool host with its working directory set to your project, such as `acme/website`. Enable the capability shards you want as shown in [shared configuration](/get-started/configuration).
 
 ## Store a memory
 
@@ -44,5 +44,19 @@ Call [`document_create`](/design-docs/tools) with:
 ```
 
 The result is draft version 1 with an ID and revision. The canonical Markdown has a deterministic filename below `.neottia/design-docs/`. `.neottia/cache/design-docs.sqlite` is disposable.
+
+## Stash a web page
+
+Call [`web_stash`](/searchable/tools) with:
+
+```json
+{
+  "url": "https://example.com/deployment-guide",
+  "title": "Deployment guide",
+  "content": "Deploy the website with pnpm and verify the status endpoint."
+}
+```
+
+The canonical JSON record appears below `.neottia/searchable/pages/`. Call `web_grep` with `{"query":"status endpoint"}` and confirm that the URL is returned. `.neottia/cache/searchable.sqlite` is disposable.
 
 Track canonical files and ignore caches as described in [Repository files](/guides/repository-files).

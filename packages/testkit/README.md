@@ -4,7 +4,7 @@ Private test infrastructure for Neottia. This workspace is not published for use
 
 ## Exported helpers
 
-Repository discovery exports `repoRoot`, `memoryMcpEntry`, `issuesMcpEntry`, `designDocsMcpEntry`, `ensureMemoryDistBuilt`, `ensureIssuesDistBuilt`, and `ensureDesignDocsDistBuilt`.
+Repository discovery exports MCP entry paths and build checks for Memory, Issues, Design Docs, and Searchable. Use `requireSearchableDistBuilt` in live tests so the test fails instead of building inside the repository worktree.
 
 Temporary fixture exports are `createTempProject`, `createTempIssueProject`, `seedMemory`, `seedIssues`, `seedDesignDocs`, `CreateTempProjectOptions`, `CreateTempIssueProjectOptions`, `TempProject`, and `TempIssueProject`. Fixture cleanup removes only its temporary tree.
 

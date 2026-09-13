@@ -37,6 +37,15 @@ export function redactDiagnosticText(value: string, credentials: readonly string
   return safe;
 }
 
+/** Returns true when text contains a raw or percent-encoded configured credential. */
+export function containsCredential(value: string, credentials: readonly string[]): boolean {
+  return credentials.some((credential) => {
+    if (!credential) return false;
+    const pattern = encodedCredentialPattern(credential);
+    return pattern ? pattern.test(value) : value.includes(credential);
+  });
+}
+
 /** Matches a credential with any UTF-8 character either raw or percent-encoded. */
 function encodedCredentialPattern(credential: string): RegExp | undefined {
   const pattern = [...credential]

@@ -1,6 +1,6 @@
 # Neottia
 
-Neottia stores software delivery records in formats that people and AI tools can inspect. Use Memory for project facts and decisions, Issues for work tracking, and Design Docs for reviewed technical records. Searchable is a foundation package for applications that supply their own search, fetch, storage, grep, and answer services.
+Neottia stores software delivery records in formats that people and AI tools can inspect. Use Memory for project facts and decisions, Issues for work tracking, Design Docs for reviewed technical records, and Searchable for bounded web research grounded in canonical repository files.
 
 ## Choose how to use Neottia
 
@@ -12,16 +12,16 @@ Read the [platform requirements](/get-started/requirements) before enabling a fi
 
 ## Availability
 
-| Capability  | Library                | Native Pi | Native OpenCode | Generic MCP |
-| ----------- | ---------------------- | --------- | --------------- | ----------- |
-| Memory      | Yes                    | Yes       | Yes             | Yes         |
-| Issues      | Yes                    | Yes       | Yes             | Yes         |
-| Design Docs | Yes                    | Yes       | Yes             | Yes         |
-| Searchable  | Injected services only | No        | No              | No          |
+| Capability  | Library | Native Pi | Native OpenCode | Generic MCP |
+| ----------- | ------- | --------- | --------------- | ----------- |
+| Memory      | Yes     | Yes       | Yes             | Yes         |
+| Issues      | Yes     | Yes       | Yes             | Yes         |
+| Design Docs | Yes     | Yes       | Yes             | Yes         |
+| Searchable  | Yes     | Yes       | Yes             | Yes         |
 
 ## Modules
 
-The [module catalog](/reference/modules) accounts for all 18 published and private workspaces and defines each status label.
+The [module catalog](/reference/modules) accounts for all 21 published and private workspaces and defines each status label.
 
 ## Start a project
 

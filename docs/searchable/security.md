@@ -1,9 +1,15 @@
-# Searchable foundation security
+# Searchable security
 
-> Searchable is foundation-only. The caller owns network and storage security.
+Searchable treats tool input, remote responses, canonical files, disposable caches, and model context as untrusted.
 
-Core checks cancellation before and after a service call. It validates tool inputs, validates returned objects, and enforces configured UTF-8 field limits, result counts, and serialized-output bytes. Errors pass through redaction so rejected URLs lose credentials, query strings, and fragments, and rejected values are not copied into limit messages.
+The default HTTP client accepts HTTP and HTTPS targets without user information. Before connecting, it resolves every address and rejects the request if any answer is local, private, link-local, metadata, multicast, reserved, or otherwise non-public. It pins an accepted answer for the connection. Redirects receive the same checks; HTTPS downgrade, loops, and excessive hops fail. Cross-origin redirects lose sensitive headers.
 
-The service must still enforce DNS and redirect policy, block private-network SSRF when required, stop streaming at the configured byte limit, apply request deadlines, limit persistent storage, isolate owners, and clean up resources. Core cannot enforce these inside caller-owned I/O.
+The client counts decoded response bytes and destroys an oversized stream. Ollama responses use incremental newline-delimited JSON parsing with separate frame and answer bounds. One overall fetch deadline covers the configured strategy sequence, and each attempt uses the smaller per-strategy deadline. The runtime converts public epoch deadlines once and uses monotonic timers for network, storage, cache, and migration work. Cancellation stops network reads and prevents later publication.
 
-Stable errors contain `category`, `code`, `message`, `paths`, and optional `details`. Codes include `TOOL_INPUT_INVALID`, `TOOL_OUTPUT_INVALID`, `RESOURCE_LIMIT_EXCEEDED`, and `OPERATION_CANCELLED`. There is no `retryable` field. Catch the error, log only redacted fields, and define retry policy in the embedding application.
+Jina and Wayback receive the requested URL only when it has no user information or query string. Wayback snapshot URLs must use the expected HTTPS archive host. Ollama is a narrow trusted-local exception used only by `web_ask`; `web_fetch` cannot use it to reach local services.
+
+Canonical stash files are repository authority. Repository Store rejects symlinks, hard links, special files, unsafe paths, concurrent replacements, and quota violations. SQLite contains only a derived FTS projection. Its separate disk limit allows eight times the canonical quota plus 8 MiB for SQLite and rebuild overhead. Grep reloads matching canonical files and builds returned snippets from those files.
+
+Ask prompts mark page content as untrusted quoted data and cap the complete prompt in UTF-8 bytes. This framing does not make remote text or model answers trustworthy. Verify important claims against their returned source URLs.
+
+Error redaction removes resolved provider credentials and URL queries from diagnostic text. Do not log prompts, page bodies, request headers, transport objects, or upstream response bodies.

@@ -12,12 +12,14 @@ import {
   type SearchableToolOutput,
 } from './tool-contracts.js';
 
-/** Per-invocation host state supplied by future MCP, Pi, and OpenCode adapters. */
+/** Per-invocation host state shared by MCP, Pi, OpenCode, and library callers. */
 export interface SearchableToolContext {
   readonly cwd: string;
   readonly services: SearchableServices;
   readonly signal?: AbortSignal;
   readonly configOverrides?: Partial<SearchableConfigInput>;
+  /** Interactive confirmation used by concrete cache-backed services. */
+  readonly onStaleCache?: () => boolean | Promise<boolean>;
 }
 
 /** Host-neutral executable definition consumed unchanged by every adapter. */
@@ -58,6 +60,12 @@ function makeTool<Name extends SearchableToolName>(
       assertNotCancelled(context.signal);
       const config = loadSearchableConfig(context.cwd, context.configOverrides);
       try {
+        if (!config.enabled)
+          throw new SearchableError(
+            'configuration',
+            'CAPABILITY_DISABLED',
+            'Searchable operation requires skills.searchable.enabled=true; the capability is disabled.',
+          );
         // Check raw strings before schema trimming, then check normalized values.
         assertInputBounds(name, input, config);
         const resolvedInput = resolveInputDefaults(name, parsed.data as SearchableToolInput<Name>, config);
@@ -66,6 +74,7 @@ function makeTool<Name extends SearchableToolName>(
           cwd: context.cwd,
           config,
           ...(context.signal === undefined ? {} : { signal: context.signal }),
+          ...(context.onStaleCache === undefined ? {} : { onStaleCache: context.onStaleCache }),
         };
         const output = await handler(context.services, resolvedInput, operation);
         assertNotCancelled(context.signal);

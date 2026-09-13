@@ -1,4 +1,5 @@
 import type { SearchableConfig } from './config.js';
+import type { SearchableDeadline } from './http.js';
 import type { ResolvedSearchableToolInput, SearchableToolOutput } from './tool-contracts.js';
 
 /** Invocation controls passed unchanged to caller-owned implementations. */
@@ -6,9 +7,15 @@ export interface SearchableOperationContext {
   readonly cwd: string;
   readonly config: SearchableConfig;
   readonly signal?: AbortSignal;
+  /** Absolute Unix epoch deadline shared by all work in one tool call. */
+  readonly deadline?: number;
+  /** Internal monotonic counterpart shared by runtime, storage, and migration stages. */
+  readonly transportDeadline?: SearchableDeadline;
+  /** Interactive confirmation used only when a disposable cache is stale. */
+  readonly onStaleCache?: () => boolean | Promise<boolean>;
 }
 
-/** Caller-owned service seams; this foundation never constructs or disposes them. */
+/** Service contract implemented by the concrete runtime or a caller-owned replacement. */
 export interface SearchableServices {
   readonly search: (
     input: ResolvedSearchableToolInput<'web_search'>,

@@ -11,9 +11,11 @@ skills:
     enabled: true
   design_docs:
     enabled: true
+  searchable:
+    enabled: true
 ```
 
-Every shard is disabled by default. Searchable also has a shard, but enabling it does not create services or a runtime.
+Every shard is disabled by default. Enable Searchable only where its web access, canonical stash, and optional local Ollama calls are intended.
 
 Values resolve in this order:
 

@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -10,6 +10,8 @@ let cwd = '';
 
 beforeEach(async () => {
   cwd = await mkdtemp(join(tmpdir(), 'neottia-searchable-tools-'));
+  await mkdir(join(cwd, '.neottia'));
+  await writeFile(join(cwd, '.neottia/config.yml'), 'version: 1\nskills:\n  searchable:\n    enabled: true\n');
 });
 
 afterEach(async () => {
@@ -35,6 +37,14 @@ function tool(name: string) {
 }
 
 describe('SEARCHABLE_TOOLS', () => {
+  it('rejects a disabled capability before calling an injected service', async () => {
+    const injected = services();
+    await expect(
+      tool('web_search').run({ cwd, services: injected, configOverrides: { enabled: false } }, { query: 'blocked' }),
+    ).rejects.toMatchObject({ code: 'CAPABILITY_DISABLED' });
+    expect(injected.search).not.toHaveBeenCalled();
+  });
+
   it('injects every operation and passes normalized defaults plus controls', async () => {
     const injected = services();
     const controller = new AbortController();
