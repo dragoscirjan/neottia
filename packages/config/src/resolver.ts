@@ -1,4 +1,4 @@
-import { closeSync, existsSync, fstatSync, openSync, readSync } from 'node:fs';
+import { closeSync, constants, existsSync, fstatSync, openSync, readSync } from 'node:fs';
 import { homedir as systemHomedir } from 'node:os';
 import path from 'node:path';
 import { isMap, isSeq, parseDocument, type Node } from 'yaml';
@@ -246,7 +246,8 @@ function readBoundedConfigFile(
 ): { readonly kind: 'success'; readonly yaml: string } | { readonly kind: 'io' | 'limit' } {
   let descriptor: number | undefined;
   try {
-    descriptor = openSync(file, 'r');
+    // Nonblocking open prevents a special file from stalling before descriptor validation.
+    descriptor = openSync(file, constants.O_RDONLY | constants.O_NONBLOCK);
     const metadata = fstatSync(descriptor);
     if (!metadata.isFile()) return { kind: 'io' };
     if (metadata.size > MAX_CONFIG_FILE_BYTES) return { kind: 'limit' };

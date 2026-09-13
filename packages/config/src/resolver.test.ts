@@ -1,3 +1,4 @@
+import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -272,6 +273,43 @@ modules:
       resolveConfig(registry, { cwd, env: {}, globalFile: 'missing-global.yml', projectFile: false }),
     );
     expect(error.diagnostics).toMatchObject([{ code: 'IO' }]);
+  });
+
+  it.runIf(process.platform !== 'win32')('rejects a selected FIFO without waiting for a writer', () => {
+    const cwd = temporaryDirectory();
+    const fifo = path.join(cwd, 'config.fifo');
+    execFileSync('mkfifo', [fifo]);
+    const configModule = new URL('./index.ts', import.meta.url).href;
+    const childScript = `
+      import { ConfigResolutionError, createConfigRegistry, resolveConfig } from ${JSON.stringify(configModule)};
+      try {
+        resolveConfig(createConfigRegistry([]), {
+          cwd: ${JSON.stringify(cwd)},
+          env: {},
+          globalFile: false,
+          projectFile: ${JSON.stringify(fifo)},
+        });
+        process.exitCode = 2;
+      } catch (error) {
+        if (!(error instanceof ConfigResolutionError)) throw error;
+        process.stdout.write(JSON.stringify(error.diagnostics));
+      }
+    `;
+
+    const child = spawnSync(process.execPath, ['--import', 'tsx', '--input-type=module', '--eval', childScript], {
+      encoding: 'utf8',
+      timeout: 2_000,
+    });
+    if (child.error !== undefined) throw child.error;
+
+    expect(child.status).toBe(0);
+    expect(JSON.parse(child.stdout)).toEqual([
+      {
+        code: 'IO',
+        message: 'configuration file could not be read as a regular file',
+        source: { file: fifo, kind: 'project' },
+      },
+    ]);
   });
 
   it('requires exact version 1 in every present configuration document', () => {

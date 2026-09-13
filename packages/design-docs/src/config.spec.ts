@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  ConfigResolutionError,
   createConfigRegistry,
   defineConfigContribution,
   generateConfigJsonSchema,
@@ -24,6 +25,7 @@ import {
   resolveDesignDocsConfigFile,
 } from './config.js';
 
+const NFKC_RESERVED_DESIGN_DOCS_ROOT = '.ｎｅｏｔｔｉａ/cache';
 const roots = new Set<string>();
 afterEach(() => {
   for (const root of roots) rmSync(root, { recursive: true, force: true });
@@ -54,6 +56,17 @@ function writeConfig(cwd: string, config: unknown, file = '.neottia/config.yml')
   mkdirSync(join(destination, '..'), { recursive: true });
   writeFileSync(destination, stringify(config, { lineWidth: 0 }), 'utf8');
   return destination;
+}
+
+/** Captures a shared configuration error from an expected failure. */
+function resolutionError(operation: () => unknown): ConfigResolutionError {
+  try {
+    operation();
+  } catch (error) {
+    expect(error).toBeInstanceOf(ConfigResolutionError);
+    return error as ConfigResolutionError;
+  }
+  throw new Error('expected configuration resolution to fail');
 }
 
 const companionPatchSchema = z.object({ mode: z.enum(['off', 'on']).optional() }).strict();
@@ -240,6 +253,52 @@ describe('Design Docs configuration contribution', () => {
       expect(generatedStringSchemaAccepts(standaloneRoot, root)).toBe(accepted);
       expect(generatedStringSchemaAccepts(completeRootSchema, root)).toBe(accepted);
     }
+  });
+
+  it('rejects NFKC-equivalent reserved roots in runtime, standalone, complete root, and profile schemas', () => {
+    const standalone = JSON.parse(readFileSync(new URL('../config.schema.json', import.meta.url), 'utf8')) as Record<
+      string,
+      unknown
+    >;
+    const standaloneRoot = (standalone['properties'] as Record<string, Record<string, unknown>>)['root'];
+    const complete = generateConfigJsonSchema(createConfigRegistry([designDocsConfigContribution]));
+    const completeProperties = complete['properties'] as Record<string, Record<string, unknown>>;
+    const completeRoot = (
+      completeProperties['modules']['properties'] as Record<string, Record<string, Record<string, unknown>>>
+    )['design_docs']['properties']['root'];
+    const profileModules = (
+      (completeProperties['profiles']['additionalProperties'] as Record<string, Record<string, unknown>>)['properties']
+        .modules as Record<string, Record<string, unknown>>
+    )['properties'] as Record<string, Record<string, Record<string, unknown>>>;
+    const profileRoot = profileModules['design_docs']['properties']['root'];
+
+    expect(designDocsConfigSchema.safeParse({ root: NFKC_RESERVED_DESIGN_DOCS_ROOT }).success).toBe(false);
+    expect(generatedStringSchemaAccepts(standaloneRoot, NFKC_RESERVED_DESIGN_DOCS_ROOT)).toBe(false);
+    expect(generatedStringSchemaAccepts(completeRoot, NFKC_RESERVED_DESIGN_DOCS_ROOT)).toBe(false);
+    expect(generatedStringSchemaAccepts(profileRoot, NFKC_RESERVED_DESIGN_DOCS_ROOT)).toBe(false);
+
+    const cwd = fixture();
+    const projectFile = writeConfig(cwd, {
+      version: 1,
+      profiles: { unsafe: { modules: { design_docs: { root: NFKC_RESERVED_DESIGN_DOCS_ROOT } } } },
+    });
+    const error = resolutionError(() =>
+      resolveConfig(createConfigRegistry([designDocsConfigContribution]), {
+        cwd,
+        env: {},
+        globalFile: false,
+        profile: 'unsafe',
+        projectFile,
+      }),
+    );
+    expect(error.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'SCHEMA',
+          path: ['profiles', 'unsafe', 'modules', 'design_docs', 'root'],
+        }),
+      ]),
+    );
   });
 
   it('loads paths, retrieval, cache, and every security limit through the shared resolver', () => {

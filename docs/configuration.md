@@ -119,7 +119,7 @@ modules:
       stale_policy: prompt
 ```
 
-Memory's PostgreSQL backend accepts `provider.db.pg` settings. Issues, Design Docs, Memory, and Searchable also have resource limits under their `security` settings. Use editor completion from the complete schema or the linked module reference when setting those limits.
+Memory's PostgreSQL backend accepts `provider.db.pg` settings. Issues, Design Docs, Memory, and Searchable also have resource limits under their `security` settings. Design Docs roots accept printable ASCII characters only. Existing Unicode Design Docs root directories must be renamed to an ASCII path before upgrading. Use editor completion from the complete schema or the linked module reference when setting those limits.
 
 ## Profiles
 

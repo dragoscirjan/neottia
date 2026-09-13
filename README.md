@@ -89,7 +89,7 @@ Enable `modules.issues` to manage Git-trackable YAML issues with exact revisions
 
 ## Design Docs
 
-Install `@neottia/design-docs` for strict repository-local Markdown/YAML design records, `@neottia/design-docs-mcp` for generic stdio MCP, or the Pi/OpenCode extensions for in-process tools. Enable `modules.design_docs` in `.neottia/config.yml`; enable `modules.issues` too for real stable-link validation through `@neottia/issues-design-docs`. The [Design Docs guide](docs/design-docs/) covers authoring, approval, immutable versioning, BM25 search, archive/restore, stable issue references, migration, and recovery.
+Install `@neottia/design-docs` for strict repository-local Markdown/YAML design records, `@neottia/design-docs-mcp` for generic stdio MCP, or the Pi/OpenCode extensions for in-process tools. Enable `modules.design_docs` in `.neottia/config.yml`; enable `modules.issues` too for real stable-link validation through `@neottia/issues-design-docs`. Design Docs root paths accept printable ASCII characters only. The [Design Docs guide](docs/design-docs/) covers authoring, approval, immutable versioning, BM25 search, archive/restore, stable issue references, migration, and recovery.
 
 ## Searchable
 
