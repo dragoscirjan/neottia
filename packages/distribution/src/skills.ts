@@ -6,7 +6,7 @@ import { dirname, join, relative } from 'node:path';
 
 import { targetPath } from '@neottia/harness-adapter';
 
-import { checksumBytes, checksumText } from './manifest.js';
+import { checksumBytes, checksumText, compareCodeUnits } from './manifest.js';
 import type { FileAsset, StageExternalSkillsOptions } from './types.js';
 
 const DEFAULT_LIMITS = Object.freeze({ maxFiles: 500, maxBytes: 8 * 1024 * 1024 });
@@ -43,7 +43,7 @@ export async function stageExternalSkills(options: StageExternalSkillsOptions): 
 
     const stagedRoot = join(project, '.agents', 'skills');
     const stagedFiles: Array<{ skill: string; relativePath: string; bytes: Buffer }> = [];
-    for (const skill of [...options.request.skills].sort((left, right) => left.localeCompare(right))) {
+    for (const skill of [...options.request.skills].sort(compareCodeUnits)) {
       const skillRoot = join(stagedRoot, skill);
       const files = await readRegularTree(skillRoot, limits, stagedFiles.length, byteLength(stagedFiles));
       for (const file of files) stagedFiles.push({ skill, relativePath: file.relativePath, bytes: file.bytes });
@@ -87,7 +87,7 @@ export async function stageExternalSkills(options: StageExternalSkillsOptions): 
       });
     }
     return Object.freeze(
-      assets.sort((left, right) => left.id.localeCompare(right.id)).map((asset) => deepFreeze(asset)),
+      assets.sort((left, right) => compareCodeUnits(left.id, right.id)).map((asset) => deepFreeze(asset)),
     );
   } finally {
     await rm(stage, { recursive: true, force: true });
@@ -107,7 +107,9 @@ export function externalSkillIntegrity(
 ): ReturnType<typeof checksumBytes> {
   const hashInput = Buffer.concat(
     [...files]
-      .sort((left, right) => `${left.skill}/${left.relativePath}`.localeCompare(`${right.skill}/${right.relativePath}`))
+      .sort((left, right) =>
+        compareCodeUnits(`${left.skill}/${left.relativePath}`, `${right.skill}/${right.relativePath}`),
+      )
       .flatMap((file) => [
         Buffer.from(`${file.skill}/${file.relativePath}\0`, 'utf8'),
         Buffer.from(file.bytes),
@@ -165,9 +167,10 @@ async function readRegularTree(
   initialBytes: number,
 ): Promise<readonly { readonly relativePath: string; readonly bytes: Buffer }[]> {
   const output: Array<{ relativePath: string; bytes: Buffer }> = [];
+  let outputBytes = 0;
   const visit = async (directory: string): Promise<void> => {
     const entries = await readdir(directory, { withFileTypes: true });
-    entries.sort((left, right) => left.name.localeCompare(right.name));
+    entries.sort((left, right) => compareCodeUnits(left.name, right.name));
     for (const entry of entries) {
       const path = join(directory, entry.name);
       const stat = await lstat(path);
@@ -177,13 +180,20 @@ async function readRegularTree(
         continue;
       }
       if (!stat.isFile()) throw new TypeError('Staged external skills can contain only regular files.');
-      const bytes = await readFile(path);
-      output.push({ relativePath: relative(root, path).split('\\').join('/'), bytes });
-      if (initialFiles + output.length > limits.maxFiles || initialBytes + byteLength(output) > limits.maxBytes) {
+      if (
+        initialFiles + output.length + 1 > limits.maxFiles ||
+        initialBytes + outputBytes + stat.size > limits.maxBytes
+      ) {
         throw new TypeError('Staged external skill exceeds configured limits.');
       }
+      const bytes = await readFile(path);
+      output.push({ relativePath: relative(root, path).split('\\').join('/'), bytes });
+      outputBytes += bytes.byteLength;
     }
   };
+  const rootStat = await lstat(root);
+  if (rootStat.isSymbolicLink()) throw new TypeError('Staged external skills cannot contain symbolic links.');
+  if (!rootStat.isDirectory()) throw new TypeError('Staged external skill root must be a directory.');
   await visit(root);
   return output;
 }

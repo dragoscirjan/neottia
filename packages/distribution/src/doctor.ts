@@ -3,7 +3,7 @@ import { access } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { delimiter, extname, join } from 'node:path';
 
-import { resolveTarget } from './manifest.js';
+import { compareCodeUnits, resolveTarget } from './manifest.js';
 import type { AssetManifest, DoctorResult, InstallationSnapshot, InstallRoots, Prerequisite } from './types.js';
 
 /** Checks declared external requirements without installing or changing them. */
@@ -24,7 +24,7 @@ export async function runDoctor(
     });
   }
   return Object.freeze(
-    results.sort((left, right) => left.id.localeCompare(right.id)).map((result) => Object.freeze(result)),
+    results.sort((left, right) => compareCodeUnits(left.id, right.id)).map((result) => Object.freeze(result)),
   );
 }
 

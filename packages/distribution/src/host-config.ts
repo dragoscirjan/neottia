@@ -69,17 +69,22 @@ export function applyHostUnitStates(
       } else if (index !== -1) {
         values.splice(index, 1);
       }
-      content = replaceValue(content, pointer, values);
+      const changed = parent === undefined ? values.length > 0 : canonicalJson(values) !== canonicalJson(parent);
+      if (changed) content = replaceValue(content, pointer, values);
     } else {
       const parent = valueAt(document, pointer);
       if (parent !== undefined && !plainRecord(parent)) {
         throw new TypeError(`Host configuration pointer ${change.unit.pointer} is not an object.`);
       }
-      content = replaceValue(
-        content,
-        [...pointer, change.unit.key],
-        change.state.exists ? parseUnitValue(change.state) : undefined,
-      );
+      const path = [...pointer, change.unit.key];
+      if (change.state.exists) {
+        const value = parseUnitValue(change.state);
+        if (parent === undefined || canonicalJson(parent[change.unit.key]) !== canonicalJson(value)) {
+          content = replaceValue(content, path, value);
+        }
+      } else if (parent !== undefined && Object.hasOwn(parent, change.unit.key)) {
+        content = replaceValue(content, path, undefined);
+      }
     }
   }
   return content.endsWith('\n') ? content : `${content}\n`;

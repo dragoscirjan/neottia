@@ -5,6 +5,7 @@ import type { HostConfigLocator, TargetPath } from '@neottia/harness-adapter';
 import { operationState, operationUnit, readHostUnit } from './host-config.js';
 import {
   checksumBytes,
+  compareCodeUnits,
   journalPath,
   receiptEntryKey,
   receiptPath,
@@ -96,7 +97,7 @@ export async function inspectInstallation(manifest: AssetManifest, roots: Instal
     units.push(await inspectReceiptEntry(entry, roots));
   }
   rejectDuplicateUnits(units);
-  units.sort((left, right) => receiptEntryKey(left).localeCompare(receiptEntryKey(right)));
+  units.sort((left, right) => compareCodeUnits(receiptEntryKey(left), receiptEntryKey(right)));
 
   return Object.freeze({
     roots: Object.freeze({ ...roots }),
@@ -116,7 +117,7 @@ export async function inspectUninstall(receiptFile: string, roots: InstallRoots)
   const receipt = parseReceipt(receiptContainer);
   if (receipt === undefined) throw new TypeError('Installation receipt does not exist.');
   const units = await Promise.all(receipt.entries.map((entry) => inspectReceiptEntry(entry, roots)));
-  units.sort((left, right) => receiptEntryKey(left).localeCompare(receiptEntryKey(right)));
+  units.sort((left, right) => compareCodeUnits(receiptEntryKey(left), receiptEntryKey(right)));
   return Object.freeze({
     roots: Object.freeze({ ...roots }),
     receiptPath: receiptFile,

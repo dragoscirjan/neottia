@@ -134,6 +134,36 @@ describe('transaction and staging integration', () => {
     expect(layer.files).toEqual([{ id: 'neottia.command.plan', content: template }]);
   });
 
+  it('rejects symbolic links in template source path components', async () => {
+    const roots = await createRoots();
+    const template = 'Outside template.\n';
+    const outside = join(dirname(roots.project), 'outside-template');
+    const templateRoot = join(roots.project, 'template-pack');
+    const manifestPath = join(templateRoot, 'neottia.templates.json');
+    await mkdir(outside);
+    await mkdir(templateRoot);
+    await writeFile(join(outside, 'plan.md'), template);
+    await symlink(outside, join(templateRoot, 'commands'));
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        schemaVersion: 1,
+        templates: {
+          'neottia.command.plan': { file: 'commands/plan.md', checksum: checksumText(template) },
+        },
+      }),
+    );
+
+    await expect(
+      loadTemplateLayer({
+        tier: 'package',
+        sourceId: 'linked-templates',
+        version: '1.0.0',
+        manifestPath,
+      }),
+    ).rejects.toThrow('escapes its manifest directory');
+  });
+
   it('recovers an interrupted transaction from its durable before-state', async () => {
     const roots = await createRoots();
     const recoveryReceipt = join(roots.xdgState, 'neottia', 'receipts', 'recover.json');
@@ -234,6 +264,55 @@ describe('transaction and staging integration', () => {
       '.pi/skills/demo/SKILL.md',
       '.pi/skills/demo/references/guide.md',
     ]);
+
+    await expect(
+      stageExternalSkills({
+        skillsBin: fakeBin,
+        adapter: piHarnessAdapter,
+        limits: { maxFiles: 10, maxBytes: 1 },
+        request: {
+          id: 'oversized-source',
+          source: 'local-fixture',
+          revision: 'commit-123',
+          integrity: externalSkillIntegrity(files),
+          skills: ['demo'],
+          scope: 'project',
+        },
+      }),
+    ).rejects.toThrow('exceeds configured limits');
+  });
+
+  it('rejects symbolic-link staged skill roots', async () => {
+    const roots = await createRoots();
+    const outside = join(dirname(roots.project), 'outside-skill');
+    const fakeBin = join(roots.project, 'linked-skills.mjs');
+    await mkdir(outside);
+    await writeFile(join(outside, 'SKILL.md'), '# Linked\n');
+    await writeFile(
+      fakeBin,
+      [
+        "import { mkdir, symlink } from 'node:fs/promises';",
+        "import { join } from 'node:path';",
+        "const root = join(process.cwd(), '.agents', 'skills');",
+        'await mkdir(root, { recursive: true });',
+        `await symlink(${JSON.stringify(outside)}, join(root, 'demo'));`,
+      ].join('\n'),
+    );
+
+    await expect(
+      stageExternalSkills({
+        skillsBin: fakeBin,
+        adapter: piHarnessAdapter,
+        request: {
+          id: 'linked-source',
+          source: 'local-fixture',
+          revision: 'commit-123',
+          integrity: checksumText('unused'),
+          skills: ['demo'],
+          scope: 'project',
+        },
+      }),
+    ).rejects.toThrow('cannot contain symbolic links');
   });
 
   it('rejects symbolic-link ancestors before publishing reviewed paths', async () => {

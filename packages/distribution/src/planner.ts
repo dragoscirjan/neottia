@@ -1,7 +1,14 @@
 import { isAbsolute, relative } from 'node:path';
 
 import { applyHostUnitStates } from './host-config.js';
-import { canonicalJson, checksumBytes, checksumText, createReceipt, receiptEntryKey } from './manifest.js';
+import {
+  canonicalJson,
+  checksumBytes,
+  checksumText,
+  compareCodeUnits,
+  createReceipt,
+  receiptEntryKey,
+} from './manifest.js';
 import type {
   ContainerState,
   ExpectedFile,
@@ -82,7 +89,7 @@ export function createInstallationPlan(
 
   mutations.sort(
     (left, right) =>
-      Number(left.role === 'receipt') - Number(right.role === 'receipt') || left.path.localeCompare(right.path),
+      Number(left.role === 'receipt') - Number(right.role === 'receipt') || compareCodeUnits(left.path, right.path),
   );
   const unsigned = {
     schemaVersion: 1 as const,
@@ -91,7 +98,7 @@ export function createInstallationPlan(
     receiptPath: snapshot.receiptPath,
     receiptRoot: rootForPath(snapshot.receiptPath, snapshot.roots),
     mutations,
-    conflicts: conflicts.sort((left, right) => left.id.localeCompare(right.id)),
+    conflicts: conflicts.sort((left, right) => compareCodeUnits(left.id, right.id)),
     ...(action === 'uninstall' || snapshot.manifest?.reloadNotice === undefined
       ? {}
       : { reloadNotice: snapshot.manifest.reloadNotice }),
@@ -225,7 +232,7 @@ function buildContentMutations(
   }
 
   const mutations: PlanMutation[] = [];
-  for (const [path, group] of [...groups.entries()].sort(([left], [right]) => left.localeCompare(right))) {
+  for (const [path, group] of [...groups.entries()].sort(([left], [right]) => compareCodeUnits(left, right))) {
     const container = group[0]!.unit.container;
     if (group.some((entry) => !sameContainer(container, entry.unit.container))) {
       throw new TypeError('Units for one path have inconsistent snapshots.');

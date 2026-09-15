@@ -1,7 +1,7 @@
 import { lstat, readFile } from 'node:fs/promises';
-import { dirname, isAbsolute, relative, resolve } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
-import { checksumText } from './manifest.js';
+import { checksumText, compareCodeUnits } from './manifest.js';
 import type { LoadTemplateLayerOptions, ResolvedTemplate, TemplateLayer, TemplateTier } from './types.js';
 
 /** Fixed precedence makes input enumeration order irrelevant. */
@@ -32,7 +32,7 @@ export async function loadTemplateLayer(options: LoadTemplateLayerOptions): Prom
   const files: Array<{ id: string; content: string }> = [];
   let totalBytes = manifestStat.size;
   for (const [id, declaration] of Object.entries(document.templates).sort(([left], [right]) =>
-    left.localeCompare(right),
+    compareCodeUnits(left, right),
   )) {
     if (!TEMPLATE_ID.test(id) || !plainRecord(declaration)) throw new TypeError('Template declaration is invalid.');
     const file = declaration.file;
@@ -43,9 +43,7 @@ export async function loadTemplateLayer(options: LoadTemplateLayerOptions): Prom
     const relation = relative(root, path);
     if (relation.startsWith('..') || isAbsolute(relation))
       throw new TypeError('Template file escapes its manifest directory.');
-    const stat = await lstat(path);
-    if (!stat.isFile() || stat.isSymbolicLink()) throw new TypeError('Template source must be a regular file.');
-    totalBytes += stat.size;
+    totalBytes += await templateFileSize(root, path);
     if (totalBytes > maxBytes) throw new TypeError('Template source exceeds its configured byte limit.');
     const content = await readFile(path, 'utf8');
     if (checksumText(content) !== declaredChecksum) throw new TypeError(`Template ${id} checksum does not match.`);
@@ -66,7 +64,7 @@ export function resolveTemplates(
   requiredIds: readonly string[],
   layers: readonly TemplateLayer[],
 ): readonly ResolvedTemplate[] {
-  const required = [...new Set(requiredIds)].sort((left, right) => left.localeCompare(right));
+  const required = [...new Set(requiredIds)].sort(compareCodeUnits);
   if (required.some((id) => !TEMPLATE_ID.test(id))) throw new TypeError('Required template ID is invalid.');
   validateLayers(layers);
 
@@ -87,7 +85,8 @@ export function resolveTemplates(
       const matches = candidates.get(id);
       if (matches === undefined || matches.length === 0) throw new TypeError(`Required template ${id} is missing.`);
       const ordered = [...matches].sort(
-        (left, right) => TIER_ORDER[left.tier] - TIER_ORDER[right.tier] || left.sourceId.localeCompare(right.sourceId),
+        (left, right) =>
+          TIER_ORDER[left.tier] - TIER_ORDER[right.tier] || compareCodeUnits(left.sourceId, right.sourceId),
       );
       const winner = ordered.at(-1)!;
       return Object.freeze({
@@ -134,6 +133,29 @@ function validateLayers(layers: readonly TemplateLayer[]): void {
     }
     idsByTier.set(layer.tier, tierIds);
   }
+}
+
+/** Returns a source size after rejecting linked or non-directory ancestors. */
+async function templateFileSize(root: string, path: string): Promise<number> {
+  const relation = relative(root, path);
+  let current = root;
+  const segments = relation.split(sep);
+  const rootStat = await lstat(root);
+  if (rootStat.isSymbolicLink() || !rootStat.isDirectory()) {
+    throw new TypeError('Template file escapes its manifest directory.');
+  }
+  for (const [index, segment] of segments.entries()) {
+    current = join(current, segment);
+    const stat = await lstat(current);
+    if (stat.isSymbolicLink()) throw new TypeError('Template file escapes its manifest directory.');
+    const last = index === segments.length - 1;
+    if (!last && !stat.isDirectory()) throw new TypeError('Template source path must contain only directories.');
+    if (last) {
+      if (!stat.isFile()) throw new TypeError('Template source must be a regular file.');
+      return stat.size;
+    }
+  }
+  throw new TypeError('Template source must be a regular file.');
 }
 
 /** Checks JSON objects without accepting arrays. */

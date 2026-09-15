@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import { applyHostUnitStates, operationState, operationUnit, readHostUnit } from './host-config.js';
 import {
+  canonicalJson,
   checksumText,
   createAssetManifest,
   createAssetSource,
@@ -84,6 +85,22 @@ describe('distribution contracts', () => {
     expect(output).toContain('"theme": "dark"');
     expect(output).toContain('@neottia/opencode-issues@2.0.0');
     expect(readHostUnit(output, unit).checksum).toBe(operationState(operation).checksum);
+  });
+
+  it('does not create or rewrite an array for a missing owned entry', () => {
+    const content = '{\n  // keep array formatting\n  "plugin": [\n    "operator-plugin"\n  ]\n}\n';
+    const unit = {
+      kind: 'array-entry' as const,
+      pointer: '/plugin',
+      identity: 'npm:@neottia/opencode-issues',
+    };
+
+    expect(applyHostUnitStates(content, [{ unit, state: { exists: false } }])).toBe(content);
+    expect(applyHostUnitStates('{}\n', [{ unit, state: { exists: false } }])).toBe('{}\n');
+  });
+
+  it('sorts canonical JSON by code unit instead of the host locale', () => {
+    expect(canonicalJson({ a: 4, A: 3, '.': 2, '-': 1 })).toBe('{\n  "-": 1,\n  ".": 2,\n  "A": 3,\n  "a": 4\n}\n');
   });
 
   it('produces byte-identical manifests for identical inputs', () => {

@@ -28,9 +28,9 @@ export function createAssetManifest(input: AssetManifestInput): AssetManifest {
     harnessId: input.harnessId,
     scope: input.scope,
     configChecksum: input.configChecksum,
-    templates: [...input.templates].sort((left, right) => left.id.localeCompare(right.id)),
-    prerequisites: [...input.prerequisites].sort((left, right) => left.id.localeCompare(right.id)),
-    assets: [...input.assets].sort((left, right) => left.id.localeCompare(right.id)),
+    templates: [...input.templates].sort((left, right) => compareCodeUnits(left.id, right.id)),
+    prerequisites: [...input.prerequisites].sort((left, right) => compareCodeUnits(left.id, right.id)),
+    assets: [...input.assets].sort((left, right) => compareCodeUnits(left.id, right.id)),
     ...(input.reloadNotice === undefined ? {} : { reloadNotice: structuredClone(input.reloadNotice) }),
   };
   const manifest = { ...canonical, checksum: checksumText(canonicalJson(canonical)) };
@@ -124,7 +124,7 @@ export function createReceipt(input: Omit<InstallationReceipt, 'schemaVersion' |
     manifestChecksum: input.manifestChecksum,
     harnessId: input.harnessId,
     scope: input.scope,
-    entries: [...input.entries].sort((left, right) => receiptEntryKey(left).localeCompare(receiptEntryKey(right))),
+    entries: [...input.entries].sort((left, right) => compareCodeUnits(receiptEntryKey(left), receiptEntryKey(right))),
   };
   const receipt = { ...unsigned, checksum: checksumText(canonicalJson(unsigned)) };
   validateReceipt(receipt);
@@ -185,6 +185,11 @@ export function checksumText(content: string): Sha256 {
 /** Hashes exact bytes. */
 export function checksumBytes(content: Uint8Array): Sha256 {
   return `sha256:${createHash('sha256').update(content).digest('hex')}`;
+}
+
+/** Compares strings by UTF-16 code units without host locale dependencies. */
+export function compareCodeUnits(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
 }
 
 /** Encodes deterministic JSON with sorted keys and a final LF. */
@@ -324,7 +329,7 @@ function sortValue(value: unknown): unknown {
   if (value !== null && typeof value === 'object') {
     return Object.fromEntries(
       Object.entries(value as Record<string, unknown>)
-        .sort(([left], [right]) => left.localeCompare(right))
+        .sort(([left], [right]) => compareCodeUnits(left, right))
         .map(([key, item]) => [key, sortValue(item)]),
     );
   }
