@@ -12,7 +12,14 @@ import {
 } from '@neottia/sdlc';
 import { searchableConfigContribution } from '@neottia/searchable-core';
 import { afterEach, describe, expect, it } from 'vitest';
-import { officialConfigContributions, officialConfigRegistry, resolveHostConfigSnapshot } from './index.js';
+import {
+  assetInstallConfigContribution,
+  harnessInstallConfigContribution,
+  officialConfigContributions,
+  officialConfigRegistry,
+  resolveHostConfigSnapshot,
+  templateInstallConfigContribution,
+} from './index.js';
 
 const roots: string[] = [];
 
@@ -39,6 +46,17 @@ modules:
     enabled: true
   searchable:
     enabled: true
+harnesses:
+  install:
+    targets:
+      - id: pi
+        scope: project
+assets:
+  install:
+    static_skills: []
+templates:
+  install:
+    packages: []
 `);
 
     const snapshot = resolveHostConfigSnapshot({ cwd, env: {}, interactive: true });
@@ -48,15 +66,25 @@ modules:
       'issues',
       'design-docs',
       'searchable',
+      'distribution-harness-install',
+      'distribution-asset-install',
+      'distribution-template-install',
       'sdlc-issues-capability',
       'sdlc-documents-capability',
       'sdlc-source-control-capability',
     ]);
-    expect(officialConfigRegistry.contributions).toHaveLength(7);
+    expect(officialConfigRegistry.contributions).toHaveLength(10);
     expect(snapshot.get(memoryConfigContribution).enabled).toBe(true);
     expect(snapshot.get(issueConfigContribution).enabled).toBe(true);
     expect(snapshot.get(designDocsConfigContribution).enabled).toBe(true);
     expect(snapshot.get(searchableConfigContribution).enabled).toBe(true);
+    expect(snapshot.get(harnessInstallConfigContribution).targets).toEqual([{ id: 'pi', scope: 'project' }]);
+    expect(snapshot.get(assetInstallConfigContribution).static_skills).toEqual([]);
+    expect(snapshot.get(templateInstallConfigContribution)).toEqual({
+      packages: [],
+      global_overrides: [],
+      project_overrides: [],
+    });
     expect(snapshot.get(issuesCapabilityConfigContribution)).toEqual({ provider: 'filesystem' });
     expect(snapshot.get(documentsCapabilityConfigContribution)).toEqual({ provider: 'filesystem' });
     expect(snapshot.get(sourceControlCapabilityConfigContribution)).toEqual({

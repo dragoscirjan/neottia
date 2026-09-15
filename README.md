@@ -9,9 +9,11 @@ Neottia provides a shared SDLC that can be understood and used by multiple AI co
 │   ├── pi-adapter/      # Declarative Pi asset projection
 │   └── opencode-adapter/# Declarative OpenCode asset projection
 ├── packages/
+│   ├── cli/             # Installable Neottia command-line application
 │   ├── config/          # Shared layered configuration platform
 │   ├── config-registry/ # Official strict host contribution registry
 │   ├── core/            # Independently versioned core package
+│   ├── distribution/    # Asset manifests, receipts, plans, and transactions
 │   ├── design-docs/     # Canonical design documents and shared tools
 │   ├── design-docs-mcp/ # Generic Design Docs MCP server
 │   ├── memory-core/     # Canonical memory library and config schema
@@ -104,6 +106,12 @@ Enable `modules.searchable` to search DuckDuckGo, Google, Bing, or Brave; extrac
 Pi and OpenCode each have native Memory, Issues, Design Docs, and Searchable extensions. Other MCP-compatible clients can launch the four generic stdio servers. TypeScript applications can embed the domain libraries directly.
 
 `@neottia/harness-adapter` defines a host-neutral, immutable asset projection contract. `@neottia/pi-adapter` and `@neottia/opencode-adapter` return symbolic paths, package declarations, reviewable host-configuration operations, and reload notices without writing files or running host commands. Each adapter declares unsupported features instead of emulating them. See the [harness adapter guide](docs/harnesses/adapters.md).
+
+## Distribution
+
+`@neottia/distribution` converts adapter output into checksummed manifests and reviewable plans. Receipts track file ownership and individual host-configuration entries. Apply uses exact checksum guards, before-image journals, rollback, and recovery. Static third-party skills are acquired through the bundled `skills` package in an isolated staging project before adapters select their final paths.
+
+`@neottia/cli` publishes the `neottia` command. Planning and applying are separate commands, and conflicts require exact per-item approval. See the [distribution guide](docs/distribution/).
 
 ## Supporting packages
 

@@ -11,6 +11,7 @@ export default defineConfig({
       { text: 'Home', link: '/' },
       { text: 'Get started', link: '/get-started/' },
       { text: 'Configuration', link: '/configuration' },
+      { text: 'Distribution', link: '/distribution/' },
       {
         text: 'Features',
         items: [
@@ -55,6 +56,12 @@ export default defineConfig({
         {
           text: 'Configuration',
           items: [{ text: 'Unified configuration', link: '/configuration' }],
+        },
+      ],
+      '/distribution/': [
+        {
+          text: 'Distribution',
+          items: [{ text: 'Install generated assets', link: '/distribution/' }],
         },
       ],
       '/get-started/': [
