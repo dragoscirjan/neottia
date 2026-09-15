@@ -43,15 +43,15 @@
     "@neottia/repository-store": "workspace:*",
     "jsdom": "^29.1.1",
     "turndown": "^7.2.4",
-    "yaml": "^2.9.0",
-    "zod": "^4.5.4"
+    "yaml": "^2.9.1",
+    "zod": "^4.6.2"
   },
   "devDependencies": {
     "@templ-project/tsconfig": "^0.2.2",
     "@types/jsdom": "^27.0.0",
-    "@types/node": "^25.0.3",
+    "@types/node": "^26.5.1",
     "@types/turndown": "^5.0.6",
-    "typescript": "^5.9.3",
-    "vitest": "^4.1.11"
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
   }
 }

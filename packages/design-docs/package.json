@@ -41,14 +41,14 @@
     "@neottia/config": "workspace:^",
     "@neottia/repository-store": "workspace:^",
     "commonmark": "^0.31.2",
-    "yaml": "^2.9.0",
-    "zod": "^4.5.4"
+    "yaml": "^2.9.1",
+    "zod": "^4.6.2"
   },
   "devDependencies": {
     "@templ-project/tsconfig": "^0.2.2",
     "@types/commonmark": "^0.27.10",
-    "@types/node": "^25.0.3",
-    "typescript": "^5.9.3",
-    "vitest": "^4.1.11"
+    "@types/node": "^26.5.1",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
   }
 }
