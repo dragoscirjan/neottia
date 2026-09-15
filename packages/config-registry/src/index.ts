@@ -1,4 +1,5 @@
 import { resolve } from 'node:path';
+
 import { createConfigRegistry, resolveConfig, type ResolvedConfigSnapshot } from '@neottia/config';
 import { designDocsConfigContribution } from '@neottia/design-docs';
 import { issueConfigContribution } from '@neottia/issues';
@@ -10,12 +11,38 @@ import {
 } from '@neottia/sdlc';
 import { searchableConfigContribution } from '@neottia/searchable-core';
 
+import {
+  assetInstallConfigContribution,
+  harnessInstallConfigContribution,
+  templateInstallConfigContribution,
+} from './distribution.js';
+
+export {
+  assetInstallConfigContribution,
+  assetInstallConfigPatchSchema,
+  assetInstallConfigSchema,
+  harnessInstallConfigContribution,
+  harnessInstallConfigPatchSchema,
+  harnessInstallConfigSchema,
+  staticSkillConfigSchema,
+  templateInstallConfigContribution,
+  templateInstallConfigPatchSchema,
+  templateInstallConfigSchema,
+  templateSourceConfigSchema,
+  type AssetInstallConfig,
+  type HarnessInstallConfig,
+  type TemplateInstallConfig,
+} from './distribution.js';
+
 /** Official contributions accepted by every Neottia host configuration. */
 export const officialConfigContributions = Object.freeze([
   memoryConfigContribution,
   issueConfigContribution,
   designDocsConfigContribution,
   searchableConfigContribution,
+  harnessInstallConfigContribution,
+  assetInstallConfigContribution,
+  templateInstallConfigContribution,
   issuesCapabilityConfigContribution,
   documentsCapabilityConfigContribution,
   sourceControlCapabilityConfigContribution,

@@ -47,6 +47,35 @@ Every present file must have the exact integer `version: 1`. The supported root 
 | Documents provider | `capabilities.documents`      | [SDLC provider selection](#sdlc-provider-selection) |
 | Source control     | `capabilities.source_control` | [SDLC provider selection](#sdlc-provider-selection) |
 
+| Distribution setting | Canonical path      | Reference                             |
+| -------------------- | ------------------- | ------------------------------------- |
+| Harness targets      | `harnesses.install` | [Asset distribution](./distribution/) |
+| Static skills        | `assets.install`    | [Asset distribution](./distribution/) |
+| Template sources     | `templates.install` | [Asset distribution](./distribution/) |
+
+## Distribution configuration
+
+Installation inputs are explicit. Neottia does not scan installed packages or infer targets from files already on disk.
+
+```yaml
+version: 1
+harnesses:
+  install:
+    targets:
+      - id: pi
+        scope: project
+assets:
+  install:
+    static_skills: []
+templates:
+  install:
+    packages: []
+    global_overrides: []
+    project_overrides: []
+```
+
+`harnesses.install.targets` selects one harness ID and scope per output. `assets.install.static_skills` requires an exact revision and SHA-256 digest. Template package and override entries require an explicit ID, manifest path, and version. These values feed compilation and staging; configuration resolution does not install assets or execute external tools.
+
 ## Project example
 
 This file enables all migrated modules. Omitted settings use module defaults. The module references above list every environment binding and setting.

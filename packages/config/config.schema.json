@@ -390,19 +390,110 @@
     "harnesses": {
       "description": "Canonical harnesses configuration.",
       "type": "object",
-      "properties": {},
+      "properties": {
+        "install": {
+          "type": "object",
+          "properties": {
+            "targets": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string", "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$" },
+                  "scope": { "type": "string", "enum": ["project", "global"] }
+                },
+                "required": ["id", "scope"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      },
       "additionalProperties": false
     },
     "assets": {
       "description": "Canonical assets configuration.",
       "type": "object",
-      "properties": {},
+      "properties": {
+        "install": {
+          "type": "object",
+          "properties": {
+            "static_skills": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string", "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$" },
+                  "source": { "type": "string", "minLength": 1 },
+                  "revision": { "type": "string", "minLength": 1 },
+                  "integrity": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+                  "skills": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": { "type": "string", "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$" }
+                  }
+                },
+                "required": ["id", "source", "revision", "integrity", "skills"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      },
       "additionalProperties": false
     },
     "templates": {
       "description": "Canonical templates configuration.",
       "type": "object",
-      "properties": {},
+      "properties": {
+        "install": {
+          "type": "object",
+          "properties": {
+            "packages": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string", "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$" },
+                  "path": { "type": "string", "minLength": 1 },
+                  "version": { "type": "string", "minLength": 1 }
+                },
+                "required": ["id", "path", "version"],
+                "additionalProperties": false
+              }
+            },
+            "global_overrides": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string", "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$" },
+                  "path": { "type": "string", "minLength": 1 },
+                  "version": { "type": "string", "minLength": 1 }
+                },
+                "required": ["id", "path", "version"],
+                "additionalProperties": false
+              }
+            },
+            "project_overrides": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string", "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$" },
+                  "path": { "type": "string", "minLength": 1 },
+                  "version": { "type": "string", "minLength": 1 }
+                },
+                "required": ["id", "path", "version"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      },
       "additionalProperties": false
     },
     "profiles": {
@@ -822,19 +913,110 @@
           "harnesses": {
             "description": "Canonical harnesses configuration.",
             "type": "object",
-            "properties": {},
+            "properties": {
+              "install": {
+                "type": "object",
+                "properties": {
+                  "targets": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$" },
+                        "scope": { "type": "string", "enum": ["project", "global"] }
+                      },
+                      "required": ["id", "scope"],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
             "additionalProperties": false
           },
           "assets": {
             "description": "Canonical assets configuration.",
             "type": "object",
-            "properties": {},
+            "properties": {
+              "install": {
+                "type": "object",
+                "properties": {
+                  "static_skills": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$" },
+                        "source": { "type": "string", "minLength": 1 },
+                        "revision": { "type": "string", "minLength": 1 },
+                        "integrity": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+                        "skills": {
+                          "minItems": 1,
+                          "type": "array",
+                          "items": { "type": "string", "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$" }
+                        }
+                      },
+                      "required": ["id", "source", "revision", "integrity", "skills"],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
             "additionalProperties": false
           },
           "templates": {
             "description": "Canonical templates configuration.",
             "type": "object",
-            "properties": {},
+            "properties": {
+              "install": {
+                "type": "object",
+                "properties": {
+                  "packages": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$" },
+                        "path": { "type": "string", "minLength": 1 },
+                        "version": { "type": "string", "minLength": 1 }
+                      },
+                      "required": ["id", "path", "version"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "global_overrides": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$" },
+                        "path": { "type": "string", "minLength": 1 },
+                        "version": { "type": "string", "minLength": 1 }
+                      },
+                      "required": ["id", "path", "version"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "project_overrides": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$" },
+                        "path": { "type": "string", "minLength": 1 },
+                        "version": { "type": "string", "minLength": 1 }
+                      },
+                      "required": ["id", "path", "version"],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
             "additionalProperties": false
           }
         },

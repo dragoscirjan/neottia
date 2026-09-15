@@ -29,6 +29,27 @@ export const OFFICIAL_CONFIG_CONTRIBUTIONS = Object.freeze([
     path: Object.freeze(['modules', 'searchable']),
   }),
   Object.freeze({
+    exportName: 'harnessInstallConfigContribution',
+    packageName: '@neottia/config-registry',
+    sourceFile: 'packages/config-registry/src/distribution.ts',
+    builtFile: 'packages/config-registry/dist/distribution.js',
+    path: Object.freeze(['harnesses', 'install']),
+  }),
+  Object.freeze({
+    exportName: 'assetInstallConfigContribution',
+    packageName: '@neottia/config-registry',
+    sourceFile: 'packages/config-registry/src/distribution.ts',
+    builtFile: 'packages/config-registry/dist/distribution.js',
+    path: Object.freeze(['assets', 'install']),
+  }),
+  Object.freeze({
+    exportName: 'templateInstallConfigContribution',
+    packageName: '@neottia/config-registry',
+    sourceFile: 'packages/config-registry/src/distribution.ts',
+    builtFile: 'packages/config-registry/dist/distribution.js',
+    path: Object.freeze(['templates', 'install']),
+  }),
+  Object.freeze({
     exportName: 'issuesCapabilityConfigContribution',
     packageName: '@neottia/sdlc',
     sourceFile: 'packages/sdlc/src/config.ts',
