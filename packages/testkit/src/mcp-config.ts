@@ -7,6 +7,7 @@ import { dirname, join } from 'node:path';
  * - generic `mcpServers` JSON: Claude Code (.mcp.json), Kiro (.kiro/settings/mcp.json)
  * - OpenCode: `opencode.json` -> mcp -> { type: 'local', command: [...], environment }
  * - VS Code: .vscode/mcp.json -> { servers: { ... } } (generic shape, different root key)
+ * Pi has no built-in MCP configuration, so it is intentionally absent.
  */
 
 export interface McpServerDefinition {
@@ -15,7 +16,7 @@ export interface McpServerDefinition {
   readonly env?: Readonly<Record<string, string>>;
 }
 
-/** Shape used by Claude Code, Kiro, pi, and others: `{ mcpServers: { <name>: {command,args,env} } }`. */
+/** Generic shape used by Claude Code, Kiro, and compatible clients. */
 export function mcpServersDocument(servers: Record<string, McpServerDefinition>): object {
   return {
     mcpServers: Object.fromEntries(

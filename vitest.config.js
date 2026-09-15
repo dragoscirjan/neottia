@@ -11,6 +11,7 @@ const workspaceSourceAliases = {
   '@neottia/issues': resolve(__dirname, 'packages/issues/src/index.ts'),
   '@neottia/issues-design-docs': resolve(__dirname, 'packages/issues-design-docs/src/index.ts'),
   '@neottia/issues-mcp': resolve(__dirname, 'packages/issues-mcp/src/index.ts'),
+  '@neottia/harness-adapter': resolve(__dirname, 'packages/harness-adapter/src/index.ts'),
   '@neottia/memory-core': resolve(__dirname, 'packages/memory-core/src/index.ts'),
   '@neottia/memory-mcp': resolve(__dirname, 'packages/memory-mcp/src/index.ts'),
   '@neottia/repository-store': resolve(__dirname, 'packages/repository-store/src/index.ts'),
@@ -18,6 +19,8 @@ const workspaceSourceAliases = {
   '@neottia/searchable-mcp': resolve(__dirname, 'packages/searchable-mcp/src/index.ts'),
   '@neottia/sdlc': resolve(__dirname, 'packages/sdlc/src/index.ts'),
   '@neottia/testkit': resolve(__dirname, 'packages/testkit/src/index.ts'),
+  '@neottia/pi-adapter': resolve(__dirname, 'extensions/pi-adapter/src/index.ts'),
+  '@neottia/opencode-adapter': resolve(__dirname, 'extensions/opencode-adapter/src/index.ts'),
 };
 
 export default defineConfig({

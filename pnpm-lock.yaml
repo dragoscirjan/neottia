@@ -83,6 +83,31 @@ importers:
         specifier: ^2.9.0
         version: 2.9.0
 
+  extensions/opencode-adapter:
+    dependencies:
+      '@neottia/harness-adapter':
+        specifier: workspace:^
+        version: link:../../packages/harness-adapter
+    devDependencies:
+      '@neottia/pi-adapter':
+        specifier: workspace:*
+        version: link:../pi-adapter
+      '@neottia/testkit':
+        specifier: workspace:*
+        version: link:../../packages/testkit
+      '@templ-project/tsconfig':
+        specifier: ^0.2.2
+        version: 0.2.2(@types/node@25.9.5)(@vitest/coverage-v8@4.1.11)(jsdom@29.1.1)(vite@7.3.6(@types/node@25.9.5)(tsx@4.23.13)(yaml@2.9.0))
+      '@types/node':
+        specifier: ^25.0.3
+        version: 25.9.5
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@types/node@25.9.5)(@vitest/coverage-v8@4.1.11)(jsdom@29.1.1)(vite@7.3.6(@types/node@25.9.5)(tsx@4.23.13)(yaml@2.9.0))
+
   extensions/opencode-design-docs:
     dependencies:
       '@neottia/config-registry':
@@ -202,6 +227,28 @@ importers:
       '@opencode-ai/plugin':
         specifier: ^1.2.27
         version: 1.18.29
+    devDependencies:
+      '@neottia/testkit':
+        specifier: workspace:*
+        version: link:../../packages/testkit
+      '@templ-project/tsconfig':
+        specifier: ^0.2.2
+        version: 0.2.2(@types/node@25.9.5)(@vitest/coverage-v8@4.1.11)(jsdom@29.1.1)(vite@7.3.6(@types/node@25.9.5)(tsx@4.23.13)(yaml@2.9.0))
+      '@types/node':
+        specifier: ^25.0.3
+        version: 25.9.5
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@types/node@25.9.5)(@vitest/coverage-v8@4.1.11)(jsdom@29.1.1)(vite@7.3.6(@types/node@25.9.5)(tsx@4.23.13)(yaml@2.9.0))
+
+  extensions/pi-adapter:
+    dependencies:
+      '@neottia/harness-adapter':
+        specifier: workspace:^
+        version: link:../../packages/harness-adapter
     devDependencies:
       '@neottia/testkit':
         specifier: workspace:*
@@ -487,6 +534,21 @@ importers:
       '@neottia/repository-store':
         specifier: workspace:*
         version: link:../repository-store
+      '@templ-project/tsconfig':
+        specifier: ^0.2.2
+        version: 0.2.2(@types/node@25.9.5)(@vitest/coverage-v8@4.1.11)(jsdom@29.1.1)(vite@7.3.6(@types/node@25.9.5)(tsx@4.23.13)(yaml@2.9.0))
+      '@types/node':
+        specifier: ^25.0.3
+        version: 25.9.5
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@types/node@25.9.5)(@vitest/coverage-v8@4.1.11)(jsdom@29.1.1)(vite@7.3.6(@types/node@25.9.5)(tsx@4.23.13)(yaml@2.9.0))
+
+  packages/harness-adapter:
+    devDependencies:
       '@templ-project/tsconfig':
         specifier: ^0.2.2
         version: 0.2.2(@types/node@25.9.5)(@vitest/coverage-v8@4.1.11)(jsdom@29.1.1)(vite@7.3.6(@types/node@25.9.5)(tsx@4.23.13)(yaml@2.9.0))
@@ -799,6 +861,9 @@ importers:
       '@neottia/design-docs':
         specifier: workspace:*
         version: link:../design-docs
+      '@neottia/harness-adapter':
+        specifier: workspace:^
+        version: link:../harness-adapter
       '@neottia/issues':
         specifier: workspace:*
         version: link:../issues

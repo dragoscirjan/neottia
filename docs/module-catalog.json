@@ -21,6 +21,13 @@
     "issue": 111
   },
   {
+    "name": "@neottia/harness-adapter",
+    "manifest": "packages/harness-adapter/package.json",
+    "classification": "library/embedding",
+    "route": "/harnesses/adapters",
+    "issue": 113
+  },
+  {
     "name": "@neottia/design-docs",
     "manifest": "packages/design-docs/package.json",
     "classification": "library/embedding",
@@ -113,6 +120,13 @@
     "issue": 107
   },
   {
+    "name": "@neottia/pi-adapter",
+    "manifest": "extensions/pi-adapter/package.json",
+    "classification": "library/embedding",
+    "route": "/harnesses/adapters",
+    "issue": 113
+  },
+  {
     "name": "@neottia/pi-memory",
     "manifest": "extensions/pi-memory/package.json",
     "classification": "native extension",
@@ -139,6 +153,13 @@
     "classification": "native extension",
     "route": "/harnesses/pi#searchable",
     "issue": 93
+  },
+  {
+    "name": "@neottia/opencode-adapter",
+    "manifest": "extensions/opencode-adapter/package.json",
+    "classification": "library/embedding",
+    "route": "/harnesses/adapters",
+    "issue": 113
   },
   {
     "name": "@neottia/opencode-memory",

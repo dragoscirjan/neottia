@@ -5,7 +5,9 @@ Neottia provides a shared SDLC that can be understood and used by multiple AI co
 ## Repository layout
 
 ```text
-├── extensions/          # Independently versioned harness extensions
+├── extensions/          # Independently versioned runtime and asset adapters
+│   ├── pi-adapter/      # Declarative Pi asset projection
+│   └── opencode-adapter/# Declarative OpenCode asset projection
 ├── packages/
 │   ├── config/          # Shared layered configuration platform
 │   ├── config-registry/ # Official strict host contribution registry
@@ -17,6 +19,7 @@ Neottia provides a shared SDLC that can be understood and used by multiple AI co
 │   ├── issues/          # Canonical issue domain and tool registry
 │   ├── issues-design-docs/ # Cycle-free issue/design-document composition
 │   ├── issues-mcp/      # Generic MCP issue server
+│   ├── harness-adapter/ # Host-neutral adapter contract and registry
 │   ├── repository-store/# Canonical repository persistence primitives
 │   ├── searchable-core/ # Searchable runtime and shared tool registry
 │   ├── searchable-mcp/  # Generic Searchable MCP server
@@ -100,9 +103,11 @@ Enable `modules.searchable` to search DuckDuckGo, Google, Bing, or Brave; extrac
 
 Pi and OpenCode each have native Memory, Issues, Design Docs, and Searchable extensions. Other MCP-compatible clients can launch the four generic stdio servers. TypeScript applications can embed the domain libraries directly.
 
+`@neottia/harness-adapter` defines a host-neutral, immutable asset projection contract. `@neottia/pi-adapter` and `@neottia/opencode-adapter` return symbolic paths, package declarations, reviewable host-configuration operations, and reload notices without writing files or running host commands. Each adapter declares unsupported features instead of emulating them. See the [harness adapter guide](docs/harnesses/adapters.md).
+
 ## Supporting packages
 
-`@neottia/repository-store` provides Linux filesystem authority, exact revisions, durable batches, leases, recovery, and disposable SQLite adapters. `@neottia/core` remains a template-level greeting utility. `@neottia/release` publishes a versioned bill of materials, while private `@neottia/testkit` stays internal to repository tests.
+`@neottia/repository-store` provides Linux filesystem authority, exact revisions, durable batches, leases, recovery, and disposable SQLite adapters. `@neottia/core` remains a template-level greeting utility. `@neottia/release` publishes a versioned bill of materials, while private `@neottia/testkit` supplies temporary adapter conformance environments and other repository test helpers.
 
 ## Documentation
 

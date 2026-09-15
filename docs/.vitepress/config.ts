@@ -24,6 +24,7 @@ export default defineConfig({
         text: 'Harnesses',
         items: [
           { text: 'Overview', link: '/harnesses/' },
+          { text: 'Adapter contract', link: '/harnesses/adapters' },
           { text: 'Pi', link: '/harnesses/pi' },
           { text: 'OpenCode', link: '/harnesses/opencode' },
         ],
@@ -72,6 +73,7 @@ export default defineConfig({
           text: 'Harnesses',
           items: [
             { text: 'Overview', link: '/harnesses/' },
+            { text: 'Adapter contract', link: '/harnesses/adapters' },
             { text: 'Pi', link: '/harnesses/pi' },
             { text: 'OpenCode', link: '/harnesses/opencode' },
           ],

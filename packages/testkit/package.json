@@ -24,6 +24,7 @@
   },
   "dependencies": {
     "@neottia/config": "workspace:^",
+    "@neottia/harness-adapter": "workspace:^",
     "@neottia/config-registry": "workspace:^",
     "@neottia/design-docs": "workspace:*",
     "@neottia/issues": "workspace:*",
