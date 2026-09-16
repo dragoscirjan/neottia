@@ -22,6 +22,7 @@ import {
   issuesCapabilityConfigContribution,
   sourceControlCapabilityConfigContribution,
 } from './config.js';
+import { loadSdlcTemplateLayers } from './template-loader.js';
 
 import { opencodeHarnessAdapter } from '../../../extensions/opencode-adapter/src/index.js';
 import { piHarnessAdapter } from '../../../extensions/pi-adapter/src/index.js';
@@ -57,6 +58,7 @@ describe.each([
         compilerVersion: '0.1.0',
         harnessId,
         scope,
+        templateLayers: await loadSdlcTemplateLayers({ projectRoot: roots.project }),
         runtimePackages,
       });
       const first = compileSdlc(input, adapter);
@@ -92,6 +94,7 @@ it('completes a filesystem and local-Git Plan-to-Release journey under one tempo
       compilerVersion: '0.1.0',
       harnessId,
       scope: 'project',
+      templateLayers: await loadSdlcTemplateLayers({ projectRoot: roots.project }),
       runtimePackages,
     });
     const output = compileSdlc(input, adapter);

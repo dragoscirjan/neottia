@@ -1,0 +1,37 @@
+import type { TwingTemplate, TwingTemplateAliases, TwingTemplateBlockMap } from "./template";
+import type { TwingContext } from "./context";
+import type { TwingOutputBuffer } from "./output-buffer";
+import type { TwingSourceMapRuntime } from "./source-map-runtime";
+import type { TwingEnvironment, TwingSynchronousEnvironment } from "./environment";
+import type { TwingNodeExecutor } from "./node-executor";
+import type { TwingTemplateLoader } from "./template-loader";
+import { TwingSynchronousNodeExecutor } from "./node-executor";
+import { TwingSynchronousTemplate, TwingSynchronousTemplateAliases, TwingSynchronousTemplateBlockMap } from "./template";
+import { TwingSynchronousTemplateLoader } from "./template-loader";
+import type { MapLike } from "./helpers/map-like";
+export type TwingExecutionContext = {
+    aliases: TwingTemplateAliases;
+    blocks: TwingTemplateBlockMap;
+    context: TwingContext<any, any>;
+    environment: TwingEnvironment;
+    nodeExecutor: TwingNodeExecutor;
+    outputBuffer: TwingOutputBuffer;
+    sandboxed: boolean;
+    sourceMapRuntime?: TwingSourceMapRuntime;
+    strict: boolean;
+    template: TwingTemplate;
+    templateLoader: TwingTemplateLoader;
+};
+export type TwingSynchronousExecutionContext = {
+    aliases: TwingSynchronousTemplateAliases;
+    blocks: TwingSynchronousTemplateBlockMap;
+    context: MapLike<string, any>;
+    environment: TwingSynchronousEnvironment;
+    nodeExecutor: TwingSynchronousNodeExecutor;
+    outputBuffer: TwingOutputBuffer;
+    sandboxed: boolean;
+    sourceMapRuntime?: TwingSourceMapRuntime;
+    strict: boolean;
+    template: TwingSynchronousTemplate;
+    templateLoader: TwingSynchronousTemplateLoader;
+};

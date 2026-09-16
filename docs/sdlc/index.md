@@ -17,7 +17,7 @@ Release instructions never authorize an autonomous merge, publication, or deploy
 
 ## Inputs and outputs
 
-Compilation depends only on explicit values:
+`loadSdlcTemplateLayers()` reads published files and conventional overrides before compilation. Compilation then depends only on explicit values:
 
 - one immutable configuration snapshot;
 - packaged, installed-package, global, and project template layers;
@@ -35,17 +35,21 @@ The compiler does not read files, invoke Git, contact providers, install package
 ```ts
 import { resolveHostConfigSnapshot } from "@neottia/config-registry";
 import { piHarnessAdapter } from "@neottia/pi-adapter";
-import { compileSdlc, createSdlcCompilerInput } from "@neottia/sdlc";
+import { compileSdlc, createSdlcCompilerInput, loadSdlcTemplateLayers } from "@neottia/sdlc";
 
 const snapshot = resolveHostConfigSnapshot({
   cwd: process.cwd(),
   interactive: false,
 });
 
+const templateLayers = await loadSdlcTemplateLayers({
+  projectRoot: process.cwd(),
+});
 const input = createSdlcCompilerInput(snapshot, {
   compilerVersion: "0.1.0",
   harnessId: "pi",
   scope: "project",
+  templateLayers,
   runtimePackages: [
     { logicalId: "issues", version: "0.1.0" },
     { logicalId: "design-docs", version: "0.1.0" },
@@ -80,14 +84,24 @@ Use the exact versions from the application or release manifest. The compiler so
 
 ## Template layers
 
-The packaged layer contains one template for each public command. Supply extra `TemplateLayer` values through `templateLayers`. Distribution resolves this precedence order:
+The package publishes six Markdown/Twig command files, their shared `layout.md`, and `lifecycle.json` under `templates/`. The JSON file contains command descriptions, approval text, and stop-condition text. TypeScript retains stable IDs and graph structure, not rendered lifecycle prose. Twing renders the resolved template from an in-memory loader with strict missing-variable checks and Markdown output without HTML escaping.
 
-1. packaged;
-2. installed package;
-3. global override;
-4. project override.
+`loadSdlcTemplateLayers()` resolves this precedence order:
 
-An override replaces the complete template. It must retain each provider token and the role token exactly once. Token validation protects assembly but cannot prove that custom lifecycle prose preserves policy. Review override content before installation. The compiler records the selected and shadowed template sources.
+1. packaged files;
+2. explicit installed-package layers;
+3. a global override;
+4. a project override.
+
+A project can replace one complete command at `.neottia/templates/sdlc/<command>.md`. Valid command filenames are `plan.md`, `build.md`, `verify.md`, `release.md`, `continue.md`, and `refresh.md`. An unknown filename fails loading. The same convention applies below the supplied global root.
+
+The Twig context has three top-level values:
+
+- `command` contains the canonical command ID, transitions, approval points, stop conditions, roles, and enforcement mode;
+- `instructions` contains the selected Issues, Documents, local source-control, and remote source-control fragments;
+- `roles` contains one ordered entry for each command role, including its ID, rendered fragment, assignment state, and optional instruction ID.
+
+The renderer allows deterministic Twig control flow, filters, blocks, and command inheritance from the packaged layout. It rejects dynamic template dependencies, recursive inheritance, unbounded `range()`, includes, and nondeterministic functions such as `random()`. Each actual provider and role fragment must appear exactly once in rendered output. This check protects template assembly but cannot prove that replacement prose preserves lifecycle policy. Review complete overrides before installation. Compiler provenance records the selected template and every shadowed source.
 
 ## Role insertion points
 

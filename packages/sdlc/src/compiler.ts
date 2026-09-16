@@ -47,20 +47,77 @@ import {
   type SdlcRoleInstruction,
 } from './instructions.js';
 import {
-  PACKAGED_LIFECYCLE_TEMPLATES,
   SDLC_COMMAND_IDS,
+  SDLC_CONTENT_TEMPLATE_ID,
+  SDLC_LAYOUT_TEMPLATE_ID,
   SDLC_LIFECYCLE,
   SDLC_LIFECYCLE_VERSION,
   SDLC_ROLE_IDS,
-  SDLC_TEMPLATE_TOKENS,
   type SdlcCommandId,
   type SdlcLifecycleCommand,
+  type SdlcRoleId,
 } from './lifecycle.js';
+import {
+  createSandboxSecurityPolicy,
+  createSynchronousArrayLoader,
+  createSynchronousEnvironment,
+} from '../vendor/twing/index.cjs';
 
 const STABLE_ID_PATTERN = /^[a-z0-9]+(?:[.-][a-z0-9]+)*$/u;
 const SHA256_PATTERN = /^sha256:[a-f0-9]{64}$/u;
 const RUNTIME_PACKAGE_IDS = ['memory', 'issues', 'design-docs', 'searchable'] as const;
 const CONFIG_SOURCE_KINDS = ['defaults', 'global', 'project', 'profile', 'environment', 'override'] as const;
+const MAX_TEMPLATE_BYTES = 1024 * 1024;
+const MAX_FRAGMENT_BYTES = 256 * 1024;
+const MAX_LIFECYCLE_TEXT_LENGTH = 16 * 1024;
+const MAX_LIFECYCLE_POINTS = 16;
+const MAX_RENDERED_COMMAND_BYTES = 2 * 1024 * 1024;
+const TWIG_ALLOWED_TAGS = ['block', 'deprecated', 'extends', 'flush', 'for', 'if', 'spaceless', 'verbatim', 'with'];
+const TWIG_ALLOWED_FILTERS = [
+  'abs',
+  'capitalize',
+  'default',
+  'first',
+  'keys',
+  'last',
+  'length',
+  'lower',
+  'reverse',
+  'round',
+  'slice',
+  'sort',
+  'striptags',
+  'title',
+  'trim',
+  'upper',
+];
+const TWIG_ALLOWED_FUNCTIONS = ['attribute', 'cycle', 'max', 'min', 'parent', 'source'];
+const TWIG_CONTEXT_PROPERTIES = [
+  'allowedNext',
+  'approvalPoints',
+  'assigned',
+  'content',
+  'description',
+  'documents',
+  'enforcement',
+  'first',
+  'id',
+  'index',
+  'index0',
+  'instructionId',
+  'issues',
+  'last',
+  'length',
+  'local',
+  'parent',
+  'remote',
+  'revindex',
+  'revindex0',
+  'roleSlots',
+  'sourceControl',
+  'stopConditions',
+  'templateId',
+];
 const checksumSchema = z.string().regex(SHA256_PATTERN);
 const stableIdSchema = z.string().regex(STABLE_ID_PATTERN);
 const configurationContextSchema = z
@@ -79,13 +136,29 @@ const configurationContextSchema = z
       .strict(),
   })
   .strict();
+const lifecycleContentSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    lifecycleVersion: z.literal(SDLC_LIFECYCLE_VERSION),
+    commands: z.array(
+      z
+        .object({
+          id: z.enum(SDLC_COMMAND_IDS),
+          description: z.string().min(1).max(MAX_LIFECYCLE_TEXT_LENGTH),
+          approvalPoints: z.array(z.string().min(1).max(MAX_LIFECYCLE_TEXT_LENGTH)).min(1).max(MAX_LIFECYCLE_POINTS),
+          stopConditions: z.array(z.string().min(1).max(MAX_LIFECYCLE_TEXT_LENGTH)).min(1).max(MAX_LIFECYCLE_POINTS),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
 const templateReferenceSchema = z
   .object({ sourceId: z.string().min(1), version: z.string().min(1), checksum: checksumSchema })
   .strict();
 const resolvedTemplateSchema = z
   .object({
     id: stableIdSchema,
-    content: z.string(),
+    content: z.string().max(MAX_TEMPLATE_BYTES),
     checksum: checksumSchema,
     sourceId: z.string().min(1),
     version: z.string().min(1),
@@ -98,7 +171,7 @@ const instructionPackSchema = z
     slot: z.enum(SDLC_INSTRUCTION_SLOTS),
     provider: stableIdSchema,
     version: z.string().min(1),
-    content: z.string().min(1),
+    content: z.string().min(1).max(MAX_FRAGMENT_BYTES),
     checksum: checksumSchema,
   })
   .strict();
@@ -108,7 +181,7 @@ const roleInstructionSchema = z
     command: z.enum(SDLC_COMMAND_IDS),
     role: z.enum(SDLC_ROLE_IDS),
     version: z.string().min(1),
-    content: z.string().min(1),
+    content: z.string().min(1).max(MAX_FRAGMENT_BYTES),
     checksum: checksumSchema,
   })
   .strict();
@@ -158,6 +231,69 @@ export interface SdlcRuntimePackage {
   readonly version: string;
 }
 
+/** Packaged prose for one canonical lifecycle command. */
+interface SdlcLifecycleCommandContent {
+  readonly id: SdlcCommandId;
+  readonly description: string;
+  readonly approvalPoints: readonly string[];
+  readonly stopConditions: readonly string[];
+}
+
+/** Parsed packaged lifecycle prose and its schema version. */
+interface SdlcLifecycleContent {
+  readonly schemaVersion: 1;
+  readonly lifecycleVersion: string;
+  readonly commands: readonly SdlcLifecycleCommandContent[];
+}
+
+/** Complete command value exposed to a lifecycle Twig template. */
+export interface SdlcTemplateCommand extends SdlcLifecycleCommand {
+  readonly description: string;
+  readonly approvalPoints: readonly string[];
+  readonly stopConditions: readonly string[];
+}
+
+/** One role fragment exposed to a lifecycle Twig template. */
+export interface SdlcTemplateRole {
+  readonly id: SdlcRoleId;
+  readonly content: string;
+  readonly assigned: boolean;
+  readonly instructionId?: string;
+}
+
+/** Tracks one fragment's exact output during validation renders. */
+class TrackedTemplateFragment {
+  readonly wrapped: string;
+  renderCount = 0;
+
+  constructor(
+    readonly slot: string,
+    value: string,
+  ) {
+    const marker = checksumText(`${slot}\0${value}`).slice('sha256:'.length, 'sha256:'.length + 16);
+    this.wrapped = `NEOTTIA_FRAGMENT_${marker}_START${value}NEOTTIA_FRAGMENT_${marker}_END`;
+  }
+
+  toString(): string {
+    this.renderCount += 1;
+    return this.wrapped;
+  }
+}
+
+/** Stable render context available to packaged and overridden Twig templates. */
+export interface SdlcTemplateContext {
+  readonly command: SdlcTemplateCommand;
+  readonly instructions: {
+    readonly issues: string;
+    readonly documents: string;
+    readonly sourceControl: {
+      readonly local: string;
+      readonly remote: string;
+    };
+  };
+  readonly roles: readonly SdlcTemplateRole[];
+}
+
 /** Portable configuration provenance for one selected compiler value. */
 export interface SdlcConfigurationProvenance {
   readonly path: readonly string[];
@@ -196,7 +332,8 @@ export interface CreateSdlcCompilerInputOptions {
   readonly installationId?: string;
   readonly harnessId: string;
   readonly scope: HarnessScope;
-  readonly templateLayers?: readonly TemplateLayer[];
+  /** Explicit layers returned by the filesystem loader or another trusted source. */
+  readonly templateLayers: readonly TemplateLayer[];
   readonly instructionPacks?: readonly SdlcInstructionPack[];
   readonly roles?: readonly SdlcRoleInstruction[];
   readonly runtimePackages?: readonly SdlcRuntimePackage[];
@@ -251,10 +388,9 @@ export function createSdlcCompilerInput(
   if (options.scope !== 'project' && options.scope !== 'global') throw new TypeError('Harness scope is invalid.');
   const context = createSdlcCompilerContext(snapshot);
   const templates = resolveTemplates(
-    SDLC_LIFECYCLE.map((command) => command.templateId),
-    [PACKAGED_LIFECYCLE_TEMPLATES, ...(options.templateLayers ?? [])],
+    [SDLC_CONTENT_TEMPLATE_ID, SDLC_LAYOUT_TEMPLATE_ID, ...SDLC_LIFECYCLE.map((command) => command.templateId)],
+    options.templateLayers,
   );
-  for (const template of templates) validateTemplateSlots(template);
   const instructions = selectSdlcInstructionPacks(context, options.instructionPacks);
   const roles = prepareRoles(options.roles ?? []);
   const runtimePackages = prepareRuntimePackages(options.runtimePackages ?? []);
@@ -290,26 +426,26 @@ export function compileSdlc(input: SdlcCompilerInputManifest, adapter: HarnessAd
     SdlcInstructionPack['slot'],
     string
   >;
+  const renderer = createTemplateRenderer(input.templates);
+  const lifecycleContent = parseLifecycleContent(input.templates);
   const assets = [] as Array<ReturnType<typeof fileAssetFromProjection> | HostConfigAsset>;
   const commands: CompiledSdlcCommand[] = [];
 
   for (const definition of SDLC_LIFECYCLE) {
     const template = requiredTemplate(input.templates, definition.templateId);
+    const content = requiredLifecycleContent(lifecycleContent, definition.id);
     const roles = input.roles.filter((candidate) => candidate.command === definition.id);
-    const roleContent = definition.roleSlots
-      .map((roleSlot) => {
-        const instruction = roles.find((role) => role.role === roleSlot);
-        const content = instruction?.content.trimEnd() ?? unassignedRoleInstructions([roleSlot]).trimEnd();
-        return `### ${roleSlot}\n\n${content}`;
-      })
-      .join('\n\n');
-    const body = renderTemplate(template.content, instructionText, roleContent);
+    const templateRoles = createTemplateRoles(definition, roles);
+    const body = renderer.render(
+      template.id,
+      createTemplateContext(definition, content, instructionText, templateRoles),
+    );
     const projected = requireProjection(
       adapter.projectPrompt({
         id: definition.id,
         scope: input.scope,
         body,
-        metadata: { description: definition.description },
+        metadata: { description: content.description },
       }),
       `Cannot project ${definition.id}.`,
     );
@@ -324,8 +460,8 @@ export function compileSdlc(input: SdlcCompilerInputManifest, adapter: HarnessAd
         roleInstructionIds: Object.freeze(roles.map((role) => role.id)),
         instructionPackIds: Object.freeze(input.instructions.map((pack) => pack.id)),
         allowedNext: Object.freeze([...definition.allowedNext]),
-        approvalPoints: Object.freeze([...definition.approvalPoints]),
-        stopConditions: Object.freeze([...definition.stopConditions]),
+        approvalPoints: Object.freeze([...content.approvalPoints]),
+        stopConditions: Object.freeze([...content.stopConditions]),
         enforcement: definition.enforcement,
         target: asset.target,
         bodyChecksum: checksumText(body),
@@ -367,6 +503,9 @@ export function compileSdlc(input: SdlcCompilerInputManifest, adapter: HarnessAd
 /** Validates a decoded input before adapter code runs. */
 export function validateSdlcCompilerInput(input: SdlcCompilerInputManifest): void {
   if (!compilerInputSchema.safeParse(input).success) throw new TypeError('SDLC compiler input schema is invalid.');
+  const { checksum, ...unsigned } = input;
+  if (checksumText(canonicalJson(unsigned)) !== checksum)
+    throw new TypeError('SDLC compiler input checksum does not match.');
   if (checksumText(canonicalJson(input.configuration.context)) !== input.configuration.checksum) {
     throw new TypeError('SDLC compiler configuration checksum does not match.');
   }
@@ -377,20 +516,17 @@ export function validateSdlcCompilerInput(input: SdlcCompilerInputManifest): voi
     throw new TypeError('SDLC compiler configuration is semantically invalid.');
   }
   validateConfigurationProvenance(input.configuration.provenance);
-  validateResolvedTemplates(input.templates);
   validateSelectedInstructions(input.configuration.context, input.instructions);
 
   const canonicalRoles = prepareRoles(input.roles);
   if (canonicalJson(canonicalRoles) !== canonicalJson(input.roles)) {
     throw new TypeError('Role instructions are not in canonical order.');
   }
+  validateResolvedTemplates(input.templates, input.instructions, canonicalRoles);
   const canonicalPackages = prepareRuntimePackages(input.runtimePackages);
   if (canonicalJson(canonicalPackages) !== canonicalJson(input.runtimePackages)) {
     throw new TypeError('Runtime packages are not in canonical order.');
   }
-  const { checksum, ...unsigned } = input;
-  if (checksumText(canonicalJson(unsigned)) !== checksum)
-    throw new TypeError('SDLC compiler input checksum does not match.');
 }
 
 /** Projects one explicitly requested runtime package as reviewable host configuration. */
@@ -452,31 +588,213 @@ function commandSource(
   });
 }
 
-/** Replaces every required slot exactly at compile time. */
-function renderTemplate(
-  content: string,
-  instructions: Readonly<Record<SdlcInstructionPack['slot'], string>>,
-  role: string,
-): string {
-  const replacements: Readonly<Record<string, string>> = Object.freeze({
-    [SDLC_TEMPLATE_TOKENS.issues]: instructions.issues,
-    [SDLC_TEMPLATE_TOKENS.documents]: instructions.documents,
-    [SDLC_TEMPLATE_TOKENS.sourceControlLocal]: instructions['source-control.local'],
-    [SDLC_TEMPLATE_TOKENS.sourceControlRemote]: instructions['source-control.remote'],
-    [SDLC_TEMPLATE_TOKENS.role]: role,
+/** Creates a deterministic, filesystem-free Twig renderer for resolved templates. */
+function createTemplateRenderer(templates: readonly ResolvedTemplate[]): {
+  readonly render: (id: string, context: SdlcTemplateContext) => string;
+} {
+  const loader = createSynchronousArrayLoader(
+    Object.fromEntries(templates.map((template) => [template.id, template.content])),
+  );
+  const sandboxPolicy = createSandboxSecurityPolicy({
+    allowedTags: [...TWIG_ALLOWED_TAGS],
+    allowedFilters: [...TWIG_ALLOWED_FILTERS],
+    allowedFunctions: [...TWIG_ALLOWED_FUNCTIONS],
+    allowedMethods: new Map([[TrackedTemplateFragment, ['toString']]]),
+    allowedProperties: new Map([[Object, [...TWIG_CONTEXT_PROPERTIES]]]),
   });
-  let output = content;
-  for (const [token, replacement] of Object.entries(replacements))
-    output = output.replaceAll(token, replacement.trimEnd());
-  if (/\{\{neottia\.[^}]+\}\}/u.test(output)) throw new TypeError('Lifecycle template has an unresolved slot.');
-  return output.endsWith('\n') ? output : `${output}\n`;
+  const environment = createSynchronousEnvironment(loader, { sandboxPolicy });
+  return Object.freeze({
+    render(id: string, context: SdlcTemplateContext): string {
+      const rendered = environment.render(id, context, { sandboxed: true, strict: true });
+      const output = rendered.endsWith('\n') ? rendered : `${rendered}\n`;
+      if (Buffer.byteLength(output, 'utf8') > MAX_RENDERED_COMMAND_BYTES) {
+        throw new TypeError(`Rendered lifecycle template ${id} exceeds its byte limit.`);
+      }
+      return output;
+    },
+  });
 }
 
-/** Requires every provider and role slot exactly once in a lifecycle template. */
-function validateTemplateSlots(template: ResolvedTemplate): void {
-  for (const token of Object.values(SDLC_TEMPLATE_TOKENS)) {
-    if (template.content.split(token).length !== 2) {
-      throw new TypeError(`Lifecycle template ${template.id} must contain slot ${token} exactly once.`);
+/** Builds ordered role fragments for one canonical invocation point set. */
+function createTemplateRoles(
+  command: SdlcLifecycleCommand,
+  roles: readonly SdlcRoleInstruction[],
+): readonly SdlcTemplateRole[] {
+  return Object.freeze(
+    command.roleSlots.map((roleSlot): SdlcTemplateRole => {
+      const instruction = roles.find((role) => role.role === roleSlot);
+      return Object.freeze({
+        id: roleSlot,
+        content: instruction?.content.trimEnd() ?? unassignedRoleInstructions([roleSlot]).trimEnd(),
+        assigned: instruction !== undefined,
+        ...(instruction === undefined ? {} : { instructionId: instruction.id }),
+      });
+    }),
+  );
+}
+
+/** Builds the public, provider-neutral context consumed by Twig. */
+function createTemplateContext(
+  command: SdlcLifecycleCommand,
+  content: SdlcLifecycleCommandContent,
+  instructions: Readonly<Record<SdlcInstructionPack['slot'], string>>,
+  roles: readonly SdlcTemplateRole[],
+): SdlcTemplateContext {
+  return Object.freeze({
+    command: Object.freeze({
+      ...command,
+      description: content.description,
+      approvalPoints: Object.freeze([...content.approvalPoints]),
+      stopConditions: Object.freeze([...content.stopConditions]),
+    }),
+    instructions: Object.freeze({
+      issues: instructions.issues.trimEnd(),
+      documents: instructions.documents.trimEnd(),
+      sourceControl: Object.freeze({
+        local: instructions['source-control.local'].trimEnd(),
+        remote: instructions['source-control.remote'].trimEnd(),
+      }),
+    }),
+    roles: Object.freeze([...roles]),
+  });
+}
+
+/** Builds a validation context whose fragment objects record exact output. */
+function createTrackedTemplateContext(
+  command: SdlcLifecycleCommand,
+  content: SdlcLifecycleCommandContent,
+  instructions: Readonly<Record<SdlcInstructionPack['slot'], string>>,
+  roles: readonly SdlcTemplateRole[],
+): { readonly context: SdlcTemplateContext; readonly fragments: readonly TrackedTemplateFragment[] } {
+  const fragments: TrackedTemplateFragment[] = [];
+  const tracked = (slot: string, value: string): string => {
+    if (value.length === 0) throw new TypeError(`Lifecycle template has an empty ${slot} fragment.`);
+    const fragment = new TrackedTemplateFragment(slot, value);
+    fragments.push(fragment);
+    return fragment as unknown as string;
+  };
+  const trackedRoles = roles.map((role) =>
+    Object.freeze({
+      ...role,
+      content: tracked(`roles.${role.id}`, role.content),
+    }),
+  );
+  return Object.freeze({
+    context: Object.freeze({
+      command: Object.freeze({
+        ...command,
+        description: content.description,
+        approvalPoints: Object.freeze([...content.approvalPoints]),
+        stopConditions: Object.freeze([...content.stopConditions]),
+      }),
+      instructions: Object.freeze({
+        issues: tracked('instructions.issues', instructions.issues.trimEnd()),
+        documents: tracked('instructions.documents', instructions.documents.trimEnd()),
+        sourceControl: Object.freeze({
+          local: tracked('instructions.sourceControl.local', instructions['source-control.local'].trimEnd()),
+          remote: tracked('instructions.sourceControl.remote', instructions['source-control.remote'].trimEnd()),
+        }),
+      }),
+      roles: Object.freeze(trackedRoles),
+    }),
+    fragments: Object.freeze(fragments),
+  });
+}
+
+/** Requires every tracked fragment object to reach output exactly once. */
+function validateTrackedFragments(
+  templateId: string,
+  output: string,
+  fragments: readonly TrackedTemplateFragment[],
+): void {
+  for (const fragment of fragments) {
+    if (fragment.renderCount !== 1 || output.split(fragment.wrapped).length !== 2) {
+      throw new TypeError(`Lifecycle template ${templateId} must render ${fragment.slot} exactly once.`);
+    }
+  }
+}
+
+/** Parses and validates packaged lifecycle prose. */
+function parseLifecycleContent(templates: readonly ResolvedTemplate[]): SdlcLifecycleContent {
+  const template = requiredTemplate(templates, SDLC_CONTENT_TEMPLATE_ID);
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(template.content);
+  } catch {
+    throw new TypeError('Packaged SDLC lifecycle content is not valid JSON.');
+  }
+  const result = lifecycleContentSchema.safeParse(decoded);
+  if (!result.success) throw new TypeError('Packaged SDLC lifecycle content schema is invalid.');
+  if (canonicalJson(result.data.commands.map((command) => command.id)) !== canonicalJson(SDLC_COMMAND_IDS)) {
+    throw new TypeError('Packaged SDLC lifecycle content is not in canonical order.');
+  }
+  return deepFreeze(result.data);
+}
+
+/** Finds one command's packaged prose. */
+function requiredLifecycleContent(
+  content: SdlcLifecycleContent,
+  commandId: SdlcCommandId,
+): SdlcLifecycleCommandContent {
+  const matches = content.commands.filter((command) => command.id === commandId);
+  if (matches.length !== 1)
+    throw new TypeError(`Packaged lifecycle content for ${commandId} is missing or duplicated.`);
+  return matches[0]!;
+}
+
+/** Rejects dynamic or cyclic inheritance before Twing evaluates templates. */
+function validateTemplateDependencies(templates: readonly ResolvedTemplate[]): void {
+  const staticExtends = /\{%-?\s*extends\s+(['"])([^'"]+)\1\s*-?%\}/gu;
+  const anyExtends = /\{%-?\s*extends\b/gu;
+  const staticFor =
+    /\{%-?\s*for\s+[a-zA-Z_][a-zA-Z0-9_]*\s+in\s+(?:command\.(?:approvalPoints|stopConditions)|roles)\s*-?%\}/gu;
+  const loopTag = /\{%-?\s*(for|endfor)\b[^%]*-?%\}/gu;
+  for (const template of templates) {
+    if (/\bblock\s*\(/u.test(template.content)) {
+      throw new TypeError(`Lifecycle template ${template.id} uses block(), which is not allowed.`);
+    }
+    const occurrences = template.content.match(anyExtends)?.length ?? 0;
+    const targets = [...template.content.matchAll(staticExtends)].map((match) => match[2]!);
+    const commandTemplate = SDLC_LIFECYCLE.some((command) => command.templateId === template.id);
+    if (occurrences !== targets.length || targets.length > 1) {
+      throw new TypeError(`Lifecycle template ${template.id} has an invalid extends declaration.`);
+    }
+    if (targets.length === 1 && (!commandTemplate || targets[0] !== SDLC_LAYOUT_TEMPLATE_ID)) {
+      throw new TypeError(`Lifecycle template ${template.id} may extend only ${SDLC_LAYOUT_TEMPLATE_ID}.`);
+    }
+
+    const forCount = template.content.match(/\{%-?\s*for\b/gu)?.length ?? 0;
+    if (forCount !== (template.content.match(staticFor)?.length ?? 0)) {
+      throw new TypeError(`Lifecycle template ${template.id} has an unbounded Twig loop.`);
+    }
+    let depth = 0;
+    for (const match of template.content.matchAll(loopTag)) {
+      depth += match[1] === 'for' ? 1 : -1;
+      if (depth > 1) throw new TypeError(`Lifecycle template ${template.id} has nested Twig loops.`);
+      if (depth < 0) throw new TypeError(`Lifecycle template ${template.id} has unmatched Twig loops.`);
+    }
+    if (depth !== 0) throw new TypeError(`Lifecycle template ${template.id} has unmatched Twig loops.`);
+  }
+}
+
+/** Requires direct output expressions for every compiler-supplied fragment. */
+function validateTemplateFragmentReferences(template: ResolvedTemplate, templates: readonly ResolvedTemplate[]): void {
+  const usesLayout = /\{%-?\s*extends\s+(['"])neottia\.sdlc\.layout\1\s*-?%\}/u.test(template.content);
+  const source = usesLayout
+    ? `${template.content}\n${requiredTemplate(templates, SDLC_LAYOUT_TEMPLATE_ID).content}`
+    : template.content;
+  const outputTags = [...source.matchAll(/\{\{(-?)([\s\S]*?)(-?)\}\}/gu)].map((match) => match[2]!.trim());
+  for (const path of [
+    'instructions.issues',
+    'instructions.documents',
+    'instructions.sourceControl.local',
+    'instructions.sourceControl.remote',
+    'role.content',
+  ]) {
+    const references = outputTags.filter((tag) => tag.includes(path));
+    const mentions = source.split(path).length - 1;
+    if (mentions !== 1 || references.length !== 1 || references[0] !== path) {
+      throw new TypeError(`Lifecycle template ${template.id} must output ${path} directly exactly once.`);
     }
   }
 }
@@ -502,17 +820,50 @@ function validateConfigurationProvenance(provenance: readonly SdlcConfigurationP
   }
 }
 
-/** Checks template identity, order, content checksums, and insertion slots. */
-function validateResolvedTemplates(templates: readonly ResolvedTemplate[]): void {
-  const expectedIds = SDLC_LIFECYCLE.map((command) => command.templateId).sort(compareCodeUnits);
+/** Checks template identity, provenance, dependencies, lifecycle data, and rendered fragments. */
+function validateResolvedTemplates(
+  templates: readonly ResolvedTemplate[],
+  instructions: readonly SdlcInstructionPack[],
+  roles: readonly SdlcRoleInstruction[],
+): void {
+  const expectedIds = [
+    SDLC_CONTENT_TEMPLATE_ID,
+    SDLC_LAYOUT_TEMPLATE_ID,
+    ...SDLC_LIFECYCLE.map((command) => command.templateId),
+  ].sort(compareCodeUnits);
   if (templates.length !== expectedIds.length) throw new TypeError('Resolved lifecycle templates are incomplete.');
   for (const [index, template] of templates.entries()) {
     if (template.id !== expectedIds[index])
       throw new TypeError('Resolved lifecycle templates are not in canonical order.');
+    if (Buffer.byteLength(template.content, 'utf8') > MAX_TEMPLATE_BYTES) {
+      throw new TypeError(`Resolved lifecycle template ${template.id} exceeds its byte limit.`);
+    }
     if (checksumText(template.content) !== template.checksum) {
       throw new TypeError(`Resolved lifecycle template ${template.id} checksum does not match.`);
     }
-    validateTemplateSlots(template);
+  }
+  validateTemplateDependencies(templates);
+  const lifecycleContent = parseLifecycleContent(templates);
+  const renderer = createTemplateRenderer(templates);
+  const instructionText = Object.fromEntries(instructions.map((pack) => [pack.slot, pack.content])) as Record<
+    SdlcInstructionPack['slot'],
+    string
+  >;
+  for (const definition of SDLC_LIFECYCLE) {
+    const template = requiredTemplate(templates, definition.templateId);
+    validateTemplateFragmentReferences(template, templates);
+    const templateRoles = createTemplateRoles(
+      definition,
+      roles.filter((role) => role.command === definition.id),
+    );
+    const tracked = createTrackedTemplateContext(
+      definition,
+      requiredLifecycleContent(lifecycleContent, definition.id),
+      instructionText,
+      templateRoles,
+    );
+    const output = renderer.render(definition.templateId, tracked.context);
+    validateTrackedFragments(definition.templateId, output, tracked.fragments);
   }
 }
 
@@ -532,6 +883,9 @@ function validateSelectedInstructions(
     throw new TypeError('SDLC instruction pack selection is incomplete.');
   for (const [index, pack] of instructions.entries()) {
     validateSdlcInstructionPack(pack);
+    if (Buffer.byteLength(pack.content, 'utf8') > MAX_FRAGMENT_BYTES) {
+      throw new TypeError(`Instruction pack ${pack.id} exceeds its byte limit.`);
+    }
     const slot = expectedSlots[index]!;
     if (pack.slot !== slot) throw new TypeError('SDLC instruction packs are not in canonical order.');
     if (pack.provider !== expectedProviders[slot]) {
@@ -545,6 +899,9 @@ function prepareRoles(roles: readonly SdlcRoleInstruction[]): readonly SdlcRoleI
   const points = new Set<string>();
   for (const role of roles) {
     validateSdlcRoleInstruction(role);
+    if (Buffer.byteLength(role.content, 'utf8') > MAX_FRAGMENT_BYTES) {
+      throw new TypeError(`Role instruction ${role.id} exceeds its byte limit.`);
+    }
     const definition = SDLC_LIFECYCLE.find((command) => command.id === role.command)!;
     if (!definition.roleSlots.includes(role.role)) {
       throw new TypeError(`Role ${role.role} is not an invocation point for ${role.command}.`);

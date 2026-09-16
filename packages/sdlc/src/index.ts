@@ -32,6 +32,9 @@ export {
   type SdlcCompilerOutputManifest,
   type SdlcConfigurationProvenance,
   type SdlcRuntimePackage,
+  type SdlcTemplateCommand,
+  type SdlcTemplateContext,
+  type SdlcTemplateRole,
 } from './compiler.js';
 export {
   createSdlcCompilerContext,
@@ -53,8 +56,9 @@ export {
   type SdlcRoleInstructionInput,
 } from './instructions.js';
 export {
-  PACKAGED_LIFECYCLE_TEMPLATES,
   SDLC_COMMAND_IDS,
+  SDLC_CONTENT_TEMPLATE_ID,
+  SDLC_LAYOUT_TEMPLATE_ID,
   SDLC_LIFECYCLE,
   SDLC_LIFECYCLE_VERSION,
   SDLC_ROLE_IDS,
@@ -62,3 +66,9 @@ export {
   type SdlcLifecycleCommand,
   type SdlcRoleId,
 } from './lifecycle.js';
+export {
+  loadPackagedSdlcTemplateLayer,
+  loadSdlcTemplateLayers,
+  SDLC_TEMPLATE_LAYER_MAX_BYTES,
+  type LoadSdlcTemplateLayersOptions,
+} from './template-loader.js';

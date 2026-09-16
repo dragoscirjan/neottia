@@ -22,6 +22,7 @@ export default [
       'package-lock.json',
       'pnpm-lock.yaml',
       'package.json',
+      'packages/sdlc/vendor/**',
       'tsconfig*.json',
     ],
   },

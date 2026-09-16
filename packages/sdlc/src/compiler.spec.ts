@@ -4,7 +4,13 @@ import { canonicalJson, checksumText, type FileAsset, type HostConfigAsset } fro
 import { issueConfigContribution } from '@neottia/issues';
 import { describe, expect, it } from 'vitest';
 
-import { compileSdlc, createSdlcCompilerInput, SdlcCompilerError, type SdlcCompilerInputManifest } from './compiler.js';
+import {
+  compileSdlc,
+  createSdlcCompilerInput as createRawSdlcCompilerInput,
+  SdlcCompilerError,
+  type CreateSdlcCompilerInputOptions,
+  type SdlcCompilerInputManifest,
+} from './compiler.js';
 import {
   documentsCapabilityConfigContribution,
   issuesCapabilityConfigContribution,
@@ -15,7 +21,8 @@ import {
   createSdlcInstructionPack,
   createSdlcRoleInstruction,
 } from './instructions.js';
-import { PACKAGED_LIFECYCLE_TEMPLATES, SDLC_COMMAND_IDS, SDLC_LIFECYCLE } from './lifecycle.js';
+import { SDLC_COMMAND_IDS, SDLC_LIFECYCLE } from './lifecycle.js';
+import { loadPackagedSdlcTemplateLayer } from './template-loader.js';
 
 import { opencodeHarnessAdapter } from '../../../extensions/opencode-adapter/src/index.js';
 import { piHarnessAdapter } from '../../../extensions/pi-adapter/src/index.js';
@@ -31,6 +38,22 @@ const runtimePackages = [
   { logicalId: 'issues' as const, version: '0.1.0' },
   { logicalId: 'design-docs' as const, version: '0.1.0' },
 ];
+const packagedTemplateLayer = await loadPackagedSdlcTemplateLayer();
+
+type TestCompilerInputOptions = Omit<CreateSdlcCompilerInputOptions, 'templateLayers'> & {
+  readonly templateLayers?: CreateSdlcCompilerInputOptions['templateLayers'];
+};
+
+/** Adds the external packaged templates to one pure compiler invocation. */
+function createSdlcCompilerInput(
+  resolvedSnapshot: Parameters<typeof createRawSdlcCompilerInput>[0],
+  options: TestCompilerInputOptions,
+): SdlcCompilerInputManifest {
+  return createRawSdlcCompilerInput(resolvedSnapshot, {
+    ...options,
+    templateLayers: [packagedTemplateLayer, ...(options.templateLayers ?? [])],
+  });
+}
 
 /** Creates a complete compiler snapshot without reading ambient configuration. */
 function snapshot(values: ConfigShardValues = {}) {
@@ -70,13 +93,22 @@ describe('canonical SDLC compiler', () => {
   it('publishes six provider-neutral lifecycle commands', () => {
     expect(SDLC_COMMAND_IDS).toEqual(['plan', 'build', 'verify', 'release', 'continue', 'refresh']);
     expect(SDLC_LIFECYCLE).toHaveLength(6);
-    expect(new Set(SDLC_LIFECYCLE.flatMap((command) => command.approvalPoints)).size).toBeGreaterThan(3);
-    expect(SDLC_LIFECYCLE.every((command) => command.stopConditions.length > 0)).toBe(true);
+    const lifecycleContent = JSON.parse(
+      packagedTemplateLayer.files.find((template) => template.id === 'neottia.sdlc.lifecycle')!.content,
+    ) as {
+      readonly commands: ReadonlyArray<{
+        readonly id: string;
+        readonly approvalPoints: readonly string[];
+        readonly stopConditions: readonly string[];
+      }>;
+    };
+    expect(lifecycleContent.commands.map((command) => command.id)).toEqual(SDLC_COMMAND_IDS);
+    expect(new Set(lifecycleContent.commands.flatMap((command) => command.approvalPoints)).size).toBeGreaterThan(3);
+    expect(lifecycleContent.commands.every((command) => command.stopConditions.length > 0)).toBe(true);
     expect(SDLC_LIFECYCLE.find((command) => command.id === 'plan')?.roleSlots).toEqual(['planner', 'researcher']);
-    for (const template of PACKAGED_LIFECYCLE_TEMPLATES.files) {
+    for (const template of packagedTemplateLayer.files) {
       expect(template.content).not.toMatch(/\b(?:github|gitlab|jira|confluence|filesystem)\b/iu);
       expect(template.content).not.toMatch(/`(?:issue_|document_|git\b)/u);
-      expect(template.content).toContain('They do not grant host permissions.');
     }
   });
 
@@ -96,6 +128,12 @@ describe('canonical SDLC compiler', () => {
     const pi = compileSdlc(piInput, piHarnessAdapter);
     const opencode = compileSdlc(opencodeInput, opencodeHarnessAdapter);
 
+    expect(pi.commands.find((command) => command.id === 'plan')?.approvalPoints).toEqual([
+      'Obtain explicit approval for the proposed scope before Build.',
+    ]);
+    expect(promptBody(promptAssets(pi).find((asset) => asset.target.segments.at(-1) === 'plan.md')!)).toContain(
+      'Obtain explicit approval for the proposed scope before Build.',
+    );
     expect(pi.commands.map((command) => ({ ...command, target: undefined }))).toEqual(
       opencode.commands.map((command) => ({ ...command, target: undefined })),
     );
@@ -180,9 +218,7 @@ describe('canonical SDLC compiler', () => {
   });
 
   it('records complete template overrides and optional role instructions', () => {
-    const packagedPlan = PACKAGED_LIFECYCLE_TEMPLATES.files.find(
-      (template) => template.id === 'neottia.sdlc.command.plan',
-    )!;
+    const packagedPlan = packagedTemplateLayer.files.find((template) => template.id === 'neottia.sdlc.command.plan')!;
     const override = packagedPlan.content.replace('Turn the request', 'Turn the reviewed request');
     const role = createSdlcRoleInstruction({
       id: 'example.role.planner',
@@ -278,10 +314,8 @@ describe('canonical SDLC compiler', () => {
     }
   });
 
-  it('requires every stable insertion token exactly once after template resolution', () => {
-    const packagedPlan = PACKAGED_LIFECYCLE_TEMPLATES.files.find(
-      (template) => template.id === 'neottia.sdlc.command.plan',
-    )!;
+  it('requires every stable insertion fragment exactly once after template resolution', () => {
+    const packagedLayout = packagedTemplateLayer.files.find((template) => template.id === 'neottia.sdlc.layout')!;
     expect(() =>
       createSdlcCompilerInput(snapshot(), {
         compilerVersion: '0.1.0',
@@ -293,12 +327,127 @@ describe('canonical SDLC compiler', () => {
             sourceId: 'broken-project-template',
             version: 'revision-1',
             files: [
-              { id: packagedPlan.id, content: packagedPlan.content.replace('{{neottia.instructions.role}}', '') },
+              {
+                id: packagedLayout.id,
+                content: packagedLayout.content.replace('{{ instructions.issues }}', ''),
+              },
             ],
           },
         ],
       }),
-    ).toThrow('must contain slot {{neottia.instructions.role}} exactly once.');
+    ).toThrow('must output instructions.issues directly exactly once.');
+
+    const spoofed = packagedLayout.content.replace(
+      '{{ instructions.issues }}',
+      '{% if instructions.issues == "NEOTTIA_SLOT_ISSUES_1A7F" %}{{ instructions.issues }}{% endif %}',
+    );
+    expect(() =>
+      createSdlcCompilerInput(snapshot(), {
+        compilerVersion: '0.1.0',
+        harnessId: 'pi',
+        scope: 'project',
+        templateLayers: [
+          {
+            tier: 'project',
+            sourceId: 'spoofed-project-template',
+            version: 'revision-1',
+            files: [{ id: packagedLayout.id, content: spoofed }],
+          },
+        ],
+      }),
+    ).toThrow('must output instructions.issues directly exactly once.');
+  });
+
+  it('accepts identical role fragments at distinct invocation points', () => {
+    const content = 'Plan\n';
+    const roles = [
+      createSdlcRoleInstruction({
+        id: 'example.role.planner',
+        command: 'plan',
+        role: 'planner',
+        version: '1.0.0',
+        content,
+      }),
+      createSdlcRoleInstruction({
+        id: 'example.role.researcher',
+        command: 'plan',
+        role: 'researcher',
+        version: '1.0.0',
+        content,
+      }),
+    ];
+    const input = createSdlcCompilerInput(snapshot(), {
+      compilerVersion: '0.1.0',
+      harnessId: 'pi',
+      scope: 'project',
+      roles,
+    });
+    const output = compileSdlc(input, piHarnessAdapter);
+    const plan = promptBody(promptAssets(output).find((asset) => asset.target.segments.at(-1) === 'plan.md')!);
+
+    expect(plan).toContain('### planner\n\nPlan');
+    expect(plan).toContain('### researcher\n\nPlan');
+  });
+
+  it('rejects missing variables and unsafe Twig functions before projection', () => {
+    const packagedPlan = packagedTemplateLayer.files.find((template) => template.id === 'neottia.sdlc.command.plan')!;
+    for (const [expression, expected] of [
+      ['{{ missing.value }}', /missing/iu],
+      ['{{ random() }}', /random.*not allowed/iu],
+      ['{{ range(0, 1000000000) }}', /range.*not allowed/iu],
+      ['{% include "neottia.sdlc.command.plan" %}', /include.*not allowed/iu],
+      ['{{ block("purpose") }}', /block.*not allowed/iu],
+      [
+        '{% for role in roles %}{% for point in command.approvalPoints %}x{% endfor %}{% endfor %}',
+        /nested Twig loops/iu,
+      ],
+    ] as const) {
+      expect(() =>
+        createSdlcCompilerInput(snapshot(), {
+          compilerVersion: '0.1.0',
+          harnessId: 'pi',
+          scope: 'project',
+          templateLayers: [
+            {
+              tier: 'project',
+              sourceId: 'unsafe-project-template',
+              version: 'revision-1',
+              files: [
+                {
+                  id: packagedPlan.id,
+                  content: packagedPlan.content.replace('{% endblock %}', ` ${expression}{% endblock %}`),
+                },
+              ],
+            },
+          ],
+        }),
+      ).toThrow(expected);
+    }
+
+    const recursivePlans = [
+      packagedPlan.content.replace('"neottia.sdlc.layout"', '"neottia.sdlc.command.plan"'),
+      packagedPlan.content.replace(
+        '{% extends "neottia.sdlc.layout" %}',
+        '{%- extends "neottia.sdlc.command.plan" -%}',
+      ),
+    ];
+    for (const recursivePlan of recursivePlans) {
+      expect(() =>
+        createSdlcCompilerInput(snapshot(), {
+          compilerVersion: '0.1.0',
+          harnessId: 'pi',
+          scope: 'project',
+          templateLayers: [
+            {
+              tier: 'project',
+              sourceId: 'recursive-project-template',
+              version: 'revision-1',
+              files: [{ id: packagedPlan.id, content: recursivePlan }],
+            },
+          ],
+        }),
+      ).toThrow('may extend only neottia.sdlc.layout.');
+    }
   });
 
   it('validates input checksums before adapter projection', () => {

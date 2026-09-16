@@ -1,6 +1,6 @@
 # @neottia/sdlc
 
-`@neottia/sdlc` compiles one canonical Plan, Build, Verify, Release, Continue, and Refresh lifecycle into assets for a Neottia harness adapter. Compilation is pure. It returns a checksummed `AssetManifest` for `@neottia/distribution` and does not read files, run providers, or install assets.
+`@neottia/sdlc` compiles one canonical Plan, Build, Verify, Release, Continue, and Refresh lifecycle into assets for a Neottia harness adapter. The package ships six Markdown/Twig templates and loads them before pure compilation. The compiler returns a checksummed `AssetManifest` for `@neottia/distribution` and does not read files, run providers, or install assets.
 
 See the [SDLC compiler guide](../../docs/sdlc/) and [configuration reference](../../docs/configuration.md#sdlc-provider-selection).
 
@@ -11,17 +11,21 @@ Resolve configuration before calling the compiler. The compiler reads only the s
 ```ts
 import { resolveHostConfigSnapshot } from "@neottia/config-registry";
 import { piHarnessAdapter } from "@neottia/pi-adapter";
-import { compileSdlc, createSdlcCompilerInput } from "@neottia/sdlc";
+import { compileSdlc, createSdlcCompilerInput, loadSdlcTemplateLayers } from "@neottia/sdlc";
 
 const snapshot = resolveHostConfigSnapshot({
   cwd: process.cwd(),
   interactive: false,
 });
 
+const templateLayers = await loadSdlcTemplateLayers({
+  projectRoot: process.cwd(),
+});
 const input = createSdlcCompilerInput(snapshot, {
   compilerVersion: "0.1.0",
   harnessId: "pi",
   scope: "project",
+  templateLayers,
   runtimePackages: [
     { logicalId: "issues", version: "0.1.0" },
     { logicalId: "design-docs", version: "0.1.0" },
@@ -46,9 +50,11 @@ A selected provider without a supplied pack fails before adapter projection. Iss
 
 ## Templates and roles
 
-Canonical templates contain provider and role insertion tokens. `resolveTemplates()` applies the distribution precedence order: packaged, package, global, then project. Every resolved template and shadowed source appears in compiler input provenance.
+The package publishes `templates/plan.md`, `build.md`, `verify.md`, `release.md`, `continue.md`, and `refresh.md`, plus their shared `layout.md` and `lifecycle.json` prose. Twing renders the selected command with strict variables and no HTML escaping. The renderer uses only the resolved in-memory template set. It rejects nondeterministic Twig functions and checks that every provider and role fragment renders exactly once.
 
-The compiler publishes portable role invocation points such as `planner`, `implementer`, `verifier`, and `release-coordinator`. Optional checksummed role instructions can fill those points. This package does not define assignment, requiredness, or fallback policy. Issue #118 owns those rules.
+Place a complete project override at `.neottia/templates/sdlc/<command>.md`. The loader rejects unknown filenames. It applies packaged, package, global, then project precedence and records selected and shadowed checksums in compiler input provenance. A whole-template override can change lifecycle policy, so review it before installation.
+
+The Twig context exposes `command`, `instructions`, and `roles`. Provider and role packages supply checksummed fragments through those fields instead of owning command templates. The compiler publishes portable role names such as `planner`, `implementer`, `verifier`, and `release-coordinator`. Issue #118 owns assignment, requiredness, and fallback policy.
 
 ## Safety boundaries
 

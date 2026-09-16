@@ -109,7 +109,7 @@ Pi and OpenCode each have native Memory, Issues, Design Docs, and Searchable ext
 
 ## Canonical SDLC
 
-`@neottia/sdlc` compiles Plan, Build, Verify, Release, Continue, and Refresh from provider-neutral templates. It selects checksummed provider and role instructions at compile time, records provenance, and returns adapter-projected asset manifests. Runtime package IDs and exact versions remain explicit inputs. See the [SDLC compiler guide](docs/sdlc/).
+`@neottia/sdlc` ships Plan, Build, Verify, Release, Continue, and Refresh as provider-neutral Markdown/Twig files. It loads conventional `.neottia/templates/sdlc/<command>.md` overrides, inserts checksummed provider and role fragments with Twing, records provenance, and returns adapter-projected asset manifests. Runtime package IDs and exact versions remain explicit inputs. See the [SDLC compiler guide](docs/sdlc/).
 
 ## Distribution
 
