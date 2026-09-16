@@ -203,7 +203,12 @@ async function writeProjectConfig(project: string): Promise<void> {
   );
 }
 
-/** Executes local Git without a shell and returns normalized stdout. */
+/** Executes isolated local Git without inheriting repository hook state. */
 function git(cwd: string, ...args: string[]): string {
-  return execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
+  // Git hooks can export GIT_DIR or GIT_WORK_TREE while running this test. Remove
+  // every Git override so cwd remains the authority for the disposable repository.
+  const env = Object.fromEntries(
+    Object.entries(process.env).filter(([name, value]) => !name.startsWith('GIT_') && value !== undefined),
+  ) as NodeJS.ProcessEnv;
+  return execFileSync('git', args, { cwd, env, encoding: 'utf8' }).trim();
 }
