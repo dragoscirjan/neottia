@@ -122,8 +122,8 @@
     "name": "@neottia/sdlc",
     "manifest": "packages/sdlc/package.json",
     "classification": "library/embedding",
-    "route": "/configuration#sdlc-provider-selection",
-    "issue": 112
+    "route": "/sdlc/",
+    "issue": 115
   },
   {
     "name": "@neottia/testkit",

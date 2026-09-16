@@ -1,7 +1,7 @@
 {
   "name": "@neottia/sdlc",
   "version": "0.1.0",
-  "description": "Typed compile-time SDLC provider configuration for Neottia",
+  "description": "Canonical Neottia lifecycle configuration and asset compiler",
   "author": "Dragos Cirjan",
   "license": "MIT",
   "type": "module",
@@ -38,6 +38,8 @@
   "dependencies": {
     "@neottia/config": "workspace:^",
     "@neottia/design-docs": "workspace:^",
+    "@neottia/distribution": "workspace:^",
+    "@neottia/harness-adapter": "workspace:^",
     "@neottia/issues": "workspace:^",
     "zod": "^4.5.4"
   },

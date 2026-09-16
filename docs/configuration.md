@@ -186,8 +186,8 @@ Remote names reserve stable compiler selections for provider instruction package
 | --------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
 | Issues                | `filesystem`, `github`, `gitlab`, `gitea`, `forgejo`, `jira`       | Filesystem is available; remote instruction packages are planned in issues #116 and #117 |
 | Documents             | `filesystem`, `github`, `gitlab`, `gitea`, `forgejo`, `confluence` | Filesystem is available; remote instruction packages are planned in issues #116 and #117 |
-| Local source control  | `git`, `jj`                                                        | The selection contract is available; prompt compilation is planned in issue #115         |
-| Remote source control | `false`, `github`, `gitlab`, `gitea`, `forgejo`, `bitbucket`       | Disabled by default; instruction packages are planned in issues #116 and #117            |
+| Local source control  | `git`, `jj`                                                        | Git instructions are available; Jujutsu instructions are planned in issue #117           |
+| Remote source control | `false`, `github`, `gitlab`, `gitea`, `forgejo`, `bitbucket`       | Disabled mode is available; remote instruction packs are planned in issues #116 and #117 |
 
 `remote` is one scalar. Set it to `false` or one supported forge:
 
@@ -206,7 +206,9 @@ capabilities:
 
 The scalar remote selection replaces atomically across global, project, and profile layers. A profile can set `remote: false` without retaining a lower provider. Provider-specific URLs, credentials, and tool names remain outside this package.
 
-Git workspaces require `local: git`. `createSdlcCompilerContext(snapshot)` reports that conflict and disabled filesystem modules through typed, value-free `SdlcConfigError` problems. It reads only the supplied snapshot and returns a deeply frozen object for the future prompt compiler.
+Git workspaces require `local: git`. `createSdlcCompilerContext(snapshot)` reports that conflict and disabled filesystem modules through typed, value-free `SdlcConfigError` problems. It reads only the supplied snapshot and returns a deeply frozen context.
+
+`createSdlcCompilerInput()` adds resolved template, instruction, role, configuration, and runtime package provenance. `compileSdlc()` then projects the canonical six-command lifecycle through a Pi or OpenCode adapter. Runtime package IDs and exact versions are separate compiler inputs. The compiler never infers packages from provider selections. See [the SDLC compiler guide](./sdlc/) for the complete input, output, and installation handoff.
 
 ## Profiles
 

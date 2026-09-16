@@ -581,12 +581,6 @@ importers:
         specifier: ^1.5.26
         version: 1.5.26
     devDependencies:
-      '@neottia/opencode-adapter':
-        specifier: workspace:^
-        version: link:../../extensions/opencode-adapter
-      '@neottia/pi-adapter':
-        specifier: workspace:^
-        version: link:../../extensions/pi-adapter
       '@templ-project/tsconfig':
         specifier: ^0.2.2
         version: 0.2.2(@types/node@25.9.5)(@vitest/coverage-v8@4.1.11)(jsdom@29.1.1)(vite@7.3.6(@types/node@25.9.5)(tsx@4.23.13)(yaml@2.9.0))
@@ -809,6 +803,12 @@ importers:
       '@neottia/design-docs':
         specifier: workspace:^
         version: link:../design-docs
+      '@neottia/distribution':
+        specifier: workspace:^
+        version: link:../distribution
+      '@neottia/harness-adapter':
+        specifier: workspace:^
+        version: link:../harness-adapter
       '@neottia/issues':
         specifier: workspace:^
         version: link:../issues

@@ -3,9 +3,6 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import type { HarnessAdapter, HarnessScope } from '@neottia/harness-adapter';
-import { opencodeHarnessAdapter } from '@neottia/opencode-adapter';
-import { piHarnessAdapter } from '@neottia/pi-adapter';
-
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { runDoctor } from './doctor.js';
@@ -25,6 +22,9 @@ import { externalSkillIntegrity, resolveSkillsBin, stageExternalSkills } from '.
 import { loadTemplateLayer } from './templates.js';
 import { applyInstallationPlan, recoverInstallation } from './transaction.js';
 import type { AssetManifest, FileAsset, InstallRoots } from './types.js';
+
+import { opencodeHarnessAdapter } from '../../../extensions/opencode-adapter/src/index.js';
+import { piHarnessAdapter } from '../../../extensions/pi-adapter/src/index.js';
 
 const temporaryRoots: string[] = [];
 const source = createAssetSource({ kind: 'generated', id: 'compiler', version: '1.0.0', content: 'compiler' });

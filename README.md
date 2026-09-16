@@ -25,7 +25,7 @@ Neottia provides a shared SDLC that can be understood and used by multiple AI co
 │   ├── repository-store/# Canonical repository persistence primitives
 │   ├── searchable-core/ # Searchable runtime and shared tool registry
 │   ├── searchable-mcp/  # Generic Searchable MCP server
-│   ├── sdlc/            # Compile-time SDLC provider configuration
+│   ├── sdlc/            # Canonical lifecycle configuration and compiler
 │   └── release/         # Global release bill of materials
 ├── docs/                # User documentation for VitePress
 ├── .changeset/          # Module release declarations
@@ -83,7 +83,7 @@ This updates `packages/release/package.json` and `packages/release/release-manif
 
 ## Configuration
 
-`@neottia/config` composes domain-owned schemas into one immutable snapshot. It loads optional global and project YAML, applies profiles, environment bindings, and explicit overrides in a fixed order, tracks value-free leaf provenance, and redacts declared secrets. `@neottia/config-registry` supplies the strict official registry used by Neottia hosts, so all published module and SDLC capability shards can coexist in one root file. `@neottia/sdlc` validates compile-time provider selections for Issues, Documents, and source control, then creates immutable input for the future prompt compiler. Use the [unified configuration guide](docs/configuration.md) for files, profiles, precedence, SDLC provider selection, secrets, diagnostics, embedding, and `skills.*` migration. The config package publishes the complete editor schema as `@neottia/config/config.schema.json`.
+`@neottia/config` composes domain-owned schemas into one immutable snapshot. It loads optional global and project YAML, applies profiles, environment bindings, and explicit overrides in a fixed order, tracks value-free leaf provenance, and redacts declared secrets. `@neottia/config-registry` supplies the strict official registry used by Neottia hosts, so all published module and SDLC capability shards can coexist in one root file. `@neottia/sdlc` validates compile-time provider selections and compiles the canonical lifecycle for Pi or OpenCode. Use the [unified configuration guide](docs/configuration.md) for files, profiles, precedence, SDLC provider selection, secrets, diagnostics, embedding, and `skills.*` migration. The config package publishes the complete editor schema as `@neottia/config/config.schema.json`.
 
 ## Memory
 
@@ -106,6 +106,10 @@ Enable `modules.searchable` to search DuckDuckGo, Google, Bing, or Brave; extrac
 Pi and OpenCode each have native Memory, Issues, Design Docs, and Searchable extensions. Other MCP-compatible clients can launch the four generic stdio servers. TypeScript applications can embed the domain libraries directly.
 
 `@neottia/harness-adapter` defines a host-neutral, immutable asset projection contract. `@neottia/pi-adapter` and `@neottia/opencode-adapter` return symbolic paths, package declarations, reviewable host-configuration operations, and reload notices without writing files or running host commands. Each adapter declares unsupported features instead of emulating them. See the [harness adapter guide](docs/harnesses/adapters.md).
+
+## Canonical SDLC
+
+`@neottia/sdlc` compiles Plan, Build, Verify, Release, Continue, and Refresh from provider-neutral templates. It selects checksummed provider and role instructions at compile time, records provenance, and returns adapter-projected asset manifests. Runtime package IDs and exact versions remain explicit inputs. See the [SDLC compiler guide](docs/sdlc/).
 
 ## Distribution
 
