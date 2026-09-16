@@ -15,7 +15,8 @@
     "**/*.test.ts",
     "coverage/**",
     "dist/**",
-    "node_modules/**"
+    "node_modules/**",
+    "packages/sdlc/vendor/**"
   ],
   "output": ".jscpd",
   "reporters": ["badge", "console", "html"],

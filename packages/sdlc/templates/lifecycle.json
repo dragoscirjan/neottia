@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "lifecycleVersion": "1.0.0",
+  "commands": [
+    {
+      "id": "plan",
+      "description": "Plan the current SDLC work",
+      "approvalPoints": ["Obtain explicit approval for the proposed scope before Build."],
+      "stopConditions": ["Requirements, ownership, dependencies, or acceptance evidence remain ambiguous."]
+    },
+    {
+      "id": "build",
+      "description": "Build the current SDLC work",
+      "approvalPoints": ["Use only the scope approved by Plan; request approval before expanding it."],
+      "stopConditions": ["The approved plan is missing, stale, blocked, or contradicted by repository evidence."]
+    },
+    {
+      "id": "verify",
+      "description": "Verify the current SDLC work",
+      "approvalPoints": ["Release requires successful required checks and an explicit release decision."],
+      "stopConditions": ["Required checks fail, evidence is incomplete, or unreviewed changes are present."]
+    },
+    {
+      "id": "release",
+      "description": "Release the current SDLC work",
+      "approvalPoints": ["Ask before merge, publication, deployment, tagging, or another irreversible action."],
+      "stopConditions": ["Verification is unsuccessful, approval is absent, or the release target changed."]
+    },
+    {
+      "id": "continue",
+      "description": "Continue the current SDLC work",
+      "approvalPoints": [
+        "Recommend exactly one supported next command, explain the evidence, and stop without invoking it."
+      ],
+      "stopConditions": ["The previous phase, approval state, or current ownership cannot be established."]
+    },
+    {
+      "id": "refresh",
+      "description": "Refresh the current SDLC work",
+      "approvalPoints": ["Report changed assumptions before resuming work."],
+      "stopConditions": ["Refreshing context would require mutation or would discard unresolved evidence."]
+    }
+  ]
+}

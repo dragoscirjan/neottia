@@ -153,9 +153,9 @@ run = "pnpm run audit"
 description = "Run the complete local validation pipeline"
 run = [
   "mise run format:check",
-  "mise run docs:check",
   "mise run clean",
   "mise run build",
+  "mise run docs:check",
   "mise run config:contracts",
   "mise run lint:check",
   "mise run duplicate-check",

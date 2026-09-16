@@ -22,9 +22,53 @@ export {
   type SourceControlCapabilityConfig,
 } from './config.js';
 export {
+  compileSdlc,
+  createSdlcCompilerInput,
+  SdlcCompilerError,
+  validateSdlcCompilerInput,
+  type CompiledSdlcCommand,
+  type CreateSdlcCompilerInputOptions,
+  type SdlcCompilerInputManifest,
+  type SdlcCompilerOutputManifest,
+  type SdlcConfigurationProvenance,
+  type SdlcRuntimePackage,
+  type SdlcTemplateCommand,
+  type SdlcTemplateContext,
+  type SdlcTemplateRole,
+} from './compiler.js';
+export {
   createSdlcCompilerContext,
   SdlcConfigError,
   type SdlcCompilerContext,
   type SdlcConfigProblem,
   type SdlcConfigProblemCode,
 } from './compiler-context.js';
+export {
+  BUILTIN_SDLC_INSTRUCTION_PACKS,
+  createSdlcInstructionPack,
+  createSdlcRoleInstruction,
+  SDLC_INSTRUCTION_SLOTS,
+  selectSdlcInstructionPacks,
+  type SdlcInstructionPack,
+  type SdlcInstructionPackInput,
+  type SdlcInstructionSlot,
+  type SdlcRoleInstruction,
+  type SdlcRoleInstructionInput,
+} from './instructions.js';
+export {
+  SDLC_COMMAND_IDS,
+  SDLC_CONTENT_TEMPLATE_ID,
+  SDLC_LAYOUT_TEMPLATE_ID,
+  SDLC_LIFECYCLE,
+  SDLC_LIFECYCLE_VERSION,
+  SDLC_ROLE_IDS,
+  type SdlcCommandId,
+  type SdlcLifecycleCommand,
+  type SdlcRoleId,
+} from './lifecycle.js';
+export {
+  loadPackagedSdlcTemplateLayer,
+  loadSdlcTemplateLayers,
+  SDLC_TEMPLATE_LAYER_MAX_BYTES,
+  type LoadSdlcTemplateLayersOptions,
+} from './template-loader.js';

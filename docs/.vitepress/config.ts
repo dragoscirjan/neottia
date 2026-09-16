@@ -11,6 +11,7 @@ export default defineConfig({
       { text: 'Home', link: '/' },
       { text: 'Get started', link: '/get-started/' },
       { text: 'Configuration', link: '/configuration' },
+      { text: 'SDLC', link: '/sdlc/' },
       { text: 'Distribution', link: '/distribution/' },
       {
         text: 'Features',
@@ -62,6 +63,12 @@ export default defineConfig({
         {
           text: 'Distribution',
           items: [{ text: 'Install generated assets', link: '/distribution/' }],
+        },
+      ],
+      '/sdlc/': [
+        {
+          text: 'SDLC',
+          items: [{ text: 'Compile the canonical lifecycle', link: '/sdlc/' }],
         },
       ],
       '/get-started/': [

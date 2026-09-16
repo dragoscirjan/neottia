@@ -1,85 +1,63 @@
 # @neottia/sdlc
 
-`@neottia/sdlc` defines the provider selections that a future Neottia prompt compiler will consume. It does not parse YAML, render prompts, run provider operations, or install external tools. The [unified configuration guide](../../docs/configuration.md#sdlc-provider-selection) documents the project YAML contract.
+`@neottia/sdlc` compiles one canonical Plan, Build, Verify, Release, Continue, and Refresh lifecycle into assets for a Neottia harness adapter. The package ships six Markdown/Twig templates and loads them before pure compilation. The compiler returns a checksummed `AssetManifest` for `@neottia/distribution` and does not read files, run providers, or install assets.
 
-## Configure provider selections
+See the [SDLC compiler guide](../../docs/sdlc/) and [configuration reference](../../docs/configuration.md#sdlc-provider-selection).
 
-The shared resolver applies these defaults:
+## Compile a lifecycle
 
-```yaml
-version: 1
-capabilities:
-  issues:
-    provider: filesystem
-  documents:
-    provider: filesystem
-  source_control:
-    local: git
-    remote: false
-    workspaces: false
-```
-
-Filesystem selections require their corresponding modules:
-
-```yaml
-version: 1
-modules:
-  issues:
-    enabled: true
-  design_docs:
-    enabled: true
-capabilities:
-  issues:
-    provider: filesystem
-  documents:
-    provider: filesystem
-```
-
-Enable a remote source-control selection by naming one supported forge:
-
-```yaml
-version: 1
-capabilities:
-  issues:
-    provider: github
-  documents:
-    provider: confluence
-  source_control:
-    local: jj
-    remote: bitbucket
-    workspaces: false
-```
-
-## Provider status
-
-This package validates provider identities and exposes them to the compiler. It does not claim that their instruction packs are installed.
-
-| Capability            | Accepted providers                                                 | Current implementation status                                                             |
-| --------------------- | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
-| Issues                | `filesystem`, `github`, `gitlab`, `gitea`, `forgejo`, `jira`       | Filesystem module available; remote instruction packs are planned in issues #116 and #117 |
-| Documents             | `filesystem`, `github`, `gitlab`, `gitea`, `forgejo`, `confluence` | Filesystem module available; remote instruction packs are planned in issues #116 and #117 |
-| Local source control  | `git`, `jj`                                                        | Selection contract available; prompt compilation is planned in issue #115                 |
-| Remote source control | `false`, `github`, `gitlab`, `gitea`, `forgejo`, `bitbucket`       | Disabled by default; instruction packs are planned in issues #116 and #117                |
-
-Fixed provider facts do not belong in project configuration. Provider instruction packages will own command names and other fixed details.
-
-## Create compiler input
-
-Pass an existing snapshot that contains the official module and capability contributions:
+Resolve configuration before calling the compiler. The compiler reads only the supplied snapshot, template layers, instruction packs, role instructions, runtime package versions, and adapter.
 
 ```ts
 import { resolveHostConfigSnapshot } from "@neottia/config-registry";
-import { createSdlcCompilerContext } from "@neottia/sdlc";
+import { piHarnessAdapter } from "@neottia/pi-adapter";
+import { compileSdlc, createSdlcCompilerInput, loadSdlcTemplateLayers } from "@neottia/sdlc";
 
 const snapshot = resolveHostConfigSnapshot({
   cwd: process.cwd(),
   interactive: false,
 });
-export const context = createSdlcCompilerContext(snapshot);
+
+const templateLayers = await loadSdlcTemplateLayers({
+  projectRoot: process.cwd(),
+});
+const input = createSdlcCompilerInput(snapshot, {
+  compilerVersion: "0.1.0",
+  harnessId: "pi",
+  scope: "project",
+  templateLayers,
+  runtimePackages: [
+    { logicalId: "issues", version: "0.1.0" },
+    { logicalId: "design-docs", version: "0.1.0" },
+  ],
+});
+const compilation = compileSdlc(input, piHarnessAdapter);
+export const manifest = compilation.assets;
 ```
 
-`createSdlcCompilerContext()` reads only the supplied snapshot. It does not inspect environment variables or configuration files. The returned context and every nested object are frozen.
+Use the installed package versions in `runtimePackages`. The compiler does not infer packages from provider selections. A change from filesystem Issues to GitHub Issues does not add, remove, or version a package.
 
-The function reports semantic conflicts with `SdlcConfigError`. Problems contain a stable code, a configuration path, and a value-free message. It rejects filesystem capabilities whose modules are disabled and rejects source-control workspaces when local source control is not Git.
+## Built-in instruction packs
 
-`remote` is one atomic scalar. A profile can replace `github` with `false` without retaining settings from a lower configuration layer. Provider-specific URLs, credentials, and tools are outside this package.
+The package includes checksummed packs for:
+
+- filesystem Issues;
+- filesystem Design Docs;
+- local Git;
+- disabled remote source control.
+
+A selected provider without a supplied pack fails before adapter projection. Issues #116 and #117 add remote provider packs.
+
+## Templates and roles
+
+The package publishes `templates/plan.md`, `build.md`, `verify.md`, `release.md`, `continue.md`, and `refresh.md`, plus their shared `layout.md` and `lifecycle.json` prose. Twing renders the selected command with strict variables and no HTML escaping. The renderer uses only the resolved in-memory template set. It rejects nondeterministic Twig functions and checks that every provider and role fragment renders exactly once.
+
+Place a complete project override at `.neottia/templates/sdlc/<command>.md`. The loader rejects unknown filenames. It applies packaged, package, global, then project precedence and records selected and shadowed checksums in compiler input provenance. A whole-template override can change lifecycle policy, so review it before installation.
+
+The Twig context exposes `command`, `instructions`, and `roles`. Provider and role packages supply checksummed fragments through those fields instead of owning command templates. The compiler publishes portable role names such as `planner`, `implementer`, `verifier`, and `release-coordinator`. Issue #118 owns assignment, requiredness, and fallback policy.
+
+## Safety boundaries
+
+Generated prompts preserve lifecycle approvals, evidence requirements, stop conditions, and transitions across Pi and OpenCode. Their permission language is guidance. It does not grant filesystem, process, network, merge, release, or deployment authority.
+
+`continue` recommends a next command and stops. `release` never grants permission to merge, publish, or deploy.

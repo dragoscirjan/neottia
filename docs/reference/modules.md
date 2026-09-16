@@ -26,7 +26,7 @@ This catalog distinguishes how each package is delivered.
 | `@neottia/repository-store`     | library/embedding | [Repository Store](/repository-store)                                                  |
 | `@neottia/searchable-core`      | library/embedding | [Searchable](/searchable/)                                                             |
 | `@neottia/searchable-mcp`       | generic MCP       | [Searchable MCP](/mcp/searchable)                                                      |
-| `@neottia/sdlc`                 | library/embedding | [SDLC provider selection](/configuration#sdlc-provider-selection)                      |
+| `@neottia/sdlc`                 | library/embedding | [Canonical SDLC compiler](/sdlc/)                                                      |
 | `@neottia/testkit`              | internal/private  | Private repository test helpers; packages/testkit/README.md is the internal reference. |
 | `@neottia/pi-adapter`           | library/embedding | [Harness adapter contract](/harnesses/adapters)                                        |
 | `@neottia/pi-memory`            | native extension  | [Pi Memory](/harnesses/pi#memory)                                                      |

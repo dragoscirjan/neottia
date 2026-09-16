@@ -26,3 +26,6 @@
 # Windows batch scripts (CRLF required)
 *.bat text eol=crlf
 *.cmd text eol=crlf
+
+# Vendored sources retain upstream whitespace.
+packages/sdlc/vendor/** -whitespace

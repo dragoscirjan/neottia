@@ -5,6 +5,7 @@ export {
   canonicalJson,
   checksumBytes,
   checksumText,
+  compareCodeUnits,
   createAssetManifest,
   createAssetSource,
   createReceipt,

@@ -1,5 +1,6 @@
 import type { ResolvedConfigSnapshot } from '@neottia/config';
 import { designDocsConfigContribution } from '@neottia/design-docs';
+import { compareCodeUnits } from '@neottia/distribution';
 import { issueConfigContribution } from '@neottia/issues';
 import {
   documentsCapabilityConfigContribution,
@@ -89,7 +90,7 @@ export function createSdlcCompilerContext(snapshot: ResolvedConfigSnapshot): Sdl
 
 /** Orders semantic problems independently of contribution access order. */
 function compareProblems(left: SdlcConfigProblem, right: SdlcConfigProblem): number {
-  return left.path.join('.').localeCompare(right.path.join('.')) || left.code.localeCompare(right.code);
+  return compareCodeUnits(left.path.join('.'), right.path.join('.')) || compareCodeUnits(left.code, right.code);
 }
 
 /** Detaches and freezes one problem before exposing it to consumers. */
