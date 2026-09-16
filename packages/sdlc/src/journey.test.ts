@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -14,7 +14,7 @@ import {
   type InstallRoots,
 } from '@neottia/distribution';
 import { IssueStore, issueConfigContribution, loadIssueConfig } from '@neottia/issues';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { compileSdlc, createSdlcCompilerInput } from './compiler.js';
 import {
@@ -42,6 +42,7 @@ const runtimePackages = [
 
 /** Removes every disposable root created by a lifecycle journey. */
 afterEach(async () => {
+  vi.unstubAllEnvs();
   await Promise.all(temporaryRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
@@ -143,12 +144,14 @@ it('completes a filesystem and local-Git Plan-to-Release journey under one tempo
   );
   issue = await issues.transition(issue.id, 'in_progress', issue.revision);
 
+  await installHostileGitEnvironment(roots.project);
   git(roots.project, 'init');
   git(roots.project, 'config', 'user.name', 'Neottia Test');
   git(roots.project, 'config', 'user.email', 'neottia-test@example.invalid');
   await writeFile(join(roots.project, 'implementation.txt'), 'canonical lifecycle implemented\n', 'utf8');
   git(roots.project, 'add', 'implementation.txt');
   git(roots.project, 'commit', '-m', 'feat: implement canonical lifecycle');
+  expect(existsSync(join(roots.project, '.git', 'hooks', 'pre-commit'))).toBe(false);
 
   issue = await issues.comment(
     issue.id,
@@ -206,12 +209,68 @@ async function writeProjectConfig(project: string): Promise<void> {
   );
 }
 
-/** Executes isolated local Git without inheriting repository hook state. */
+/** Installs inherited Git settings that the journey must ignore. */
+async function installHostileGitEnvironment(project: string): Promise<void> {
+  const root = join(project, '.hostile-git');
+  const home = join(root, 'home');
+  const hooks = join(root, 'hooks');
+  const template = join(root, 'template');
+  const templateHooks = join(template, 'hooks');
+  await Promise.all([home, hooks, templateHooks].map((path) => mkdir(path, { recursive: true })));
+  await writeFile(
+    join(home, '.gitconfig'),
+    `[commit]\n\tgpgSign = true\n[core]\n\thooksPath = ${hooks}\n[init]\n\ttemplateDir = ${template}\n`,
+    'utf8',
+  );
+  for (const path of [join(hooks, 'pre-commit'), join(templateHooks, 'pre-commit')]) {
+    await writeFile(path, '#!/bin/sh\nexit 97\n', 'utf8');
+    await chmod(path, 0o755);
+  }
+
+  vi.stubEnv('HOME', home);
+  vi.stubEnv('XDG_CONFIG_HOME', join(root, 'xdg-config'));
+  vi.stubEnv('GIT_CONFIG_GLOBAL', join(home, '.gitconfig'));
+  vi.stubEnv('GIT_TEMPLATE_DIR', template);
+  vi.stubEnv('GIT_CONFIG_COUNT', '2');
+  vi.stubEnv('GIT_CONFIG_KEY_0', 'commit.gpgSign');
+  vi.stubEnv('GIT_CONFIG_VALUE_0', 'true');
+  vi.stubEnv('GIT_CONFIG_KEY_1', 'core.hooksPath');
+  vi.stubEnv('GIT_CONFIG_VALUE_1', hooks);
+}
+
+/** Executes local Git without inheriting user, system, template, hook, or signing configuration. */
 function git(cwd: string, ...args: string[]): string {
   // Git hooks can export GIT_DIR or GIT_WORK_TREE while running this test. Remove
   // every Git override so cwd remains the authority for the disposable repository.
-  const env = Object.fromEntries(
+  const inherited = Object.fromEntries(
     Object.entries(process.env).filter(([name, value]) => !name.startsWith('GIT_') && value !== undefined),
   ) as NodeJS.ProcessEnv;
-  return execFileSync('git', args, { cwd, env, encoding: 'utf8' }).trim();
+  const isolation = join(cwd, '.git-isolation');
+  const home = join(isolation, 'home');
+  const xdgConfig = join(isolation, 'xdg-config');
+  const hooks = join(isolation, 'hooks');
+  const templates = join(isolation, 'templates');
+  const globalConfig = join(isolation, 'global.config');
+  for (const path of [home, xdgConfig, hooks, templates]) mkdirSync(path, { recursive: true });
+  if (!existsSync(globalConfig)) writeFileSync(globalConfig, '', 'utf8');
+
+  const env: NodeJS.ProcessEnv = {
+    ...inherited,
+    HOME: home,
+    XDG_CONFIG_HOME: xdgConfig,
+    GIT_CONFIG_GLOBAL: globalConfig,
+    GIT_CONFIG_NOSYSTEM: '1',
+  };
+  const isolatedArgs = [
+    '-c',
+    'commit.gpgSign=false',
+    '-c',
+    'tag.gpgSign=false',
+    '-c',
+    `core.hooksPath=${hooks}`,
+    '-c',
+    `init.templateDir=${templates}`,
+    ...args,
+  ];
+  return execFileSync('git', isolatedArgs, { cwd, env, encoding: 'utf8' }).trim();
 }
