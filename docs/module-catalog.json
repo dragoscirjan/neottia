@@ -21,6 +21,20 @@
     "issue": 111
   },
   {
+    "name": "@neottia/distribution",
+    "manifest": "packages/distribution/package.json",
+    "classification": "library/embedding",
+    "route": "/distribution/",
+    "issue": 114
+  },
+  {
+    "name": "@neottia/cli",
+    "manifest": "packages/cli/package.json",
+    "classification": "library/embedding",
+    "route": "/distribution/",
+    "issue": 114
+  },
+  {
     "name": "@neottia/harness-adapter",
     "manifest": "packages/harness-adapter/package.json",
     "classification": "library/embedding",

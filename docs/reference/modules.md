@@ -12,6 +12,8 @@ This catalog distinguishes how each package is delivered.
 | `@neottia/core`                 | library/embedding | [Core](/reference/core)                                                                |
 | `@neottia/config`               | library/embedding | [Unified configuration](/configuration)                                                |
 | `@neottia/config-registry`      | library/embedding | [Official configuration registry](/configuration)                                      |
+| `@neottia/distribution`         | library/embedding | [Asset distribution](/distribution/)                                                   |
+| `@neottia/cli`                  | library/embedding | [Neottia CLI](/distribution/)                                                          |
 | `@neottia/harness-adapter`      | library/embedding | [Harness adapter contract](/harnesses/adapters)                                        |
 | `@neottia/design-docs`          | library/embedding | [Design Docs library](/design-docs/library)                                            |
 | `@neottia/design-docs-mcp`      | generic MCP       | [Design Docs MCP](/mcp/design-docs)                                                    |

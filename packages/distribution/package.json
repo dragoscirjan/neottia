@@ -1,7 +1,7 @@
 {
-  "name": "@neottia/config-registry",
+  "name": "@neottia/distribution",
   "version": "0.1.0",
-  "description": "Official unified configuration registry for Neottia hosts",
+  "description": "Declarative manifests, ownership receipts, and transactional asset installation for Neottia",
   "author": "Dragos Cirjan",
   "license": "MIT",
   "type": "module",
@@ -9,7 +9,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/dragoscirjan/neottia.git",
-    "directory": "packages/config-registry"
+    "directory": "packages/distribution"
   },
   "bugs": {
     "url": "https://github.com/dragoscirjan/neottia/issues"
@@ -28,23 +28,21 @@
   },
   "files": ["dist", "README.md", "LICENSE"],
   "engines": {
-    "node": ">=22.16.0"
+    "node": ">=22.20.0"
   },
   "scripts": {
     "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
-    "test": "vitest run --root ../.. packages/config-registry/src",
+    "test": "vitest run --root ../.. packages/distribution/src",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@neottia/config": "workspace:^",
-    "@neottia/design-docs": "workspace:^",
-    "@neottia/issues": "workspace:^",
-    "@neottia/memory-core": "workspace:^",
-    "@neottia/searchable-core": "workspace:^",
-    "@neottia/sdlc": "workspace:^",
-    "zod": "^4.5.4"
+    "@neottia/harness-adapter": "workspace:^",
+    "jsonc-parser": "^3.3.1",
+    "skills": "^1.5.26"
   },
   "devDependencies": {
+    "@neottia/opencode-adapter": "workspace:^",
+    "@neottia/pi-adapter": "workspace:^",
     "@templ-project/tsconfig": "^0.2.2",
     "@types/node": "^25.0.3",
     "typescript": "^5.9.3",

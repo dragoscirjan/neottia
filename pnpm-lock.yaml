@@ -393,6 +393,25 @@ importers:
         specifier: ^4.1.11
         version: 4.1.11(@types/node@25.9.5)(@vitest/coverage-v8@4.1.11)(jsdom@29.1.1)(vite@7.3.6(@types/node@25.9.5)(tsx@4.23.13)(yaml@2.9.0))
 
+  packages/cli:
+    dependencies:
+      '@neottia/distribution':
+        specifier: workspace:^
+        version: link:../distribution
+    devDependencies:
+      '@templ-project/tsconfig':
+        specifier: ^0.2.2
+        version: 0.2.2(@types/node@25.9.5)(@vitest/coverage-v8@4.1.11)(jsdom@29.1.1)(vite@7.3.6(@types/node@25.9.5)(tsx@4.23.13)(yaml@2.9.0))
+      '@types/node':
+        specifier: ^25.0.3
+        version: 25.9.5
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@types/node@25.9.5)(@vitest/coverage-v8@4.1.11)(jsdom@29.1.1)(vite@7.3.6(@types/node@25.9.5)(tsx@4.23.13)(yaml@2.9.0))
+
   packages/config:
     dependencies:
       yaml:
@@ -435,6 +454,9 @@ importers:
       '@neottia/searchable-core':
         specifier: workspace:^
         version: link:../searchable-core
+      zod:
+        specifier: ^4.5.4
+        version: 4.5.4
     devDependencies:
       '@templ-project/tsconfig':
         specifier: ^0.2.2
@@ -534,6 +556,37 @@ importers:
       '@neottia/repository-store':
         specifier: workspace:*
         version: link:../repository-store
+      '@templ-project/tsconfig':
+        specifier: ^0.2.2
+        version: 0.2.2(@types/node@25.9.5)(@vitest/coverage-v8@4.1.11)(jsdom@29.1.1)(vite@7.3.6(@types/node@25.9.5)(tsx@4.23.13)(yaml@2.9.0))
+      '@types/node':
+        specifier: ^25.0.3
+        version: 25.9.5
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@types/node@25.9.5)(@vitest/coverage-v8@4.1.11)(jsdom@29.1.1)(vite@7.3.6(@types/node@25.9.5)(tsx@4.23.13)(yaml@2.9.0))
+
+  packages/distribution:
+    dependencies:
+      '@neottia/harness-adapter':
+        specifier: workspace:^
+        version: link:../harness-adapter
+      jsonc-parser:
+        specifier: ^3.3.1
+        version: 3.3.1
+      skills:
+        specifier: ^1.5.26
+        version: 1.5.26
+    devDependencies:
+      '@neottia/opencode-adapter':
+        specifier: workspace:^
+        version: link:../../extensions/opencode-adapter
+      '@neottia/pi-adapter':
+        specifier: workspace:^
+        version: link:../../extensions/pi-adapter
       '@templ-project/tsconfig':
         specifier: ^0.2.2
         version: 0.2.2(@types/node@25.9.5)(@vitest/coverage-v8@4.1.11)(jsdom@29.1.1)(vite@7.3.6(@types/node@25.9.5)(tsx@4.23.13)(yaml@2.9.0))
@@ -4285,6 +4338,11 @@ packages:
   signal-exit@4.1.0:
     resolution: {integrity: sha512-bzyZ1e88w9O1iNJbKnOlvYTrWPDl46O1bG0D3XInv+9tkPrxrN8jUUTiFlDkkmKWgn1M6CfIA13SuGqOa9Korw==}
     engines: {node: '>=14'}
+
+  skills@1.5.26:
+    resolution: {integrity: sha512-D5jnWoMPDRQ3fJM3RpQH8SBrAS9tmVlTC7OdOB2tk7D6nORbRnw8RLwjVj81IIGlxwWuBthEgUChM7SOZGvTHQ==}
+    engines: {node: '>=22.20.0'}
+    hasBin: true
 
   slash@3.0.0:
     resolution: {integrity: sha512-g9Q1haeby36OSStwb4ntCGGGaKsaVSjQ68fBxoQcutl5fS1vuY18H3wSt3jFyFtrkx+Kz0V1G85A4MyAdDMi2Q==}
@@ -8770,6 +8828,11 @@ snapshots:
   signal-exit@3.0.7: {}
 
   signal-exit@4.1.0: {}
+
+  skills@1.5.26:
+    dependencies:
+      tar: 7.5.22
+      yaml: 2.9.0
 
   slash@3.0.0: {}
 
