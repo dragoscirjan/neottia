@@ -340,7 +340,202 @@
     "connections": {
       "description": "Canonical connections configuration.",
       "type": "object",
-      "properties": {},
+      "properties": {
+        "forges": {
+          "type": "object",
+          "properties": {
+            "github": {
+              "type": "object",
+              "properties": {
+                "base_url": {
+                  "type": "string",
+                  "maxLength": 8192,
+                  "pattern": "^[hH][tT][tT][pP][sS]?:\\/\\/(?![^/?#]*@)[^?#]+$",
+                  "format": "uri"
+                },
+                "credential_environment": { "type": "string", "maxLength": 128, "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
+                "allow_insecure_http": { "type": "boolean", "const": true },
+                "mcp": {
+                  "type": "object",
+                  "properties": {
+                    "issues": {
+                      "type": "object",
+                      "properties": {
+                        "server": { "type": "string", "maxLength": 128, "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$" },
+                        "command": { "type": "string", "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" }
+                      },
+                      "required": ["server", "command"],
+                      "additionalProperties": false
+                    },
+                    "documents": {
+                      "type": "object",
+                      "properties": {
+                        "server": { "type": "string", "maxLength": 128, "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$" },
+                        "command": { "type": "string", "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" }
+                      },
+                      "required": ["server", "command"],
+                      "additionalProperties": false
+                    },
+                    "remote_source_control": {
+                      "type": "object",
+                      "properties": {
+                        "server": { "type": "string", "maxLength": 128, "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$" },
+                        "command": { "type": "string", "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" }
+                      },
+                      "required": ["server", "command"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            },
+            "gitlab": {
+              "type": "object",
+              "properties": {
+                "base_url": {
+                  "type": "string",
+                  "maxLength": 8192,
+                  "pattern": "^[hH][tT][tT][pP][sS]?:\\/\\/(?![^/?#]*@)[^?#]+$",
+                  "format": "uri"
+                },
+                "credential_environment": { "type": "string", "maxLength": 128, "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
+                "allow_insecure_http": { "type": "boolean", "const": true },
+                "mcp": {
+                  "type": "object",
+                  "properties": {
+                    "issues": {
+                      "type": "object",
+                      "properties": {
+                        "server": { "type": "string", "maxLength": 128, "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$" },
+                        "command": { "type": "string", "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" }
+                      },
+                      "required": ["server", "command"],
+                      "additionalProperties": false
+                    },
+                    "documents": {
+                      "type": "object",
+                      "properties": {
+                        "server": { "type": "string", "maxLength": 128, "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$" },
+                        "command": { "type": "string", "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" }
+                      },
+                      "required": ["server", "command"],
+                      "additionalProperties": false
+                    },
+                    "remote_source_control": {
+                      "type": "object",
+                      "properties": {
+                        "server": { "type": "string", "maxLength": 128, "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$" },
+                        "command": { "type": "string", "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" }
+                      },
+                      "required": ["server", "command"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            },
+            "gitea": {
+              "type": "object",
+              "properties": {
+                "base_url": {
+                  "type": "string",
+                  "maxLength": 8192,
+                  "pattern": "^[hH][tT][tT][pP][sS]?:\\/\\/(?![^/?#]*@)[^?#]+$",
+                  "format": "uri"
+                },
+                "credential_environment": { "type": "string", "maxLength": 128, "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
+                "allow_insecure_http": { "type": "boolean", "const": true },
+                "mcp": {
+                  "type": "object",
+                  "properties": {
+                    "issues": {
+                      "type": "object",
+                      "properties": {
+                        "server": { "type": "string", "maxLength": 128, "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$" },
+                        "command": { "type": "string", "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" }
+                      },
+                      "required": ["server", "command"],
+                      "additionalProperties": false
+                    },
+                    "documents": {
+                      "type": "object",
+                      "properties": {
+                        "server": { "type": "string", "maxLength": 128, "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$" },
+                        "command": { "type": "string", "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" }
+                      },
+                      "required": ["server", "command"],
+                      "additionalProperties": false
+                    },
+                    "remote_source_control": {
+                      "type": "object",
+                      "properties": {
+                        "server": { "type": "string", "maxLength": 128, "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$" },
+                        "command": { "type": "string", "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" }
+                      },
+                      "required": ["server", "command"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            },
+            "forgejo": {
+              "type": "object",
+              "properties": {
+                "base_url": {
+                  "type": "string",
+                  "maxLength": 8192,
+                  "pattern": "^[hH][tT][tT][pP][sS]?:\\/\\/(?![^/?#]*@)[^?#]+$",
+                  "format": "uri"
+                },
+                "credential_environment": { "type": "string", "maxLength": 128, "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
+                "allow_insecure_http": { "type": "boolean", "const": true },
+                "mcp": {
+                  "type": "object",
+                  "properties": {
+                    "issues": {
+                      "type": "object",
+                      "properties": {
+                        "server": { "type": "string", "maxLength": 128, "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$" },
+                        "command": { "type": "string", "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" }
+                      },
+                      "required": ["server", "command"],
+                      "additionalProperties": false
+                    },
+                    "documents": {
+                      "type": "object",
+                      "properties": {
+                        "server": { "type": "string", "maxLength": 128, "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$" },
+                        "command": { "type": "string", "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" }
+                      },
+                      "required": ["server", "command"],
+                      "additionalProperties": false
+                    },
+                    "remote_source_control": {
+                      "type": "object",
+                      "properties": {
+                        "server": { "type": "string", "maxLength": 128, "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$" },
+                        "command": { "type": "string", "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" }
+                      },
+                      "required": ["server", "command"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        }
+      },
       "additionalProperties": false
     },
     "capabilities": {
@@ -860,7 +1055,314 @@
           "connections": {
             "description": "Canonical connections configuration.",
             "type": "object",
-            "properties": {},
+            "properties": {
+              "forges": {
+                "type": "object",
+                "properties": {
+                  "github": {
+                    "type": "object",
+                    "properties": {
+                      "base_url": {
+                        "type": "string",
+                        "maxLength": 8192,
+                        "pattern": "^[hH][tT][tT][pP][sS]?:\\/\\/(?![^/?#]*@)[^?#]+$",
+                        "format": "uri"
+                      },
+                      "credential_environment": {
+                        "type": "string",
+                        "maxLength": 128,
+                        "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                      },
+                      "allow_insecure_http": { "type": "boolean", "const": true },
+                      "mcp": {
+                        "type": "object",
+                        "properties": {
+                          "issues": {
+                            "type": "object",
+                            "properties": {
+                              "server": {
+                                "type": "string",
+                                "maxLength": 128,
+                                "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$"
+                              },
+                              "command": {
+                                "type": "string",
+                                "maxLength": 128,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+                              }
+                            },
+                            "required": ["server", "command"],
+                            "additionalProperties": false
+                          },
+                          "documents": {
+                            "type": "object",
+                            "properties": {
+                              "server": {
+                                "type": "string",
+                                "maxLength": 128,
+                                "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$"
+                              },
+                              "command": {
+                                "type": "string",
+                                "maxLength": 128,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+                              }
+                            },
+                            "required": ["server", "command"],
+                            "additionalProperties": false
+                          },
+                          "remote_source_control": {
+                            "type": "object",
+                            "properties": {
+                              "server": {
+                                "type": "string",
+                                "maxLength": 128,
+                                "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$"
+                              },
+                              "command": {
+                                "type": "string",
+                                "maxLength": 128,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+                              }
+                            },
+                            "required": ["server", "command"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "gitlab": {
+                    "type": "object",
+                    "properties": {
+                      "base_url": {
+                        "type": "string",
+                        "maxLength": 8192,
+                        "pattern": "^[hH][tT][tT][pP][sS]?:\\/\\/(?![^/?#]*@)[^?#]+$",
+                        "format": "uri"
+                      },
+                      "credential_environment": {
+                        "type": "string",
+                        "maxLength": 128,
+                        "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                      },
+                      "allow_insecure_http": { "type": "boolean", "const": true },
+                      "mcp": {
+                        "type": "object",
+                        "properties": {
+                          "issues": {
+                            "type": "object",
+                            "properties": {
+                              "server": {
+                                "type": "string",
+                                "maxLength": 128,
+                                "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$"
+                              },
+                              "command": {
+                                "type": "string",
+                                "maxLength": 128,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+                              }
+                            },
+                            "required": ["server", "command"],
+                            "additionalProperties": false
+                          },
+                          "documents": {
+                            "type": "object",
+                            "properties": {
+                              "server": {
+                                "type": "string",
+                                "maxLength": 128,
+                                "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$"
+                              },
+                              "command": {
+                                "type": "string",
+                                "maxLength": 128,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+                              }
+                            },
+                            "required": ["server", "command"],
+                            "additionalProperties": false
+                          },
+                          "remote_source_control": {
+                            "type": "object",
+                            "properties": {
+                              "server": {
+                                "type": "string",
+                                "maxLength": 128,
+                                "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$"
+                              },
+                              "command": {
+                                "type": "string",
+                                "maxLength": 128,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+                              }
+                            },
+                            "required": ["server", "command"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "gitea": {
+                    "type": "object",
+                    "properties": {
+                      "base_url": {
+                        "type": "string",
+                        "maxLength": 8192,
+                        "pattern": "^[hH][tT][tT][pP][sS]?:\\/\\/(?![^/?#]*@)[^?#]+$",
+                        "format": "uri"
+                      },
+                      "credential_environment": {
+                        "type": "string",
+                        "maxLength": 128,
+                        "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                      },
+                      "allow_insecure_http": { "type": "boolean", "const": true },
+                      "mcp": {
+                        "type": "object",
+                        "properties": {
+                          "issues": {
+                            "type": "object",
+                            "properties": {
+                              "server": {
+                                "type": "string",
+                                "maxLength": 128,
+                                "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$"
+                              },
+                              "command": {
+                                "type": "string",
+                                "maxLength": 128,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+                              }
+                            },
+                            "required": ["server", "command"],
+                            "additionalProperties": false
+                          },
+                          "documents": {
+                            "type": "object",
+                            "properties": {
+                              "server": {
+                                "type": "string",
+                                "maxLength": 128,
+                                "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$"
+                              },
+                              "command": {
+                                "type": "string",
+                                "maxLength": 128,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+                              }
+                            },
+                            "required": ["server", "command"],
+                            "additionalProperties": false
+                          },
+                          "remote_source_control": {
+                            "type": "object",
+                            "properties": {
+                              "server": {
+                                "type": "string",
+                                "maxLength": 128,
+                                "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$"
+                              },
+                              "command": {
+                                "type": "string",
+                                "maxLength": 128,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+                              }
+                            },
+                            "required": ["server", "command"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "forgejo": {
+                    "type": "object",
+                    "properties": {
+                      "base_url": {
+                        "type": "string",
+                        "maxLength": 8192,
+                        "pattern": "^[hH][tT][tT][pP][sS]?:\\/\\/(?![^/?#]*@)[^?#]+$",
+                        "format": "uri"
+                      },
+                      "credential_environment": {
+                        "type": "string",
+                        "maxLength": 128,
+                        "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                      },
+                      "allow_insecure_http": { "type": "boolean", "const": true },
+                      "mcp": {
+                        "type": "object",
+                        "properties": {
+                          "issues": {
+                            "type": "object",
+                            "properties": {
+                              "server": {
+                                "type": "string",
+                                "maxLength": 128,
+                                "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$"
+                              },
+                              "command": {
+                                "type": "string",
+                                "maxLength": 128,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+                              }
+                            },
+                            "required": ["server", "command"],
+                            "additionalProperties": false
+                          },
+                          "documents": {
+                            "type": "object",
+                            "properties": {
+                              "server": {
+                                "type": "string",
+                                "maxLength": 128,
+                                "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$"
+                              },
+                              "command": {
+                                "type": "string",
+                                "maxLength": 128,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+                              }
+                            },
+                            "required": ["server", "command"],
+                            "additionalProperties": false
+                          },
+                          "remote_source_control": {
+                            "type": "object",
+                            "properties": {
+                              "server": {
+                                "type": "string",
+                                "maxLength": 128,
+                                "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$"
+                              },
+                              "command": {
+                                "type": "string",
+                                "maxLength": 128,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+                              }
+                            },
+                            "required": ["server", "command"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
             "additionalProperties": false
           },
           "capabilities": {

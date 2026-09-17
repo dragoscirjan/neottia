@@ -1,6 +1,6 @@
 import { createConfigRegistry, createResolvedConfigSnapshot, type ConfigShardValues } from '@neottia/config';
 import { designDocsConfigContribution } from '@neottia/design-docs';
-import { canonicalJson, checksumText, type FileAsset, type HostConfigAsset } from '@neottia/distribution';
+import { canonicalJson, checksumText, runDoctor, type FileAsset, type HostConfigAsset } from '@neottia/distribution';
 import { issueConfigContribution } from '@neottia/issues';
 import { describe, expect, it } from 'vitest';
 
@@ -16,6 +16,7 @@ import {
   issuesCapabilityConfigContribution,
   sourceControlCapabilityConfigContribution,
 } from './config.js';
+import { forgeConnectionsConfigContribution } from './forge-config.js';
 import {
   BUILTIN_SDLC_INSTRUCTION_PACKS,
   createSdlcInstructionPack,
@@ -30,6 +31,7 @@ import { piHarnessAdapter } from '../../../extensions/pi-adapter/src/index.js';
 const registry = createConfigRegistry([
   issueConfigContribution,
   designDocsConfigContribution,
+  forgeConnectionsConfigContribution,
   issuesCapabilityConfigContribution,
   documentsCapabilityConfigContribution,
   sourceControlCapabilityConfigContribution,
@@ -164,6 +166,249 @@ describe('canonical SDLC compiler', () => {
     expect(continueBody).toContain('stop without invoking it');
   });
 
+  it.each([
+    {
+      provider: 'github',
+      documents: true,
+      connection: {
+        base_url: 'https://github.example.test',
+        credential_environment: 'GITHUB_TOKEN',
+      },
+      command: 'gh',
+    },
+    {
+      provider: 'gitlab',
+      documents: true,
+      connection: {
+        base_url: 'https://gitlab.example.test/root/',
+        credential_environment: 'GITLAB_TOKEN',
+      },
+      command: 'glab',
+    },
+    {
+      provider: 'gitea',
+      documents: false,
+      connection: {
+        base_url: 'https://gitea.example.test',
+        credential_environment: 'GITEA_TOKEN',
+        mcp: {
+          issues: { server: 'gitea', command: 'gitea-mcp-server' },
+          remote_source_control: { server: 'gitea', command: 'gitea-mcp-server' },
+        },
+      },
+      command: 'gitea-mcp-server',
+    },
+    {
+      provider: 'forgejo',
+      documents: false,
+      connection: {
+        base_url: 'https://forgejo.example.test',
+        credential_environment: 'FORGEJO_TOKEN',
+        mcp: {
+          issues: { server: 'forgejo', command: 'forgejo-mcp-server' },
+          remote_source_control: { server: 'forgejo', command: 'forgejo-mcp-server' },
+        },
+      },
+      command: 'forgejo-mcp-server',
+    },
+  ] as const)(
+    'compiles equivalent Pi and OpenCode semantics for $provider',
+    ({ provider, documents, connection, command }) => {
+      const values = {
+        'sdlc-issues-capability': { provider },
+        'sdlc-documents-capability': { provider: documents ? provider : 'filesystem' },
+        'sdlc-source-control-capability': { local: 'git', remote: provider, workspaces: false },
+        'sdlc-forge-connections': { [provider]: connection },
+      } as ConfigShardValues;
+      const piInput = createSdlcCompilerInput(snapshot(values), {
+        compilerVersion: '0.1.0',
+        harnessId: 'pi',
+        scope: 'project',
+      });
+      const opencodeInput = createSdlcCompilerInput(snapshot(values), {
+        compilerVersion: '0.1.0',
+        harnessId: 'opencode',
+        scope: 'project',
+      });
+      const pi = compileSdlc(piInput, piHarnessAdapter);
+      const opencode = compileSdlc(opencodeInput, opencodeHarnessAdapter);
+      const piBodies = promptAssets(pi).map(promptBody);
+
+      expect(piBodies).toEqual(promptAssets(opencode).map(promptBody));
+      expect(piBodies.join('\n')).toContain('choose exactly one available tool');
+      expect(piBodies.join('\n')).toContain('never retry the same mutation through another tool');
+      expect(piBodies.join('\n')).toContain('separate explicit authorization');
+      expect(piInput.instructions.filter((pack) => pack.provider === provider).map((pack) => pack.slot)).toEqual(
+        documents ? ['documents', 'issues', 'source-control.remote'] : ['issues', 'source-control.remote'],
+      );
+      expect(pi.assets.prerequisites).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            category: 'configuration',
+            check: { kind: 'environment', variable: connection.credential_environment },
+            instructions: expect.any(String),
+          }),
+          expect.objectContaining({
+            check: { kind: 'command', command },
+            instructions: expect.any(String),
+          }),
+        ]),
+      );
+      for (const other of ['github', 'gitlab', 'gitea', 'forgejo'].filter((candidate) => candidate !== provider)) {
+        expect(piBodies.join('\n')).not.toContain(`https://${other}.example.test`);
+      }
+    },
+  );
+
+  it('renders only the instruction blocks used by each lifecycle template', () => {
+    const input = createSdlcCompilerInput(
+      snapshot({
+        'sdlc-issues-capability': { provider: 'github' },
+        'sdlc-documents-capability': { provider: 'github' },
+        'sdlc-source-control-capability': { local: 'git', remote: 'github', workspaces: false },
+        'sdlc-forge-connections': {
+          github: {
+            base_url: 'https://github.example.test',
+            credential_environment: 'GITHUB_TOKEN',
+          },
+        },
+      }),
+      { compilerVersion: '0.1.0', harnessId: 'pi', scope: 'project' },
+    );
+    const output = compileSdlc(input, piHarnessAdapter);
+    const body = (command: string): string =>
+      promptBody(promptAssets(output).find((asset) => asset.target.segments.at(-1) === `${command}.md`)!);
+
+    for (const command of ['plan', 'build']) {
+      expect(body(command)).not.toContain('## Compiled remote source-control instructions');
+      expect(output.commands.find((candidate) => candidate.id === command)?.instructionPackIds).not.toContain(
+        'neottia.source-control.remote.github',
+      );
+    }
+    expect(body('verify')).toContain('## Compiled remote source-control instructions');
+    expect(body('release')).not.toContain('## Compiled Documents instructions');
+    expect(output.commands.find((command) => command.id === 'release')?.instructionPackIds).not.toContain(
+      'neottia.documents.github',
+    );
+  });
+
+  it('does not require a forge CLI when configured MCP covers every CLI-backed capability', () => {
+    const input = createSdlcCompilerInput(
+      snapshot({
+        'sdlc-issues-capability': { provider: 'github' },
+        'sdlc-source-control-capability': { local: 'git', remote: 'github', workspaces: false },
+        'sdlc-forge-connections': {
+          github: {
+            base_url: 'https://github.example.test',
+            credential_environment: 'GITHUB_TOKEN',
+            mcp: {
+              issues: { server: 'github', command: 'github-mcp-server' },
+              remote_source_control: { server: 'github', command: 'github-mcp-server' },
+            },
+          },
+        },
+      }),
+      {
+        compilerVersion: '0.1.0',
+        harnessId: 'pi',
+        scope: 'project',
+      },
+    );
+    const commands = compileSdlc(input, piHarnessAdapter).assets.prerequisites.flatMap((prerequisite) =>
+      prerequisite.check.kind === 'command' ? [prerequisite.check.command] : [],
+    );
+
+    expect(commands).toContain('github-mcp-server');
+    expect(commands).toContain('git');
+    expect(commands).not.toContain('gh');
+  });
+
+  it('does not require Git when MCP covers forge documents and remote source control is disabled', () => {
+    const input = createSdlcCompilerInput(
+      snapshot({
+        'sdlc-documents-capability': { provider: 'github' },
+        'sdlc-source-control-capability': { local: 'jj', remote: false, workspaces: false },
+        'sdlc-forge-connections': {
+          github: {
+            base_url: 'https://github.example.test',
+            credential_environment: 'GITHUB_TOKEN',
+            mcp: {
+              documents: { server: 'github', command: 'github-mcp-server' },
+            },
+          },
+        },
+      }),
+      {
+        compilerVersion: '0.1.0',
+        harnessId: 'pi',
+        scope: 'project',
+        instructionPacks: [
+          createSdlcInstructionPack({
+            id: 'example.source-control.local.jj',
+            slot: 'source-control.local',
+            provider: 'jj',
+            version: '1.0.0',
+            content: 'Use Jujutsu for local source control.\n',
+          }),
+        ],
+      },
+    );
+    const commands = compileSdlc(input, piHarnessAdapter).assets.prerequisites.flatMap((prerequisite) =>
+      prerequisite.check.kind === 'command' ? [prerequisite.check.command] : [],
+    );
+
+    expect(commands).toContain('github-mcp-server');
+    expect(commands).toContain('jj');
+    expect(commands).not.toContain('git');
+  });
+
+  it('returns actionable doctor results for missing forge tools, credentials, and MCP services', async () => {
+    const input = createSdlcCompilerInput(
+      snapshot({
+        'sdlc-issues-capability': { provider: 'forgejo' },
+        'sdlc-source-control-capability': { local: 'git', remote: 'forgejo', workspaces: false },
+        'sdlc-forge-connections': {
+          forgejo: {
+            base_url: 'https://forgejo.example.test',
+            credential_environment: 'FORGEJO_TOKEN',
+            mcp: {
+              issues: { server: 'forgejo', command: 'forgejo-mcp-server' },
+              remote_source_control: { server: 'forgejo', command: 'forgejo-mcp-server' },
+            },
+          },
+        },
+      }),
+      {
+        compilerVersion: '0.1.0',
+        harnessId: 'pi',
+        scope: 'project',
+      },
+    );
+    const output = compileSdlc(input, piHarnessAdapter);
+    const roots = { project: '/tmp/project', home: '/tmp/home', xdgConfig: '/tmp/config', xdgState: '/tmp/state' };
+    const results = await runDoctor(output.assets, roots, { PATH: '' });
+
+    expect(results).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          category: 'configuration',
+          status: 'error',
+          instructions: expect.stringContaining('FORGEJO_TOKEN'),
+        }),
+        expect.objectContaining({
+          category: 'mcp-server',
+          status: 'error',
+          instructions: expect.stringContaining('forgejo-mcp-server'),
+        }),
+        expect.objectContaining({
+          category: 'tool',
+          status: 'error',
+          instructions: expect.stringContaining('Install Git'),
+        }),
+      ]),
+    );
+  });
+
   it('is byte-deterministic across input enumeration and cloned manifests', () => {
     const options = {
       compilerVersion: '0.1.0',
@@ -183,31 +428,33 @@ describe('canonical SDLC compiler', () => {
   });
 
   it('changes only the selected instruction section when a provider changes', () => {
-    const githubPack = createSdlcInstructionPack({
-      id: 'example.issues.github',
-      slot: 'issues',
-      provider: 'github',
-      version: '1.0.0',
-      content: 'Use the configured GitHub issue integration and preserve issue-number evidence.\n',
-    });
     const filesystemInput = createSdlcCompilerInput(snapshot(), {
       compilerVersion: '0.1.0',
       harnessId: 'pi',
       scope: 'project',
-      instructionPacks: [githubPack],
       runtimePackages,
     });
-    const githubInput = createSdlcCompilerInput(snapshot({ 'sdlc-issues-capability': { provider: 'github' } }), {
-      compilerVersion: '0.1.0',
-      harnessId: 'pi',
-      scope: 'project',
-      instructionPacks: [githubPack],
-      runtimePackages,
-    });
+    const githubInput = createSdlcCompilerInput(
+      snapshot({
+        'sdlc-issues-capability': { provider: 'github' },
+        'sdlc-forge-connections': {
+          github: {
+            base_url: 'https://github.example.test',
+            credential_environment: 'GITHUB_TOKEN',
+          },
+        },
+      }),
+      {
+        compilerVersion: '0.1.0',
+        harnessId: 'pi',
+        scope: 'project',
+        runtimePackages,
+      },
+    );
     const filesystem = compileSdlc(filesystemInput, piHarnessAdapter);
     const github = compileSdlc(githubInput, piHarnessAdapter);
     const filesystemIssues = BUILTIN_SDLC_INSTRUCTION_PACKS.find((pack) => pack.slot === 'issues')!.content.trimEnd();
-    const githubIssues = githubPack.content.trimEnd();
+    const githubIssues = githubInput.instructions.find((pack) => pack.slot === 'issues')!.content.trimEnd();
 
     expect(promptAssets(filesystem).map((asset) => promptBody(asset).replace(filesystemIssues, '<issues>'))).toEqual(
       promptAssets(github).map((asset) => promptBody(asset).replace(githubIssues, '<issues>')),
@@ -389,6 +636,30 @@ describe('canonical SDLC compiler', () => {
     expect(plan).toContain('### researcher\n\nPlan');
   });
 
+  it('restores replacement-token fragments literally after tracked rendering', () => {
+    const content = "Literal replacement tokens: $& $` $'\n";
+    const role = createSdlcRoleInstruction({
+      id: 'example.role.literal-tokens',
+      command: 'plan',
+      role: 'planner',
+      version: '1.0.0',
+      content,
+    });
+    const output = compileSdlc(
+      createSdlcCompilerInput(snapshot(), {
+        compilerVersion: '0.1.0',
+        harnessId: 'pi',
+        scope: 'project',
+        roles: [role],
+      }),
+      piHarnessAdapter,
+    );
+    const plan = promptBody(promptAssets(output).find((asset) => asset.target.segments.at(-1) === 'plan.md')!);
+
+    expect(plan.split(content.trimEnd())).toHaveLength(2);
+    expect(plan).not.toContain('NEOTTIA_FRAGMENT_');
+  });
+
   it('rejects missing variables and unsafe Twig functions before projection', () => {
     const packagedPlan = packagedTemplateLayer.files.find((template) => template.id === 'neottia.sdlc.command.plan')!;
     for (const [expression, expected] of [
@@ -486,7 +757,7 @@ describe('canonical SDLC compiler', () => {
       ],
       [
         resignCompilerInput(input, { configuration: githubConfiguration }),
-        'does not match selected provider for issues',
+        'forge connections do not match selected capabilities',
       ],
       [
         resignCompilerInput(input, { instructions: input.instructions.slice(1) }),
@@ -515,6 +786,61 @@ describe('canonical SDLC compiler', () => {
       expect(() => compileSdlc(decoded, spyAdapter)).toThrow(message);
     }
     expect(adapterCalls).toBe(0);
+  });
+
+  it('rejects conflicting MCP commands across selected forge connections', () => {
+    expect(() =>
+      createSdlcCompilerInput(
+        snapshot({
+          'sdlc-issues-capability': { provider: 'github' },
+          'sdlc-source-control-capability': { local: 'git', remote: 'gitlab', workspaces: false },
+          'sdlc-forge-connections': {
+            github: {
+              base_url: 'https://github.example.test',
+              credential_environment: 'GITHUB_TOKEN',
+              mcp: { issues: { server: 'shared-forge', command: 'github-mcp-server' } },
+            },
+            gitlab: {
+              base_url: 'https://gitlab.example.test',
+              credential_environment: 'GITLAB_TOKEN',
+              mcp: { remote_source_control: { server: 'shared-forge', command: 'gitlab-mcp-server' } },
+            },
+          },
+        }),
+        { compilerVersion: '0.1.0', harnessId: 'pi', scope: 'project' },
+      ),
+    ).toThrow('forge MCP server maps to conflicting commands');
+  });
+
+  it('rejects conflicting MCP commands in resigned compiler inputs', () => {
+    const input = createSdlcCompilerInput(
+      snapshot({
+        'sdlc-issues-capability': { provider: 'github' },
+        'sdlc-source-control-capability': { local: 'git', remote: 'github', workspaces: false },
+        'sdlc-forge-connections': {
+          github: {
+            base_url: 'https://github.example.test',
+            credential_environment: 'GITHUB_TOKEN',
+            mcp: {
+              issues: { server: 'github', command: 'github-mcp-server' },
+              remote_source_control: { server: 'github', command: 'github-mcp-server' },
+            },
+          },
+        },
+      }),
+      { compilerVersion: '0.1.0', harnessId: 'pi', scope: 'project' },
+    );
+    const context = structuredClone(input.configuration.context);
+    context.forges[0]!.mcp.remoteSourceControl!.command = 'other-mcp-server';
+    const configuration = {
+      ...input.configuration,
+      context,
+      checksum: checksumText(canonicalJson(context)),
+    };
+
+    expect(() => compileSdlc(resignCompilerInput(input, { configuration }), piHarnessAdapter)).toThrow(
+      'forge MCP server maps to conflicting commands',
+    );
   });
 
   it('preserves adapter diagnostics without guessing an alternate projection', () => {

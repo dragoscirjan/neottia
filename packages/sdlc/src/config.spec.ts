@@ -18,10 +18,12 @@ import {
   sourceControlCapabilityConfigPatchSchema,
   sourceControlCapabilityConfigSchema,
 } from './config.js';
+import { forgeConnectionsConfigContribution } from './forge-config.js';
 
 const registry = createConfigRegistry([
   issueConfigContribution,
   designDocsConfigContribution,
+  forgeConnectionsConfigContribution,
   issuesCapabilityConfigContribution,
   documentsCapabilityConfigContribution,
   sourceControlCapabilityConfigContribution,
@@ -94,6 +96,7 @@ describe('SDLC compiler context', () => {
       issues: { provider: 'filesystem' },
       documents: { provider: 'filesystem' },
       sourceControl: { local: 'git', remote: { enabled: false }, workspaces: false },
+      forges: [],
     });
     expect(Object.isFrozen(context)).toBe(true);
     expect(Object.isFrozen(context.issues)).toBe(true);
@@ -108,6 +111,16 @@ describe('SDLC compiler context', () => {
       snapshot({
         'sdlc-issues-capability': { provider: 'github' },
         'sdlc-documents-capability': { provider: 'confluence' },
+        'sdlc-forge-connections': {
+          github: {
+            base_url: 'https://github.example.test',
+            credential_environment: 'GITHUB_TOKEN',
+            mcp: {
+              documents: { server: 'unused-documents', command: 'github-mcp-server' },
+              remote_source_control: { server: 'unused-remote', command: 'github-mcp-server' },
+            },
+          },
+        },
         'sdlc-source-control-capability': {
           local: 'jj',
           remote: 'bitbucket',
@@ -124,7 +137,69 @@ describe('SDLC compiler context', () => {
         remote: { enabled: true, provider: 'bitbucket' },
         workspaces: false,
       },
+      forges: [
+        {
+          provider: 'github',
+          capabilities: ['issues'],
+          baseUrl: 'https://github.example.test',
+          credentialEnvironment: 'GITHUB_TOKEN',
+          allowInsecureHttp: false,
+          mcp: {},
+        },
+      ],
     });
+  });
+
+  it('requires explicit opt-in before compiling an HTTP forge connection', () => {
+    const values = {
+      'sdlc-issues-capability': { provider: 'gitlab' },
+      'sdlc-forge-connections': {
+        gitlab: {
+          base_url: 'http://gitlab.example.test',
+          credential_environment: 'GITLAB_TOKEN',
+        },
+      },
+    } satisfies ConfigShardValues;
+
+    expect(() => createSdlcCompilerContext(snapshot(values))).toThrowError(
+      expect.objectContaining({
+        problems: expect.arrayContaining([expect.objectContaining({ code: 'FORGE_INSECURE_HTTP_REQUIRES_OPT_IN' })]),
+      }),
+    );
+    expect(
+      createSdlcCompilerContext(
+        snapshot({
+          ...values,
+          'sdlc-forge-connections': {
+            gitlab: { ...values['sdlc-forge-connections'].gitlab, allow_insecure_http: true },
+          },
+        }),
+      ).forges[0]?.allowInsecureHttp,
+    ).toBe(true);
+  });
+
+  it('rejects missing connections, unsupported documents, and required MCP services', () => {
+    const invalid = snapshot({
+      'sdlc-issues-capability': { provider: 'gitea' },
+      'sdlc-documents-capability': { provider: 'gitea' },
+      'sdlc-source-control-capability': { local: 'git', remote: 'forgejo', workspaces: false },
+      'sdlc-forge-connections': {
+        gitea: {
+          base_url: 'https://gitea.example.test',
+          credential_environment: 'GITEA_TOKEN',
+        },
+      },
+    });
+
+    expect(() => createSdlcCompilerContext(invalid)).toThrowError(
+      expect.objectContaining({
+        problems: expect.arrayContaining([
+          expect.objectContaining({ code: 'FORGE_CAPABILITY_UNSUPPORTED' }),
+          expect.objectContaining({ code: 'FORGE_CONNECTION_REQUIRED' }),
+          expect.objectContaining({ code: 'FORGE_MCP_REQUIRED' }),
+        ]),
+      }),
+    );
   });
 
   it('reports every cross-shard conflict without rejected values', () => {

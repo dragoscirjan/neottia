@@ -11,11 +11,13 @@ import {
   issuesCapabilityConfigContribution,
   sourceControlCapabilityConfigContribution,
 } from './config.js';
+import { forgeConnectionsConfigContribution } from './forge-config.js';
 
 const roots: string[] = [];
 const registry = createConfigRegistry([
   issueConfigContribution,
   designDocsConfigContribution,
+  forgeConnectionsConfigContribution,
   issuesCapabilityConfigContribution,
   documentsCapabilityConfigContribution,
   sourceControlCapabilityConfigContribution,
@@ -48,6 +50,7 @@ modules:
       issues: { provider: 'filesystem' },
       documents: { provider: 'filesystem' },
       sourceControl: { local: 'git', remote: { enabled: false }, workspaces: false },
+      forges: [],
     });
   });
 
@@ -80,6 +83,7 @@ profiles:
         remote: { enabled: true, provider: 'bitbucket' },
         workspaces: false,
       },
+      forges: [],
     });
     expect(snapshot.sourceOf(issuesCapabilityConfigContribution, ['provider'])).toEqual({
       kind: 'profile',
@@ -90,6 +94,51 @@ profiles:
       kind: 'profile',
       file: join(cwd, '.neottia', 'config.yml'),
       profile: 'atlassian',
+    });
+  });
+
+  it('selects only the active profile connection and retains its provenance', () => {
+    const cwd = fixture(`version: 1
+modules:
+  design_docs:
+    enabled: true
+capabilities:
+  issues:
+    provider: github
+connections:
+  forges:
+    github:
+      base_url: https://github.com
+      credential_environment: GITHUB_TOKEN
+profiles:
+  self-hosted:
+    capabilities:
+      issues:
+        provider: gitlab
+    connections:
+      forges:
+        gitlab:
+          base_url: https://gitlab.example.test/root/
+          credential_environment: GITLAB_TOKEN
+`);
+
+    const snapshot = resolveConfig(registry, { cwd, env: { NEOTTIA_PROFILE: 'self-hosted' } });
+    const context = createSdlcCompilerContext(snapshot);
+
+    expect(context.forges).toEqual([
+      {
+        provider: 'gitlab',
+        capabilities: ['issues'],
+        baseUrl: 'https://gitlab.example.test/root/',
+        credentialEnvironment: 'GITLAB_TOKEN',
+        allowInsecureHttp: false,
+        mcp: {},
+      },
+    ]);
+    expect(snapshot.sourceOf(forgeConnectionsConfigContribution, ['gitlab', 'base_url'])).toEqual({
+      kind: 'profile',
+      file: join(cwd, '.neottia', 'config.yml'),
+      profile: 'self-hosted',
     });
   });
 
@@ -126,6 +175,11 @@ capabilities:
     provider: github
   documents:
     provider: confluence
+connections:
+  forges:
+    github:
+      base_url: https://github.example.test
+      credential_environment: GITHUB_TOKEN
 `);
     const path = join(cwd, '.neottia', 'config.yml');
     const snapshot = resolveConfig(registry, { cwd, env: {} });
@@ -146,6 +200,16 @@ capabilities:
       issues: { provider: 'github' },
       documents: { provider: 'confluence' },
       sourceControl: { local: 'git', remote: { enabled: false }, workspaces: false },
+      forges: [
+        {
+          provider: 'github',
+          capabilities: ['issues'],
+          baseUrl: 'https://github.example.test',
+          credentialEnvironment: 'GITHUB_TOKEN',
+          allowInsecureHttp: false,
+          mcp: {},
+        },
+      ],
     });
   });
 

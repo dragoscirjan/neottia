@@ -7,6 +7,7 @@ import { memoryConfigContribution } from '@neottia/memory-core';
 import {
   createSdlcCompilerContext,
   documentsCapabilityConfigContribution,
+  forgeConnectionsConfigContribution,
   issuesCapabilityConfigContribution,
   sourceControlCapabilityConfigContribution,
 } from '@neottia/sdlc';
@@ -69,11 +70,12 @@ templates:
       'distribution-harness-install',
       'distribution-asset-install',
       'distribution-template-install',
+      'sdlc-forge-connections',
       'sdlc-issues-capability',
       'sdlc-documents-capability',
       'sdlc-source-control-capability',
     ]);
-    expect(officialConfigRegistry.contributions).toHaveLength(10);
+    expect(officialConfigRegistry.contributions).toHaveLength(11);
     expect(snapshot.get(memoryConfigContribution).enabled).toBe(true);
     expect(snapshot.get(issueConfigContribution).enabled).toBe(true);
     expect(snapshot.get(designDocsConfigContribution).enabled).toBe(true);
@@ -85,6 +87,7 @@ templates:
       global_overrides: [],
       project_overrides: [],
     });
+    expect(snapshot.get(forgeConnectionsConfigContribution)).toEqual({});
     expect(snapshot.get(issuesCapabilityConfigContribution)).toEqual({ provider: 'filesystem' });
     expect(snapshot.get(documentsCapabilityConfigContribution)).toEqual({ provider: 'filesystem' });
     expect(snapshot.get(sourceControlCapabilityConfigContribution)).toEqual({

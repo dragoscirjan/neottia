@@ -45,11 +45,11 @@ describe('SDLC template loader', () => {
     const packagedPlan = packaged.files.find((file) => file.id === 'neottia.sdlc.command.plan')!;
     await writeOverride(
       globalRoot,
-      'plan.md',
+      'plan.md.twig',
       packagedPlan.content.replace('Turn the request', 'Turn the global request'),
     );
     const projectContent = packagedPlan.content.replace('Turn the request', 'Turn the project request');
-    await writeOverride(projectRoot, 'plan.md', projectContent);
+    await writeOverride(projectRoot, 'plan.md.twig', projectContent);
 
     const layers = await loadSdlcTemplateLayers({ globalRoot, projectRoot });
     const templates = resolveTemplates(
@@ -65,9 +65,18 @@ describe('SDLC template loader', () => {
 
   it('rejects unknown command filenames instead of ignoring them', async () => {
     const projectRoot = await temporaryRoot('neottia-sdlc-unknown-');
-    await writeOverride(projectRoot, 'deploy.md', '# Deploy\n');
+    await writeOverride(projectRoot, 'deploy.md.twig', '# Deploy\n');
 
-    await expect(loadSdlcTemplateLayers({ projectRoot })).rejects.toThrow('Unknown SDLC template filename deploy.md.');
+    await expect(loadSdlcTemplateLayers({ projectRoot })).rejects.toThrow(
+      'Unknown SDLC template filename deploy.md.twig.',
+    );
+  });
+
+  it('rejects unsuffixed Twig override filenames', async () => {
+    const projectRoot = await temporaryRoot('neottia-sdlc-unsuffixed-');
+    await writeOverride(projectRoot, 'plan.md', '# Plan\n');
+
+    await expect(loadSdlcTemplateLayers({ projectRoot })).rejects.toThrow('Unknown SDLC template filename plan.md.');
   });
 
   it('rejects linked override directories before reading templates', async () => {

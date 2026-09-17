@@ -2,6 +2,7 @@
 *.lock
 *.log
 *.gyp
+*.twig
 *.cc
 .editorconfig
 .gitattributes

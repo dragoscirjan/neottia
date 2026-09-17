@@ -39,10 +39,39 @@ export {
 export {
   createSdlcCompilerContext,
   SdlcConfigError,
+  validateSdlcCompilerContext,
   type SdlcCompilerContext,
   type SdlcConfigProblem,
   type SdlcConfigProblemCode,
+  type SdlcForgeConnectionContext,
+  type SdlcForgeMcpContext,
 } from './compiler-context.js';
+export {
+  forgeBaseUrlSchema,
+  forgeConnectionPatchSchema,
+  forgeConnectionSchema,
+  forgeConnectionsConfigContribution,
+  forgeConnectionsConfigPatchSchema,
+  forgeConnectionsConfigSchema,
+  forgeCredentialEnvironmentSchema,
+  forgeMcpConfigSchema,
+  forgeMcpServiceSchema,
+  type ForgeConnection,
+  type ForgeConnectionsConfig,
+  type ForgeMcpConfig,
+  type ForgeMcpService,
+} from './forge-config.js';
+export { createForgeInstructionPacks } from './forge-instructions.js';
+export {
+  FORGE_CAPABILITIES,
+  FORGE_PROVIDERS,
+  FORGE_SUPPORT_DECLARATIONS,
+  isForgeProvider,
+  type ForgeCapability,
+  type ForgeCliSupport,
+  type ForgeProvider,
+  type ForgeSupportDeclaration,
+} from './forge-support.js';
 export {
   BUILTIN_SDLC_INSTRUCTION_PACKS,
   createSdlcInstructionPack,

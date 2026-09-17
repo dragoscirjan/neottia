@@ -18,21 +18,22 @@
 {% for condition in command.stopConditions %}- {{ condition }}
 {% endfor %}
 
-## Compiled Issues instructions
+{% block issues_instructions %}## Compiled Issues instructions
 
 {{ instructions.issues }}
-
-## Compiled Documents instructions
+{% endblock %}
+{% block documents_instructions %}## Compiled Documents instructions
 
 {{ instructions.documents }}
-
-## Compiled local source-control instructions
+{% endblock %}
+{% block local_source_control_instructions %}## Compiled local source-control instructions
 
 {{ instructions.sourceControl.local }}
-
-## Compiled remote source-control instructions
+{% endblock %}
+{% block remote_source_control_instructions %}## Compiled remote source-control instructions
 
 {{ instructions.sourceControl.remote }}
+{% endblock %}
 
 ## Role invocation
 

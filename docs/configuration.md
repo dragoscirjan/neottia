@@ -47,6 +47,10 @@ Every present file must have the exact integer `version: 1`. The supported root 
 | Documents provider | `capabilities.documents`      | [SDLC provider selection](#sdlc-provider-selection) |
 | Source control     | `capabilities.source_control` | [SDLC provider selection](#sdlc-provider-selection) |
 
+| Provider connection | Canonical path       | Reference                                           |
+| ------------------- | -------------------- | --------------------------------------------------- |
+| Forge connections   | `connections.forges` | [Forge provider configuration](./sdlc/providers.md) |
+
 | Distribution setting | Canonical path      | Reference                             |
 | -------------------- | ------------------- | ------------------------------------- |
 | Harness targets      | `harnesses.install` | [Asset distribution](./distribution/) |
@@ -182,12 +186,12 @@ capabilities:
 
 Remote names reserve stable compiler selections for provider instruction packages. Selecting a name does not install instructions, authenticate a provider, or grant access.
 
-| Capability            | Accepted selections                                                | Delivery status                                                                          |
-| --------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
-| Issues                | `filesystem`, `github`, `gitlab`, `gitea`, `forgejo`, `jira`       | Filesystem is available; remote instruction packages are planned in issues #116 and #117 |
-| Documents             | `filesystem`, `github`, `gitlab`, `gitea`, `forgejo`, `confluence` | Filesystem is available; remote instruction packages are planned in issues #116 and #117 |
-| Local source control  | `git`, `jj`                                                        | Git instructions are available; Jujutsu instructions are planned in issue #117           |
-| Remote source control | `false`, `github`, `gitlab`, `gitea`, `forgejo`, `bitbucket`       | Disabled mode is available; remote instruction packs are planned in issues #116 and #117 |
+| Capability            | Accepted selections                                                | Delivery status                                                                                      |
+| --------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| Issues                | `filesystem`, `github`, `gitlab`, `gitea`, `forgejo`, `jira`       | Filesystem and the four forge bundles are available. Gitea and Forgejo require MCP. Jira is planned. |
+| Documents             | `filesystem`, `github`, `gitlab`, `gitea`, `forgejo`, `confluence` | Filesystem, GitHub, and GitLab are available. Gitea and Forgejo are rejected. Confluence is planned. |
+| Local source control  | `git`, `jj`                                                        | Git instructions are available. Jujutsu is planned.                                                  |
+| Remote source control | `false`, `github`, `gitlab`, `gitea`, `forgejo`, `bitbucket`       | The four forge bundles are available. Gitea and Forgejo require MCP. Bitbucket is planned.           |
 
 `remote` is one scalar. Set it to `false` or one supported forge:
 
@@ -204,11 +208,33 @@ capabilities:
     workspaces: false
 ```
 
-The scalar remote selection replaces atomically across global, project, and profile layers. A profile can set `remote: false` without retaining a lower provider. Provider-specific URLs, credentials, and tool names remain outside this package.
+The scalar remote selection replaces atomically across global, project, and profile layers. A profile can set `remote: false` without retaining a lower provider.
 
-Git workspaces require `local: git`. `createSdlcCompilerContext(snapshot)` reports that conflict and disabled filesystem modules through typed, value-free `SdlcConfigError` problems. It reads only the supplied snapshot and returns a deeply frozen context.
+A selected forge also needs a strict `connections.forges.<provider>` entry. The entry stores an HTTP or HTTPS base URL and the name of a credential environment variable. HTTP connections also require `allow_insecure_http: true`; HTTPS connections omit that field. Optional MCP entries use strict `{server, command}` pairs for `issues`, `documents`, or `remote_source_control`. Configuration stores names only, never token values.
 
-`loadSdlcTemplateLayers()` reads the six published Markdown/Twig templates and complete command overrides from `.neottia/templates/sdlc/<command>.md`. It rejects unknown command filenames. Pass its result to `createSdlcCompilerInput()`, which adds resolved template, instruction, role, configuration, and runtime package provenance. `compileSdlc()` then projects the canonical six-command lifecycle through a Pi or OpenCode adapter. Runtime package IDs and exact versions are separate compiler inputs. The compiler never infers packages from provider selections. See [the SDLC compiler guide](./sdlc/) for the complete input, output, and installation handoff.
+```yaml
+version: 1
+capabilities:
+  issues:
+    provider: github
+  documents:
+    provider: github
+  source_control:
+    local: git
+    remote: github
+    workspaces: true
+connections:
+  forges:
+    github:
+      base_url: https://github.com
+      credential_environment: GITHUB_TOKEN
+```
+
+Git workspaces require `local: git`. `createSdlcCompilerContext(snapshot)` also rejects a missing selected connection, an unsupported forge capability, or a missing required Gitea or Forgejo MCP service. It reports typed, value-free `SdlcConfigError` problems, reads only the supplied snapshot, and returns a deeply frozen context.
+
+Read [forge provider configuration](./sdlc/providers.md) for the support matrix, self-hosted URLs, CLI and MCP setup, authentication, mutation safety, and troubleshooting.
+
+`loadSdlcTemplateLayers()` reads the six published `.md.twig` templates and complete command overrides from `.neottia/templates/sdlc/<command>.md.twig`. It rejects unknown command filenames. Pass its result to `createSdlcCompilerInput()`, which adds resolved template, instruction, role, configuration, and runtime package provenance. `compileSdlc()` then projects the canonical six-command lifecycle through a Pi or OpenCode adapter. Runtime package IDs and exact versions are separate compiler inputs. The compiler never infers packages from provider selections. See [the SDLC compiler guide](./sdlc/) for the complete input, output, and installation handoff.
 
 ## Profiles
 
