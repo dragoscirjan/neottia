@@ -40,6 +40,18 @@ import { compileSdlc, createSdlcCompilerInput, loadSdlcTemplateLayers } from "@n
 const snapshot = resolveHostConfigSnapshot({
   cwd: process.cwd(),
   interactive: false,
+  overrides: {
+    agents: {
+      sdlc: {
+        pi: {
+          planner: { agent: "current" },
+          implementer: { agent: "current" },
+          verifier: { agent: "current" },
+          "release-coordinator": { agent: "current" },
+        },
+      },
+    },
+  },
 });
 
 const templateLayers = await loadSdlcTemplateLayers({

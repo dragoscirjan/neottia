@@ -1,4 +1,5 @@
 import { createConfigRegistry, createResolvedConfigSnapshot, type ConfigShardValues } from '@neottia/config';
+import { defineHarnessDeclaration } from '@neottia/harness-adapter';
 import { describe, expect, it } from 'vitest';
 
 import { SdlcConfigError } from './compiler-context.js';
@@ -40,7 +41,7 @@ describe('portable SDLC role compilation', () => {
   it('reports every missing required role before projection', () => {
     let thrown: unknown;
     try {
-      createSdlcRoleCompilerContext(snapshot(), 'pi', piHarnessDeclaration);
+      createSdlcRoleCompilerContext(snapshot(), 'pi', piHarnessDeclaration, 'project');
     } catch (error) {
       thrown = error;
     }
@@ -61,6 +62,7 @@ describe('portable SDLC role compilation', () => {
       snapshot({ pi: REQUIRED_CURRENT_ASSIGNMENTS }),
       'pi',
       piHarnessDeclaration,
+      'project',
     );
     const instructions = createConfiguredSdlcRoleInstructions(context);
 
@@ -85,6 +87,7 @@ describe('portable SDLC role compilation', () => {
         snapshot({ pi: { ...REQUIRED_CURRENT_ASSIGNMENTS, planner: { agent: 'neottia-planner' } } }),
         'pi',
         piHarnessDeclaration,
+        'project',
       ),
     ).toThrowError(
       expect.objectContaining({
@@ -110,8 +113,9 @@ describe('portable SDLC role compilation', () => {
       }),
       'opencode',
       opencodeHarnessDeclaration,
+      'project',
     );
-    const agents = createSdlcRoleAgentRequests(context, 'project');
+    const agents = createSdlcRoleAgentRequests(context);
     const planner = createConfiguredSdlcRoleInstructions(context).find(({ role }) => role === 'planner')!;
 
     expect(JSON.stringify(context)).not.toContain('unused-pi-agent');
@@ -133,6 +137,59 @@ describe('portable SDLC role compilation', () => {
     expect(planner.content).toContain('Required tools: `issue_read`');
   });
 
+  it('rejects named routes outside the declared native-agent scopes', () => {
+    const globalOnlyDeclaration = defineHarnessDeclaration({
+      ...opencodeHarnessDeclaration,
+      features: {
+        ...opencodeHarnessDeclaration.features,
+        'asset.agent': { ...opencodeHarnessDeclaration.features['asset.agent'], scopes: ['global'] },
+        'agent.subagent': { ...opencodeHarnessDeclaration.features['agent.subagent'], scopes: ['global'] },
+      },
+    });
+    const configured = snapshot({
+      opencode: {
+        ...REQUIRED_CURRENT_ASSIGNMENTS,
+        planner: { agent: 'neottia-planner' },
+      },
+    });
+
+    expect(() => createSdlcRoleCompilerContext(configured, 'opencode', globalOnlyDeclaration, 'project')).toThrowError(
+      expect.objectContaining({
+        problems: [expect.objectContaining({ code: 'ROLE_ASSIGNMENT_UNSUPPORTED' })],
+      }),
+    );
+
+    const context = createSdlcRoleCompilerContext(configured, 'opencode', globalOnlyDeclaration, 'global');
+    expect(createSdlcRoleAgentRequests(context)[0]?.request.scope).toBe('global');
+  });
+
+  it('emits optional agent metadata only in its declared scopes', () => {
+    const globalMetadataDeclaration = defineHarnessDeclaration({
+      ...opencodeHarnessDeclaration,
+      features: {
+        ...opencodeHarnessDeclaration.features,
+        'agent.model': { ...opencodeHarnessDeclaration.features['agent.model'], scopes: ['global'] },
+        'agent.steps': { ...opencodeHarnessDeclaration.features['agent.steps'], scopes: ['global'] },
+      },
+    });
+    const configured = snapshot({
+      opencode: {
+        ...REQUIRED_CURRENT_ASSIGNMENTS,
+        planner: { agent: 'neottia-planner', model: 'provider/model' },
+      },
+    });
+
+    const projectContext = createSdlcRoleCompilerContext(configured, 'opencode', globalMetadataDeclaration, 'project');
+    const projectAgent = createSdlcRoleAgentRequests(projectContext)[0]!.request;
+    expect(projectAgent).not.toHaveProperty('modelHint');
+    expect(projectAgent).not.toHaveProperty('steps');
+
+    const globalContext = createSdlcRoleCompilerContext(configured, 'opencode', globalMetadataDeclaration, 'global');
+    const globalAgent = createSdlcRoleAgentRequests(globalContext)[0]!.request;
+    expect(globalAgent.modelHint).toBe('provider/model');
+    expect(globalAgent.steps).toBe(SDLC_ROLE_MAX_STEPS);
+  });
+
   it('rejects duplicate native agent targets and tampered requiredness', () => {
     expect(() =>
       createSdlcRoleCompilerContext(
@@ -146,6 +203,7 @@ describe('portable SDLC role compilation', () => {
         }),
         'opencode',
         opencodeHarnessDeclaration,
+        'project',
       ),
     ).toThrowError(
       expect.objectContaining({
@@ -157,6 +215,7 @@ describe('portable SDLC role compilation', () => {
       snapshot({ pi: REQUIRED_CURRENT_ASSIGNMENTS }),
       'pi',
       piHarnessDeclaration,
+      'project',
     );
     const tampered = structuredClone(context);
     tampered.roles[0]!.required = false;

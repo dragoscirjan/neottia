@@ -77,13 +77,13 @@ export const SDLC_ROLE_DECLARATIONS: Readonly<Record<SdlcRoleId, SdlcRoleDeclara
   ),
 });
 
-/** Adapter features that affect portable role projection. */
+/** Adapter feature scopes that affect portable role projection. */
 export interface SdlcRoleHostSupport {
-  readonly agentAsset: boolean;
-  readonly subagent: boolean;
-  readonly model: boolean;
-  readonly steps: boolean;
-  readonly thinking: boolean;
+  readonly agentAsset: readonly HarnessScope[];
+  readonly subagent: readonly HarnessScope[];
+  readonly model: readonly HarnessScope[];
+  readonly steps: readonly HarnessScope[];
+  readonly thinking: readonly HarnessScope[];
 }
 
 /** One selected assignment detached from unselected harness configuration. */
@@ -96,6 +96,7 @@ export interface SdlcSelectedRoleAssignment {
 /** Selected-only role context serialized into compiler input. */
 export interface SdlcRoleCompilerContext {
   readonly harnessId: SdlcRoleHarnessId;
+  readonly scope: HarnessScope;
   readonly hostSupport: SdlcRoleHostSupport;
   readonly roles: readonly SdlcSelectedRoleAssignment[];
 }
@@ -107,13 +108,17 @@ export interface SdlcProjectedRoleAgent {
   readonly request: AgentProjectionRequest;
 }
 
+const hostFeatureScopesSchema = z
+  .array(z.enum(['project', 'global']))
+  .max(2)
+  .refine((scopes) => new Set(scopes).size === scopes.length, 'Host feature scopes must be unique.');
 const roleHostSupportSchema = z
   .object({
-    agentAsset: z.boolean(),
-    subagent: z.boolean(),
-    model: z.boolean(),
-    steps: z.boolean(),
-    thinking: z.boolean(),
+    agentAsset: hostFeatureScopesSchema,
+    subagent: hostFeatureScopesSchema,
+    model: hostFeatureScopesSchema,
+    steps: hostFeatureScopesSchema,
+    thinking: hostFeatureScopesSchema,
   })
   .strict();
 
@@ -121,6 +126,7 @@ const roleHostSupportSchema = z
 export const sdlcRoleCompilerContextSchema = z
   .object({
     harnessId: z.enum(SDLC_ROLE_HARNESS_IDS),
+    scope: z.enum(['project', 'global']),
     hostSupport: roleHostSupportSchema,
     roles: z.array(
       z
@@ -139,6 +145,7 @@ export function createSdlcRoleCompilerContext(
   snapshot: ResolvedConfigSnapshot,
   harnessId: string,
   declaration: HarnessDeclaration,
+  scope: HarnessScope,
 ): SdlcRoleCompilerContext {
   if (declaration.id !== harnessId) throw new TypeError('Role compiler harness declaration does not match its ID.');
   if (!isSdlcRoleHarnessId(harnessId)) {
@@ -167,7 +174,7 @@ export function createSdlcRoleCompilerContext(
       });
     }
     if (assignment !== undefined && assignment.agent !== 'current') {
-      if (!supportsNamedAgent(support)) {
+      if (!supportsNamedAgent(support, scope)) {
         problems.push({
           code: 'ROLE_ASSIGNMENT_UNSUPPORTED',
           path: ['agents', 'sdlc', harnessId, roleId, 'agent'],
@@ -188,7 +195,7 @@ export function createSdlcRoleCompilerContext(
     return Object.freeze({ role: roleId, required: roleDefinition.required, ...(assignment ? { assignment } : {}) });
   });
   if (problems.length > 0) throw new SdlcConfigError(problems);
-  const context = Object.freeze({ harnessId, hostSupport: support, roles: Object.freeze(roles) });
+  const context = Object.freeze({ harnessId, scope, hostSupport: support, roles: Object.freeze(roles) });
   validateSdlcRoleCompilerContext(context);
   return context;
 }
@@ -210,7 +217,7 @@ export function validateSdlcRoleCompilerContext(context: SdlcRoleCompilerContext
       throw new TypeError('SDLC role context is missing a required assignment.');
     }
     if (selected.assignment?.agent !== undefined && selected.assignment.agent !== 'current') {
-      if (!supportsNamedAgent(context.hostSupport)) {
+      if (!supportsNamedAgent(context.hostSupport, context.scope)) {
         throw new TypeError('SDLC role context contains an unsupported named assignment.');
       }
       if (namedAgents.has(selected.assignment.agent))
@@ -240,10 +247,7 @@ export function createConfiguredSdlcRoleInstructions(context: SdlcRoleCompilerCo
 }
 
 /** Creates native subagent requests only for routes the selected host can represent. */
-export function createSdlcRoleAgentRequests(
-  context: SdlcRoleCompilerContext,
-  scope: HarnessScope,
-): readonly SdlcProjectedRoleAgent[] {
+export function createSdlcRoleAgentRequests(context: SdlcRoleCompilerContext): readonly SdlcProjectedRoleAgent[] {
   validateSdlcRoleCompilerContext(context);
   return Object.freeze(
     context.roles.flatMap((selected): SdlcProjectedRoleAgent[] => {
@@ -252,15 +256,17 @@ export function createSdlcRoleAgentRequests(
       const declaration = SDLC_ROLE_DECLARATIONS[selected.role];
       const request: AgentProjectionRequest = Object.freeze({
         id: assignment.agent,
-        scope,
-        body: roleAgentBody(selected, context.hostSupport),
+        scope: context.scope,
+        body: roleAgentBody(selected, context),
         description: declaration.description,
         mode: 'subagent' as const,
-        ...(assignment.model === undefined || !context.hostSupport.model ? {} : { modelHint: assignment.model }),
-        ...(assignment.thinking === undefined || !context.hostSupport.thinking
+        ...(assignment.model === undefined || !supportsScope(context.hostSupport.model, context.scope)
+          ? {}
+          : { modelHint: assignment.model }),
+        ...(assignment.thinking === undefined || !supportsScope(context.hostSupport.thinking, context.scope)
           ? {}
           : { thinkingHint: assignment.thinking }),
-        ...(context.hostSupport.steps ? { steps: SDLC_ROLE_MAX_STEPS } : {}),
+        ...(supportsScope(context.hostSupport.steps, context.scope) ? { steps: SDLC_ROLE_MAX_STEPS } : {}),
       });
       return [{ role: selected.role, assignment, request: Object.freeze(request) }];
     }),
@@ -296,15 +302,18 @@ export function validateSdlcRoleHostDeclaration(
   }
 }
 
-/** Converts the relevant #113 declaration features into deterministic booleans. */
+/** Converts the relevant #113 declaration features into immutable scope lists. */
 export function roleHostSupport(declaration: HarnessDeclaration): SdlcRoleHostSupport {
-  const supported = (feature: HostFeature): boolean => declaration.features[feature].status === 'supported';
+  const scopes = (feature: HostFeature): readonly HarnessScope[] => {
+    const support = declaration.features[feature];
+    return Object.freeze(support.status === 'supported' ? [...support.scopes] : []);
+  };
   return Object.freeze({
-    agentAsset: supported('asset.agent'),
-    subagent: supported('agent.subagent'),
-    model: supported('agent.model'),
-    steps: supported('agent.steps'),
-    thinking: supported('agent.thinking'),
+    agentAsset: scopes('asset.agent'),
+    subagent: scopes('agent.subagent'),
+    model: scopes('agent.model'),
+    steps: scopes('agent.steps'),
+    thinking: scopes('agent.thinking'),
   });
 }
 
@@ -339,7 +348,7 @@ function roleInstructionContent(context: SdlcRoleCompilerContext, selected: Sdlc
 }
 
 /** Renders the reusable body of one native host agent asset. */
-function roleAgentBody(selected: SdlcSelectedRoleAssignment, support: SdlcRoleHostSupport): string {
+function roleAgentBody(selected: SdlcSelectedRoleAssignment, context: SdlcRoleCompilerContext): string {
   const assignment = selected.assignment!;
   const lines = [
     `# ${SDLC_ROLE_DECLARATIONS[selected.role].description}`,
@@ -347,7 +356,7 @@ function roleAgentBody(selected: SdlcSelectedRoleAssignment, support: SdlcRoleHo
     `Portable role: ${selected.role}.`,
     `Objective: ${SDLC_ROLE_DECLARATIONS[selected.role].objective}`,
     ...requirementLines(assignment),
-    ...hintLines({ hostSupport: support }, assignment),
+    ...hintLines(context, assignment),
     ...receiverContractLines(),
   ];
   return `${lines.join('\n')}\n`;
@@ -366,20 +375,20 @@ function requirementLines(assignment: SdlcRoleAssignmentConfig | undefined): str
 
 /** Explains whether optional hints are host metadata or advisory prose. */
 function hintLines(
-  context: Pick<SdlcRoleCompilerContext, 'hostSupport'>,
+  context: Pick<SdlcRoleCompilerContext, 'hostSupport' | 'scope'>,
   assignment: SdlcRoleAssignmentConfig | undefined,
 ): string[] {
   const lines: string[] = [];
   if (assignment?.model !== undefined) {
     lines.push(
-      assignment.agent !== 'current' && context.hostSupport.model
+      assignment.agent !== 'current' && supportsScope(context.hostSupport.model, context.scope)
         ? `Request model hint \`${assignment.model}\` through supported host metadata.`
         : `Model hint \`${assignment.model}\` is advisory because this execution route cannot enforce it.`,
     );
   }
   if (assignment?.thinking !== undefined) {
     lines.push(
-      assignment.agent !== 'current' && context.hostSupport.thinking
+      assignment.agent !== 'current' && supportsScope(context.hostSupport.thinking, context.scope)
         ? `Request thinking hint \`${assignment.thinking}\` through supported host metadata.`
         : `Thinking hint \`${assignment.thinking}\` is advisory because this execution route cannot encode it.`,
     );
@@ -461,8 +470,13 @@ function freezeAssignment(
 }
 
 /** Tests whether the declaration can emit the configured named subagent route. */
-function supportsNamedAgent(support: SdlcRoleHostSupport): boolean {
-  return support.agentAsset && support.subagent;
+function supportsNamedAgent(support: SdlcRoleHostSupport, scope: HarnessScope): boolean {
+  return supportsScope(support.agentAsset, scope) && supportsScope(support.subagent, scope);
+}
+
+/** Tests whether one declared host feature includes the selected installation scope. */
+function supportsScope(scopes: readonly HarnessScope[], scope: HarnessScope): boolean {
+  return scopes.includes(scope);
 }
 
 /** Narrows one public harness ID to the strict role configuration keys. */

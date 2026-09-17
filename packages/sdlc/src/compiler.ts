@@ -435,7 +435,12 @@ export function createSdlcCompilerInput(
   }
   if (options.scope !== 'project' && options.scope !== 'global') throw new TypeError('Harness scope is invalid.');
   const context = createSdlcCompilerContext(snapshot);
-  const roleContext = createSdlcRoleCompilerContext(snapshot, options.harnessId, options.harnessDeclaration);
+  const roleContext = createSdlcRoleCompilerContext(
+    snapshot,
+    options.harnessId,
+    options.harnessDeclaration,
+    options.scope,
+  );
   const templates = resolveTemplates(
     [SDLC_CONTENT_TEMPLATE_ID, SDLC_LAYOUT_TEMPLATE_ID, ...SDLC_LIFECYCLE.map((command) => command.templateId)],
     options.templateLayers,
@@ -476,7 +481,7 @@ export function compileSdlc(input: SdlcCompilerInputManifest, adapter: HarnessAd
   validateSdlcCompilerInput(input);
   if (adapter.declaration.id !== input.harnessId) throw new TypeError('Compiler input does not match the adapter.');
   validateSdlcRoleHostDeclaration(input.configuration.roles, adapter.declaration);
-  const roleAgents = createSdlcRoleAgentRequests(input.configuration.roles, input.scope);
+  const roleAgents = createSdlcRoleAgentRequests(input.configuration.roles);
   const instructionText = Object.fromEntries(input.instructions.map((pack) => [pack.slot, pack.content])) as Record<
     SdlcInstructionPack['slot'],
     string
@@ -585,6 +590,9 @@ export function validateSdlcCompilerInput(input: SdlcCompilerInputManifest): voi
   }
   validateSdlcCompilerContext(input.configuration.context);
   validateSdlcRoleCompilerContext(input.configuration.roles);
+  if (input.configuration.roles.scope !== input.scope) {
+    throw new TypeError('SDLC role compiler context scope does not match compiler scope.');
+  }
   validateConfigurationProvenance(
     input.configuration.context,
     input.configuration.roles,

@@ -30,7 +30,8 @@ function requirementList<T extends z.ZodType<string>>(item: T) {
   return z
     .array(item)
     .max(MAX_REQUIREMENTS)
-    .refine((values) => new Set(values).size === values.length, 'Requirement identifiers must be unique.');
+    .refine((values) => new Set(values).size === values.length, 'Requirement identifiers must be unique.')
+    .meta({ uniqueItems: true });
 }
 
 /** Complete strict assignment for one canonical role on one harness. */

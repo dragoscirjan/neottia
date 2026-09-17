@@ -695,7 +695,8 @@
                         "required_skills": {
                           "maxItems": 32,
                           "type": "array",
-                          "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                          "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+                          "uniqueItems": true
                         },
                         "required_tools": {
                           "maxItems": 32,
@@ -705,7 +706,8 @@
                             "minLength": 1,
                             "maxLength": 128,
                             "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
-                          }
+                          },
+                          "uniqueItems": true
                         }
                       },
                       "additionalProperties": false
@@ -734,7 +736,8 @@
                         "required_skills": {
                           "maxItems": 32,
                           "type": "array",
-                          "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                          "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+                          "uniqueItems": true
                         },
                         "required_tools": {
                           "maxItems": 32,
@@ -744,7 +747,8 @@
                             "minLength": 1,
                             "maxLength": 128,
                             "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
-                          }
+                          },
+                          "uniqueItems": true
                         }
                       },
                       "additionalProperties": false
@@ -773,7 +777,8 @@
                         "required_skills": {
                           "maxItems": 32,
                           "type": "array",
-                          "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                          "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+                          "uniqueItems": true
                         },
                         "required_tools": {
                           "maxItems": 32,
@@ -783,7 +788,8 @@
                             "minLength": 1,
                             "maxLength": 128,
                             "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
-                          }
+                          },
+                          "uniqueItems": true
                         }
                       },
                       "additionalProperties": false
@@ -812,7 +818,8 @@
                         "required_skills": {
                           "maxItems": 32,
                           "type": "array",
-                          "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                          "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+                          "uniqueItems": true
                         },
                         "required_tools": {
                           "maxItems": 32,
@@ -822,7 +829,8 @@
                             "minLength": 1,
                             "maxLength": 128,
                             "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
-                          }
+                          },
+                          "uniqueItems": true
                         }
                       },
                       "additionalProperties": false
@@ -851,7 +859,8 @@
                         "required_skills": {
                           "maxItems": 32,
                           "type": "array",
-                          "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                          "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+                          "uniqueItems": true
                         },
                         "required_tools": {
                           "maxItems": 32,
@@ -861,7 +870,8 @@
                             "minLength": 1,
                             "maxLength": 128,
                             "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
-                          }
+                          },
+                          "uniqueItems": true
                         }
                       },
                       "additionalProperties": false
@@ -890,7 +900,8 @@
                         "required_skills": {
                           "maxItems": 32,
                           "type": "array",
-                          "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                          "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+                          "uniqueItems": true
                         },
                         "required_tools": {
                           "maxItems": 32,
@@ -900,7 +911,8 @@
                             "minLength": 1,
                             "maxLength": 128,
                             "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
-                          }
+                          },
+                          "uniqueItems": true
                         }
                       },
                       "additionalProperties": false
@@ -929,7 +941,8 @@
                         "required_skills": {
                           "maxItems": 32,
                           "type": "array",
-                          "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                          "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+                          "uniqueItems": true
                         },
                         "required_tools": {
                           "maxItems": 32,
@@ -939,7 +952,8 @@
                             "minLength": 1,
                             "maxLength": 128,
                             "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
-                          }
+                          },
+                          "uniqueItems": true
                         }
                       },
                       "additionalProperties": false
@@ -974,7 +988,8 @@
                         "required_skills": {
                           "maxItems": 32,
                           "type": "array",
-                          "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                          "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+                          "uniqueItems": true
                         },
                         "required_tools": {
                           "maxItems": 32,
@@ -984,7 +999,8 @@
                             "minLength": 1,
                             "maxLength": 128,
                             "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
-                          }
+                          },
+                          "uniqueItems": true
                         }
                       },
                       "additionalProperties": false
@@ -1013,7 +1029,8 @@
                         "required_skills": {
                           "maxItems": 32,
                           "type": "array",
-                          "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                          "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+                          "uniqueItems": true
                         },
                         "required_tools": {
                           "maxItems": 32,
@@ -1023,7 +1040,8 @@
                             "minLength": 1,
                             "maxLength": 128,
                             "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
-                          }
+                          },
+                          "uniqueItems": true
                         }
                       },
                       "additionalProperties": false
@@ -1052,7 +1070,8 @@
                         "required_skills": {
                           "maxItems": 32,
                           "type": "array",
-                          "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                          "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+                          "uniqueItems": true
                         },
                         "required_tools": {
                           "maxItems": 32,
@@ -1062,7 +1081,8 @@
                             "minLength": 1,
                             "maxLength": 128,
                             "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
-                          }
+                          },
+                          "uniqueItems": true
                         }
                       },
                       "additionalProperties": false
@@ -1091,7 +1111,8 @@
                         "required_skills": {
                           "maxItems": 32,
                           "type": "array",
-                          "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                          "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+                          "uniqueItems": true
                         },
                         "required_tools": {
                           "maxItems": 32,
@@ -1101,7 +1122,8 @@
                             "minLength": 1,
                             "maxLength": 128,
                             "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
-                          }
+                          },
+                          "uniqueItems": true
                         }
                       },
                       "additionalProperties": false
@@ -1130,7 +1152,8 @@
                         "required_skills": {
                           "maxItems": 32,
                           "type": "array",
-                          "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                          "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+                          "uniqueItems": true
                         },
                         "required_tools": {
                           "maxItems": 32,
@@ -1140,7 +1163,8 @@
                             "minLength": 1,
                             "maxLength": 128,
                             "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
-                          }
+                          },
+                          "uniqueItems": true
                         }
                       },
                       "additionalProperties": false
@@ -1169,7 +1193,8 @@
                         "required_skills": {
                           "maxItems": 32,
                           "type": "array",
-                          "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                          "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+                          "uniqueItems": true
                         },
                         "required_tools": {
                           "maxItems": 32,
@@ -1179,7 +1204,8 @@
                             "minLength": 1,
                             "maxLength": 128,
                             "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
-                          }
+                          },
+                          "uniqueItems": true
                         }
                       },
                       "additionalProperties": false
@@ -1208,7 +1234,8 @@
                         "required_skills": {
                           "maxItems": 32,
                           "type": "array",
-                          "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                          "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+                          "uniqueItems": true
                         },
                         "required_tools": {
                           "maxItems": 32,
@@ -1218,7 +1245,8 @@
                             "minLength": 1,
                             "maxLength": 128,
                             "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
-                          }
+                          },
+                          "uniqueItems": true
                         }
                       },
                       "additionalProperties": false
@@ -2213,7 +2241,8 @@
                               "required_skills": {
                                 "maxItems": 32,
                                 "type": "array",
-                                "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                                "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+                                "uniqueItems": true
                               },
                               "required_tools": {
                                 "maxItems": 32,
@@ -2223,7 +2252,8 @@
                                   "minLength": 1,
                                   "maxLength": 128,
                                   "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
-                                }
+                                },
+                                "uniqueItems": true
                               }
                             },
                             "additionalProperties": false
@@ -2252,7 +2282,8 @@
                               "required_skills": {
                                 "maxItems": 32,
                                 "type": "array",
-                                "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                                "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+                                "uniqueItems": true
                               },
                               "required_tools": {
                                 "maxItems": 32,
@@ -2262,7 +2293,8 @@
                                   "minLength": 1,
                                   "maxLength": 128,
                                   "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
-                                }
+                                },
+                                "uniqueItems": true
                               }
                             },
                             "additionalProperties": false
@@ -2291,7 +2323,8 @@
                               "required_skills": {
                                 "maxItems": 32,
                                 "type": "array",
-                                "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                                "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+                                "uniqueItems": true
                               },
                               "required_tools": {
                                 "maxItems": 32,
@@ -2301,7 +2334,8 @@
                                   "minLength": 1,
                                   "maxLength": 128,
                                   "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
-                                }
+                                },
+                                "uniqueItems": true
                               }
                             },
                             "additionalProperties": false
@@ -2330,7 +2364,8 @@
                               "required_skills": {
                                 "maxItems": 32,
                                 "type": "array",
-                                "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                                "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+                                "uniqueItems": true
                               },
                               "required_tools": {
                                 "maxItems": 32,
@@ -2340,7 +2375,8 @@
                                   "minLength": 1,
                                   "maxLength": 128,
                                   "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
-                                }
+                                },
+                                "uniqueItems": true
                               }
                             },
                             "additionalProperties": false
@@ -2369,7 +2405,8 @@
                               "required_skills": {
                                 "maxItems": 32,
                                 "type": "array",
-                                "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                                "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+                                "uniqueItems": true
                               },
                               "required_tools": {
                                 "maxItems": 32,
@@ -2379,7 +2416,8 @@
                                   "minLength": 1,
                                   "maxLength": 128,
                                   "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
-                                }
+                                },
+                                "uniqueItems": true
                               }
                             },
                             "additionalProperties": false
@@ -2408,7 +2446,8 @@
                               "required_skills": {
                                 "maxItems": 32,
                                 "type": "array",
-                                "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                                "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+                                "uniqueItems": true
                               },
                               "required_tools": {
                                 "maxItems": 32,
@@ -2418,7 +2457,8 @@
                                   "minLength": 1,
                                   "maxLength": 128,
                                   "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
-                                }
+                                },
+                                "uniqueItems": true
                               }
                             },
                             "additionalProperties": false
@@ -2447,7 +2487,8 @@
                               "required_skills": {
                                 "maxItems": 32,
                                 "type": "array",
-                                "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                                "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+                                "uniqueItems": true
                               },
                               "required_tools": {
                                 "maxItems": 32,
@@ -2457,7 +2498,8 @@
                                   "minLength": 1,
                                   "maxLength": 128,
                                   "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
-                                }
+                                },
+                                "uniqueItems": true
                               }
                             },
                             "additionalProperties": false
@@ -2492,7 +2534,8 @@
                               "required_skills": {
                                 "maxItems": 32,
                                 "type": "array",
-                                "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                                "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+                                "uniqueItems": true
                               },
                               "required_tools": {
                                 "maxItems": 32,
@@ -2502,7 +2545,8 @@
                                   "minLength": 1,
                                   "maxLength": 128,
                                   "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
-                                }
+                                },
+                                "uniqueItems": true
                               }
                             },
                             "additionalProperties": false
@@ -2531,7 +2575,8 @@
                               "required_skills": {
                                 "maxItems": 32,
                                 "type": "array",
-                                "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                                "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+                                "uniqueItems": true
                               },
                               "required_tools": {
                                 "maxItems": 32,
@@ -2541,7 +2586,8 @@
                                   "minLength": 1,
                                   "maxLength": 128,
                                   "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
-                                }
+                                },
+                                "uniqueItems": true
                               }
                             },
                             "additionalProperties": false
@@ -2570,7 +2616,8 @@
                               "required_skills": {
                                 "maxItems": 32,
                                 "type": "array",
-                                "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                                "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+                                "uniqueItems": true
                               },
                               "required_tools": {
                                 "maxItems": 32,
@@ -2580,7 +2627,8 @@
                                   "minLength": 1,
                                   "maxLength": 128,
                                   "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
-                                }
+                                },
+                                "uniqueItems": true
                               }
                             },
                             "additionalProperties": false
@@ -2609,7 +2657,8 @@
                               "required_skills": {
                                 "maxItems": 32,
                                 "type": "array",
-                                "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                                "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+                                "uniqueItems": true
                               },
                               "required_tools": {
                                 "maxItems": 32,
@@ -2619,7 +2668,8 @@
                                   "minLength": 1,
                                   "maxLength": 128,
                                   "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
-                                }
+                                },
+                                "uniqueItems": true
                               }
                             },
                             "additionalProperties": false
@@ -2648,7 +2698,8 @@
                               "required_skills": {
                                 "maxItems": 32,
                                 "type": "array",
-                                "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                                "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+                                "uniqueItems": true
                               },
                               "required_tools": {
                                 "maxItems": 32,
@@ -2658,7 +2709,8 @@
                                   "minLength": 1,
                                   "maxLength": 128,
                                   "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
-                                }
+                                },
+                                "uniqueItems": true
                               }
                             },
                             "additionalProperties": false
@@ -2687,7 +2739,8 @@
                               "required_skills": {
                                 "maxItems": 32,
                                 "type": "array",
-                                "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                                "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+                                "uniqueItems": true
                               },
                               "required_tools": {
                                 "maxItems": 32,
@@ -2697,7 +2750,8 @@
                                   "minLength": 1,
                                   "maxLength": 128,
                                   "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
-                                }
+                                },
+                                "uniqueItems": true
                               }
                             },
                             "additionalProperties": false
@@ -2726,7 +2780,8 @@
                               "required_skills": {
                                 "maxItems": 32,
                                 "type": "array",
-                                "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                                "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+                                "uniqueItems": true
                               },
                               "required_tools": {
                                 "maxItems": 32,
@@ -2736,7 +2791,8 @@
                                   "minLength": 1,
                                   "maxLength": 128,
                                   "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
-                                }
+                                },
+                                "uniqueItems": true
                               }
                             },
                             "additionalProperties": false
