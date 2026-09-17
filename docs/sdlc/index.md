@@ -86,7 +86,7 @@ Use the exact versions from the application or release manifest. The compiler so
 
 ## Template layers
 
-The package publishes six Markdown/Twig command files, their shared `layout.md`, and `lifecycle.json` under `templates/`. The JSON file contains command descriptions, approval text, and stop-condition text. TypeScript retains stable IDs and graph structure, not rendered lifecycle prose. Twing renders the resolved template from an in-memory loader with strict missing-variable checks and Markdown output without HTML escaping.
+The package publishes six `.md.twig` command files, their shared `layout.md.twig`, and `lifecycle.json` under `templates/`. The JSON file contains command descriptions, approval text, and stop-condition text. TypeScript retains stable IDs and graph structure, not rendered lifecycle prose. Twing renders the resolved template from an in-memory loader with strict missing-variable checks and Markdown output without HTML escaping.
 
 `loadSdlcTemplateLayers()` resolves this precedence order:
 
@@ -95,7 +95,7 @@ The package publishes six Markdown/Twig command files, their shared `layout.md`,
 3. a global override;
 4. a project override.
 
-A project can replace one complete command at `.neottia/templates/sdlc/<command>.md`. Valid command filenames are `plan.md`, `build.md`, `verify.md`, `release.md`, `continue.md`, and `refresh.md`. An unknown filename fails loading. The same convention applies below the supplied global root.
+A project can replace one complete command at `.neottia/templates/sdlc/<command>.md.twig`. Valid command filenames are `plan.md.twig`, `build.md.twig`, `verify.md.twig`, `release.md.twig`, `continue.md.twig`, and `refresh.md.twig`. An unknown filename fails loading. The same convention applies below the supplied global root.
 
 The Twig context has three top-level values:
 

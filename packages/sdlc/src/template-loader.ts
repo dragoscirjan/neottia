@@ -16,11 +16,11 @@ export const SDLC_TEMPLATE_LAYER_MAX_BYTES = 1024 * 1024;
 
 const TEMPLATE_DIRECTORY_SEGMENTS = ['.neottia', 'templates', 'sdlc'] as const;
 const COMMAND_TEMPLATE_FILENAMES = new Map<string, string>(
-  SDLC_COMMAND_IDS.map((command) => [`${command}.md`, `neottia.sdlc.command.${command}`]),
+  SDLC_COMMAND_IDS.map((command) => [`${command}.md.twig`, `neottia.sdlc.command.${command}`]),
 );
 const PACKAGED_TEMPLATE_FILENAMES = new Map<string, string>([
   ...COMMAND_TEMPLATE_FILENAMES,
-  ['layout.md', SDLC_LAYOUT_TEMPLATE_ID],
+  ['layout.md.twig', SDLC_LAYOUT_TEMPLATE_ID],
   ['lifecycle.json', SDLC_CONTENT_TEMPLATE_ID],
 ]);
 

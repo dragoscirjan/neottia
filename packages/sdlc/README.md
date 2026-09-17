@@ -49,9 +49,9 @@ See the [forge provider guide](../../docs/sdlc/providers.md) for configuration, 
 
 ## Templates and roles
 
-The package publishes `templates/plan.md`, `build.md`, `verify.md`, `release.md`, `continue.md`, and `refresh.md`, plus their shared `layout.md` and `lifecycle.json` prose. Twing renders the selected command with strict variables and no HTML escaping. The shared layout has one named block per instruction slot, and command templates leave unused blocks empty. The renderer rejects nondeterministic Twig functions, duplicate instruction fragments, and missing or duplicate role fragments.
+The package publishes `templates/plan.md.twig`, `build.md.twig`, `verify.md.twig`, `release.md.twig`, `continue.md.twig`, and `refresh.md.twig`, plus their shared `layout.md.twig` and `lifecycle.json` prose. Twing renders the selected command with strict variables and no HTML escaping. The shared layout has one named block per instruction slot, and command templates leave unused blocks empty. The renderer rejects nondeterministic Twig functions, duplicate instruction fragments, and missing or duplicate role fragments.
 
-Place a complete project override at `.neottia/templates/sdlc/<command>.md`. The loader rejects unknown filenames. It applies packaged, package, global, then project precedence and records selected and shadowed checksums in compiler input provenance. A whole-template override can change lifecycle policy, so review it before installation.
+Place a complete project override at `.neottia/templates/sdlc/<command>.md.twig`. The loader rejects unknown filenames. It applies packaged, package, global, then project precedence and records selected and shadowed checksums in compiler input provenance. A whole-template override can change lifecycle policy, so review it before installation.
 
 The Twig context exposes `command`, `instructions`, and `roles`. Provider and role packages supply checksummed fragments through those fields instead of owning command templates. The compiler publishes portable role names such as `planner`, `implementer`, `verifier`, and `release-coordinator`. Issue #118 owns assignment, requiredness, and fallback policy.
 
