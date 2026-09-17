@@ -260,6 +260,38 @@ describe('canonical SDLC compiler', () => {
     },
   );
 
+  it('renders only the instruction blocks used by each lifecycle template', () => {
+    const input = createSdlcCompilerInput(
+      snapshot({
+        'sdlc-issues-capability': { provider: 'github' },
+        'sdlc-documents-capability': { provider: 'github' },
+        'sdlc-source-control-capability': { local: 'git', remote: 'github', workspaces: false },
+        'sdlc-forge-connections': {
+          github: {
+            base_url: 'https://github.example.test',
+            credential_environment: 'GITHUB_TOKEN',
+          },
+        },
+      }),
+      { compilerVersion: '0.1.0', harnessId: 'pi', scope: 'project' },
+    );
+    const output = compileSdlc(input, piHarnessAdapter);
+    const body = (command: string): string =>
+      promptBody(promptAssets(output).find((asset) => asset.target.segments.at(-1) === `${command}.md`)!);
+
+    for (const command of ['plan', 'build']) {
+      expect(body(command)).not.toContain('## Compiled remote source-control instructions');
+      expect(output.commands.find((candidate) => candidate.id === command)?.instructionPackIds).not.toContain(
+        'neottia.source-control.remote.github',
+      );
+    }
+    expect(body('verify')).toContain('## Compiled remote source-control instructions');
+    expect(body('release')).not.toContain('## Compiled Documents instructions');
+    expect(output.commands.find((command) => command.id === 'release')?.instructionPackIds).not.toContain(
+      'neottia.documents.github',
+    );
+  });
+
   it('does not require a forge CLI when configured MCP covers every CLI-backed capability', () => {
     const input = createSdlcCompilerInput(
       snapshot({
@@ -604,6 +636,30 @@ describe('canonical SDLC compiler', () => {
     expect(plan).toContain('### researcher\n\nPlan');
   });
 
+  it('restores replacement-token fragments literally after tracked rendering', () => {
+    const content = "Literal replacement tokens: $& $` $'\n";
+    const role = createSdlcRoleInstruction({
+      id: 'example.role.literal-tokens',
+      command: 'plan',
+      role: 'planner',
+      version: '1.0.0',
+      content,
+    });
+    const output = compileSdlc(
+      createSdlcCompilerInput(snapshot(), {
+        compilerVersion: '0.1.0',
+        harnessId: 'pi',
+        scope: 'project',
+        roles: [role],
+      }),
+      piHarnessAdapter,
+    );
+    const plan = promptBody(promptAssets(output).find((asset) => asset.target.segments.at(-1) === 'plan.md')!);
+
+    expect(plan.split(content.trimEnd())).toHaveLength(2);
+    expect(plan).not.toContain('NEOTTIA_FRAGMENT_');
+  });
+
   it('rejects missing variables and unsafe Twig functions before projection', () => {
     const packagedPlan = packagedTemplateLayer.files.find((template) => template.id === 'neottia.sdlc.command.plan')!;
     for (const [expression, expected] of [
@@ -730,6 +786,30 @@ describe('canonical SDLC compiler', () => {
       expect(() => compileSdlc(decoded, spyAdapter)).toThrow(message);
     }
     expect(adapterCalls).toBe(0);
+  });
+
+  it('rejects conflicting MCP commands across selected forge connections', () => {
+    expect(() =>
+      createSdlcCompilerInput(
+        snapshot({
+          'sdlc-issues-capability': { provider: 'github' },
+          'sdlc-source-control-capability': { local: 'git', remote: 'gitlab', workspaces: false },
+          'sdlc-forge-connections': {
+            github: {
+              base_url: 'https://github.example.test',
+              credential_environment: 'GITHUB_TOKEN',
+              mcp: { issues: { server: 'shared-forge', command: 'github-mcp-server' } },
+            },
+            gitlab: {
+              base_url: 'https://gitlab.example.test',
+              credential_environment: 'GITLAB_TOKEN',
+              mcp: { remote_source_control: { server: 'shared-forge', command: 'gitlab-mcp-server' } },
+            },
+          },
+        }),
+        { compilerVersion: '0.1.0', harnessId: 'pi', scope: 'project' },
+      ),
+    ).toThrow('forge MCP server maps to conflicting commands');
   });
 
   it('rejects conflicting MCP commands in resigned compiler inputs', () => {

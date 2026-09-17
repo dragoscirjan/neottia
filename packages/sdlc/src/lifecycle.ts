@@ -1,5 +1,5 @@
 /** Version of the canonical lifecycle semantics and packaged templates. */
-export const SDLC_LIFECYCLE_VERSION = '1.0.0';
+export const SDLC_LIFECYCLE_VERSION = '1.1.0';
 
 /** Public commands exposed by every compiled harness. */
 export const SDLC_COMMAND_IDS = Object.freeze(['plan', 'build', 'verify', 'release', 'continue', 'refresh'] as const);

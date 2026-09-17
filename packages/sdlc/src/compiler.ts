@@ -154,6 +154,7 @@ const configurationContextSchema = z
           capabilities: z.array(z.enum(FORGE_CAPABILITIES)),
           baseUrl: forgeBaseUrlSchema,
           credentialEnvironment: forgeCredentialEnvironmentSchema,
+          allowInsecureHttp: z.boolean(),
           mcp: z
             .object({
               issues: forgeMcpServiceContextSchema.optional(),
@@ -298,7 +299,7 @@ class TrackedTemplateFragment {
 
   constructor(
     readonly slot: string,
-    value: string,
+    readonly value: string,
   ) {
     const marker = checksumText(`${slot}\0${value}`).slice('sha256:'.length, 'sha256:'.length + 16);
     this.wrapped = `NEOTTIA_FRAGMENT_${marker}_START${value}NEOTTIA_FRAGMENT_${marker}_END`;
@@ -469,10 +470,16 @@ export function compileSdlc(input: SdlcCompilerInputManifest, adapter: HarnessAd
     const content = requiredLifecycleContent(lifecycleContent, definition.id);
     const roles = input.roles.filter((candidate) => candidate.command === definition.id);
     const templateRoles = createTemplateRoles(definition, roles);
-    const body = renderer.render(
+    const rendered = renderTrackedLifecycleTemplate(
+      renderer,
       template.id,
-      createTemplateContext(definition, content, instructionText, templateRoles),
+      definition,
+      content,
+      instructionText,
+      templateRoles,
     );
+    const renderedInstructions = input.instructions.filter((pack) => rendered.instructionSlots.includes(pack.slot));
+    const body = rendered.body;
     const projected = requireProjection(
       adapter.projectPrompt({
         id: definition.id,
@@ -482,7 +489,7 @@ export function compileSdlc(input: SdlcCompilerInputManifest, adapter: HarnessAd
       }),
       `Cannot project ${definition.id}.`,
     );
-    const source = commandSource(input, definition, template, roles, body);
+    const source = commandSource(input, definition, template, renderedInstructions, roles, body);
     const asset = fileAssetFromProjection(projected, source);
     assets.push(asset);
     commands.push(
@@ -491,7 +498,7 @@ export function compileSdlc(input: SdlcCompilerInputManifest, adapter: HarnessAd
         templateId: definition.templateId,
         roleSlots: Object.freeze([...definition.roleSlots]),
         roleInstructionIds: Object.freeze(roles.map((role) => role.id)),
-        instructionPackIds: Object.freeze(input.instructions.map((pack) => pack.id)),
+        instructionPackIds: Object.freeze(renderedInstructions.map((pack) => pack.id)),
         allowedNext: Object.freeze([...definition.allowedNext]),
         approvalPoints: Object.freeze([...content.approvalPoints]),
         stopConditions: Object.freeze([...content.stopConditions]),
@@ -600,6 +607,7 @@ function commandSource(
   input: SdlcCompilerInputManifest,
   definition: SdlcLifecycleCommand,
   template: ResolvedTemplate,
+  instructions: readonly SdlcInstructionPack[],
   roles: readonly SdlcRoleInstruction[],
   body: string,
 ): AssetSource {
@@ -616,7 +624,7 @@ function commandSource(
         version: template.version,
         checksum: template.checksum,
       },
-      instructions: input.instructions.map(({ id, version, checksum }) => ({ id, version, checksum })),
+      instructions: instructions.map(({ id, version, checksum }) => ({ id, version, checksum })),
       roles: roles.map(({ id, role, version, checksum }) => ({ id, role, version, checksum })),
     }),
   });
@@ -667,30 +675,37 @@ function createTemplateRoles(
   );
 }
 
-/** Builds the public, provider-neutral context consumed by Twig. */
-function createTemplateContext(
+/** Renders one command and records which instruction blocks the template used. */
+function renderTrackedLifecycleTemplate(
+  renderer: ReturnType<typeof createTemplateRenderer>,
+  templateId: string,
   command: SdlcLifecycleCommand,
   content: SdlcLifecycleCommandContent,
   instructions: Readonly<Record<SdlcInstructionPack['slot'], string>>,
   roles: readonly SdlcTemplateRole[],
-): SdlcTemplateContext {
-  return Object.freeze({
-    command: Object.freeze({
-      ...command,
-      description: content.description,
-      approvalPoints: Object.freeze([...content.approvalPoints]),
-      stopConditions: Object.freeze([...content.stopConditions]),
-    }),
-    instructions: Object.freeze({
-      issues: instructions.issues.trimEnd(),
-      documents: instructions.documents.trimEnd(),
-      sourceControl: Object.freeze({
-        local: instructions['source-control.local'].trimEnd(),
-        remote: instructions['source-control.remote'].trimEnd(),
-      }),
-    }),
-    roles: Object.freeze([...roles]),
+): { readonly body: string; readonly instructionSlots: readonly SdlcInstructionPack['slot'][] } {
+  const tracked = createTrackedTemplateContext(command, content, instructions, roles);
+  const output = renderer.render(templateId, tracked.context);
+  validateTrackedFragments(templateId, output, tracked.fragments);
+  let body = output;
+  for (const fragment of tracked.fragments) {
+    if (fragment.renderCount === 1) body = body.replace(fragment.wrapped, () => fragment.value);
+  }
+  const instructionSlots = tracked.fragments.flatMap((fragment) => {
+    if (fragment.renderCount !== 1) return [];
+    const slot = instructionSlotForFragment(fragment.slot);
+    return slot === undefined ? [] : [slot];
   });
+  return Object.freeze({ body, instructionSlots: Object.freeze(instructionSlots) });
+}
+
+/** Maps a tracked Twig path to its instruction-pack slot. */
+function instructionSlotForFragment(slot: string): SdlcInstructionPack['slot'] | undefined {
+  if (slot === 'instructions.issues') return 'issues';
+  if (slot === 'instructions.documents') return 'documents';
+  if (slot === 'instructions.sourceControl.local') return 'source-control.local';
+  if (slot === 'instructions.sourceControl.remote') return 'source-control.remote';
+  return undefined;
 }
 
 /** Builds a validation context whose fragment objects record exact output. */
@@ -735,15 +750,18 @@ function createTrackedTemplateContext(
   });
 }
 
-/** Requires every tracked fragment object to reach output exactly once. */
+/** Requires roles once and permits each template-selected instruction at most once. */
 function validateTrackedFragments(
   templateId: string,
   output: string,
   fragments: readonly TrackedTemplateFragment[],
 ): void {
   for (const fragment of fragments) {
-    if (fragment.renderCount !== 1 || output.split(fragment.wrapped).length !== 2) {
-      throw new TypeError(`Lifecycle template ${templateId} must render ${fragment.slot} exactly once.`);
+    const occurrences = output.split(fragment.wrapped).length - 1;
+    const instruction = instructionSlotForFragment(fragment.slot) !== undefined;
+    if (occurrences !== fragment.renderCount || (instruction ? fragment.renderCount > 1 : fragment.renderCount !== 1)) {
+      const cardinality = instruction ? 'at most once' : 'exactly once';
+      throw new TypeError(`Lifecycle template ${templateId} must render ${fragment.slot} ${cardinality}.`);
     }
   }
 }
@@ -862,6 +880,7 @@ function configurationProvenancePaths(context: SdlcCompilerContext): readonly (r
   for (const forge of context.forges) {
     paths.push(['connections', 'forges', forge.provider, 'base_url']);
     paths.push(['connections', 'forges', forge.provider, 'credential_environment']);
+    if (forge.allowInsecureHttp) paths.push(['connections', 'forges', forge.provider, 'allow_insecure_http']);
     for (const [key, service] of [
       ['issues', forge.mcp.issues],
       ['documents', forge.mcp.documents],
@@ -911,14 +930,14 @@ function validateResolvedTemplates(
       definition,
       roles.filter((role) => role.command === definition.id),
     );
-    const tracked = createTrackedTemplateContext(
+    renderTrackedLifecycleTemplate(
+      renderer,
+      definition.templateId,
       definition,
       requiredLifecycleContent(lifecycleContent, definition.id),
       instructionText,
       templateRoles,
     );
-    const output = renderer.render(definition.templateId, tracked.context);
-    validateTrackedFragments(definition.templateId, output, tracked.fragments);
   }
 }
 

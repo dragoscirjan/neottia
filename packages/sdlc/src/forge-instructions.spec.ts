@@ -6,17 +6,24 @@ import { createForgeInstructionPacks } from './forge-instructions.js';
 import type { ForgeCapability, ForgeProvider } from './forge-support.js';
 
 /** Creates one isolated selected-forge context for fragment tests. */
-function context(provider: ForgeProvider, capabilities: readonly ForgeCapability[]): SdlcCompilerContext {
-  const mcp = {
-    issues: { server: `${provider}-issues`, command: `${provider}-mcp` },
-    documents: { server: `${provider}-documents`, command: `${provider}-mcp` },
-    remoteSourceControl: { server: `${provider}-remote`, command: `${provider}-mcp` },
-  };
+function context(
+  provider: ForgeProvider,
+  capabilities: readonly ForgeCapability[],
+  withMcp = true,
+): SdlcCompilerContext {
+  const mcp = withMcp
+    ? {
+        issues: { server: `${provider}-issues`, command: `${provider}-mcp` },
+        documents: { server: `${provider}-documents`, command: `${provider}-mcp` },
+        remoteSourceControl: { server: `${provider}-remote`, command: `${provider}-mcp` },
+      }
+    : {};
   const connection: SdlcForgeConnectionContext = {
     provider,
     capabilities,
     baseUrl: `https://${provider}.example.test/root/`,
     credentialEnvironment: `${provider.toUpperCase()}_TOKEN`,
+    allowInsecureHttp: false,
     mcp,
   };
   return {
@@ -57,10 +64,14 @@ describe('forge instruction bundles', () => {
   });
 
   it('uses documented GitHub and GitLab command groups', () => {
-    const github = createForgeInstructionPacks(context('github', ['issues', 'documents', 'remote-source-control']))
+    const github = createForgeInstructionPacks(
+      context('github', ['issues', 'documents', 'remote-source-control'], false),
+    )
       .map(({ content }) => content)
       .join('\n');
-    const gitlab = createForgeInstructionPacks(context('gitlab', ['issues', 'documents', 'remote-source-control']))
+    const gitlab = createForgeInstructionPacks(
+      context('gitlab', ['issues', 'documents', 'remote-source-control'], false),
+    )
       .map(({ content }) => content)
       .join('\n');
 
@@ -70,13 +81,38 @@ describe('forge instruction bundles', () => {
     expect(gitlab).toContain('`glab mr`, `glab ci`, and `glab release`');
   });
 
-  it('does not present administrative binaries as Gitea or Forgejo user clients', () => {
+  it('uses only configured MCP routes when they cover a capability', () => {
+    const github = createForgeInstructionPacks(context('github', ['issues', 'documents', 'remote-source-control']));
+
+    expect(github.find((pack) => pack.slot === 'issues')?.content).not.toContain('`gh issue`');
+    expect(github.find((pack) => pack.slot === 'documents')?.content).not.toContain('local Git');
+    expect(github.find((pack) => pack.slot === 'source-control.remote')?.content).not.toContain('`gh pr`');
+    expect(github.every((pack) => pack.content.includes('only provider-object route'))).toBe(true);
+  });
+
+  it('warns only when a selected connection opts into insecure HTTP', () => {
+    const selected = context('gitlab', ['issues'], false);
+    const insecure: SdlcCompilerContext = {
+      ...selected,
+      forges: selected.forges.map((connection) => ({
+        ...connection,
+        baseUrl: 'http://gitlab.example.test',
+        allowInsecureHttp: true,
+      })),
+    };
+
+    expect(createForgeInstructionPacks(insecure)[0]?.content).toContain('explicitly permits insecure HTTP');
+    expect(createForgeInstructionPacks(selected)[0]?.content).not.toContain('insecure HTTP');
+  });
+
+  it('does not mention unused administrative binaries for Gitea or Forgejo', () => {
     for (const provider of ['gitea', 'forgejo'] as const) {
       const content = createForgeInstructionPacks(context(provider, ['issues', 'remote-source-control']))
         .map((pack) => pack.content)
         .join('\n');
-      expect(content).toContain(`\`${provider}\` binary is an administrative server CLI`);
       expect(content).toContain(`configured MCP server is \`${provider}-issues\``);
+      expect(content).not.toContain(`\`${provider}\` binary`);
+      expect(content).not.toContain('administrative server CLI');
       expect(content).not.toContain('`tea`');
     }
   });

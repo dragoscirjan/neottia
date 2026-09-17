@@ -131,6 +131,7 @@ profiles:
         capabilities: ['issues'],
         baseUrl: 'https://gitlab.example.test/root/',
         credentialEnvironment: 'GITLAB_TOKEN',
+        allowInsecureHttp: false,
         mcp: {},
       },
     ]);
@@ -205,6 +206,7 @@ capabilities:
           capabilities: ['issues'],
           baseUrl: 'https://github.example.test',
           credentialEnvironment: 'GITHUB_TOKEN',
+          allowInsecureHttp: false,
           mcp: {},
         },
       ],

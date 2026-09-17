@@ -210,7 +210,7 @@ capabilities:
 
 The scalar remote selection replaces atomically across global, project, and profile layers. A profile can set `remote: false` without retaining a lower provider.
 
-A selected forge also needs a strict `connections.forges.<provider>` entry. The entry stores an HTTP or HTTPS base URL and the name of a credential environment variable. Optional MCP entries use strict `{server, command}` pairs for `issues`, `documents`, or `remote_source_control`. Configuration stores names only, never token values.
+A selected forge also needs a strict `connections.forges.<provider>` entry. The entry stores an HTTP or HTTPS base URL and the name of a credential environment variable. HTTP connections also require `allow_insecure_http: true`; HTTPS connections omit that field. Optional MCP entries use strict `{server, command}` pairs for `issues`, `documents`, or `remote_source_control`. Configuration stores names only, never token values.
 
 ```yaml
 version: 1

@@ -59,6 +59,7 @@ export const forgeConnectionSchema = z
   .object({
     base_url: forgeBaseUrlSchema,
     credential_environment: forgeCredentialEnvironmentSchema,
+    allow_insecure_http: z.literal(true).optional(),
     mcp: forgeMcpConfigSchema.optional(),
   })
   .strict();
@@ -68,6 +69,7 @@ export const forgeConnectionPatchSchema = z
   .object({
     base_url: forgeBaseUrlSchema.optional(),
     credential_environment: forgeCredentialEnvironmentSchema.optional(),
+    allow_insecure_http: z.literal(true).optional(),
     mcp: forgeMcpConfigSchema.optional(),
   })
   .strict();

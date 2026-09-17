@@ -4,14 +4,14 @@
 
 ## Commands
 
-| Command  | Required behavior                                                                                                                       |
-| -------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| Plan     | Read tracked work and repository evidence, define bounded scope, and stop for plan or design approval.                                  |
-| Build    | Require approved plan evidence, implement only that scope, and stop on ownership conflicts or unexpected changes.                       |
-| Verify   | Compare the change with requirements, run declared checks, and record failures before returning to Build.                               |
-| Release  | Require approved scope and passing verification, prepare release evidence, and request explicit authorization for irreversible actions. |
-| Continue | Inspect durable evidence, recommend one next public command, and stop without running it.                                               |
-| Refresh  | Reload authoritative state, report drift, and avoid silent lifecycle transitions.                                                       |
+| Command  | Instruction blocks                                 | Required behavior                                                                                                                       |
+| -------- | -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Plan     | Issues, Documents, local source control            | Read tracked work and repository evidence, define bounded scope, and stop for plan or design approval.                                  |
+| Build    | Issues, Documents, local source control            | Require approved plan evidence, implement only that scope, and stop on ownership conflicts or unexpected changes.                       |
+| Verify   | Issues, Documents, local and remote source control | Compare the change with requirements, run declared checks, and record failures before returning to Build.                               |
+| Release  | Issues, local and remote source control            | Require approved scope and passing verification, prepare release evidence, and request explicit authorization for irreversible actions. |
+| Continue | Issues, Documents, local and remote source control | Inspect durable evidence, recommend one next public command, and stop without running it.                                               |
+| Refresh  | Issues, Documents, local and remote source control | Reload authoritative state, report drift, and avoid silent lifecycle transitions.                                                       |
 
 Release instructions never authorize an autonomous merge, publication, or deployment. Every command states that workflow text does not grant host permissions.
 
@@ -26,7 +26,7 @@ Release instructions never authorize an autonomous merge, publication, or deploy
 - runtime package IDs with exact versions;
 - one harness adapter and installation scope.
 
-`createSdlcCompilerInput()` resolves template precedence and selects one instruction pack for each configured capability. It records configuration, template, instruction, role, and package provenance in a checksummed input manifest. `compileSdlc()` projects the six prompts and explicit package configuration through the adapter. The returned output manifest contains semantic command records and a checksummed distribution `AssetManifest`.
+`createSdlcCompilerInput()` resolves template precedence and selects one instruction pack for each configured capability. Each command template renders only the instruction blocks that command uses. `compileSdlc()` records those rendered packs in the command provenance, then projects the six prompts and explicit package configuration through the adapter. The returned output manifest contains semantic command records and a checksummed distribution `AssetManifest`.
 
 The compiler does not read files, invoke Git, contact providers, install packages, or change host configuration.
 
@@ -67,7 +67,7 @@ The built-in packs cover filesystem Issues, filesystem Design Docs, local Git, d
 
 Forge bundles contain separate checksummed fragments for each supported slot. GitHub and GitLab support Issues, Git-backed wikis, and remote source-control work through their documented CLIs. Gitea and Forgejo require a configured command-backed MCP service for Issues and remote forge objects. Their Documents selections fail as unsupported rather than claiming wiki parity.
 
-Canonical lifecycle templates contain no provider command names. A provider change replaces only the selected instruction section and its provenance. It does not change lifecycle approval points, stop conditions, role points, or transitions.
+Canonical lifecycle templates contain no provider command names. They omit instruction blocks that a command does not use. A provider change affects only commands that render the selected block and does not change lifecycle approval points, stop conditions, role points, or transitions.
 
 See [SDLC provider selection](/configuration#sdlc-provider-selection) for the capability fields and [forge provider configuration](/sdlc/providers) for connections, authentication, MCP requirements, tool checks, and troubleshooting.
 
@@ -103,7 +103,7 @@ The Twig context has three top-level values:
 - `instructions` contains the selected Issues, Documents, local source-control, and remote source-control fragments;
 - `roles` contains one ordered entry for each command role, including its ID, rendered fragment, assignment state, and optional instruction ID.
 
-The renderer allows deterministic Twig control flow, filters, blocks, and command inheritance from the packaged layout. It rejects dynamic template dependencies, recursive inheritance, unbounded `range()`, includes, and nondeterministic functions such as `random()`. Each actual provider and role fragment must appear exactly once in rendered output. This check protects template assembly but cannot prove that replacement prose preserves lifecycle policy. Review complete overrides before installation. Compiler provenance records the selected template and every shadowed source.
+The shared layout exposes one named Twig block per instruction slot. Command templates override blocks they do not need with an empty block. The renderer rejects duplicate instruction fragments and requires every role fragment exactly once. It also rejects dynamic template dependencies, recursive inheritance, unbounded `range()`, includes, and nondeterministic functions such as `random()`. These checks protect template assembly but cannot prove that replacement prose preserves lifecycle policy. Review complete overrides before installation. Compiler provenance records the rendered instruction packs, selected template, and every shadowed source.
 
 ## Role insertion points
 

@@ -2,7 +2,7 @@
 
 Neottia ships compile-time instruction bundles for GitHub, GitLab, Gitea, and Forgejo. Each bundle supplies checksummed fragments for the existing Issues, Documents, and remote source-control slots. The lifecycle templates remain provider-neutral.
 
-The compiler includes only the fragments selected by `capabilities.*`. It does not contact a forge, resolve a credential, install a command, or authenticate a user.
+The compiler input includes only the fragments selected by `capabilities.*`. Each lifecycle template then renders only the slots that command uses. Omitted fragments do not enter the command body or its instruction-pack list.
 
 ## Support matrix
 
@@ -15,11 +15,13 @@ The compiler includes only the fragments selected by `capabilities.*`. It does n
 
 GitHub documents local wiki editing in its [wiki guide](https://docs.github.com/en/communities/documenting-your-project-with-wikis/adding-or-editing-wiki-pages). GitLab documents its Git-backed wiki in the [GitLab wiki guide](https://docs.gitlab.com/user/project/wiki/).
 
-The documented `gitea` and `forgejo` commands administer server installations. Neottia does not treat them as project issue, pull-request, review, CI, or release clients. Gitea and Forgejo Documents remain unsupported until first-party documentation establishes a compatible user workflow.
+Neottia has no built-in Gitea or Forgejo CLI route. Configure MCP for their Issues and remote source-control slots. Their Documents slots remain unsupported.
 
 ## Configure a connection
 
 A selected forge needs an entry under `connections.forges`. `base_url` accepts an HTTP or HTTPS URL. It rejects embedded user information, query strings, fragments, and values over 8 KiB. Paths and trailing slashes are allowed for self-hosted installations.
+
+HTTPS needs no transport setting. HTTP requires `allow_insecure_http: true` on the connection. This explicit opt-in adds an insecure-transport warning to each rendered fragment. Prefer HTTPS whenever the route sends credentials.
 
 `credential_environment` is the name of an environment variable. It is not `${NAME}` and it never contains the credential value.
 
@@ -88,7 +90,7 @@ connections:
           command: forgejo-mcp-server
 ```
 
-The accepted MCP keys are `issues`, `documents`, and `remote_source_control`. GitHub and GitLab can use MCP when configured. Their documented CLIs remain the built-in command-line implementation. Gitea and Forgejo require MCP for Issues and remote forge objects.
+The accepted MCP keys are `issues`, `documents`, and `remote_source_control`. A configured MCP entry replaces the CLI or local-Git route for that capability. Remote source control still uses Git for fetch and push. Gitea and Forgejo require MCP for Issues and remote forge objects.
 
 Neottia's doctor checks whether `command` exists on `PATH`. It cannot prove that Pi or OpenCode has registered `server`, or that the server exposes a required operation. Generated instructions require a read-only server and operation check before mutation. The agent stops with a configuration diagnostic when that check fails.
 

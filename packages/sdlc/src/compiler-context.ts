@@ -24,6 +24,7 @@ export type SdlcConfigProblemCode =
   | 'DOCUMENTS_MODULE_DISABLED'
   | 'FORGE_CAPABILITY_UNSUPPORTED'
   | 'FORGE_CONNECTION_REQUIRED'
+  | 'FORGE_INSECURE_HTTP_REQUIRES_OPT_IN'
   | 'FORGE_MCP_REQUIRED'
   | 'ISSUES_MODULE_DISABLED'
   | 'WORKSPACES_REQUIRE_GIT';
@@ -61,6 +62,7 @@ export interface SdlcForgeConnectionContext {
   readonly capabilities: readonly ForgeCapability[];
   readonly baseUrl: string;
   readonly credentialEnvironment: string;
+  readonly allowInsecureHttp: boolean;
   readonly mcp: SdlcForgeMcpContext;
 }
 
@@ -118,6 +120,13 @@ export function createSdlcCompilerContext(snapshot: ResolvedConfigSnapshot): Sdl
       continue;
     }
     const support = FORGE_SUPPORT_DECLARATIONS[selection.provider];
+    if (connection.base_url.toLowerCase().startsWith('http://') && connection.allow_insecure_http !== true) {
+      problems.push({
+        code: 'FORGE_INSECURE_HTTP_REQUIRES_OPT_IN',
+        path: ['connections', 'forges', selection.provider, 'allow_insecure_http'],
+        message: 'An HTTP forge connection requires explicit insecure-transport opt-in.',
+      });
+    }
     for (const capability of selection.capabilities) {
       if (!support.capabilities.includes(capability)) {
         problems.push({
@@ -150,6 +159,7 @@ export function createSdlcCompilerContext(snapshot: ResolvedConfigSnapshot): Sdl
       capabilities: selection.capabilities,
       baseUrl: connection.base_url,
       credentialEnvironment: connection.credential_environment,
+      allowInsecureHttp: connection.allow_insecure_http === true,
       mcp: toContextMcp(connection.mcp, selection.capabilities),
     });
   });
@@ -174,8 +184,12 @@ export function validateSdlcCompilerContext(context: SdlcCompilerContext): void 
   if (canonicalJson(actualSelections) !== canonicalJson(selected)) {
     throw new TypeError('SDLC forge connections do not match selected capabilities.');
   }
+  const commands = new Map<string, string>();
   for (const connection of context.forges) {
     const support = FORGE_SUPPORT_DECLARATIONS[connection.provider];
+    if (connection.baseUrl.toLowerCase().startsWith('http://') && !connection.allowInsecureHttp) {
+      throw new TypeError('SDLC forge HTTP connection lacks explicit insecure-transport opt-in.');
+    }
     const configuredMcpCapabilities = [
       ...(connection.mcp.issues === undefined ? [] : (['issues'] as const)),
       ...(connection.mcp.documents === undefined ? [] : (['documents'] as const)),
@@ -184,7 +198,6 @@ export function validateSdlcCompilerContext(context: SdlcCompilerContext): void 
     if (configuredMcpCapabilities.some((capability) => !connection.capabilities.includes(capability))) {
       throw new TypeError('SDLC forge connection contains an unselected MCP service.');
     }
-    const commands = new Map<string, string>();
     for (const service of [connection.mcp.issues, connection.mcp.documents, connection.mcp.remoteSourceControl]) {
       if (service === undefined) continue;
       const command = commands.get(service.server);

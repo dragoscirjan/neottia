@@ -1,5 +1,5 @@
 import type { SdlcCompilerContext, SdlcForgeConnectionContext } from './compiler-context.js';
-import { FORGE_SUPPORT_DECLARATIONS, type ForgeCapability, type ForgeProvider } from './forge-support.js';
+import type { ForgeCapability, ForgeProvider } from './forge-support.js';
 import { createSdlcInstructionPack, type SdlcInstructionPack } from './instructions.js';
 
 const FORGE_INSTRUCTION_VERSION = '1.0.0';
@@ -29,7 +29,10 @@ function instructionId(provider: ForgeProvider, capability: ForgeCapability): st
 
 /** Renders one provider-specific fragment without changing canonical lifecycle templates. */
 function instructionContent(connection: SdlcForgeConnectionContext, capability: ForgeCapability): string {
-  const header = `Use ${providerName(connection.provider)} at ${connection.baseUrl}. Read credentials only from the ${connection.credentialEnvironment} environment variable; never print, persist, or copy its value into tracked evidence.`;
+  const insecureTransport = connection.allowInsecureHttp
+    ? ' This connection explicitly permits insecure HTTP. Confirm authorization for plaintext transport before sending credentials.'
+    : '';
+  const header = `Use ${providerName(connection.provider)} at ${connection.baseUrl}.${insecureTransport} Read credentials only from the ${connection.credentialEnvironment} environment variable; never print, persist, or copy its value into tracked evidence.`;
   const guidance = providerCapabilityGuidance(connection, capability);
   const mcp = mcpGuidance(connection, capability);
   const safety = mutationSafety();
@@ -39,6 +42,17 @@ function instructionContent(connection: SdlcForgeConnectionContext, capability: 
 /** Returns commands and supported operations grounded in each provider's documented interfaces. */
 function providerCapabilityGuidance(connection: SdlcForgeConnectionContext, capability: ForgeCapability): string {
   const provider = connection.provider;
+  const service =
+    capability === 'remote-source-control' ? connection.mcp.remoteSourceControl : connection.mcp[capability];
+  if (service !== undefined) {
+    if (capability === 'issues') {
+      return 'Use only the configured MCP service for issue reads and mutations. Preserve the repository identity, issue number, URL, and resulting state as evidence.';
+    }
+    if (capability === 'documents') {
+      return 'Use only the configured MCP service for document reads and mutations. Read before editing, preserve the document identity and resulting state, and keep document changes separate from product-source commits.';
+    }
+    return 'Use local Git for fetch and push. Use only the configured MCP service for pull or merge requests, review state, CI evidence, and releases. A successful push does not authorize merge, and preparing a release does not authorize publication.';
+  }
   if (provider === 'github') {
     if (capability === 'issues') {
       return 'Use the documented `gh issue` command group for issue reads, creation, comments, edits, and closure. Preserve the repository, issue number, URL, and resulting state as evidence.';
@@ -57,10 +71,7 @@ function providerCapabilityGuidance(connection: SdlcForgeConnectionContext, capa
     }
     return 'Use local Git for fetch and push. Use the documented `glab mr`, `glab ci`, and `glab release` command groups for merge requests, review state, pipeline evidence, and releases. A successful push does not authorize merge, and preparing a release does not authorize publication.';
   }
-  if (capability === 'issues') {
-    return `The documented \`${provider}\` binary is an administrative server CLI, not an end-user issue client. Use only the configured MCP service for issue reads and mutations. Preserve repository identity, issue number, URL, and resulting state as evidence.`;
-  }
-  return `Use local Git only for fetch and push. The documented \`${provider}\` binary is an administrative server CLI and must not be used for pull requests, review, CI, or releases. Use only the configured MCP service for those forge objects. A successful push does not authorize merge, and preparing a release does not authorize publication.`;
+  throw new TypeError(`Forge capability ${provider}:${capability} has no usable instruction route.`);
 }
 
 /** Adds capability-specific MCP selection and bounded availability checks. */
@@ -68,10 +79,7 @@ function mcpGuidance(connection: SdlcForgeConnectionContext, capability: ForgeCa
   const service =
     capability === 'remote-source-control' ? connection.mcp.remoteSourceControl : connection.mcp[capability];
   if (service === undefined) return '';
-  const cli = FORGE_SUPPORT_DECLARATIONS[connection.provider].cli?.command;
-  const alternative =
-    capability === 'documents' ? ' or local Git' : cli === undefined ? '' : ` or the documented \`${cli}\` CLI`;
-  return `\n\nThe configured MCP server is \`${service.server}\`, backed by the \`${service.command}\` command. Before mutation, verify read-only that this server is registered and exposes the required operation. If registration or the operation is missing, stop and report how to configure it; do not guess a tool. The MCP server${alternative} is a candidate, not permission to mutate.`;
+  return `\n\nThe configured MCP server is \`${service.server}\`, backed by the \`${service.command}\` command. Before mutation, verify read-only that this server is registered and exposes the required operation. If registration or the operation is missing, stop and report how to configure it; do not guess a tool. Use this MCP server as the only provider-object route for this capability.`;
 }
 
 /** Encodes the no-fallback mutation rule shared by every forge fragment. */

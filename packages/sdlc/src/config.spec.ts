@@ -143,10 +143,39 @@ describe('SDLC compiler context', () => {
           capabilities: ['issues'],
           baseUrl: 'https://github.example.test',
           credentialEnvironment: 'GITHUB_TOKEN',
+          allowInsecureHttp: false,
           mcp: {},
         },
       ],
     });
+  });
+
+  it('requires explicit opt-in before compiling an HTTP forge connection', () => {
+    const values = {
+      'sdlc-issues-capability': { provider: 'gitlab' },
+      'sdlc-forge-connections': {
+        gitlab: {
+          base_url: 'http://gitlab.example.test',
+          credential_environment: 'GITLAB_TOKEN',
+        },
+      },
+    } satisfies ConfigShardValues;
+
+    expect(() => createSdlcCompilerContext(snapshot(values))).toThrowError(
+      expect.objectContaining({
+        problems: expect.arrayContaining([expect.objectContaining({ code: 'FORGE_INSECURE_HTTP_REQUIRES_OPT_IN' })]),
+      }),
+    );
+    expect(
+      createSdlcCompilerContext(
+        snapshot({
+          ...values,
+          'sdlc-forge-connections': {
+            gitlab: { ...values['sdlc-forge-connections'].gitlab, allow_insecure_http: true },
+          },
+        }),
+      ).forges[0]?.allowInsecureHttp,
+    ).toBe(true);
   });
 
   it('rejects missing connections, unsupported documents, and required MCP services', () => {
