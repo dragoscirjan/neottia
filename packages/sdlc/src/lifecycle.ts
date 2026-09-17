@@ -1,5 +1,5 @@
 /** Version of the canonical lifecycle semantics and packaged templates. */
-export const SDLC_LIFECYCLE_VERSION = '1.1.0';
+export const SDLC_LIFECYCLE_VERSION = '1.2.0';
 
 /** Public commands exposed by every compiled harness. */
 export const SDLC_COMMAND_IDS = Object.freeze(['plan', 'build', 'verify', 'release', 'continue', 'refresh'] as const);
@@ -13,7 +13,7 @@ export const SDLC_LAYOUT_TEMPLATE_ID = 'neottia.sdlc.layout';
 /** Stable identifier for one canonical command. */
 export type SdlcCommandId = (typeof SDLC_COMMAND_IDS)[number];
 
-/** Portable role vocabulary consumed later by the role compiler in #118. */
+/** Portable role vocabulary consumed by configured harness assignments. */
 export const SDLC_ROLE_IDS = Object.freeze([
   'planner',
   'researcher',

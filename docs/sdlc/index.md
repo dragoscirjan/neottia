@@ -22,11 +22,11 @@ Release instructions never authorize an autonomous merge, publication, or deploy
 - one immutable configuration snapshot;
 - packaged, installed-package, global, and project template layers;
 - checksummed provider instruction packs;
-- optional checksummed role instructions;
+- checksummed role instructions derived from the selected harness assignments;
 - runtime package IDs with exact versions;
 - one harness adapter and installation scope.
 
-`createSdlcCompilerInput()` resolves template precedence and selects one instruction pack for each configured capability. Each command template renders only the instruction blocks that command uses. `compileSdlc()` records those rendered packs in the command provenance, then projects the six prompts and explicit package configuration through the adapter. The returned output manifest contains semantic command records and a checksummed distribution `AssetManifest`.
+`createSdlcCompilerInput()` resolves template precedence, selects one instruction pack for each configured capability, and derives role instructions from the selected harness map. Each command template renders only the provider and role blocks that command uses. `compileSdlc()` records those rendered packs in the command provenance, then projects the six prompts, supported native role agents, and explicit package configuration through the adapter. The returned output manifest contains semantic command records and a checksummed distribution `AssetManifest`.
 
 The compiler does not read files, invoke Git, contact providers, install packages, or change host configuration.
 
@@ -34,7 +34,7 @@ The compiler does not read files, invoke Git, contact providers, install package
 
 ```ts
 import { resolveHostConfigSnapshot } from "@neottia/config-registry";
-import { piHarnessAdapter } from "@neottia/pi-adapter";
+import { piHarnessAdapter, piHarnessDeclaration } from "@neottia/pi-adapter";
 import { compileSdlc, createSdlcCompilerInput, loadSdlcTemplateLayers } from "@neottia/sdlc";
 
 const snapshot = resolveHostConfigSnapshot({
@@ -48,6 +48,7 @@ const templateLayers = await loadSdlcTemplateLayers({
 const input = createSdlcCompilerInput(snapshot, {
   compilerVersion: "0.1.0",
   harnessId: "pi",
+  harnessDeclaration: piHarnessDeclaration,
   scope: "project",
   templateLayers,
   runtimePackages: [
@@ -59,7 +60,7 @@ const input = createSdlcCompilerInput(snapshot, {
 export const output = compileSdlc(input, piHarnessAdapter);
 ```
 
-Compile once per harness and scope. Use the same snapshot, template layers, instruction packs, role instructions, and runtime package list when Pi and OpenCode must preserve equivalent semantics. Their frontmatter and paths differ because adapters own host syntax.
+Compile once per harness and scope. The selected harness must explicitly assign `planner`, `implementer`, `verifier`, and `release-coordinator`. Use `agent: current` when the current agent performs a required role. Pi and OpenCode preserve the same role contracts, but their assignment maps, frontmatter, and paths differ because adapters own host syntax. See [portable role assignments](/sdlc/roles).
 
 ## Provider selection
 
@@ -105,11 +106,13 @@ The Twig context has three top-level values:
 
 The shared layout exposes one named Twig block per instruction slot. Command templates override blocks they do not need with an empty block. The renderer rejects duplicate instruction fragments and requires every role fragment exactly once. It also rejects dynamic template dependencies, recursive inheritance, unbounded `range()`, includes, and nondeterministic functions such as `random()`. These checks protect template assembly but cannot prove that replacement prose preserves lifecycle policy. Review complete overrides before installation. Compiler provenance records the rendered instruction packs, selected template, and every shadowed source.
 
-## Role insertion points
+## Role assignments
 
 Templates name portable roles rather than Pi or OpenCode agents. The published role vocabulary includes `planner`, `researcher`, `implementer`, `reviewer`, `verifier`, `release-coordinator`, and `documentation-writer`.
 
-A role instruction identifies both a command and one allowed role. Compilation without role instructions remains valid and records the unassigned points. Assignment, required versus optional roles, current-agent fallback, model hints, and handoff rules belong to issue #118.
+Configuration under `agents.sdlc.<harness>` assigns each role to the current agent, a supported named agent, or `false`. The compiler requires explicit assignments for `planner`, `implementer`, `verifier`, and `release-coordinator`. An omitted or disabled optional role falls back to the current agent, so lifecycle work is never silently skipped.
+
+Each generated role fragment states its objective, availability requirements, host-aware hint behavior, bounded handoff, result evidence, and authorization limits. OpenCode can receive native named subagent assets. Pi accepts current-agent assignments only and receives the same duties inside command prompts. See [portable role assignments](/sdlc/roles) for the schema, host differences, and examples.
 
 ## Install the result
 

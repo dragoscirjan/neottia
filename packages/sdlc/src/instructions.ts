@@ -24,7 +24,7 @@ export interface SdlcInstructionPack {
   readonly checksum: Sha256;
 }
 
-/** Versioned role instructions supplied by the future role compiler. */
+/** Versioned role instructions supplied by the portable role compiler. */
 export interface SdlcRoleInstruction {
   readonly id: string;
   readonly command: SdlcCommandId;
@@ -121,11 +121,6 @@ export function selectSdlcInstructionPacks(
       return matches[0]!;
     }).sort((left, right) => compareCodeUnits(left.slot, right.slot)),
   );
-}
-
-/** Records role invocation points without defining #118 fallback behavior. */
-export function unassignedRoleInstructions(roles: readonly SdlcRoleId[]): string {
-  return `No role instructions are compiled for these invocation points: ${roles.join(', ')}. Assignment, requiredness, and fallback behavior are owned by the role compiler.\n`;
 }
 
 /** Validates a decoded provider pack before it enters a checksummed manifest. */

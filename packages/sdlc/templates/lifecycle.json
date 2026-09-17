@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "lifecycleVersion": "1.1.0",
+  "lifecycleVersion": "1.2.0",
   "commands": [
     {
       "id": "plan",

@@ -666,7 +666,572 @@
     "agents": {
       "description": "Canonical agents configuration.",
       "type": "object",
-      "properties": {},
+      "properties": {
+        "sdlc": {
+          "type": "object",
+          "properties": {
+            "pi": {
+              "type": "object",
+              "properties": {
+                "planner": {
+                  "anyOf": [
+                    { "type": "boolean", "const": false },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "agent": {
+                          "anyOf": [
+                            { "type": "string", "const": "current" },
+                            { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                          ]
+                        },
+                        "model": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                        },
+                        "thinking": { "type": "string", "enum": ["low", "medium", "high"] },
+                        "required_skills": {
+                          "maxItems": 32,
+                          "type": "array",
+                          "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                        },
+                        "required_tools": {
+                          "maxItems": 32,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128,
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                "researcher": {
+                  "anyOf": [
+                    { "type": "boolean", "const": false },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "agent": {
+                          "anyOf": [
+                            { "type": "string", "const": "current" },
+                            { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                          ]
+                        },
+                        "model": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                        },
+                        "thinking": { "type": "string", "enum": ["low", "medium", "high"] },
+                        "required_skills": {
+                          "maxItems": 32,
+                          "type": "array",
+                          "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                        },
+                        "required_tools": {
+                          "maxItems": 32,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128,
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                "implementer": {
+                  "anyOf": [
+                    { "type": "boolean", "const": false },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "agent": {
+                          "anyOf": [
+                            { "type": "string", "const": "current" },
+                            { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                          ]
+                        },
+                        "model": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                        },
+                        "thinking": { "type": "string", "enum": ["low", "medium", "high"] },
+                        "required_skills": {
+                          "maxItems": 32,
+                          "type": "array",
+                          "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                        },
+                        "required_tools": {
+                          "maxItems": 32,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128,
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                "reviewer": {
+                  "anyOf": [
+                    { "type": "boolean", "const": false },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "agent": {
+                          "anyOf": [
+                            { "type": "string", "const": "current" },
+                            { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                          ]
+                        },
+                        "model": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                        },
+                        "thinking": { "type": "string", "enum": ["low", "medium", "high"] },
+                        "required_skills": {
+                          "maxItems": 32,
+                          "type": "array",
+                          "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                        },
+                        "required_tools": {
+                          "maxItems": 32,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128,
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                "verifier": {
+                  "anyOf": [
+                    { "type": "boolean", "const": false },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "agent": {
+                          "anyOf": [
+                            { "type": "string", "const": "current" },
+                            { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                          ]
+                        },
+                        "model": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                        },
+                        "thinking": { "type": "string", "enum": ["low", "medium", "high"] },
+                        "required_skills": {
+                          "maxItems": 32,
+                          "type": "array",
+                          "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                        },
+                        "required_tools": {
+                          "maxItems": 32,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128,
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                "release-coordinator": {
+                  "anyOf": [
+                    { "type": "boolean", "const": false },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "agent": {
+                          "anyOf": [
+                            { "type": "string", "const": "current" },
+                            { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                          ]
+                        },
+                        "model": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                        },
+                        "thinking": { "type": "string", "enum": ["low", "medium", "high"] },
+                        "required_skills": {
+                          "maxItems": 32,
+                          "type": "array",
+                          "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                        },
+                        "required_tools": {
+                          "maxItems": 32,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128,
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                "documentation-writer": {
+                  "anyOf": [
+                    { "type": "boolean", "const": false },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "agent": {
+                          "anyOf": [
+                            { "type": "string", "const": "current" },
+                            { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                          ]
+                        },
+                        "model": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                        },
+                        "thinking": { "type": "string", "enum": ["low", "medium", "high"] },
+                        "required_skills": {
+                          "maxItems": 32,
+                          "type": "array",
+                          "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                        },
+                        "required_tools": {
+                          "maxItems": 32,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128,
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              },
+              "additionalProperties": false
+            },
+            "opencode": {
+              "type": "object",
+              "properties": {
+                "planner": {
+                  "anyOf": [
+                    { "type": "boolean", "const": false },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "agent": {
+                          "anyOf": [
+                            { "type": "string", "const": "current" },
+                            { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                          ]
+                        },
+                        "model": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                        },
+                        "thinking": { "type": "string", "enum": ["low", "medium", "high"] },
+                        "required_skills": {
+                          "maxItems": 32,
+                          "type": "array",
+                          "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                        },
+                        "required_tools": {
+                          "maxItems": 32,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128,
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                "researcher": {
+                  "anyOf": [
+                    { "type": "boolean", "const": false },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "agent": {
+                          "anyOf": [
+                            { "type": "string", "const": "current" },
+                            { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                          ]
+                        },
+                        "model": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                        },
+                        "thinking": { "type": "string", "enum": ["low", "medium", "high"] },
+                        "required_skills": {
+                          "maxItems": 32,
+                          "type": "array",
+                          "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                        },
+                        "required_tools": {
+                          "maxItems": 32,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128,
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                "implementer": {
+                  "anyOf": [
+                    { "type": "boolean", "const": false },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "agent": {
+                          "anyOf": [
+                            { "type": "string", "const": "current" },
+                            { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                          ]
+                        },
+                        "model": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                        },
+                        "thinking": { "type": "string", "enum": ["low", "medium", "high"] },
+                        "required_skills": {
+                          "maxItems": 32,
+                          "type": "array",
+                          "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                        },
+                        "required_tools": {
+                          "maxItems": 32,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128,
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                "reviewer": {
+                  "anyOf": [
+                    { "type": "boolean", "const": false },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "agent": {
+                          "anyOf": [
+                            { "type": "string", "const": "current" },
+                            { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                          ]
+                        },
+                        "model": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                        },
+                        "thinking": { "type": "string", "enum": ["low", "medium", "high"] },
+                        "required_skills": {
+                          "maxItems": 32,
+                          "type": "array",
+                          "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                        },
+                        "required_tools": {
+                          "maxItems": 32,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128,
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                "verifier": {
+                  "anyOf": [
+                    { "type": "boolean", "const": false },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "agent": {
+                          "anyOf": [
+                            { "type": "string", "const": "current" },
+                            { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                          ]
+                        },
+                        "model": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                        },
+                        "thinking": { "type": "string", "enum": ["low", "medium", "high"] },
+                        "required_skills": {
+                          "maxItems": 32,
+                          "type": "array",
+                          "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                        },
+                        "required_tools": {
+                          "maxItems": 32,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128,
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                "release-coordinator": {
+                  "anyOf": [
+                    { "type": "boolean", "const": false },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "agent": {
+                          "anyOf": [
+                            { "type": "string", "const": "current" },
+                            { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                          ]
+                        },
+                        "model": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                        },
+                        "thinking": { "type": "string", "enum": ["low", "medium", "high"] },
+                        "required_skills": {
+                          "maxItems": 32,
+                          "type": "array",
+                          "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                        },
+                        "required_tools": {
+                          "maxItems": 32,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128,
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                "documentation-writer": {
+                  "anyOf": [
+                    { "type": "boolean", "const": false },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "agent": {
+                          "anyOf": [
+                            { "type": "string", "const": "current" },
+                            { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                          ]
+                        },
+                        "model": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                        },
+                        "thinking": { "type": "string", "enum": ["low", "medium", "high"] },
+                        "required_skills": {
+                          "maxItems": 32,
+                          "type": "array",
+                          "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                        },
+                        "required_tools": {
+                          "maxItems": 32,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128,
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        }
+      },
       "additionalProperties": false
     },
     "harnesses": {
@@ -1619,7 +2184,572 @@
           "agents": {
             "description": "Canonical agents configuration.",
             "type": "object",
-            "properties": {},
+            "properties": {
+              "sdlc": {
+                "type": "object",
+                "properties": {
+                  "pi": {
+                    "type": "object",
+                    "properties": {
+                      "planner": {
+                        "anyOf": [
+                          { "type": "boolean", "const": false },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "agent": {
+                                "anyOf": [
+                                  { "type": "string", "const": "current" },
+                                  { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                                ]
+                              },
+                              "model": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 256,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                              },
+                              "thinking": { "type": "string", "enum": ["low", "medium", "high"] },
+                              "required_skills": {
+                                "maxItems": 32,
+                                "type": "array",
+                                "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                              },
+                              "required_tools": {
+                                "maxItems": 32,
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128,
+                                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                                }
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        ]
+                      },
+                      "researcher": {
+                        "anyOf": [
+                          { "type": "boolean", "const": false },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "agent": {
+                                "anyOf": [
+                                  { "type": "string", "const": "current" },
+                                  { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                                ]
+                              },
+                              "model": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 256,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                              },
+                              "thinking": { "type": "string", "enum": ["low", "medium", "high"] },
+                              "required_skills": {
+                                "maxItems": 32,
+                                "type": "array",
+                                "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                              },
+                              "required_tools": {
+                                "maxItems": 32,
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128,
+                                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                                }
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        ]
+                      },
+                      "implementer": {
+                        "anyOf": [
+                          { "type": "boolean", "const": false },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "agent": {
+                                "anyOf": [
+                                  { "type": "string", "const": "current" },
+                                  { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                                ]
+                              },
+                              "model": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 256,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                              },
+                              "thinking": { "type": "string", "enum": ["low", "medium", "high"] },
+                              "required_skills": {
+                                "maxItems": 32,
+                                "type": "array",
+                                "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                              },
+                              "required_tools": {
+                                "maxItems": 32,
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128,
+                                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                                }
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        ]
+                      },
+                      "reviewer": {
+                        "anyOf": [
+                          { "type": "boolean", "const": false },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "agent": {
+                                "anyOf": [
+                                  { "type": "string", "const": "current" },
+                                  { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                                ]
+                              },
+                              "model": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 256,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                              },
+                              "thinking": { "type": "string", "enum": ["low", "medium", "high"] },
+                              "required_skills": {
+                                "maxItems": 32,
+                                "type": "array",
+                                "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                              },
+                              "required_tools": {
+                                "maxItems": 32,
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128,
+                                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                                }
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        ]
+                      },
+                      "verifier": {
+                        "anyOf": [
+                          { "type": "boolean", "const": false },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "agent": {
+                                "anyOf": [
+                                  { "type": "string", "const": "current" },
+                                  { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                                ]
+                              },
+                              "model": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 256,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                              },
+                              "thinking": { "type": "string", "enum": ["low", "medium", "high"] },
+                              "required_skills": {
+                                "maxItems": 32,
+                                "type": "array",
+                                "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                              },
+                              "required_tools": {
+                                "maxItems": 32,
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128,
+                                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                                }
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        ]
+                      },
+                      "release-coordinator": {
+                        "anyOf": [
+                          { "type": "boolean", "const": false },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "agent": {
+                                "anyOf": [
+                                  { "type": "string", "const": "current" },
+                                  { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                                ]
+                              },
+                              "model": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 256,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                              },
+                              "thinking": { "type": "string", "enum": ["low", "medium", "high"] },
+                              "required_skills": {
+                                "maxItems": 32,
+                                "type": "array",
+                                "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                              },
+                              "required_tools": {
+                                "maxItems": 32,
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128,
+                                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                                }
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        ]
+                      },
+                      "documentation-writer": {
+                        "anyOf": [
+                          { "type": "boolean", "const": false },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "agent": {
+                                "anyOf": [
+                                  { "type": "string", "const": "current" },
+                                  { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                                ]
+                              },
+                              "model": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 256,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                              },
+                              "thinking": { "type": "string", "enum": ["low", "medium", "high"] },
+                              "required_skills": {
+                                "maxItems": 32,
+                                "type": "array",
+                                "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                              },
+                              "required_tools": {
+                                "maxItems": 32,
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128,
+                                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                                }
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "opencode": {
+                    "type": "object",
+                    "properties": {
+                      "planner": {
+                        "anyOf": [
+                          { "type": "boolean", "const": false },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "agent": {
+                                "anyOf": [
+                                  { "type": "string", "const": "current" },
+                                  { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                                ]
+                              },
+                              "model": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 256,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                              },
+                              "thinking": { "type": "string", "enum": ["low", "medium", "high"] },
+                              "required_skills": {
+                                "maxItems": 32,
+                                "type": "array",
+                                "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                              },
+                              "required_tools": {
+                                "maxItems": 32,
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128,
+                                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                                }
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        ]
+                      },
+                      "researcher": {
+                        "anyOf": [
+                          { "type": "boolean", "const": false },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "agent": {
+                                "anyOf": [
+                                  { "type": "string", "const": "current" },
+                                  { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                                ]
+                              },
+                              "model": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 256,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                              },
+                              "thinking": { "type": "string", "enum": ["low", "medium", "high"] },
+                              "required_skills": {
+                                "maxItems": 32,
+                                "type": "array",
+                                "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                              },
+                              "required_tools": {
+                                "maxItems": 32,
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128,
+                                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                                }
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        ]
+                      },
+                      "implementer": {
+                        "anyOf": [
+                          { "type": "boolean", "const": false },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "agent": {
+                                "anyOf": [
+                                  { "type": "string", "const": "current" },
+                                  { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                                ]
+                              },
+                              "model": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 256,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                              },
+                              "thinking": { "type": "string", "enum": ["low", "medium", "high"] },
+                              "required_skills": {
+                                "maxItems": 32,
+                                "type": "array",
+                                "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                              },
+                              "required_tools": {
+                                "maxItems": 32,
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128,
+                                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                                }
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        ]
+                      },
+                      "reviewer": {
+                        "anyOf": [
+                          { "type": "boolean", "const": false },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "agent": {
+                                "anyOf": [
+                                  { "type": "string", "const": "current" },
+                                  { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                                ]
+                              },
+                              "model": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 256,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                              },
+                              "thinking": { "type": "string", "enum": ["low", "medium", "high"] },
+                              "required_skills": {
+                                "maxItems": 32,
+                                "type": "array",
+                                "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                              },
+                              "required_tools": {
+                                "maxItems": 32,
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128,
+                                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                                }
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        ]
+                      },
+                      "verifier": {
+                        "anyOf": [
+                          { "type": "boolean", "const": false },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "agent": {
+                                "anyOf": [
+                                  { "type": "string", "const": "current" },
+                                  { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                                ]
+                              },
+                              "model": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 256,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                              },
+                              "thinking": { "type": "string", "enum": ["low", "medium", "high"] },
+                              "required_skills": {
+                                "maxItems": 32,
+                                "type": "array",
+                                "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                              },
+                              "required_tools": {
+                                "maxItems": 32,
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128,
+                                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                                }
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        ]
+                      },
+                      "release-coordinator": {
+                        "anyOf": [
+                          { "type": "boolean", "const": false },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "agent": {
+                                "anyOf": [
+                                  { "type": "string", "const": "current" },
+                                  { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                                ]
+                              },
+                              "model": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 256,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                              },
+                              "thinking": { "type": "string", "enum": ["low", "medium", "high"] },
+                              "required_skills": {
+                                "maxItems": 32,
+                                "type": "array",
+                                "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                              },
+                              "required_tools": {
+                                "maxItems": 32,
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128,
+                                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                                }
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        ]
+                      },
+                      "documentation-writer": {
+                        "anyOf": [
+                          { "type": "boolean", "const": false },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "agent": {
+                                "anyOf": [
+                                  { "type": "string", "const": "current" },
+                                  { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                                ]
+                              },
+                              "model": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 256,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                              },
+                              "thinking": { "type": "string", "enum": ["low", "medium", "high"] },
+                              "required_skills": {
+                                "maxItems": 32,
+                                "type": "array",
+                                "items": { "type": "string", "maxLength": 64, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+                              },
+                              "required_tools": {
+                                "maxItems": 32,
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 128,
+                                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+                                }
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
             "additionalProperties": false
           },
           "harnesses": {
