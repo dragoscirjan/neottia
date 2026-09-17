@@ -1,5 +1,13 @@
-/** Forge providers delivered by the built-in SDLC instruction bundles. */
-export const FORGE_PROVIDERS = Object.freeze(['github', 'gitlab', 'gitea', 'forgejo'] as const);
+/** External providers delivered by the built-in SDLC instruction bundles. */
+export const FORGE_PROVIDERS = Object.freeze([
+  'github',
+  'gitlab',
+  'gitea',
+  'forgejo',
+  'bitbucket',
+  'jira',
+  'confluence',
+] as const);
 
 /** Provider capabilities that map to the stable SDLC instruction slots. */
 export const FORGE_CAPABILITIES = Object.freeze(['issues', 'documents', 'remote-source-control'] as const);
@@ -24,6 +32,7 @@ export interface ForgeSupportDeclaration {
   readonly documentation: Readonly<{
     readonly provider: string;
     readonly wiki?: string;
+    readonly mcp?: string;
   }>;
 }
 
@@ -61,9 +70,36 @@ export const FORGE_SUPPORT_DECLARATIONS: Readonly<Record<ForgeProvider, ForgeSup
     mcpRequiredFor: Object.freeze(['issues', 'remote-source-control'] as const),
     documentation: Object.freeze({ provider: 'https://forgejo.org/docs/latest/' }),
   }),
+  bitbucket: Object.freeze({
+    provider: 'bitbucket',
+    capabilities: Object.freeze(['remote-source-control'] as const),
+    mcpRequiredFor: Object.freeze(['remote-source-control'] as const),
+    documentation: Object.freeze({
+      provider: 'https://support.atlassian.com/bitbucket-cloud/',
+      mcp: 'https://support.atlassian.com/atlassian-rovo-mcp-server/docs/supported-tools/',
+    }),
+  }),
+  jira: Object.freeze({
+    provider: 'jira',
+    capabilities: Object.freeze(['issues'] as const),
+    mcpRequiredFor: Object.freeze(['issues'] as const),
+    documentation: Object.freeze({
+      provider: 'https://support.atlassian.com/jira-software-cloud/',
+      mcp: 'https://support.atlassian.com/atlassian-rovo-mcp-server/docs/supported-tools/',
+    }),
+  }),
+  confluence: Object.freeze({
+    provider: 'confluence',
+    capabilities: Object.freeze(['documents'] as const),
+    mcpRequiredFor: Object.freeze(['documents'] as const),
+    documentation: Object.freeze({
+      provider: 'https://support.atlassian.com/confluence-cloud/',
+      mcp: 'https://support.atlassian.com/atlassian-rovo-mcp-server/docs/supported-tools/',
+    }),
+  }),
 });
 
-/** Identifies provider names delivered by this issue without widening reserved enums. */
+/** Identifies provider names delivered by built-in instruction bundles without widening reserved enums. */
 export function isForgeProvider(value: string): value is ForgeProvider {
   return FORGE_PROVIDERS.some((provider) => provider === value);
 }

@@ -109,7 +109,7 @@ describe('canonical SDLC compiler', () => {
     expect(lifecycleContent.commands.every((command) => command.stopConditions.length > 0)).toBe(true);
     expect(SDLC_LIFECYCLE.find((command) => command.id === 'plan')?.roleSlots).toEqual(['planner', 'researcher']);
     for (const template of packagedTemplateLayer.files) {
-      expect(template.content).not.toMatch(/\b(?:github|gitlab|jira|confluence|filesystem)\b/iu);
+      expect(template.content).not.toMatch(/\b(?:github|gitlab|bitbucket|jira|confluence|filesystem)\b/iu);
       expect(template.content).not.toMatch(/`(?:issue_|document_|git\b)/u);
     }
   });
@@ -254,11 +254,83 @@ describe('canonical SDLC compiler', () => {
           }),
         ]),
       );
-      for (const other of ['github', 'gitlab', 'gitea', 'forgejo'].filter((candidate) => candidate !== provider)) {
+      for (const other of ['github', 'gitlab', 'gitea', 'forgejo', 'bitbucket', 'jira', 'confluence'].filter(
+        (candidate) => candidate !== provider,
+      )) {
         expect(piBodies.join('\n')).not.toContain(`https://${other}.example.test`);
       }
     },
   );
+
+  it('compiles equivalent mixed Jira, Confluence, and Bitbucket semantics for Pi and OpenCode', () => {
+    const service = { server: 'atlassian', command: 'mcp-remote' };
+    const values = {
+      'sdlc-issues-capability': { provider: 'jira' },
+      'sdlc-documents-capability': { provider: 'confluence' },
+      'sdlc-source-control-capability': { local: 'git', remote: 'bitbucket', workspaces: false },
+      'sdlc-forge-connections': {
+        jira: {
+          base_url: 'https://example.atlassian.net',
+          credential_environment: 'JIRA_TOKEN',
+          mcp: { issues: service },
+        },
+        confluence: {
+          base_url: 'https://example.atlassian.net/wiki',
+          credential_environment: 'CONFLUENCE_TOKEN',
+          mcp: { documents: service },
+        },
+        bitbucket: {
+          base_url: 'https://bitbucket.org/example',
+          credential_environment: 'BITBUCKET_TOKEN',
+          mcp: { remote_source_control: service },
+        },
+      },
+    } satisfies ConfigShardValues;
+    const piInput = createSdlcCompilerInput(snapshot(values), {
+      compilerVersion: '0.1.0',
+      harnessId: 'pi',
+      scope: 'project',
+    });
+    const opencodeInput = createSdlcCompilerInput(snapshot(values), {
+      compilerVersion: '0.1.0',
+      harnessId: 'opencode',
+      scope: 'project',
+    });
+    const pi = compileSdlc(piInput, piHarnessAdapter);
+    const opencode = compileSdlc(opencodeInput, opencodeHarnessAdapter);
+    const bodies = promptAssets(pi).map(promptBody);
+    const prerequisites = pi.assets.prerequisites;
+
+    expect(bodies).toEqual(promptAssets(opencode).map(promptBody));
+    expect(
+      piInput.instructions
+        .filter((pack) => ['bitbucket', 'jira', 'confluence'].includes(pack.provider))
+        .map((pack) => pack.id),
+    ).toEqual(['neottia.documents.confluence', 'neottia.issues.jira', 'neottia.source-control.remote.bitbucket']);
+    expect(bodies.join('\n')).toContain('Jira work item search');
+    expect(bodies.join('\n')).toContain('current content, space, parent, and version');
+    expect(bodies.join('\n')).toContain('Bitbucket pull requests');
+    expect(bodies.join('\n')).toContain('Require an explicit release operation');
+    for (const variable of ['BITBUCKET_TOKEN', 'CONFLUENCE_TOKEN', 'JIRA_TOKEN']) {
+      expect(prerequisites).toContainEqual(expect.objectContaining({ check: { kind: 'environment', variable } }));
+    }
+    expect(
+      prerequisites.filter(
+        (prerequisite) => prerequisite.check.kind === 'command' && prerequisite.check.command === 'mcp-remote',
+      ),
+    ).toHaveLength(3);
+    expect(
+      prerequisites.some(
+        (prerequisite) => prerequisite.check.kind === 'command' && ['gh', 'glab'].includes(prerequisite.check.command),
+      ),
+    ).toBe(false);
+    expect(pi.commands.find((command) => command.id === 'plan')?.instructionPackIds).not.toContain(
+      'neottia.source-control.remote.bitbucket',
+    );
+    expect(pi.commands.find((command) => command.id === 'release')?.instructionPackIds).not.toContain(
+      'neottia.documents.confluence',
+    );
+  });
 
   it('renders only the instruction blocks used by each lifecycle template', () => {
     const input = createSdlcCompilerInput(
@@ -507,12 +579,17 @@ describe('canonical SDLC compiler', () => {
 
   it('fails compilation before projection when a selected instruction pack is missing', () => {
     expect(() =>
-      createSdlcCompilerInput(snapshot({ 'sdlc-documents-capability': { provider: 'confluence' } }), {
-        compilerVersion: '0.1.0',
-        harnessId: 'pi',
-        scope: 'project',
-      }),
-    ).toThrow('No instruction pack exists for documents:confluence.');
+      createSdlcCompilerInput(
+        snapshot({
+          'sdlc-source-control-capability': { local: 'jj', remote: false, workspaces: false },
+        }),
+        {
+          compilerVersion: '0.1.0',
+          harnessId: 'pi',
+          scope: 'project',
+        },
+      ),
+    ).toThrow('No instruction pack exists for source-control.local:jj.');
   });
 
   it('rejects malformed checksums, duplicate selections, and package ranges', () => {

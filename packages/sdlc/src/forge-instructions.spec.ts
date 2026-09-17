@@ -44,6 +44,9 @@ describe('forge instruction bundles', () => {
     ['gitlab', ['issues', 'documents', 'remote-source-control']],
     ['gitea', ['issues', 'remote-source-control']],
     ['forgejo', ['issues', 'remote-source-control']],
+    ['bitbucket', ['remote-source-control']],
+    ['jira', ['issues']],
+    ['confluence', ['documents']],
   ] as const)('creates checksummed selected fragments for %s', (provider, capabilities) => {
     const packs = createForgeInstructionPacks(context(provider, capabilities));
 
@@ -88,6 +91,23 @@ describe('forge instruction bundles', () => {
     expect(github.find((pack) => pack.slot === 'documents')?.content).not.toContain('local Git');
     expect(github.find((pack) => pack.slot === 'source-control.remote')?.content).not.toContain('`gh pr`');
     expect(github.every((pack) => pack.content.includes('only provider-object route'))).toBe(true);
+  });
+
+  it('preserves distinct Jira, Confluence, and Bitbucket semantics', () => {
+    const jira = createForgeInstructionPacks(context('jira', ['issues']))[0]!.content;
+    const confluence = createForgeInstructionPacks(context('confluence', ['documents']))[0]!.content;
+    const bitbucket = createForgeInstructionPacks(context('bitbucket', ['remote-source-control']))[0]!.content;
+
+    expect(jira).toContain('Jira work item search');
+    expect(jira).toContain('field metadata and allowed transitions');
+    expect(jira).not.toContain('Confluence');
+    expect(confluence).toContain('current content, space, parent, and version');
+    expect(confluence).toContain('Do not substitute repository files');
+    expect(confluence).not.toContain('Jira work item');
+    expect(bitbucket).toContain('Bitbucket pull requests');
+    expect(bitbucket).toContain('pipeline and deployment evidence');
+    expect(bitbucket).toContain('Require an explicit release operation');
+    expect(bitbucket).toContain('Use local Git for fetch and push');
   });
 
   it('warns only when a selected connection opts into insecure HTTP', () => {

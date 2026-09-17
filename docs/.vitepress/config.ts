@@ -70,7 +70,7 @@ export default defineConfig({
           text: 'SDLC',
           items: [
             { text: 'Compile the canonical lifecycle', link: '/sdlc/' },
-            { text: 'Configure forge providers', link: '/sdlc/providers' },
+            { text: 'Configure provider packs', link: '/sdlc/providers' },
           ],
         },
       ],

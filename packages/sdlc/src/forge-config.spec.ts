@@ -75,19 +75,65 @@ describe('forge connection configuration', () => {
         github: { ...githubConnection, unknown: true },
       }).success,
     ).toBe(false);
-    expect(forgeConnectionsConfigSchema.safeParse({ bitbucket: githubConnection }).success).toBe(false);
+    expect(forgeConnectionsConfigSchema.safeParse({ azure_devops: githubConnection }).success).toBe(false);
+  });
+
+  it('accepts independent Atlassian product connections and rejects unrelated MCP slots', () => {
+    const service = { server: 'atlassian', command: 'mcp-remote' };
+    const connections = {
+      bitbucket: {
+        base_url: 'https://bitbucket.org/example',
+        credential_environment: 'BITBUCKET_TOKEN',
+        mcp: { remote_source_control: service },
+      },
+      jira: {
+        base_url: 'https://example.atlassian.net',
+        credential_environment: 'JIRA_TOKEN',
+        mcp: { issues: service },
+      },
+      confluence: {
+        base_url: 'https://example.atlassian.net/wiki',
+        credential_environment: 'CONFLUENCE_TOKEN',
+        mcp: { documents: service },
+      },
+    };
+
+    expect(forgeConnectionsConfigSchema.parse(connections)).toEqual(connections);
+    expect(
+      forgeConnectionsConfigSchema.safeParse({
+        jira: { ...connections.jira, mcp: { documents: service } },
+      }).success,
+    ).toBe(false);
+    expect(
+      forgeConnectionsConfigSchema.safeParse({
+        confluence: { ...connections.confluence, mcp: { issues: service } },
+      }).success,
+    ).toBe(false);
+    expect(
+      forgeConnectionsConfigSchema.safeParse({
+        bitbucket: { ...connections.bitbucket, mcp: { issues: service } },
+      }).success,
+    ).toBe(false);
   });
 });
 
 describe('forge support declarations', () => {
-  it('declares documented CLI support without assuming Gitea or Forgejo parity', () => {
+  it('declares documented CLI and MCP support without assuming provider parity', () => {
     expect(FORGE_SUPPORT_DECLARATIONS.github.cli?.command).toBe('gh');
     expect(FORGE_SUPPORT_DECLARATIONS.gitlab.cli?.command).toBe('glab');
-    expect(FORGE_SUPPORT_DECLARATIONS.gitea.cli).toBeUndefined();
-    expect(FORGE_SUPPORT_DECLARATIONS.forgejo.cli).toBeUndefined();
+    for (const provider of ['gitea', 'forgejo', 'bitbucket', 'jira', 'confluence'] as const) {
+      expect(FORGE_SUPPORT_DECLARATIONS[provider].cli).toBeUndefined();
+    }
     expect(FORGE_SUPPORT_DECLARATIONS.gitea.capabilities).not.toContain('documents');
     expect(FORGE_SUPPORT_DECLARATIONS.forgejo.capabilities).not.toContain('documents');
     expect(FORGE_SUPPORT_DECLARATIONS.gitea.mcpRequiredFor).toEqual(['issues', 'remote-source-control']);
     expect(FORGE_SUPPORT_DECLARATIONS.forgejo.mcpRequiredFor).toEqual(['issues', 'remote-source-control']);
+    expect(FORGE_SUPPORT_DECLARATIONS.bitbucket.capabilities).toEqual(['remote-source-control']);
+    expect(FORGE_SUPPORT_DECLARATIONS.jira.capabilities).toEqual(['issues']);
+    expect(FORGE_SUPPORT_DECLARATIONS.confluence.capabilities).toEqual(['documents']);
+    expect(FORGE_SUPPORT_DECLARATIONS.bitbucket.mcpRequiredFor).toEqual(['remote-source-control']);
+    expect(FORGE_SUPPORT_DECLARATIONS.jira.mcpRequiredFor).toEqual(['issues']);
+    expect(FORGE_SUPPORT_DECLARATIONS.confluence.mcpRequiredFor).toEqual(['documents']);
+    expect(FORGE_SUPPORT_DECLARATIONS.jira.documentation.mcp).toContain('atlassian-rovo-mcp-server');
   });
 });

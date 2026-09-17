@@ -47,9 +47,9 @@ Every present file must have the exact integer `version: 1`. The supported root 
 | Documents provider | `capabilities.documents`      | [SDLC provider selection](#sdlc-provider-selection) |
 | Source control     | `capabilities.source_control` | [SDLC provider selection](#sdlc-provider-selection) |
 
-| Provider connection | Canonical path       | Reference                                           |
-| ------------------- | -------------------- | --------------------------------------------------- |
-| Forge connections   | `connections.forges` | [Forge provider configuration](./sdlc/providers.md) |
+| Provider connection  | Canonical path       | Reference                                         |
+| -------------------- | -------------------- | ------------------------------------------------- |
+| Provider connections | `connections.forges` | [Provider instruction packs](./sdlc/providers.md) |
 
 | Distribution setting | Canonical path      | Reference                             |
 | -------------------- | ------------------- | ------------------------------------- |
@@ -186,14 +186,14 @@ capabilities:
 
 Remote names reserve stable compiler selections for provider instruction packages. Selecting a name does not install instructions, authenticate a provider, or grant access.
 
-| Capability            | Accepted selections                                                | Delivery status                                                                                      |
-| --------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
-| Issues                | `filesystem`, `github`, `gitlab`, `gitea`, `forgejo`, `jira`       | Filesystem and the four forge bundles are available. Gitea and Forgejo require MCP. Jira is planned. |
-| Documents             | `filesystem`, `github`, `gitlab`, `gitea`, `forgejo`, `confluence` | Filesystem, GitHub, and GitLab are available. Gitea and Forgejo are rejected. Confluence is planned. |
-| Local source control  | `git`, `jj`                                                        | Git instructions are available. Jujutsu is planned.                                                  |
-| Remote source control | `false`, `github`, `gitlab`, `gitea`, `forgejo`, `bitbucket`       | The four forge bundles are available. Gitea and Forgejo require MCP. Bitbucket is planned.           |
+| Capability            | Accepted selections                                                | Delivery status                                                                                                    |
+| --------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| Issues                | `filesystem`, `github`, `gitlab`, `gitea`, `forgejo`, `jira`       | All are available. Gitea, Forgejo, and Jira require MCP.                                                           |
+| Documents             | `filesystem`, `github`, `gitlab`, `gitea`, `forgejo`, `confluence` | Filesystem, GitHub, GitLab, and Confluence are available. Confluence requires MCP. Gitea and Forgejo are rejected. |
+| Local source control  | `git`, `jj`                                                        | Git instructions are available. Jujutsu is planned.                                                                |
+| Remote source control | `false`, `github`, `gitlab`, `gitea`, `forgejo`, `bitbucket`       | All remote providers are available. Gitea, Forgejo, and Bitbucket require MCP for provider objects.                |
 
-`remote` is one scalar. Set it to `false` or one supported forge:
+`remote` is one scalar. Set it to `false` or one supported provider. Jira, Confluence, and Bitbucket remain independent selections:
 
 ```yaml
 version: 1
@@ -210,7 +210,7 @@ capabilities:
 
 The scalar remote selection replaces atomically across global, project, and profile layers. A profile can set `remote: false` without retaining a lower provider.
 
-A selected forge also needs a strict `connections.forges.<provider>` entry. The entry stores an HTTP or HTTPS base URL and the name of a credential environment variable. HTTP connections also require `allow_insecure_http: true`; HTTPS connections omit that field. Optional MCP entries use strict `{server, command}` pairs for `issues`, `documents`, or `remote_source_control`. Configuration stores names only, never token values.
+A selected remote provider also needs a strict `connections.forges.<provider>` entry. The entry stores an HTTP or HTTPS base URL and the name of a credential environment variable. HTTP connections also require `allow_insecure_http: true`; HTTPS connections omit that field. Optional MCP entries use strict `{server, command}` pairs for `issues`, `documents`, or `remote_source_control`. Jira accepts only the Issues entry, Confluence accepts only the Documents entry, and Bitbucket accepts only the remote source-control entry. Configuration stores names only, never token values.
 
 ```yaml
 version: 1
@@ -230,9 +230,9 @@ connections:
       credential_environment: GITHUB_TOKEN
 ```
 
-Git workspaces require `local: git`. `createSdlcCompilerContext(snapshot)` also rejects a missing selected connection, an unsupported forge capability, or a missing required Gitea or Forgejo MCP service. It reports typed, value-free `SdlcConfigError` problems, reads only the supplied snapshot, and returns a deeply frozen context.
+Git workspaces require `local: git`. `createSdlcCompilerContext(snapshot)` also rejects a missing selected connection, an unsupported provider capability, or a missing required MCP service. It reports typed, value-free `SdlcConfigError` problems, reads only the supplied snapshot, and returns a deeply frozen context.
 
-Read [forge provider configuration](./sdlc/providers.md) for the support matrix, self-hosted URLs, CLI and MCP setup, authentication, mutation safety, and troubleshooting.
+Read [provider instruction-pack configuration](./sdlc/providers.md) for the support matrix, independent Atlassian product connections, self-hosted URLs, CLI and MCP setup, authentication, mutation safety, and troubleshooting.
 
 `loadSdlcTemplateLayers()` reads the six published `.md.twig` templates and complete command overrides from `.neottia/templates/sdlc/<command>.md.twig`. It rejects unknown command filenames. Pass its result to `createSdlcCompilerInput()`, which adds resolved template, instruction, role, configuration, and runtime package provenance. `compileSdlc()` then projects the canonical six-command lifecycle through a Pi or OpenCode adapter. Runtime package IDs and exact versions are separate compiler inputs. The compiler never infers packages from provider selections. See [the SDLC compiler guide](./sdlc/) for the complete input, output, and installation handoff.
 
