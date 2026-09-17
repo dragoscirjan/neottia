@@ -39,13 +39,15 @@ Use the installed package versions in `runtimePackages`. The compiler does not i
 
 ## Built-in instruction packs
 
-The package includes checksummed fragments for filesystem Issues, filesystem Design Docs, local Git, disabled remote source control, GitHub, GitLab, Gitea, and Forgejo.
+The package includes checksummed fragments for filesystem Issues, filesystem Design Docs, local Git, disabled remote source control, GitHub, GitLab, Gitea, Forgejo, Jira, Confluence, and Bitbucket.
 
-GitHub uses the documented `gh` CLI. GitLab uses `glab`. Both include Git-backed wiki guidance. Gitea and Forgejo require a configured MCP service for Issues and remote forge objects. Their Documents selections fail before adapter projection because this package does not claim undocumented wiki parity.
+GitHub uses the documented `gh` CLI. GitLab uses `glab`. Both include Git-backed wiki guidance. Gitea and Forgejo require a configured MCP service for Issues and remote provider objects. Their Documents selections fail before adapter projection because this package does not claim undocumented wiki parity.
 
-Forge connection settings live at `connections.forges`. A selected connection supplies a validated base URL, a credential environment-variable name, and optional capability-specific `{server, command}` MCP entries. The compiler includes only selected connections and fragments in its checksummed input. Each command template renders only the instruction blocks it uses.
+Jira Issues, Confluence Documents, and Bitbucket remote source control require configured MCP services. Their connection entries remain independent. Bitbucket uses local Git for fetch and push, then MCP for pull requests, review state, pipelines, deployments, and explicit release operations when available.
 
-See the [forge provider guide](../../docs/sdlc/providers.md) for configuration, installation, authentication, supported operations, tool checks, mutation safety, and troubleshooting. A selected Jira, Confluence, Bitbucket, or Jujutsu provider still fails when no caller-supplied pack exists.
+Provider connection settings live at `connections.forges`. A selected connection supplies a validated base URL, a credential environment-variable name, and capability-specific `{server, command}` MCP entries. The compiler includes only selected connections and fragments in its checksummed input. Each command template renders only the instruction blocks it uses.
+
+See the [provider instruction-pack guide](../../docs/sdlc/providers.md) for configuration, installation, authentication, supported operations, tool checks, mutation safety, and troubleshooting. Jujutsu still needs a caller-supplied pack.
 
 ## Templates and roles
 

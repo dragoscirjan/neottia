@@ -54,6 +54,11 @@ export const forgeMcpConfigSchema = z
     }
   });
 
+// Atlassian product connections accept only their independently selected capability slot.
+const bitbucketMcpConfigSchema = z.object({ remote_source_control: forgeMcpServiceSchema.optional() }).strict();
+const jiraMcpConfigSchema = z.object({ issues: forgeMcpServiceSchema.optional() }).strict();
+const confluenceMcpConfigSchema = z.object({ documents: forgeMcpServiceSchema.optional() }).strict();
+
 /** One complete forge connection referenced by compile-time capability selection. */
 export const forgeConnectionSchema = z
   .object({
@@ -74,13 +79,28 @@ export const forgeConnectionPatchSchema = z
   })
   .strict();
 
-/** Complete strict connection map for the four built-in forge bundles. */
+// These variants preserve the common connection contract while rejecting unrelated MCP slots.
+const bitbucketConnectionSchema = forgeConnectionSchema.extend({ mcp: bitbucketMcpConfigSchema.optional() }).strict();
+const jiraConnectionSchema = forgeConnectionSchema.extend({ mcp: jiraMcpConfigSchema.optional() }).strict();
+const confluenceConnectionSchema = forgeConnectionSchema.extend({ mcp: confluenceMcpConfigSchema.optional() }).strict();
+const bitbucketConnectionPatchSchema = forgeConnectionPatchSchema
+  .extend({ mcp: bitbucketMcpConfigSchema.optional() })
+  .strict();
+const jiraConnectionPatchSchema = forgeConnectionPatchSchema.extend({ mcp: jiraMcpConfigSchema.optional() }).strict();
+const confluenceConnectionPatchSchema = forgeConnectionPatchSchema
+  .extend({ mcp: confluenceMcpConfigSchema.optional() })
+  .strict();
+
+/** Complete strict connection map for the seven built-in provider bundles. */
 export const forgeConnectionsConfigSchema = z
   .object({
     github: forgeConnectionSchema.optional(),
     gitlab: forgeConnectionSchema.optional(),
     gitea: forgeConnectionSchema.optional(),
     forgejo: forgeConnectionSchema.optional(),
+    bitbucket: bitbucketConnectionSchema.optional(),
+    jira: jiraConnectionSchema.optional(),
+    confluence: confluenceConnectionSchema.optional(),
   })
   .strict();
 
@@ -91,6 +111,9 @@ export const forgeConnectionsConfigPatchSchema = z
     gitlab: forgeConnectionPatchSchema.optional(),
     gitea: forgeConnectionPatchSchema.optional(),
     forgejo: forgeConnectionPatchSchema.optional(),
+    bitbucket: bitbucketConnectionPatchSchema.optional(),
+    jira: jiraConnectionPatchSchema.optional(),
+    confluence: confluenceConnectionPatchSchema.optional(),
   })
   .strict();
 

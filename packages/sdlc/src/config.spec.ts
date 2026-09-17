@@ -106,19 +106,31 @@ describe('SDLC compiler context', () => {
     expect(() => Object.assign(context.issues, { provider: 'github' })).toThrow(TypeError);
   });
 
-  it('returns explicit remote selections', () => {
+  it('returns independent mixed-provider selections', () => {
+    const service = { server: 'atlassian', command: 'mcp-remote' };
     const context = createSdlcCompilerContext(
       snapshot({
-        'sdlc-issues-capability': { provider: 'github' },
+        'sdlc-issues-capability': { provider: 'jira' },
         'sdlc-documents-capability': { provider: 'confluence' },
         'sdlc-forge-connections': {
           github: {
             base_url: 'https://github.example.test',
             credential_environment: 'GITHUB_TOKEN',
-            mcp: {
-              documents: { server: 'unused-documents', command: 'github-mcp-server' },
-              remote_source_control: { server: 'unused-remote', command: 'github-mcp-server' },
-            },
+          },
+          bitbucket: {
+            base_url: 'https://bitbucket.org/example',
+            credential_environment: 'BITBUCKET_TOKEN',
+            mcp: { remote_source_control: service },
+          },
+          jira: {
+            base_url: 'https://example.atlassian.net',
+            credential_environment: 'JIRA_TOKEN',
+            mcp: { issues: service },
+          },
+          confluence: {
+            base_url: 'https://example.atlassian.net/wiki',
+            credential_environment: 'CONFLUENCE_TOKEN',
+            mcp: { documents: service },
           },
         },
         'sdlc-source-control-capability': {
@@ -130,7 +142,7 @@ describe('SDLC compiler context', () => {
     );
 
     expect(context).toEqual({
-      issues: { provider: 'github' },
+      issues: { provider: 'jira' },
       documents: { provider: 'confluence' },
       sourceControl: {
         local: 'jj',
@@ -139,12 +151,28 @@ describe('SDLC compiler context', () => {
       },
       forges: [
         {
-          provider: 'github',
-          capabilities: ['issues'],
-          baseUrl: 'https://github.example.test',
-          credentialEnvironment: 'GITHUB_TOKEN',
+          provider: 'bitbucket',
+          capabilities: ['remote-source-control'],
+          baseUrl: 'https://bitbucket.org/example',
+          credentialEnvironment: 'BITBUCKET_TOKEN',
           allowInsecureHttp: false,
-          mcp: {},
+          mcp: { remoteSourceControl: service },
+        },
+        {
+          provider: 'confluence',
+          capabilities: ['documents'],
+          baseUrl: 'https://example.atlassian.net/wiki',
+          credentialEnvironment: 'CONFLUENCE_TOKEN',
+          allowInsecureHttp: false,
+          mcp: { documents: service },
+        },
+        {
+          provider: 'jira',
+          capabilities: ['issues'],
+          baseUrl: 'https://example.atlassian.net',
+          credentialEnvironment: 'JIRA_TOKEN',
+          allowInsecureHttp: false,
+          mcp: { issues: service },
         },
       ],
     });
@@ -198,6 +226,32 @@ describe('SDLC compiler context', () => {
           expect.objectContaining({ code: 'FORGE_CONNECTION_REQUIRED' }),
           expect.objectContaining({ code: 'FORGE_MCP_REQUIRED' }),
         ]),
+      }),
+    );
+  });
+
+  it('requires MCP for every selected Atlassian product capability', () => {
+    const invalid = snapshot({
+      'sdlc-issues-capability': { provider: 'jira' },
+      'sdlc-documents-capability': { provider: 'confluence' },
+      'sdlc-source-control-capability': { local: 'git', remote: 'bitbucket', workspaces: false },
+      'sdlc-forge-connections': {
+        jira: { base_url: 'https://example.atlassian.net', credential_environment: 'JIRA_TOKEN' },
+        confluence: {
+          base_url: 'https://example.atlassian.net/wiki',
+          credential_environment: 'CONFLUENCE_TOKEN',
+        },
+        bitbucket: { base_url: 'https://bitbucket.org/example', credential_environment: 'BITBUCKET_TOKEN' },
+      },
+    });
+
+    expect(() => createSdlcCompilerContext(invalid)).toThrowError(
+      expect.objectContaining({
+        problems: [
+          expect.objectContaining({ code: 'FORGE_MCP_REQUIRED' }),
+          expect.objectContaining({ code: 'FORGE_MCP_REQUIRED' }),
+          expect.objectContaining({ code: 'FORGE_MCP_REQUIRED' }),
+        ],
       }),
     );
   });

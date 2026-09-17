@@ -71,6 +71,29 @@ profiles:
       source_control:
         local: jj
         remote: bitbucket
+    connections:
+      forges:
+        bitbucket:
+          base_url: https://bitbucket.org/example
+          credential_environment: BITBUCKET_TOKEN
+          mcp:
+            remote_source_control:
+              server: atlassian
+              command: mcp-remote
+        jira:
+          base_url: https://example.atlassian.net
+          credential_environment: JIRA_TOKEN
+          mcp:
+            issues:
+              server: atlassian
+              command: mcp-remote
+        confluence:
+          base_url: https://example.atlassian.net/wiki
+          credential_environment: CONFLUENCE_TOKEN
+          mcp:
+            documents:
+              server: atlassian
+              command: mcp-remote
 `);
 
     const snapshot = resolveConfig(registry, { cwd, env: { NEOTTIA_PROFILE: 'atlassian' } });
@@ -83,7 +106,32 @@ profiles:
         remote: { enabled: true, provider: 'bitbucket' },
         workspaces: false,
       },
-      forges: [],
+      forges: [
+        {
+          provider: 'bitbucket',
+          capabilities: ['remote-source-control'],
+          baseUrl: 'https://bitbucket.org/example',
+          credentialEnvironment: 'BITBUCKET_TOKEN',
+          allowInsecureHttp: false,
+          mcp: { remoteSourceControl: { server: 'atlassian', command: 'mcp-remote' } },
+        },
+        {
+          provider: 'confluence',
+          capabilities: ['documents'],
+          baseUrl: 'https://example.atlassian.net/wiki',
+          credentialEnvironment: 'CONFLUENCE_TOKEN',
+          allowInsecureHttp: false,
+          mcp: { documents: { server: 'atlassian', command: 'mcp-remote' } },
+        },
+        {
+          provider: 'jira',
+          capabilities: ['issues'],
+          baseUrl: 'https://example.atlassian.net',
+          credentialEnvironment: 'JIRA_TOKEN',
+          allowInsecureHttp: false,
+          mcp: { issues: { server: 'atlassian', command: 'mcp-remote' } },
+        },
+      ],
     });
     expect(snapshot.sourceOf(issuesCapabilityConfigContribution, ['provider'])).toEqual({
       kind: 'profile',
@@ -91,6 +139,11 @@ profiles:
       profile: 'atlassian',
     });
     expect(snapshot.sourceOf(sourceControlCapabilityConfigContribution, ['remote'])).toEqual({
+      kind: 'profile',
+      file: join(cwd, '.neottia', 'config.yml'),
+      profile: 'atlassian',
+    });
+    expect(snapshot.sourceOf(forgeConnectionsConfigContribution, ['jira', 'base_url'])).toEqual({
       kind: 'profile',
       file: join(cwd, '.neottia', 'config.yml'),
       profile: 'atlassian',
@@ -174,7 +227,7 @@ capabilities:
   issues:
     provider: github
   documents:
-    provider: confluence
+    provider: github
 connections:
   forges:
     github:
@@ -198,12 +251,12 @@ capabilities:
 
     expect(createSdlcCompilerContext(snapshot)).toEqual({
       issues: { provider: 'github' },
-      documents: { provider: 'confluence' },
+      documents: { provider: 'github' },
       sourceControl: { local: 'git', remote: { enabled: false }, workspaces: false },
       forges: [
         {
           provider: 'github',
-          capabilities: ['issues'],
+          capabilities: ['documents', 'issues'],
           baseUrl: 'https://github.example.test',
           credentialEnvironment: 'GITHUB_TOKEN',
           allowInsecureHttp: false,

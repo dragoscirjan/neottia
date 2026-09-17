@@ -45,6 +45,15 @@ function providerCapabilityGuidance(connection: SdlcForgeConnectionContext, capa
   const service =
     capability === 'remote-source-control' ? connection.mcp.remoteSourceControl : connection.mcp[capability];
   if (service !== undefined) {
+    if (provider === 'jira') {
+      return 'Use only the configured MCP service for Jira work item search, reads, creation, edits, comments, and transitions. Read field metadata and allowed transitions before mutation. Preserve the site, project key, work item key, URL, and resulting status as evidence. If the required operation or permission is absent, stop rather than substituting another route.';
+    }
+    if (provider === 'confluence') {
+      return 'Use only the configured MCP service for Confluence search, reads, creation, updates, and comments. Read the current content, space, parent, and version before mutation. Preserve the content ID, URL, version, and resulting status as evidence. Do not substitute repository files for the configured Confluence document.';
+    }
+    if (provider === 'bitbucket') {
+      return 'Use local Git for fetch and push. Use only the configured MCP service for Bitbucket pull requests, review state, pipeline and deployment evidence, and provider release operations. Require an explicit release operation before release publication; if none exists, stop and report the operation as unsupported rather than substituting a tag, deployment, or pipeline. A successful push does not authorize merge, and preparing a release does not authorize publication.';
+    }
     if (capability === 'issues') {
       return 'Use only the configured MCP service for issue reads and mutations. Preserve the repository identity, issue number, URL, and resulting state as evidence.';
     }
@@ -92,5 +101,8 @@ function providerName(provider: ForgeProvider): string {
   if (provider === 'github') return 'GitHub';
   if (provider === 'gitlab') return 'GitLab';
   if (provider === 'gitea') return 'Gitea';
-  return 'Forgejo';
+  if (provider === 'forgejo') return 'Forgejo';
+  if (provider === 'bitbucket') return 'Bitbucket';
+  if (provider === 'jira') return 'Jira';
+  return 'Confluence';
 }

@@ -531,6 +531,93 @@
                 }
               },
               "additionalProperties": false
+            },
+            "bitbucket": {
+              "type": "object",
+              "properties": {
+                "base_url": {
+                  "type": "string",
+                  "maxLength": 8192,
+                  "pattern": "^[hH][tT][tT][pP][sS]?:\\/\\/(?![^/?#]*@)[^?#]+$",
+                  "format": "uri"
+                },
+                "credential_environment": { "type": "string", "maxLength": 128, "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
+                "allow_insecure_http": { "type": "boolean", "const": true },
+                "mcp": {
+                  "type": "object",
+                  "properties": {
+                    "remote_source_control": {
+                      "type": "object",
+                      "properties": {
+                        "server": { "type": "string", "maxLength": 128, "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$" },
+                        "command": { "type": "string", "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" }
+                      },
+                      "required": ["server", "command"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            },
+            "jira": {
+              "type": "object",
+              "properties": {
+                "base_url": {
+                  "type": "string",
+                  "maxLength": 8192,
+                  "pattern": "^[hH][tT][tT][pP][sS]?:\\/\\/(?![^/?#]*@)[^?#]+$",
+                  "format": "uri"
+                },
+                "credential_environment": { "type": "string", "maxLength": 128, "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
+                "allow_insecure_http": { "type": "boolean", "const": true },
+                "mcp": {
+                  "type": "object",
+                  "properties": {
+                    "issues": {
+                      "type": "object",
+                      "properties": {
+                        "server": { "type": "string", "maxLength": 128, "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$" },
+                        "command": { "type": "string", "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" }
+                      },
+                      "required": ["server", "command"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            },
+            "confluence": {
+              "type": "object",
+              "properties": {
+                "base_url": {
+                  "type": "string",
+                  "maxLength": 8192,
+                  "pattern": "^[hH][tT][tT][pP][sS]?:\\/\\/(?![^/?#]*@)[^?#]+$",
+                  "format": "uri"
+                },
+                "credential_environment": { "type": "string", "maxLength": 128, "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
+                "allow_insecure_http": { "type": "boolean", "const": true },
+                "mcp": {
+                  "type": "object",
+                  "properties": {
+                    "documents": {
+                      "type": "object",
+                      "properties": {
+                        "server": { "type": "string", "maxLength": 128, "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$" },
+                        "command": { "type": "string", "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" }
+                      },
+                      "required": ["server", "command"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -1337,6 +1424,129 @@
                             "additionalProperties": false
                           },
                           "remote_source_control": {
+                            "type": "object",
+                            "properties": {
+                              "server": {
+                                "type": "string",
+                                "maxLength": 128,
+                                "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$"
+                              },
+                              "command": {
+                                "type": "string",
+                                "maxLength": 128,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+                              }
+                            },
+                            "required": ["server", "command"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "bitbucket": {
+                    "type": "object",
+                    "properties": {
+                      "base_url": {
+                        "type": "string",
+                        "maxLength": 8192,
+                        "pattern": "^[hH][tT][tT][pP][sS]?:\\/\\/(?![^/?#]*@)[^?#]+$",
+                        "format": "uri"
+                      },
+                      "credential_environment": {
+                        "type": "string",
+                        "maxLength": 128,
+                        "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                      },
+                      "allow_insecure_http": { "type": "boolean", "const": true },
+                      "mcp": {
+                        "type": "object",
+                        "properties": {
+                          "remote_source_control": {
+                            "type": "object",
+                            "properties": {
+                              "server": {
+                                "type": "string",
+                                "maxLength": 128,
+                                "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$"
+                              },
+                              "command": {
+                                "type": "string",
+                                "maxLength": 128,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+                              }
+                            },
+                            "required": ["server", "command"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "jira": {
+                    "type": "object",
+                    "properties": {
+                      "base_url": {
+                        "type": "string",
+                        "maxLength": 8192,
+                        "pattern": "^[hH][tT][tT][pP][sS]?:\\/\\/(?![^/?#]*@)[^?#]+$",
+                        "format": "uri"
+                      },
+                      "credential_environment": {
+                        "type": "string",
+                        "maxLength": 128,
+                        "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                      },
+                      "allow_insecure_http": { "type": "boolean", "const": true },
+                      "mcp": {
+                        "type": "object",
+                        "properties": {
+                          "issues": {
+                            "type": "object",
+                            "properties": {
+                              "server": {
+                                "type": "string",
+                                "maxLength": 128,
+                                "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$"
+                              },
+                              "command": {
+                                "type": "string",
+                                "maxLength": 128,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+                              }
+                            },
+                            "required": ["server", "command"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "confluence": {
+                    "type": "object",
+                    "properties": {
+                      "base_url": {
+                        "type": "string",
+                        "maxLength": 8192,
+                        "pattern": "^[hH][tT][tT][pP][sS]?:\\/\\/(?![^/?#]*@)[^?#]+$",
+                        "format": "uri"
+                      },
+                      "credential_environment": {
+                        "type": "string",
+                        "maxLength": 128,
+                        "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                      },
+                      "allow_insecure_http": { "type": "boolean", "const": true },
+                      "mcp": {
+                        "type": "object",
+                        "properties": {
+                          "documents": {
                             "type": "object",
                             "properties": {
                               "server": {

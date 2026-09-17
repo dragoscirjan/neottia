@@ -63,13 +63,13 @@ Compile once per harness and scope. Use the same snapshot, template layers, inst
 
 ## Provider selection
 
-The built-in packs cover filesystem Issues, filesystem Design Docs, local Git, disabled remote source control, GitHub, GitLab, Gitea, and Forgejo. Jira, Confluence, Bitbucket, and Jujutsu still fail before projection because no matching pack exists.
+The built-in packs cover filesystem Issues, filesystem Design Docs, local Git, disabled remote source control, GitHub, GitLab, Gitea, Forgejo, Jira, Confluence, and Bitbucket. Jujutsu still fails before projection unless the caller supplies a matching pack.
 
-Forge bundles contain separate checksummed fragments for each supported slot. GitHub and GitLab support Issues, Git-backed wikis, and remote source-control work through their documented CLIs. Gitea and Forgejo require a configured command-backed MCP service for Issues and remote forge objects. Their Documents selections fail as unsupported rather than claiming wiki parity.
+Provider bundles contain separate checksummed fragments for each supported slot. GitHub and GitLab support Issues, Git-backed wikis, and remote source-control work through their documented CLIs. Gitea and Forgejo require a configured command-backed MCP service for Issues and remote provider objects. Their Documents selections fail as unsupported rather than claiming wiki parity. Jira Issues, Confluence Documents, and Bitbucket remote source control also require configured MCP services. These three products keep independent connections, credentials, capability semantics, and provenance.
 
 Canonical lifecycle templates contain no provider command names. They omit instruction blocks that a command does not use. A provider change affects only commands that render the selected block and does not change lifecycle approval points, stop conditions, role points, or transitions.
 
-See [SDLC provider selection](/configuration#sdlc-provider-selection) for the capability fields and [forge provider configuration](/sdlc/providers) for connections, authentication, MCP requirements, tool checks, and troubleshooting.
+See [SDLC provider selection](/configuration#sdlc-provider-selection) for the capability fields and [provider instruction-pack configuration](/sdlc/providers) for connections, authentication, MCP requirements, tool checks, and troubleshooting.
 
 ## Runtime packages
 
