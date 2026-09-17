@@ -22,6 +22,7 @@ import {
   issuesCapabilityConfigContribution,
   sourceControlCapabilityConfigContribution,
 } from './config.js';
+import { forgeConnectionsConfigContribution } from './forge-config.js';
 import { loadSdlcTemplateLayers } from './template-loader.js';
 
 import { opencodeHarnessAdapter } from '../../../extensions/opencode-adapter/src/index.js';
@@ -30,6 +31,7 @@ import { piHarnessAdapter } from '../../../extensions/pi-adapter/src/index.js';
 const registry = createConfigRegistry([
   issueConfigContribution,
   designDocsConfigContribution,
+  forgeConnectionsConfigContribution,
   issuesCapabilityConfigContribution,
   documentsCapabilityConfigContribution,
   sourceControlCapabilityConfigContribution,

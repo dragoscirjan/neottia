@@ -6,6 +6,7 @@ import { issueConfigContribution } from '@neottia/issues';
 import { memoryConfigContribution } from '@neottia/memory-core';
 import {
   documentsCapabilityConfigContribution,
+  forgeConnectionsConfigContribution,
   issuesCapabilityConfigContribution,
   sourceControlCapabilityConfigContribution,
 } from '@neottia/sdlc';
@@ -43,6 +44,7 @@ export const officialConfigContributions = Object.freeze([
   harnessInstallConfigContribution,
   assetInstallConfigContribution,
   templateInstallConfigContribution,
+  forgeConnectionsConfigContribution,
   issuesCapabilityConfigContribution,
   documentsCapabilityConfigContribution,
   sourceControlCapabilityConfigContribution,

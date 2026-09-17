@@ -13,7 +13,7 @@ const snapshot = resolveHostConfigSnapshot({
 export const memory = snapshot.get(memoryConfigContribution);
 ```
 
-`officialConfigContributions` exposes the immutable contribution list, and `officialConfigRegistry` exposes its validated registry. Root files remain strict: unknown keys fail validation, while every shard published in the [unified configuration guide](../../docs/configuration.md) can coexist in one file.
+`officialConfigContributions` exposes the immutable contribution list, and `officialConfigRegistry` exposes its validated registry. Root files remain strict. Unknown keys fail validation, while every shard published in the [unified configuration guide](../../docs/configuration.md) can coexist in one file. The registry includes compile-time forge connections under `connections.forges` for GitHub, GitLab, Gitea, and Forgejo.
 
 The registry exports schemas and contributions for `harnesses.install`, `assets.install`, and `templates.install`. They declare harness targets, exact static skill sources, and explicit template packages or overrides. Configuration resolution does not install these assets.
 

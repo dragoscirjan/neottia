@@ -109,7 +109,7 @@ Pi and OpenCode each have native Memory, Issues, Design Docs, and Searchable ext
 
 ## Canonical SDLC
 
-`@neottia/sdlc` ships Plan, Build, Verify, Release, Continue, and Refresh as provider-neutral Markdown/Twig files. It loads conventional `.neottia/templates/sdlc/<command>.md` overrides, inserts checksummed provider and role fragments with Twing, records provenance, and returns adapter-projected asset manifests. Runtime package IDs and exact versions remain explicit inputs. See the [SDLC compiler guide](docs/sdlc/).
+`@neottia/sdlc` ships Plan, Build, Verify, Release, Continue, and Refresh as provider-neutral Markdown/Twig files. It loads conventional `.neottia/templates/sdlc/<command>.md` overrides, inserts checksummed provider and role fragments with Twing, records provenance, and returns adapter-projected asset manifests. Built-in compile-time bundles cover GitHub, GitLab, Gitea, and Forgejo with strict connection settings, tool prerequisites, and no cross-tool mutation retry. Runtime package IDs and exact versions remain explicit inputs. See the [SDLC compiler guide](docs/sdlc/) and [forge provider guide](docs/sdlc/providers.md).
 
 ## Distribution
 

@@ -27,7 +27,11 @@ import {
 } from '@neottia/harness-adapter';
 import { z } from 'zod';
 
-import { createSdlcCompilerContext, type SdlcCompilerContext } from './compiler-context.js';
+import {
+  createSdlcCompilerContext,
+  validateSdlcCompilerContext,
+  type SdlcCompilerContext,
+} from './compiler-context.js';
 import {
   DOCUMENT_PROVIDERS,
   ISSUE_PROVIDERS,
@@ -37,6 +41,14 @@ import {
   issuesCapabilityConfigContribution,
   sourceControlCapabilityConfigContribution,
 } from './config.js';
+import {
+  forgeBaseUrlSchema,
+  forgeConnectionsConfigContribution,
+  forgeCredentialEnvironmentSchema,
+  forgeMcpServiceSchema,
+} from './forge-config.js';
+import { createForgeInstructionPacks } from './forge-instructions.js';
+import { FORGE_CAPABILITIES, FORGE_PROVIDERS, FORGE_SUPPORT_DECLARATIONS } from './forge-support.js';
 import {
   SDLC_INSTRUCTION_SLOTS,
   selectSdlcInstructionPacks,
@@ -120,6 +132,7 @@ const TWIG_CONTEXT_PROPERTIES = [
 ];
 const checksumSchema = z.string().regex(SHA256_PATTERN);
 const stableIdSchema = z.string().regex(STABLE_ID_PATTERN);
+const forgeMcpServiceContextSchema = forgeMcpServiceSchema;
 const configurationContextSchema = z
   .object({
     issues: z.object({ provider: z.enum(ISSUE_PROVIDERS) }).strict(),
@@ -134,6 +147,23 @@ const configurationContextSchema = z
         workspaces: z.boolean(),
       })
       .strict(),
+    forges: z.array(
+      z
+        .object({
+          provider: z.enum(FORGE_PROVIDERS),
+          capabilities: z.array(z.enum(FORGE_CAPABILITIES)),
+          baseUrl: forgeBaseUrlSchema,
+          credentialEnvironment: forgeCredentialEnvironmentSchema,
+          mcp: z
+            .object({
+              issues: forgeMcpServiceContextSchema.optional(),
+              documents: forgeMcpServiceContextSchema.optional(),
+              remoteSourceControl: forgeMcpServiceContextSchema.optional(),
+            })
+            .strict(),
+        })
+        .strict(),
+    ),
   })
   .strict();
 const lifecycleContentSchema = z
@@ -204,7 +234,7 @@ const configurationProvenanceSchema = z
   .strict();
 const compilerInputSchema = z
   .object({
-    schemaVersion: z.literal(1),
+    schemaVersion: z.literal(2),
     lifecycleVersion: z.literal(SDLC_LIFECYCLE_VERSION),
     compilerVersion: z.string().regex(PACKAGE_VERSION_PATTERN),
     installationId: stableIdSchema,
@@ -308,7 +338,7 @@ export interface SdlcConfigurationProvenance {
 
 /** Deterministic, serializable compiler input. */
 export interface SdlcCompilerInputManifest {
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 2;
   readonly lifecycleVersion: string;
   readonly compilerVersion: string;
   readonly installationId: string;
@@ -356,7 +386,7 @@ export interface CompiledSdlcCommand {
 
 /** Compiler output plus the installer handoff from #114. */
 export interface SdlcCompilerOutputManifest {
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 2;
   readonly lifecycleVersion: string;
   readonly inputChecksum: Sha256;
   readonly harnessId: string;
@@ -391,17 +421,20 @@ export function createSdlcCompilerInput(
     [SDLC_CONTENT_TEMPLATE_ID, SDLC_LAYOUT_TEMPLATE_ID, ...SDLC_LIFECYCLE.map((command) => command.templateId)],
     options.templateLayers,
   );
-  const instructions = selectSdlcInstructionPacks(context, options.instructionPacks);
+  const instructions = selectSdlcInstructionPacks(context, [
+    ...createForgeInstructionPacks(context),
+    ...(options.instructionPacks ?? []),
+  ]);
   const roles = prepareRoles(options.roles ?? []);
   const runtimePackages = prepareRuntimePackages(options.runtimePackages ?? []);
-  const provenance = configurationProvenance(snapshot);
+  const provenance = configurationProvenance(snapshot, context);
   const configuration = Object.freeze({
     checksum: checksumText(canonicalJson(context)),
     context,
     provenance,
   });
   const unsigned = {
-    schemaVersion: 1 as const,
+    schemaVersion: 2 as const,
     lifecycleVersion: SDLC_LIFECYCLE_VERSION,
     compilerVersion: options.compilerVersion,
     installationId: options.installationId ?? `sdlc-${options.harnessId}`,
@@ -489,7 +522,7 @@ export function compileSdlc(input: SdlcCompilerInputManifest, adapter: HarnessAd
     reloadNotice,
   });
   const unsigned = {
-    schemaVersion: 1 as const,
+    schemaVersion: 2 as const,
     lifecycleVersion: input.lifecycleVersion,
     inputChecksum: input.checksum,
     harnessId: input.harnessId,
@@ -515,7 +548,8 @@ export function validateSdlcCompilerInput(input: SdlcCompilerInputManifest): voi
   ) {
     throw new TypeError('SDLC compiler configuration is semantically invalid.');
   }
-  validateConfigurationProvenance(input.configuration.provenance);
+  validateSdlcCompilerContext(input.configuration.context);
+  validateConfigurationProvenance(input.configuration.context, input.configuration.provenance);
   validateSelectedInstructions(input.configuration.context, input.instructions);
 
   const canonicalRoles = prepareRoles(input.roles);
@@ -806,18 +840,39 @@ function requiredTemplate(templates: readonly ResolvedTemplate[], id: string): R
   return matches[0]!;
 }
 
-/** Requires the fixed compiler provenance paths in their canonical order. */
-function validateConfigurationProvenance(provenance: readonly SdlcConfigurationProvenance[]): void {
-  const expectedPaths = [
+/** Requires selected compiler provenance paths in deterministic order. */
+function validateConfigurationProvenance(
+  context: SdlcCompilerContext,
+  provenance: readonly SdlcConfigurationProvenance[],
+): void {
+  if (canonicalJson(provenance.map((entry) => entry.path)) !== canonicalJson(configurationProvenancePaths(context))) {
+    throw new TypeError('SDLC compiler configuration provenance is invalid.');
+  }
+}
+
+/** Lists every selected configuration leaf that affects generated instructions. */
+function configurationProvenancePaths(context: SdlcCompilerContext): readonly (readonly string[])[] {
+  const paths: string[][] = [
     ['capabilities', 'issues', 'provider'],
     ['capabilities', 'documents', 'provider'],
     ['capabilities', 'source_control', 'local'],
     ['capabilities', 'source_control', 'remote'],
     ['capabilities', 'source_control', 'workspaces'],
   ];
-  if (canonicalJson(provenance.map((entry) => entry.path)) !== canonicalJson(expectedPaths)) {
-    throw new TypeError('SDLC compiler configuration provenance is invalid.');
+  for (const forge of context.forges) {
+    paths.push(['connections', 'forges', forge.provider, 'base_url']);
+    paths.push(['connections', 'forges', forge.provider, 'credential_environment']);
+    for (const [key, service] of [
+      ['issues', forge.mcp.issues],
+      ['documents', forge.mcp.documents],
+      ['remote_source_control', forge.mcp.remoteSourceControl],
+    ] as const) {
+      if (service === undefined) continue;
+      paths.push(['connections', 'forges', forge.provider, 'mcp', key, 'server']);
+      paths.push(['connections', 'forges', forge.provider, 'mcp', key, 'command']);
+    }
   }
+  return Object.freeze(paths.map((path) => Object.freeze(path)));
 }
 
 /** Checks template identity, provenance, dependencies, lifecycle data, and rendered fragments. */
@@ -944,34 +999,26 @@ function prepareRuntimePackages(packages: readonly SdlcRuntimePackage[]): readon
 }
 
 /** Records only portable source metadata for selected configuration leaves. */
-function configurationProvenance(snapshot: ResolvedConfigSnapshot): readonly SdlcConfigurationProvenance[] {
-  const leaves = [
-    {
-      path: ['capabilities', 'issues', 'provider'],
-      source: snapshot.sourceOf(issuesCapabilityConfigContribution, ['provider']),
-    },
-    {
-      path: ['capabilities', 'documents', 'provider'],
-      source: snapshot.sourceOf(documentsCapabilityConfigContribution, ['provider']),
-    },
-    {
-      path: ['capabilities', 'source_control', 'local'],
-      source: snapshot.sourceOf(sourceControlCapabilityConfigContribution, ['local']),
-    },
-    {
-      path: ['capabilities', 'source_control', 'remote'],
-      source: snapshot.sourceOf(sourceControlCapabilityConfigContribution, ['remote']),
-    },
-    {
-      path: ['capabilities', 'source_control', 'workspaces'],
-      source: snapshot.sourceOf(sourceControlCapabilityConfigContribution, ['workspaces']),
-    },
+function configurationProvenance(
+  snapshot: ResolvedConfigSnapshot,
+  context: SdlcCompilerContext,
+): readonly SdlcConfigurationProvenance[] {
+  const fixedSources = [
+    snapshot.sourceOf(issuesCapabilityConfigContribution, ['provider']),
+    snapshot.sourceOf(documentsCapabilityConfigContribution, ['provider']),
+    snapshot.sourceOf(sourceControlCapabilityConfigContribution, ['local']),
+    snapshot.sourceOf(sourceControlCapabilityConfigContribution, ['remote']),
+    snapshot.sourceOf(sourceControlCapabilityConfigContribution, ['workspaces']),
   ];
+  const paths = configurationProvenancePaths(context);
+  const forgeSources = paths
+    .slice(fixedSources.length)
+    .map((path) => snapshot.sourceOf(forgeConnectionsConfigContribution, path.slice(2)));
   return Object.freeze(
-    leaves.map(({ path, source }) =>
+    paths.map((path, index) =>
       Object.freeze({
-        path: Object.freeze(path),
-        source: portableProvenance(source ?? { kind: 'defaults' }),
+        path,
+        source: portableProvenance([...fixedSources, ...forgeSources][index] ?? { kind: 'defaults' }),
       }),
     ),
   );
@@ -988,17 +1035,60 @@ function portableProvenance(source: ConfigProvenance): SdlcConfigurationProvenan
   });
 }
 
-/** Declares non-mutating prerequisite checks for selected local tools. */
+/** Declares non-mutating prerequisite checks for selected forge integrations. */
 function prerequisites(context: SdlcCompilerContext): readonly Prerequisite[] {
-  return Object.freeze([
-    Object.freeze({
-      id: `source-control.${context.sourceControl.local}`,
-      category: 'tool' as const,
-      description: `${context.sourceControl.local} source control`,
-      check: Object.freeze({ kind: 'command' as const, command: context.sourceControl.local }),
-      instructions: `Install ${context.sourceControl.local} and make it available on PATH.`,
-    }),
-  ]);
+  const requirements = new Map<string, Prerequisite>();
+  const add = (prerequisite: Prerequisite): void => {
+    requirements.set(prerequisite.id, Object.freeze(prerequisite));
+  };
+  const addTool = (command: string, description: string, instructions: string): void => {
+    add({
+      id: `tool.${command}`,
+      category: 'tool',
+      description,
+      check: Object.freeze({ kind: 'command', command }),
+      instructions,
+    });
+  };
+
+  addTool(
+    context.sourceControl.local,
+    `${context.sourceControl.local} source control`,
+    `Install ${context.sourceControl.local} and make it available on PATH.`,
+  );
+  for (const forge of context.forges) {
+    add({
+      id: `forge.${forge.provider}.credential`,
+      category: 'configuration',
+      description: `${forge.provider} credential environment`,
+      check: Object.freeze({ kind: 'environment', variable: forge.credentialEnvironment }),
+      instructions: `Set ${forge.credentialEnvironment} to a credential accepted by the configured ${forge.provider} instance.`,
+    });
+    const needsGit =
+      forge.capabilities.includes('remote-source-control') ||
+      (forge.capabilities.includes('documents') && forge.mcp.documents === undefined);
+    if (needsGit) addTool('git', 'Git for forge repository operations', 'Install Git and make it available on PATH.');
+    const cli = FORGE_SUPPORT_DECLARATIONS[forge.provider].cli;
+    const needsCli = forge.capabilities.some((capability) => {
+      if (capability === 'documents') return false;
+      if (capability === 'issues') return forge.mcp.issues === undefined;
+      return forge.mcp.remoteSourceControl === undefined;
+    });
+    if (cli !== undefined && needsCli) {
+      addTool(cli.command, `${forge.provider} command-line client`, `Install ${cli.command} from ${cli.documentation}`);
+    }
+    for (const service of [forge.mcp.issues, forge.mcp.documents, forge.mcp.remoteSourceControl]) {
+      if (service === undefined) continue;
+      add({
+        id: `forge.${forge.provider}.mcp.${service.server}`,
+        category: 'mcp-server',
+        description: `${service.server} MCP server command`,
+        check: Object.freeze({ kind: 'command', command: service.command }),
+        instructions: `Install ${service.command}, register it as MCP server ${service.server}, and expose the required read and mutation operations.`,
+      });
+    }
+  }
+  return Object.freeze([...requirements.values()]);
 }
 
 /** Returns a projection value or raises all adapter diagnostics together. */

@@ -63,11 +63,13 @@ Compile once per harness and scope. Use the same snapshot, template layers, inst
 
 ## Provider selection
 
-The built-in packs cover filesystem Issues, filesystem Design Docs, local Git, and disabled remote source control. The compiler rejects a selected provider when no matching pack exists. It does not insert placeholder behavior for GitHub, GitLab, Jira, Confluence, Jujutsu, or another future provider.
+The built-in packs cover filesystem Issues, filesystem Design Docs, local Git, disabled remote source control, GitHub, GitLab, Gitea, and Forgejo. Jira, Confluence, Bitbucket, and Jujutsu still fail before projection because no matching pack exists.
 
-Provider packs contain provider-specific operation guidance. Canonical lifecycle templates contain no provider command names. A provider change replaces the compiled provider section and its provenance without changing lifecycle approval points, stop conditions, role points, or transitions.
+Forge bundles contain separate checksummed fragments for each supported slot. GitHub and GitLab support Issues, Git-backed wikis, and remote source-control work through their documented CLIs. Gitea and Forgejo require a configured command-backed MCP service for Issues and remote forge objects. Their Documents selections fail as unsupported rather than claiming wiki parity.
 
-See [SDLC provider selection](/configuration#sdlc-provider-selection) for the configuration fields. Issues #116 and #117 supply remote issue, document, and source-control packs.
+Canonical lifecycle templates contain no provider command names. A provider change replaces only the selected instruction section and its provenance. It does not change lifecycle approval points, stop conditions, role points, or transitions.
+
+See [SDLC provider selection](/configuration#sdlc-provider-selection) for the capability fields and [forge provider configuration](/sdlc/providers) for connections, authentication, MCP requirements, tool checks, and troubleshooting.
 
 ## Runtime packages
 

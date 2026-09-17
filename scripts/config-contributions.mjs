@@ -50,6 +50,13 @@ export const OFFICIAL_CONFIG_CONTRIBUTIONS = Object.freeze([
     path: Object.freeze(['templates', 'install']),
   }),
   Object.freeze({
+    exportName: 'forgeConnectionsConfigContribution',
+    packageName: '@neottia/sdlc',
+    sourceFile: 'packages/sdlc/src/forge-config.ts',
+    builtFile: 'packages/sdlc/dist/forge-config.js',
+    path: Object.freeze(['connections', 'forges']),
+  }),
+  Object.freeze({
     exportName: 'issuesCapabilityConfigContribution',
     packageName: '@neottia/sdlc',
     sourceFile: 'packages/sdlc/src/config.ts',
