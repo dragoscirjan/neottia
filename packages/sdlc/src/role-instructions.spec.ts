@@ -13,6 +13,7 @@ import {
   SDLC_ROLE_MAX_STEPS,
   validateSdlcRoleCompilerContext,
 } from './role-instructions.js';
+import { claudeCodeHarnessDeclaration } from '../../../extensions/claude-code-adapter/src/index.js';
 import { opencodeHarnessDeclaration } from '../../../extensions/opencode-adapter/src/index.js';
 import { piHarnessDeclaration } from '../../../extensions/pi-adapter/src/index.js';
 
@@ -135,6 +136,37 @@ describe('portable SDLC role compilation', () => {
     expect(planner.content).toContain('Thinking hint `high` is advisory');
     expect(planner.content).toContain('Required skills: `planning`');
     expect(planner.content).toContain('Required tools: `issue_read`');
+  });
+
+  it('projects roles for adapter IDs registered outside the original built-ins', () => {
+    const context = createSdlcRoleCompilerContext(
+      snapshot({
+        'claude-code': {
+          ...REQUIRED_CURRENT_ASSIGNMENTS,
+          verifier: {
+            agent: 'neottia-verifier',
+            model: 'sonnet',
+            thinking: 'high',
+          },
+        },
+      }),
+      'claude-code',
+      claudeCodeHarnessDeclaration,
+      'project',
+    );
+
+    expect(context.harnessId).toBe('claude-code');
+    expect(createSdlcRoleAgentRequests(context)).toMatchObject([
+      {
+        role: 'verifier',
+        request: {
+          id: 'neottia-verifier',
+          modelHint: 'sonnet',
+          thinkingHint: 'high',
+          steps: SDLC_ROLE_MAX_STEPS,
+        },
+      },
+    ]);
   });
 
   it('rejects named routes outside the declared native-agent scopes', () => {

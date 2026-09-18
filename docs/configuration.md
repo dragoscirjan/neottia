@@ -238,7 +238,7 @@ Read [provider instruction-pack configuration](./sdlc/providers.md) for the supp
 
 ## SDLC role assignments
 
-Configure portable roles independently for each harness under `agents.sdlc.pi` and `agents.sdlc.opencode`. The selected harness must explicitly assign `planner`, `implementer`, `verifier`, and `release-coordinator`. Optional roles are `researcher`, `reviewer`, and `documentation-writer`.
+Configure portable roles independently for each harness under `agents.sdlc.<harness-id>`. The `pi` and `opencode` maps are documented built-ins, and any adapter ID in the portable asset-ID format is accepted, including `claude-code`. The selected harness must explicitly assign `planner`, `implementer`, `verifier`, and `release-coordinator`. Optional roles are `researcher`, `reviewer`, and `documentation-writer`.
 
 ```yaml
 version: 1

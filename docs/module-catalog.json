@@ -202,5 +202,12 @@
     "classification": "native extension",
     "route": "/harnesses/opencode#searchable",
     "issue": 93
+  },
+  {
+    "name": "@neottia/claude-code-adapter",
+    "manifest": "extensions/claude-code-adapter/package.json",
+    "classification": "library/embedding",
+    "route": "/harnesses/claude-code",
+    "issue": 119
   }
 ]

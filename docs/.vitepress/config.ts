@@ -29,6 +29,7 @@ export default defineConfig({
           { text: 'Adapter contract', link: '/harnesses/adapters' },
           { text: 'Pi', link: '/harnesses/pi' },
           { text: 'OpenCode', link: '/harnesses/opencode' },
+          { text: 'Claude Code', link: '/harnesses/claude-code' },
         ],
       },
       {
@@ -94,6 +95,7 @@ export default defineConfig({
             { text: 'Adapter contract', link: '/harnesses/adapters' },
             { text: 'Pi', link: '/harnesses/pi' },
             { text: 'OpenCode', link: '/harnesses/opencode' },
+            { text: 'Claude Code', link: '/harnesses/claude-code' },
           ],
         },
       ],

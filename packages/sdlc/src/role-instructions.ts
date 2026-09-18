@@ -7,9 +7,9 @@ import { SdlcConfigError, type SdlcConfigProblem } from './compiler-context.js';
 import { createSdlcRoleInstruction, type SdlcRoleInstruction } from './instructions.js';
 import { SDLC_LIFECYCLE, SDLC_ROLE_IDS, type SdlcRoleId } from './lifecycle.js';
 import {
-  SDLC_ROLE_HARNESS_IDS,
   sdlcRoleAssignmentConfigSchema,
   sdlcRoleAssignmentsConfigContribution,
+  sdlcRoleHarnessIdSchema,
   type SdlcRoleAssignmentConfig,
   type SdlcRoleHarnessId,
 } from './role-config.js';
@@ -125,7 +125,7 @@ const roleHostSupportSchema = z
 /** Runtime schema used to reject tampered selected role context. */
 export const sdlcRoleCompilerContextSchema = z
   .object({
-    harnessId: z.enum(SDLC_ROLE_HARNESS_IDS),
+    harnessId: sdlcRoleHarnessIdSchema,
     scope: z.enum(['project', 'global']),
     hostSupport: roleHostSupportSchema,
     roles: z.array(
@@ -148,18 +148,18 @@ export function createSdlcRoleCompilerContext(
   scope: HarnessScope,
 ): SdlcRoleCompilerContext {
   if (declaration.id !== harnessId) throw new TypeError('Role compiler harness declaration does not match its ID.');
-  if (!isSdlcRoleHarnessId(harnessId)) {
+  if (!sdlcRoleHarnessIdSchema.safeParse(harnessId).success) {
     throw new SdlcConfigError([
       {
         code: 'ROLE_HARNESS_UNSUPPORTED',
         path: ['agents', 'sdlc'],
-        message: 'The selected harness has no built-in SDLC role assignment schema.',
+        message: 'The selected harness ID cannot address a portable role assignment map.',
       },
     ]);
   }
 
   const support = roleHostSupport(declaration);
-  const configured = snapshot.get(sdlcRoleAssignmentsConfigContribution)[harnessId];
+  const configured = snapshot.get(sdlcRoleAssignmentsConfigContribution)[harnessId] ?? {};
   const problems: SdlcConfigProblem[] = [];
   const agentRoles = new Map<string, SdlcRoleId>();
   const roles = SDLC_ROLE_IDS.map((roleId): SdlcSelectedRoleAssignment => {
@@ -477,11 +477,6 @@ function supportsNamedAgent(support: SdlcRoleHostSupport, scope: HarnessScope): 
 /** Tests whether one declared host feature includes the selected installation scope. */
 function supportsScope(scopes: readonly HarnessScope[], scope: HarnessScope): boolean {
   return scopes.includes(scope);
-}
-
-/** Narrows one public harness ID to the strict role configuration keys. */
-function isSdlcRoleHarnessId(value: string): value is SdlcRoleHarnessId {
-  return SDLC_ROLE_HARNESS_IDS.some((candidate) => candidate === value);
 }
 
 /** Formats one requirement identifier as inline code. */

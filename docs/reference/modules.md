@@ -38,5 +38,6 @@ This catalog distinguishes how each package is delivered.
 | `@neottia/opencode-issues`      | native extension  | [OpenCode Issues](/harnesses/opencode#issues)                                          |
 | `@neottia/opencode-design-docs` | native extension  | [OpenCode Design Docs](/harnesses/opencode#design-docs)                                |
 | `@neottia/opencode-searchable`  | native extension  | [OpenCode Searchable](/harnesses/opencode#searchable)                                  |
+| `@neottia/claude-code-adapter`  | library/embedding | [Claude Code setup](/harnesses/claude-code)                                            |
 
 `docs/module-catalog.json` is the machine-readable copy checked against workspace manifests and this table.

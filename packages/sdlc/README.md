@@ -70,7 +70,7 @@ Place a complete project override at `.neottia/templates/sdlc/<command>.md.twig`
 
 The Twig context exposes `command`, `instructions`, and `roles`. Provider and role packages supply checksummed fragments through those fields instead of owning command templates. The compiler publishes `planner`, `researcher`, `implementer`, `reviewer`, `verifier`, `release-coordinator`, and `documentation-writer` as portable role names.
 
-Assign roles under `agents.sdlc.pi` or `agents.sdlc.opencode`. Planner, implementer, verifier, and release coordinator need explicit selected-harness assignments. Optional roles fall back to the current agent when omitted or disabled. OpenCode can project named native subagents, model hints, and step limits. Pi accepts current-agent routes only. Unsupported metadata remains advisory text and never grants permissions. See the [portable role assignment guide](../../docs/sdlc/roles.md).
+Assign roles under `agents.sdlc.<harness-id>`, for example `agents.sdlc.pi`, `agents.sdlc.opencode`, or `agents.sdlc.claude-code`. Planner, implementer, verifier, and release coordinator need explicit selected-harness assignments. Optional roles fall back to the current agent when omitted or disabled. OpenCode and Claude Code can project named native subagents, model hints, and step limits; Claude Code maps the thinking hint to the host `effort` field. Pi accepts current-agent routes only. Unsupported metadata remains advisory text and never grants permissions. See the [portable role assignment guide](../../docs/sdlc/roles.md).
 
 ## Safety boundaries
 
