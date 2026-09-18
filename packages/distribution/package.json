@@ -1,6 +1,6 @@
 {
   "name": "@neottia/distribution",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Declarative manifests, ownership receipts, and transactional asset installation for Neottia",
   "author": "Dragos Cirjan",
   "license": "MIT",

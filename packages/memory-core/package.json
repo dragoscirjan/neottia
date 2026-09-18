@@ -1,6 +1,6 @@
 {
   "name": "@neottia/memory-core",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Standalone agent memory: filesystem-canonical records with SQLite FTS5 index, Postgres-ready backend interface",
   "author": "Dragos Cirjan",
   "license": "MIT",

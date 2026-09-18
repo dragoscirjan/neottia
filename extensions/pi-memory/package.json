@@ -1,6 +1,6 @@
 {
   "name": "@neottia/pi-memory",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "pi extension: in-process memory tools from @neottia/memory-core",
   "author": "Dragos Cirjan",
   "license": "MIT",

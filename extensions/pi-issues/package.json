@@ -1,6 +1,6 @@
 {
   "name": "@neottia/pi-issues",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "In-process Pi tools for Neottia Issues",
   "author": "Dragos Cirjan",
   "license": "MIT",

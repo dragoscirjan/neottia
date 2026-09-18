@@ -1,6 +1,6 @@
 {
   "name": "@neottia/issues-mcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Generic MCP stdio server for Neottia Issues",
   "author": "Dragos Cirjan",
   "license": "MIT",

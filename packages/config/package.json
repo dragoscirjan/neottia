@@ -1,6 +1,6 @@
 {
   "name": "@neottia/config",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Typed contribution registry and immutable configuration snapshots for Neottia",
   "author": "Dragos Cirjan",
   "license": "MIT",

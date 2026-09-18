@@ -1,6 +1,6 @@
 {
   "name": "@neottia/searchable-core",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Concrete runtime and shared contracts for Searchable web tools",
   "author": "Dragos Cirjan",
   "license": "MIT",
