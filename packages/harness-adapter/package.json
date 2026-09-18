@@ -1,6 +1,6 @@
 {
   "name": "@neottia/harness-adapter",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Immutable contracts and registry for Neottia harness asset adapters",
   "author": "Dragos Cirjan",
   "license": "MIT",

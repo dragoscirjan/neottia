@@ -1,6 +1,6 @@
 {
   "name": "@neottia/memory-mcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "MCP stdio server exposing the Neottia memory tools (same tool names as the pi/OpenCode extensions)",
   "author": "Dragos Cirjan",
   "license": "MIT",

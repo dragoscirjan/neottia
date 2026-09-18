@@ -1,6 +1,6 @@
 {
   "name": "@neottia/issues",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Filesystem-canonical issue management with a disposable SQLite FTS5 cache",
   "author": "Dragos Cirjan",
   "license": "MIT",

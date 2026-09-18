@@ -1,6 +1,6 @@
 {
   "name": "@neottia/design-docs",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Repository-local versioned design documents with strict Markdown/YAML and SQLite FTS5 search",
   "author": "Dragos Cirjan",
   "license": "MIT",
