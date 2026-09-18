@@ -34,7 +34,7 @@
     "lint": "eslint --fix .",
     "lint:check": "eslint .",
     "release:global": "pnpm --filter @neottia/release release:prepare",
-    "release:modules": "changeset publish",
+    "release:modules": "pnpm run build && changeset publish",
     "serve": "vitepress dev docs",
     "start": "pnpm --filter @neottia/core start",
     "start:debug": "pnpm --filter @neottia/core start:debug",
@@ -46,6 +46,7 @@
     "version:modules": "changeset version"
   },
   "devDependencies": {
+    "@changesets/changelog-github": "^0.5.1",
     "@changesets/cli": "^2.29.8",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@jscpd/badge-reporter": "^4.0.1",
