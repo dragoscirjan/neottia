@@ -1,7 +1,7 @@
 name: CI » Release
 
 on:
-  workflow_call:
+  workflow_call: {}
 
 permissions: {}
 
