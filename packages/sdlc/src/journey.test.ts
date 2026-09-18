@@ -26,6 +26,7 @@ import { forgeConnectionsConfigContribution } from './forge-config.js';
 import { sdlcRoleAssignmentsConfigContribution } from './role-config.js';
 import { loadSdlcTemplateLayers } from './template-loader.js';
 
+import { claudeCodeHarnessAdapter } from '../../../extensions/claude-code-adapter/src/index.js';
 import { opencodeHarnessAdapter } from '../../../extensions/opencode-adapter/src/index.js';
 import { piHarnessAdapter } from '../../../extensions/pi-adapter/src/index.js';
 
@@ -50,11 +51,12 @@ afterEach(async () => {
   await Promise.all(temporaryRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
-/** Proves both adapters install the same six commands in both supported scopes. */
+/** Proves every selected adapter installs the same six commands in both scopes. */
 describe.each([
-  ['pi', piHarnessAdapter],
-  ['opencode', opencodeHarnessAdapter],
-] as const)('%s compiler projection', (harnessId, adapter) => {
+  ['pi', piHarnessAdapter, runtimePackages, 2],
+  ['opencode', opencodeHarnessAdapter, runtimePackages, 2],
+  ['claude-code', claudeCodeHarnessAdapter, [] as const, 0],
+] as const)('%s compiler projection', (harnessId, adapter, selectedPackages, hostConfigCount) => {
   it.each(['project', 'global'] as const)(
     'installs the canonical %s lifecycle in a temporary project',
     async (scope) => {
@@ -65,7 +67,7 @@ describe.each([
         harnessDeclaration: adapter.declaration,
         scope,
         templateLayers: await loadSdlcTemplateLayers({ projectRoot: roots.project }),
-        runtimePackages,
+        runtimePackages: selectedPackages,
       });
       const first = compileSdlc(input, adapter);
       const second = compileSdlc(structuredClone(input), adapter);
@@ -82,7 +84,7 @@ describe.each([
           'They do not grant host permissions.',
         );
       }
-      expect(first.assets.assets.filter((asset) => asset.kind === 'host-config')).toHaveLength(2);
+      expect(first.assets.assets.filter((asset) => asset.kind === 'host-config')).toHaveLength(hostConfigCount);
     },
   );
 });
@@ -207,7 +209,11 @@ function compilerSnapshot() {
   return createResolvedConfigSnapshot(registry, {
     issues: { enabled: true },
     'design-docs': { enabled: true },
-    'sdlc-role-assignments': { pi: requiredAssignments, opencode: requiredAssignments },
+    'sdlc-role-assignments': {
+      pi: requiredAssignments,
+      opencode: requiredAssignments,
+      'claude-code': requiredAssignments,
+    },
   });
 }
 

@@ -22,6 +22,7 @@ import { SDLC_COMMAND_IDS, SDLC_LIFECYCLE } from './lifecycle.js';
 import { sdlcRoleAssignmentsConfigContribution } from './role-config.js';
 import { loadPackagedSdlcTemplateLayer } from './template-loader.js';
 
+import { claudeCodeHarnessAdapter } from '../../../extensions/claude-code-adapter/src/index.js';
 import { opencodeHarnessAdapter } from '../../../extensions/opencode-adapter/src/index.js';
 import { piHarnessAdapter } from '../../../extensions/pi-adapter/src/index.js';
 
@@ -55,7 +56,12 @@ function createSdlcCompilerInput(
   resolvedSnapshot: Parameters<typeof createRawSdlcCompilerInput>[0],
   options: TestCompilerInputOptions,
 ): SdlcCompilerInputManifest {
-  const adapter = options.harnessId === 'pi' ? piHarnessAdapter : opencodeHarnessAdapter;
+  const adapter =
+    options.harnessId === 'pi'
+      ? piHarnessAdapter
+      : options.harnessId === 'opencode'
+        ? opencodeHarnessAdapter
+        : claudeCodeHarnessAdapter;
   return createRawSdlcCompilerInput(resolvedSnapshot, {
     ...options,
     harnessDeclaration: adapter.declaration,
@@ -71,6 +77,7 @@ function snapshot(values: ConfigShardValues = {}) {
     'sdlc-role-assignments': {
       pi: REQUIRED_CURRENT_ASSIGNMENTS,
       opencode: REQUIRED_CURRENT_ASSIGNMENTS,
+      'claude-code': REQUIRED_CURRENT_ASSIGNMENTS,
     },
     ...values,
   });
@@ -174,6 +181,39 @@ describe('canonical SDLC compiler', () => {
     const continueBody = promptBody(promptAssets(pi).find((asset) => asset.target.segments.at(-1) === 'continue.md')!);
     expect(continueBody).toContain('Recommend exactly one supported next public command with its evidence');
     expect(continueBody).toContain('stop without invoking it');
+  });
+
+  it('compiles the same lifecycle bodies through the independent Claude Code adapter', () => {
+    const pi = compileSdlc(
+      createSdlcCompilerInput(snapshot(), {
+        compilerVersion: '0.1.0',
+        harnessId: 'pi',
+        scope: 'project',
+      }),
+      piHarnessAdapter,
+    );
+    const claude = compileSdlc(
+      createSdlcCompilerInput(snapshot(), {
+        compilerVersion: '0.1.0',
+        harnessId: 'claude-code',
+        scope: 'project',
+      }),
+      claudeCodeHarnessAdapter,
+    );
+
+    expect(claude.commands.map((command) => ({ ...command, target: undefined }))).toEqual(
+      pi.commands.map((command) => ({ ...command, target: undefined })),
+    );
+    expect(promptAssets(claude).map(promptBody)).toEqual(promptAssets(pi).map(promptBody));
+    expect(promptAssets(claude).map((asset) => asset.target.segments.join('/'))).toEqual([
+      '.claude/commands/build.md',
+      '.claude/commands/continue.md',
+      '.claude/commands/plan.md',
+      '.claude/commands/refresh.md',
+      '.claude/commands/release.md',
+      '.claude/commands/verify.md',
+    ]);
+    expect(claude.assets.assets.filter((asset) => asset.kind === 'host-config')).toEqual([]);
   });
 
   it('projects named OpenCode roles without granting permissions or unsupported thinking metadata', () => {

@@ -4,11 +4,12 @@ import { z } from 'zod';
 
 import { SDLC_ROLE_IDS } from './lifecycle.js';
 
-/** Harnesses with built-in role-assignment projections. */
+/** Harnesses whose empty role maps remain in the lowest-precedence defaults. */
 export const SDLC_ROLE_HARNESS_IDS = Object.freeze(['pi', 'opencode'] as const);
 
 /** Stable harness identifier accepted by the role compiler. */
-export type SdlcRoleHarnessId = (typeof SDLC_ROLE_HARNESS_IDS)[number];
+export const sdlcRoleHarnessIdSchema = z.string().regex(HARNESS_ASSET_ID_PATTERN);
+export type SdlcRoleHarnessId = z.output<typeof sdlcRoleHarnessIdSchema>;
 
 const MAX_HINT_LENGTH = 256;
 const MAX_REQUIREMENTS = 32;
@@ -71,21 +72,28 @@ export const sdlcHarnessRoleAssignmentsSchema = z.object(harnessAssignmentsShape
 /** Default-free assignment map for one supported harness. */
 export const sdlcHarnessRoleAssignmentsPatchSchema = z.object(harnessAssignmentPatchShape).strict();
 
-/** Complete strict Pi and OpenCode role-assignment configuration. */
+const validHarnessKeys = (value: Readonly<Record<string, unknown>>): boolean =>
+  Object.keys(value).every((key) => HARNESS_ASSET_ID_PATTERN.test(key));
+
+/** Complete role-assignment configuration keyed by validated adapter ID. */
 export const sdlcRoleAssignmentsConfigSchema = z
   .object({
     pi: sdlcHarnessRoleAssignmentsSchema.default({}),
     opencode: sdlcHarnessRoleAssignmentsSchema.default({}),
   })
-  .strict();
+  .catchall(sdlcHarnessRoleAssignmentsSchema)
+  .refine(validHarnessKeys, 'Harness identifiers must use the portable asset ID format.')
+  .meta({ propertyNames: { pattern: HARNESS_ASSET_ID_PATTERN.source } });
 
-/** Default-free Pi and OpenCode role-assignment configuration. */
+/** Default-free role-assignment patches keyed by validated adapter ID. */
 export const sdlcRoleAssignmentsConfigPatchSchema = z
   .object({
     pi: sdlcHarnessRoleAssignmentsPatchSchema.optional(),
     opencode: sdlcHarnessRoleAssignmentsPatchSchema.optional(),
   })
-  .strict();
+  .catchall(sdlcHarnessRoleAssignmentsPatchSchema)
+  .refine(validHarnessKeys, 'Harness identifiers must use the portable asset ID format.')
+  .meta({ propertyNames: { pattern: HARNESS_ASSET_ID_PATTERN.source } });
 
 export type SdlcRoleAssignmentConfig = z.output<typeof sdlcRoleAssignmentConfigSchema>;
 export type SdlcHarnessRoleAssignments = z.output<typeof sdlcHarnessRoleAssignmentsSchema>;

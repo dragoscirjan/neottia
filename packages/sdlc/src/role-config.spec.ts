@@ -8,13 +8,14 @@ import {
 } from './role-config.js';
 
 describe('SDLC role assignment configuration', () => {
-  it('publishes independent strict harness maps with no implicit assignments', () => {
+  it('publishes independent adapter maps without closing the harness registry', () => {
     expect(SDLC_ROLE_HARNESS_IDS).toEqual(['pi', 'opencode']);
     expect(sdlcRoleAssignmentsConfigSchema.parse({})).toEqual({ pi: {}, opencode: {} });
     expect(
       sdlcRoleAssignmentsConfigSchema.parse({
         pi: { planner: { agent: 'current' } },
         opencode: { planner: { agent: 'neottia-planner', model: 'provider/model', thinking: 'high' } },
+        'claude-code': { verifier: { agent: 'claude-verifier' } },
       }),
     ).toEqual({
       pi: {
@@ -29,6 +30,9 @@ describe('SDLC role assignment configuration', () => {
           required_tools: [],
         },
       },
+      'claude-code': {
+        verifier: { agent: 'claude-verifier', required_skills: [], required_tools: [] },
+      },
     });
   });
 
@@ -41,7 +45,7 @@ describe('SDLC role assignment configuration', () => {
   });
 
   it.each([
-    { claude: {} },
+    { 'Claude Code': {} },
     { pi: { unknown: { agent: 'current' } } },
     { pi: { planner: { agent: 'current', permissions: { shell: 'allow' } } } },
     { pi: { planner: { agent: '../planner' } } },

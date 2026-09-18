@@ -1,6 +1,6 @@
 # Configure portable SDLC roles
 
-Neottia assigns the canonical SDLC roles at compile time. Each harness has its own assignment map under `agents.sdlc`, while the lifecycle templates keep the same role names and duties.
+Neottia assigns the canonical SDLC roles at compile time. Each harness has its own assignment map under `agents.sdlc`, keyed by adapter ID, while the lifecycle templates keep the same role names and duties.
 
 Role assignments choose who performs a lifecycle role. They do not choose an Issues, Documents, or source-control provider. They also do not grant host permissions or approve lifecycle actions.
 
@@ -121,7 +121,7 @@ A role result is evidence. It cannot approve scope expansion, merge, publication
 
 ## Profiles and harness isolation
 
-Pi and OpenCode maps are independent. Compiling Pi reads only `agents.sdlc.pi`; compiling OpenCode reads only `agents.sdlc.opencode`. An unused harness map does not enter the compiler checksum or generated provenance.
+Adapter maps are independent. Compiling Pi reads only `agents.sdlc.pi`; compiling OpenCode reads only `agents.sdlc.opencode`; compiling Claude Code reads only `agents.sdlc.claude-code`. An unused harness map does not enter the compiler checksum or generated provenance.
 
 Profiles may replace or refine individual role assignments:
 

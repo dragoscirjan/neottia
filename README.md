@@ -7,7 +7,8 @@ Neottia provides a shared SDLC that can be understood and used by multiple AI co
 ```text
 ├── extensions/          # Independently versioned runtime and asset adapters
 │   ├── pi-adapter/      # Declarative Pi asset projection
-│   └── opencode-adapter/# Declarative OpenCode asset projection
+│   ├── opencode-adapter/# Declarative OpenCode asset projection
+│   └── claude-code-adapter/ # Declarative Claude Code asset projection
 ├── packages/
 │   ├── cli/             # Installable Neottia command-line application
 │   ├── config/          # Shared layered configuration platform
@@ -83,7 +84,7 @@ This updates `packages/release/package.json` and `packages/release/release-manif
 
 ## Configuration
 
-`@neottia/config` composes domain-owned schemas into one immutable snapshot. It loads optional global and project YAML, applies profiles, environment bindings, and explicit overrides in a fixed order, tracks value-free leaf provenance, and redacts declared secrets. `@neottia/config-registry` supplies the strict official registry used by Neottia hosts, so all published module and SDLC capability shards can coexist in one root file. `@neottia/sdlc` validates compile-time provider selections and compiles the canonical lifecycle for Pi or OpenCode. Use the [unified configuration guide](docs/configuration.md) for files, profiles, precedence, SDLC provider selection, secrets, diagnostics, embedding, and `skills.*` migration. The config package publishes the complete editor schema as `@neottia/config/config.schema.json`.
+`@neottia/config` composes domain-owned schemas into one immutable snapshot. It loads optional global and project YAML, applies profiles, environment bindings, and explicit overrides in a fixed order, tracks value-free leaf provenance, and redacts declared secrets. `@neottia/config-registry` supplies the strict official registry used by Neottia hosts, so all published module and SDLC capability shards can coexist in one root file. `@neottia/sdlc` validates compile-time provider selections and compiles the canonical lifecycle for Pi, OpenCode, or Claude Code. Use the [unified configuration guide](docs/configuration.md) for files, profiles, precedence, SDLC provider selection, secrets, diagnostics, embedding, and `skills.*` migration. The config package publishes the complete editor schema as `@neottia/config/config.schema.json`.
 
 ## Memory
 
@@ -105,11 +106,11 @@ Enable `modules.searchable` to search DuckDuckGo, Google, Bing, or Brave; extrac
 
 Pi and OpenCode each have native Memory, Issues, Design Docs, and Searchable extensions. Other MCP-compatible clients can launch the four generic stdio servers. TypeScript applications can embed the domain libraries directly.
 
-`@neottia/harness-adapter` defines a host-neutral, immutable asset projection contract. `@neottia/pi-adapter` and `@neottia/opencode-adapter` return symbolic paths, package declarations, reviewable host-configuration operations, and reload notices without writing files or running host commands. Each adapter declares unsupported features instead of emulating them. See the [harness adapter guide](docs/harnesses/adapters.md).
+`@neottia/harness-adapter` defines a host-neutral, immutable asset projection contract. `@neottia/pi-adapter`, `@neottia/opencode-adapter`, and `@neottia/claude-code-adapter` return symbolic paths, package declarations, reviewable host-configuration operations, and reload notices without writing files or running host commands. Each adapter declares unsupported features instead of emulating them. See the [harness adapter guide](docs/harnesses/adapters.md).
 
 ## Canonical SDLC
 
-`@neottia/sdlc` ships Plan, Build, Verify, Release, Continue, and Refresh as provider-neutral `.md.twig` files. It loads conventional `.neottia/templates/sdlc/<command>.md.twig` overrides, inserts checksummed provider and role fragments with Twing, records provenance, and returns adapter-projected asset manifests. Built-in compile-time bundles cover GitHub, GitLab, Gitea, Forgejo, Bitbucket, Jira, and Confluence with strict connection settings, tool prerequisites, and no cross-tool mutation retry. Per-harness role assignments preserve the same duties and bounded evidence contracts, with current-agent execution in Pi and supported native subagents in OpenCode. Runtime package IDs and exact versions remain explicit inputs. See the [SDLC compiler guide](docs/sdlc/), [provider instruction-pack guide](docs/sdlc/providers.md), and [portable role assignment guide](docs/sdlc/roles.md).
+`@neottia/sdlc` ships Plan, Build, Verify, Release, Continue, and Refresh as provider-neutral `.md.twig` files. It loads conventional `.neottia/templates/sdlc/<command>.md.twig` overrides, inserts checksummed provider and role fragments with Twing, records provenance, and returns adapter-projected asset manifests. Built-in compile-time bundles cover GitHub, GitLab, Gitea, Forgejo, Bitbucket, Jira, and Confluence with strict connection settings, tool prerequisites, and no cross-tool mutation retry. Per-harness role assignments preserve the same duties and bounded evidence contracts, with current-agent execution in Pi and supported native subagents in OpenCode and Claude Code. Runtime package IDs and exact versions remain explicit inputs. See the [SDLC compiler guide](docs/sdlc/), [provider instruction-pack guide](docs/sdlc/providers.md), and [portable role assignment guide](docs/sdlc/roles.md).
 
 ## Distribution
 
