@@ -66,12 +66,19 @@ Use `mise tasks` for the complete task list. Mise remains the project task inter
 
 ## Releases
 
-Modules are independently versioned with [Changesets](https://github.com/changesets/changesets):
+Modules are independently versioned with [Changesets](https://github.com/changesets/changesets). Describe every user-visible change as a changeset before merging:
 
 ```bash
 mise run changeset
-mise run version:modules
-mise run release:modules
+```
+
+CI handles the rest. When changesets accumulate on `main`, a `CI » Release` job opens or refreshes one `chore: version packages` pull request. Merging that PR applies the version bumps and writes every package `CHANGELOG.md` with pull-request and commit links. After the version PR merges, a publish job runs `mise run validate`, then publishes every changed package to npm with `changeset publish` and creates the matching GitHub releases and tags. Publishing uses an `NPM_TOKEN` secret stored in the `npm` GitHub environment.
+
+You can run the same steps locally:
+
+```bash
+mise run version:modules   # Apply pending changesets to module versions
+mise run release:modules   # Build every module, then publish changed packages
 ```
 
 A global Neottia release has its own version and exact module bill of materials. Prepare one after publishing its module versions:

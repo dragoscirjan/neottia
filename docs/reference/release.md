@@ -23,4 +23,6 @@ const manifest = JSON.parse(await readFile(join(dirname(packageFile), "release-m
 console.log(manifest); // {version: "0.1.0", modules: {"@neottia/core": "0.1.0"}}
 ```
 
-Check `version`, then compare only required module entries. The package manifest also pins the Core dependency represented by this snapshot. Release preparation is maintainer work and is documented only in the root repository README.
+Check `version`, then compare only required module entries. The package manifest also pins the Core dependency represented by this snapshot.
+
+Module versions and npm publication are automated through Changesets. The `CI » Release` workflow opens a `chore: version packages` pull request when changesets accumulate, applies the bumps and changelogs when it merges, then validates, builds, publishes, and tags from `main`. The root repository README documents the maintainer flow and the npm environment secret it uses.
