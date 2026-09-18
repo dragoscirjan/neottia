@@ -61,6 +61,23 @@ describe('Claude Code harness adapter', () => {
     expect(prompt.value?.content).toBe(
       '---\ndescription: "Plan a change"\nargument-hint: "<issue>"\nmodel: "sonnet"\n---\nPlan this change.\n',
     );
+    expect(prompt.value?.content).not.toContain('context');
+
+    const forked = claudeCodeHarnessAdapter.projectPrompt({
+      id: 'plan',
+      scope: 'project',
+      body: 'Plan this change.\n',
+      metadata: { execution: { subtask: true } },
+    });
+    expect(forked.value?.content).toBe('---\ncontext: "fork"\n---\nPlan this change.\n');
+
+    const routed = claudeCodeHarnessAdapter.projectPrompt({
+      id: 'plan',
+      scope: 'project',
+      body: 'Plan this change.\n',
+      metadata: { execution: { agent: 'neottia-planner' } },
+    });
+    expect(routed.value?.content).toBe('---\ncontext: "fork"\nagent: "neottia-planner"\n---\nPlan this change.\n');
 
     const agent = claudeCodeHarnessAdapter.projectAgent({
       id: 'reviewer',
@@ -89,17 +106,17 @@ describe('Claude Code harness adapter', () => {
     ).toMatchObject([{ code: 'UNREPRESENTABLE_METADATA', feature: 'agent.permissions' }]);
   });
 
-  it('rejects command routing fields that Claude command files cannot represent', () => {
+  it('rejects blank command routing values without emitting them', () => {
     const result = claudeCodeHarnessAdapter.projectPrompt({
       id: 'plan',
       scope: 'project',
       body: 'Plan.\n',
-      metadata: { execution: { agent: 'planner', subtask: true } },
+      metadata: { execution: { agent: '   ', model: ' ' } },
     });
     expect(result.value).toBeUndefined();
     expect(result.diagnostics).toMatchObject([
-      { code: 'UNREPRESENTABLE_METADATA', feature: 'prompt.agent' },
-      { code: 'UNREPRESENTABLE_METADATA', feature: 'prompt.subtask' },
+      { code: 'INVALID_CONTENT', feature: 'prompt.agent' },
+      { code: 'INVALID_CONTENT', feature: 'prompt.model' },
     ]);
   });
 

@@ -13,7 +13,7 @@ The adapter projects these assets. Paths follow the [Claude Code documentation](
 | Agent             | `.claude/agents/<id>.md`       | `~/.claude/agents/<id>.md`       |
 | MCP configuration | `.mcp.json`                    | Unsupported                      |
 
-Command frontmatter supports `description`, `argument-hint`, and `model`. Command files cannot select a custom agent or declare subtask execution, so those requests return diagnostics. Agent files support `name`, `description`, `model`, `effort`, and `maxTurns`. The portable per-tool permission map has no documented agent-file representation, so permission metadata also returns a diagnostic instead of being dropped.
+Command frontmatter supports `description`, `argument-hint`, `model`, and documented subagent routing. A portable subtask request maps to `context: fork`, and an explicit agent selection emits both `context: fork` and the documented `agent` field. Agent files support `name`, `description`, `model`, `effort`, and `maxTurns`. The portable per-tool permission map has no documented agent-file representation, so permission metadata returns a diagnostic instead of being dropped.
 
 MCP plans target the committed project file `.mcp.json` under `mcpServers`. Local servers use the documented `type: "stdio"` shape with `command` and optional `args` and `env`; remote servers use `type: "http"` with `url` and optional `headers`. Per-server `timeout` values follow the documented minimum of 1000 milliseconds. The adapter does not edit user-managed state such as `~/.claude.json`, so MCP configuration is project-scoped only. Claude Code additionally requires interactive approval of project `.mcp.json` servers after installation.
 

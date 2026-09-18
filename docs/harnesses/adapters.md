@@ -25,7 +25,7 @@ Adapters only return data. They do not read or write files, install packages, ex
 | Native primary and subagents               | Unsupported                                 | Supported                                 | Supported                                    |
 | Prompt description                         | Supported                                   | Supported                                 | Supported                                    |
 | Prompt argument hint                       | Supported                                   | Unsupported                               | Supported                                    |
-| Prompt agent, model, and subtask selection | Unsupported                                 | Supported                                 | Model only                                   |
+| Prompt agent, model, and subtask selection | Unsupported                                 | Supported                                 | Supported through `context: fork`            |
 | Agent step limit                           | Unsupported                                 | Supported                                 | Supported as `maxTurns`                      |
 | Portable agent thinking setting            | Unsupported                                 | Unsupported                               | Supported as `effort`                        |
 
@@ -71,7 +71,7 @@ Asset IDs must match `^[a-z0-9]+(?:-[a-z0-9]+)*$`. The adapters reject path sepa
 
 ## Prompt and skill output
 
-Both adapters preserve an accepted LF-only prompt body after deterministic YAML frontmatter. Pi emits `description` and `argument-hint`. OpenCode emits `description`, `agent`, `model`, and `subtask`. Claude Code emits `description`, `argument-hint`, and `model`. If a request includes metadata that the host cannot represent, projection fails instead of dropping the field.
+Both adapters preserve an accepted LF-only prompt body after deterministic YAML frontmatter. Pi emits `description` and `argument-hint`. OpenCode emits `description`, `agent`, `model`, and `subtask`. Claude Code emits `description`, `argument-hint`, and `model`, and routes subagent execution through the documented `context: fork` field; an explicit `agent` selection emits both `context` and `agent`. If a request includes metadata that the host cannot represent, projection fails instead of dropping the field.
 
 Both adapters produce the same `SKILL.md` bytes for the same skill request. Skill names use the safe asset ID format and cannot exceed 64 characters. Descriptions cannot exceed 1024 characters. Optional compatibility text must contain non-whitespace text and cannot exceed 500 characters. Optional licenses must contain non-whitespace text. Metadata keys must contain non-whitespace text, and metadata values must be strings.
 

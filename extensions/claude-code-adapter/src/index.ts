@@ -62,9 +62,9 @@ export const claudeCodeHarnessDeclaration = defineHarnessDeclaration({
     'config.mcp.remote': PROJECT_CONFIG_SUPPORT,
     'prompt.description': supportedFeature('metadata'),
     'prompt.argument-hint': supportedFeature('metadata'),
-    'prompt.agent': unsupportedFeatureSupport('Claude Code command files cannot select a custom agent.'),
+    'prompt.agent': supportedFeature('metadata'),
     'prompt.model': supportedFeature('metadata'),
-    'prompt.subtask': unsupportedFeatureSupport('Claude Code command files have no portable subtask field.'),
+    'prompt.subtask': supportedFeature('metadata'),
     'agent.primary': supportedFeature('metadata'),
     'agent.subagent': supportedFeature('metadata'),
     'agent.model': supportedFeature('metadata'),
@@ -112,7 +112,7 @@ function claudeCodeTarget(request: TargetRequest): ProjectionResult<TargetPath |
   return projectionSuccess(targetPath(anchor, [...base, 'agents', `${request.assetId}.md`]));
 }
 
-/** Projects current Claude Code command frontmatter. */
+/** Projects current Claude Code command frontmatter, including fork routing. */
 function projectClaudeCodePrompt(request: PromptProjectionRequest): ProjectionResult<ProjectedFile> {
   const diagnostics = contentDiagnostics('asset.prompt', request.scope, request.id, request.body);
   const metadata = request.metadata ?? {};
@@ -122,17 +122,24 @@ function projectClaudeCodePrompt(request: PromptProjectionRequest): ProjectionRe
   if (metadata.argumentHint !== undefined && !nonblank(metadata.argumentHint)) {
     diagnostics.push(invalidPromptMetadata('prompt.argument-hint', request));
   }
-  if (metadata.execution?.agent !== undefined) diagnostics.push(unrepresentablePrompt('prompt.agent', request));
+  if (metadata.execution?.agent !== undefined && !nonblank(metadata.execution.agent)) {
+    diagnostics.push(invalidPromptMetadata('prompt.agent', request));
+  }
   if (metadata.execution?.model !== undefined && !nonblank(metadata.execution.model)) {
     diagnostics.push(invalidPromptMetadata('prompt.model', request));
   }
-  if (metadata.execution?.subtask !== undefined) diagnostics.push(unrepresentablePrompt('prompt.subtask', request));
   if (diagnostics.length > 0) return projectionFailure(diagnostics);
 
-  const entries: Array<readonly [string, string]> = [];
+  const entries: Array<readonly [string, string | boolean]> = [];
   if (metadata.description !== undefined) entries.push(['description', metadata.description]);
   if (metadata.argumentHint !== undefined) entries.push(['argument-hint', metadata.argumentHint]);
   if (metadata.execution?.model !== undefined) entries.push(['model', metadata.execution.model]);
+  // Claude Code forks the command into a subagent when context is set. An explicit
+  // agent selection implies the fork; a portable subtask request maps to fork alone.
+  if (metadata.execution?.agent !== undefined || metadata.execution?.subtask === true) {
+    entries.push(['context', 'fork']);
+  }
+  if (metadata.execution?.agent !== undefined) entries.push(['agent', metadata.execution.agent]);
   return projectionSuccess({
     assetId: request.id,
     feature: 'asset.prompt' as const,
@@ -365,18 +372,6 @@ function unsupportedScope(feature: HostFeature, scope: HarnessScope): Projection
     feature,
     scope,
     message: 'Claude Code supports this operation only in the declared scope.',
-  };
-}
-
-/** Returns a prompt metadata diagnostic without copying rejected values. */
-function unrepresentablePrompt(feature: HostFeature, request: PromptProjectionRequest): ProjectionDiagnostic {
-  return {
-    code: 'UNREPRESENTABLE_METADATA',
-    hostId: CLAUDE_CODE_ID,
-    feature,
-    scope: request.scope,
-    assetId: request.id,
-    message: 'Claude Code cannot represent the requested prompt metadata.',
   };
 }
 
