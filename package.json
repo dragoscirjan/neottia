@@ -46,8 +46,8 @@
     "version:modules": "changeset version"
   },
   "devDependencies": {
-    "@changesets/changelog-github": "^0.5.1",
-    "@changesets/cli": "^2.29.8",
+    "@changesets/changelog-github": "^1.0.0",
+    "@changesets/cli": "^3.0.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@jscpd/badge-reporter": "^4.0.1",
     "@templ-project/eslint": "^1.3.0",
