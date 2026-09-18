@@ -57,6 +57,13 @@ export const OFFICIAL_CONFIG_CONTRIBUTIONS = Object.freeze([
     path: Object.freeze(['connections', 'forges']),
   }),
   Object.freeze({
+    exportName: 'sdlcRoleAssignmentsConfigContribution',
+    packageName: '@neottia/sdlc',
+    sourceFile: 'packages/sdlc/src/role-config.ts',
+    builtFile: 'packages/sdlc/dist/role-config.js',
+    path: Object.freeze(['agents', 'sdlc']),
+  }),
+  Object.freeze({
     exportName: 'issuesCapabilityConfigContribution',
     packageName: '@neottia/sdlc',
     sourceFile: 'packages/sdlc/src/config.ts',

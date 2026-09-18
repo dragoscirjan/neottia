@@ -12,12 +12,14 @@ import {
   sourceControlCapabilityConfigContribution,
 } from './config.js';
 import { forgeConnectionsConfigContribution } from './forge-config.js';
+import { sdlcRoleAssignmentsConfigContribution } from './role-config.js';
 
 const roots: string[] = [];
 const registry = createConfigRegistry([
   issueConfigContribution,
   designDocsConfigContribution,
   forgeConnectionsConfigContribution,
+  sdlcRoleAssignmentsConfigContribution,
   issuesCapabilityConfigContribution,
   documentsCapabilityConfigContribution,
   sourceControlCapabilityConfigContribution,
@@ -218,6 +220,45 @@ profiles:
       kind: 'profile',
       file: join(cwd, '.neottia', 'config.yml'),
       profile: 'local',
+    });
+  });
+
+  it('merges per-harness role assignments through profiles with leaf provenance', () => {
+    const cwd = fixture(`version: 1
+agents:
+  sdlc:
+    opencode:
+      planner:
+        agent: neottia-planner
+        required_skills: [planning]
+profiles:
+  review:
+    agents:
+      sdlc:
+        opencode:
+          planner:
+            model: provider/model
+            thinking: high
+`);
+
+    const snapshot = resolveConfig(registry, { cwd, env: { NEOTTIA_PROFILE: 'review' } });
+
+    expect(snapshot.get(sdlcRoleAssignmentsConfigContribution)).toEqual({
+      pi: {},
+      opencode: {
+        planner: {
+          agent: 'neottia-planner',
+          model: 'provider/model',
+          thinking: 'high',
+          required_skills: ['planning'],
+          required_tools: [],
+        },
+      },
+    });
+    expect(snapshot.sourceOf(sdlcRoleAssignmentsConfigContribution, ['opencode', 'planner', 'model'])).toEqual({
+      kind: 'profile',
+      file: join(cwd, '.neottia', 'config.yml'),
+      profile: 'review',
     });
   });
 

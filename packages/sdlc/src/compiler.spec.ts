@@ -17,12 +17,9 @@ import {
   sourceControlCapabilityConfigContribution,
 } from './config.js';
 import { forgeConnectionsConfigContribution } from './forge-config.js';
-import {
-  BUILTIN_SDLC_INSTRUCTION_PACKS,
-  createSdlcInstructionPack,
-  createSdlcRoleInstruction,
-} from './instructions.js';
+import { BUILTIN_SDLC_INSTRUCTION_PACKS, createSdlcInstructionPack } from './instructions.js';
 import { SDLC_COMMAND_IDS, SDLC_LIFECYCLE } from './lifecycle.js';
+import { sdlcRoleAssignmentsConfigContribution } from './role-config.js';
 import { loadPackagedSdlcTemplateLayer } from './template-loader.js';
 
 import { opencodeHarnessAdapter } from '../../../extensions/opencode-adapter/src/index.js';
@@ -32,6 +29,7 @@ const registry = createConfigRegistry([
   issueConfigContribution,
   designDocsConfigContribution,
   forgeConnectionsConfigContribution,
+  sdlcRoleAssignmentsConfigContribution,
   issuesCapabilityConfigContribution,
   documentsCapabilityConfigContribution,
   sourceControlCapabilityConfigContribution,
@@ -40,9 +38,15 @@ const runtimePackages = [
   { logicalId: 'issues' as const, version: '0.1.0' },
   { logicalId: 'design-docs' as const, version: '0.1.0' },
 ];
+const REQUIRED_CURRENT_ASSIGNMENTS = Object.freeze({
+  planner: { agent: 'current' as const },
+  implementer: { agent: 'current' as const },
+  verifier: { agent: 'current' as const },
+  'release-coordinator': { agent: 'current' as const },
+});
 const packagedTemplateLayer = await loadPackagedSdlcTemplateLayer();
 
-type TestCompilerInputOptions = Omit<CreateSdlcCompilerInputOptions, 'templateLayers'> & {
+type TestCompilerInputOptions = Omit<CreateSdlcCompilerInputOptions, 'harnessDeclaration' | 'templateLayers'> & {
   readonly templateLayers?: CreateSdlcCompilerInputOptions['templateLayers'];
 };
 
@@ -51,8 +55,10 @@ function createSdlcCompilerInput(
   resolvedSnapshot: Parameters<typeof createRawSdlcCompilerInput>[0],
   options: TestCompilerInputOptions,
 ): SdlcCompilerInputManifest {
+  const adapter = options.harnessId === 'pi' ? piHarnessAdapter : opencodeHarnessAdapter;
   return createRawSdlcCompilerInput(resolvedSnapshot, {
     ...options,
+    harnessDeclaration: adapter.declaration,
     templateLayers: [packagedTemplateLayer, ...(options.templateLayers ?? [])],
   });
 }
@@ -62,6 +68,10 @@ function snapshot(values: ConfigShardValues = {}) {
   return createResolvedConfigSnapshot(registry, {
     issues: { enabled: true },
     'design-docs': { enabled: true },
+    'sdlc-role-assignments': {
+      pi: REQUIRED_CURRENT_ASSIGNMENTS,
+      opencode: REQUIRED_CURRENT_ASSIGNMENTS,
+    },
     ...values,
   });
 }
@@ -164,6 +174,105 @@ describe('canonical SDLC compiler', () => {
     const continueBody = promptBody(promptAssets(pi).find((asset) => asset.target.segments.at(-1) === 'continue.md')!);
     expect(continueBody).toContain('Recommend exactly one supported next public command with its evidence');
     expect(continueBody).toContain('stop without invoking it');
+  });
+
+  it('projects named OpenCode roles without granting permissions or unsupported thinking metadata', () => {
+    const input = createSdlcCompilerInput(
+      snapshot({
+        'sdlc-role-assignments': {
+          pi: REQUIRED_CURRENT_ASSIGNMENTS,
+          opencode: {
+            ...REQUIRED_CURRENT_ASSIGNMENTS,
+            planner: {
+              agent: 'neottia-planner',
+              model: 'provider/model',
+              thinking: 'high',
+              required_skills: ['planning'],
+              required_tools: ['issue_read'],
+            },
+          },
+        },
+      }),
+      {
+        compilerVersion: '0.1.0',
+        harnessId: 'opencode',
+        scope: 'project',
+      },
+    );
+    const output = compileSdlc(input, opencodeHarnessAdapter);
+    const agent = output.assets.assets.find(
+      (asset) => asset.kind === 'file' && asset.id === 'asset.agent.neottia-planner',
+    );
+    const plan = output.assets.assets.find((asset) => asset.kind === 'file' && asset.id === 'asset.prompt.plan');
+
+    expect(agent).toMatchObject({
+      kind: 'file',
+      target: { segments: ['.opencode', 'agents', 'neottia-planner.md'] },
+    });
+    expect(agent?.content).toContain('model: "provider/model"');
+    expect(agent?.content).toContain('steps: 24');
+    expect(agent?.content).not.toContain('thinking:');
+    expect(agent?.content).not.toContain('permission:');
+    expect(plan?.content).toContain('Invoke only the configured host subagent `neottia-planner`');
+    expect(plan?.content).toContain('Thinking hint `high` is advisory');
+    expect(plan?.content).toContain('Obtain explicit approval for the proposed scope before Build.');
+    expect(output.assets.reloadNotice?.affectedFeatures).toContain('asset.agent');
+    expect(input.configuration.provenance.map(({ path }) => path.join('.'))).toContain(
+      'agents.sdlc.opencode.planner.model',
+    );
+    expect(input.configuration.provenance.map(({ path }) => path.join('.')).join('\n')).not.toContain('agents.sdlc.pi');
+  });
+
+  it('keeps unselected harness assignments out of checksums and provenance', () => {
+    const createPi = (opencodePlanner: string): SdlcCompilerInputManifest =>
+      createSdlcCompilerInput(
+        snapshot({
+          'sdlc-role-assignments': {
+            pi: REQUIRED_CURRENT_ASSIGNMENTS,
+            opencode: { ...REQUIRED_CURRENT_ASSIGNMENTS, planner: { agent: opencodePlanner } },
+          },
+        }),
+        { compilerVersion: '0.1.0', harnessId: 'pi', scope: 'project' },
+      );
+    const left = createPi('planner-left');
+    const right = createPi('planner-right');
+
+    expect(left).toEqual(right);
+    expect(JSON.stringify(left)).not.toContain('planner-left');
+    expect(JSON.stringify(right)).not.toContain('planner-right');
+  });
+
+  it('stops on missing required assignments and unsupported named routes before projection', () => {
+    expect(() =>
+      createSdlcCompilerInput(
+        snapshot({
+          'sdlc-role-assignments': {
+            pi: { ...REQUIRED_CURRENT_ASSIGNMENTS, planner: false },
+            opencode: REQUIRED_CURRENT_ASSIGNMENTS,
+          },
+        }),
+        { compilerVersion: '0.1.0', harnessId: 'pi', scope: 'project' },
+      ),
+    ).toThrowError(
+      expect.objectContaining({
+        problems: [expect.objectContaining({ code: 'ROLE_ASSIGNMENT_REQUIRED' })],
+      }),
+    );
+    expect(() =>
+      createSdlcCompilerInput(
+        snapshot({
+          'sdlc-role-assignments': {
+            pi: { ...REQUIRED_CURRENT_ASSIGNMENTS, planner: { agent: 'neottia-planner' } },
+            opencode: REQUIRED_CURRENT_ASSIGNMENTS,
+          },
+        }),
+        { compilerVersion: '0.1.0', harnessId: 'pi', scope: 'project' },
+      ),
+    ).toThrowError(
+      expect.objectContaining({
+        problems: [expect.objectContaining({ code: 'ROLE_ASSIGNMENT_UNSUPPORTED' })],
+      }),
+    );
   });
 
   it.each([
@@ -536,16 +645,9 @@ describe('canonical SDLC compiler', () => {
     );
   });
 
-  it('records complete template overrides and optional role instructions', () => {
+  it('records complete template overrides and configured role instructions', () => {
     const packagedPlan = packagedTemplateLayer.files.find((template) => template.id === 'neottia.sdlc.command.plan')!;
     const override = packagedPlan.content.replace('Turn the request', 'Turn the reviewed request');
-    const role = createSdlcRoleInstruction({
-      id: 'example.role.planner',
-      command: 'plan',
-      role: 'planner',
-      version: '1.0.0',
-      content: 'Invoke the compiled planner role and require its structured handoff.\n',
-    });
     const input = createSdlcCompilerInput(snapshot(), {
       compilerVersion: '0.1.0',
       harnessId: 'pi',
@@ -558,18 +660,17 @@ describe('canonical SDLC compiler', () => {
           files: [{ id: packagedPlan.id, content: override }],
         },
       ],
-      roles: [role],
     });
     const output = compileSdlc(input, piHarnessAdapter);
     const plan = promptAssets(output).find((asset) => asset.target.segments.at(-1) === 'plan.md')!;
     const build = promptAssets(output).find((asset) => asset.target.segments.at(-1) === 'build.md')!;
 
     expect(plan.content).toContain('Turn the reviewed request');
-    expect(plan.content).toContain(role.content.trimEnd());
-    expect(plan.content).toContain('### researcher');
-    expect(plan.content).toContain('No role instructions are compiled for these invocation points: researcher');
-    expect(build.content).toContain('No role instructions are compiled for these invocation points: implementer');
-    expect(build.content).toContain('fallback behavior are owned by the role compiler.');
+    expect(plan.content).toContain('The selected assignment explicitly requires the current agent');
+    expect(plan.content).toContain('No dedicated agent is assigned for this optional role');
+    expect(plan.content).toContain('at most 20 evidence entries');
+    expect(build.content).toContain('Portable role: implementer.');
+    expect(build.content).not.toContain('owned by the role compiler');
     expect(input.templates.find((template) => template.id === packagedPlan.id)).toMatchObject({
       sourceId: 'project-templates',
       checksum: checksumText(override),
@@ -682,58 +783,52 @@ describe('canonical SDLC compiler', () => {
     ).toThrow('must output instructions.issues directly exactly once.');
   });
 
-  it('accepts identical role fragments at distinct invocation points', () => {
-    const content = 'Plan\n';
-    const roles = [
-      createSdlcRoleInstruction({
-        id: 'example.role.planner',
-        command: 'plan',
-        role: 'planner',
-        version: '1.0.0',
-        content,
-      }),
-      createSdlcRoleInstruction({
-        id: 'example.role.researcher',
-        command: 'plan',
-        role: 'researcher',
-        version: '1.0.0',
-        content,
-      }),
-    ];
+  it('accepts identical configured role fragments at distinct invocation points', () => {
     const input = createSdlcCompilerInput(snapshot(), {
       compilerVersion: '0.1.0',
       harnessId: 'pi',
       scope: 'project',
-      roles,
     });
+    const plannerRoles = input.roles.filter((role) => role.role === 'planner');
     const output = compileSdlc(input, piHarnessAdapter);
-    const plan = promptBody(promptAssets(output).find((asset) => asset.target.segments.at(-1) === 'plan.md')!);
 
-    expect(plan).toContain('### planner\n\nPlan');
-    expect(plan).toContain('### researcher\n\nPlan');
+    expect(plannerRoles.map((role) => role.command)).toEqual(['plan', 'continue']);
+    expect(new Set(plannerRoles.map((role) => role.checksum)).size).toBe(1);
+    expect(promptBody(promptAssets(output).find((asset) => asset.target.segments.at(-1) === 'plan.md')!)).toContain(
+      'Portable role: planner.',
+    );
+    expect(promptBody(promptAssets(output).find((asset) => asset.target.segments.at(-1) === 'continue.md')!)).toContain(
+      'Portable role: planner.',
+    );
   });
 
   it('restores replacement-token fragments literally after tracked rendering', () => {
-    const content = "Literal replacement tokens: $& $` $'\n";
-    const role = createSdlcRoleInstruction({
-      id: 'example.role.literal-tokens',
-      command: 'plan',
-      role: 'planner',
-      version: '1.0.0',
-      content,
-    });
+    const instruction = "Use provider tokens $&, $`, and $' literally.\n";
     const output = compileSdlc(
-      createSdlcCompilerInput(snapshot(), {
-        compilerVersion: '0.1.0',
-        harnessId: 'pi',
-        scope: 'project',
-        roles: [role],
-      }),
+      createSdlcCompilerInput(
+        snapshot({
+          'sdlc-source-control-capability': { local: 'jj', remote: false, workspaces: false },
+        }),
+        {
+          compilerVersion: '0.1.0',
+          harnessId: 'pi',
+          scope: 'project',
+          instructionPacks: [
+            createSdlcInstructionPack({
+              id: 'test.source-control.jj',
+              slot: 'source-control.local',
+              provider: 'jj',
+              version: '1.0.0',
+              content: instruction,
+            }),
+          ],
+        },
+      ),
       piHarnessAdapter,
     );
     const plan = promptBody(promptAssets(output).find((asset) => asset.target.segments.at(-1) === 'plan.md')!);
 
-    expect(plan.split(content.trimEnd())).toHaveLength(2);
+    expect(plan.split(instruction.trimEnd())).toHaveLength(2);
     expect(plan).not.toContain('NEOTTIA_FRAGMENT_');
   });
 
@@ -822,7 +917,7 @@ describe('canonical SDLC compiler', () => {
     const githubConfiguration = {
       ...input.configuration,
       context: githubContext,
-      checksum: checksumText(canonicalJson(githubContext)),
+      checksum: checksumText(canonicalJson({ context: githubContext, roles: input.configuration.roles })),
     };
     const changedTemplate = { ...input.templates[0]!, content: `${input.templates[0]!.content}\nTampered.\n` };
     const cases = [
@@ -912,7 +1007,7 @@ describe('canonical SDLC compiler', () => {
     const configuration = {
       ...input.configuration,
       context,
-      checksum: checksumText(canonicalJson(context)),
+      checksum: checksumText(canonicalJson({ context, roles: input.configuration.roles })),
     };
 
     expect(() => compileSdlc(resignCompilerInput(input, { configuration }), piHarnessAdapter)).toThrow(

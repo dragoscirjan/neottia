@@ -236,6 +236,47 @@ Read [provider instruction-pack configuration](./sdlc/providers.md) for the supp
 
 `loadSdlcTemplateLayers()` reads the six published `.md.twig` templates and complete command overrides from `.neottia/templates/sdlc/<command>.md.twig`. It rejects unknown command filenames. Pass its result to `createSdlcCompilerInput()`, which adds resolved template, instruction, role, configuration, and runtime package provenance. `compileSdlc()` then projects the canonical six-command lifecycle through a Pi or OpenCode adapter. Runtime package IDs and exact versions are separate compiler inputs. The compiler never infers packages from provider selections. See [the SDLC compiler guide](./sdlc/) for the complete input, output, and installation handoff.
 
+## SDLC role assignments
+
+Configure portable roles independently for each harness under `agents.sdlc.pi` and `agents.sdlc.opencode`. The selected harness must explicitly assign `planner`, `implementer`, `verifier`, and `release-coordinator`. Optional roles are `researcher`, `reviewer`, and `documentation-writer`.
+
+```yaml
+version: 1
+agents:
+  sdlc:
+    pi:
+      planner:
+        agent: current
+      implementer:
+        agent: current
+        required_skills: [coding]
+      verifier:
+        agent: current
+        required_tools: [bash]
+      release-coordinator:
+        agent: current
+    opencode:
+      planner:
+        agent: neottia-planner
+        model: anthropic/claude-sonnet-4-5
+      implementer:
+        agent: neottia-implementer
+        required_skills: [coding]
+        required_tools: [read, edit, bash]
+      verifier:
+        agent: neottia-verifier
+        required_tools: [read, bash]
+      release-coordinator:
+        agent: current
+      reviewer: false
+```
+
+An assignment accepts `agent`, optional `model` and `thinking` hints, and optional `required_skills` and `required_tools` lists. Use `agent: current` for current-agent execution. Set an optional role to `false` or omit it to use current-agent fallback. Setting a required role to `false`, omitting it, duplicating a named agent, or naming an agent on a harness without native agent support fails before asset projection.
+
+Pi accepts only current-agent routes. OpenCode can project named subagent files and supported model and step metadata. Thinking hints remain advisory on OpenCode because its adapter declares no portable thinking field. No hint or requirement grants a permission, tool, approval, or provider route.
+
+The compiler includes only the selected harness map in its checksum and provenance. Read [portable role assignments](./sdlc/roles.md) for all roles, strict field limits, profile behavior, host degradation, and handoff and result limits.
+
 ## Profiles
 
 A profile is a root-shaped fragment under `profiles.<name>`. It may change registered module settings, but it cannot contain `version`, another `profiles` mapping, or an unknown path.

@@ -9,6 +9,7 @@ import {
   documentsCapabilityConfigContribution,
   forgeConnectionsConfigContribution,
   issuesCapabilityConfigContribution,
+  sdlcRoleAssignmentsConfigContribution,
   sourceControlCapabilityConfigContribution,
 } from '@neottia/sdlc';
 import { searchableConfigContribution } from '@neottia/searchable-core';
@@ -71,11 +72,12 @@ templates:
       'distribution-asset-install',
       'distribution-template-install',
       'sdlc-forge-connections',
+      'sdlc-role-assignments',
       'sdlc-issues-capability',
       'sdlc-documents-capability',
       'sdlc-source-control-capability',
     ]);
-    expect(officialConfigRegistry.contributions).toHaveLength(11);
+    expect(officialConfigRegistry.contributions).toHaveLength(12);
     expect(snapshot.get(memoryConfigContribution).enabled).toBe(true);
     expect(snapshot.get(issueConfigContribution).enabled).toBe(true);
     expect(snapshot.get(designDocsConfigContribution).enabled).toBe(true);
@@ -88,6 +90,7 @@ templates:
       project_overrides: [],
     });
     expect(snapshot.get(forgeConnectionsConfigContribution)).toEqual({});
+    expect(snapshot.get(sdlcRoleAssignmentsConfigContribution)).toEqual({ pi: {}, opencode: {} });
     expect(snapshot.get(issuesCapabilityConfigContribution)).toEqual({ provider: 'filesystem' });
     expect(snapshot.get(documentsCapabilityConfigContribution)).toEqual({ provider: 'filesystem' });
     expect(snapshot.get(sourceControlCapabilityConfigContribution)).toEqual({

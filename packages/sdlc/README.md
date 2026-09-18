@@ -6,16 +6,28 @@ See the [SDLC compiler guide](../../docs/sdlc/) and [configuration reference](..
 
 ## Compile a lifecycle
 
-Resolve configuration before calling the compiler. The compiler reads only the supplied snapshot, template layers, instruction packs, role instructions, runtime package versions, and adapter.
+Resolve configuration before calling the compiler. The compiler reads only the supplied snapshot, template layers, runtime package versions, and adapter. It derives provider and role instructions from the selected configuration.
 
 ```ts
 import { resolveHostConfigSnapshot } from "@neottia/config-registry";
-import { piHarnessAdapter } from "@neottia/pi-adapter";
+import { piHarnessAdapter, piHarnessDeclaration } from "@neottia/pi-adapter";
 import { compileSdlc, createSdlcCompilerInput, loadSdlcTemplateLayers } from "@neottia/sdlc";
 
 const snapshot = resolveHostConfigSnapshot({
   cwd: process.cwd(),
   interactive: false,
+  overrides: {
+    agents: {
+      sdlc: {
+        pi: {
+          planner: { agent: "current" },
+          implementer: { agent: "current" },
+          verifier: { agent: "current" },
+          "release-coordinator": { agent: "current" },
+        },
+      },
+    },
+  },
 });
 
 const templateLayers = await loadSdlcTemplateLayers({
@@ -24,6 +36,7 @@ const templateLayers = await loadSdlcTemplateLayers({
 const input = createSdlcCompilerInput(snapshot, {
   compilerVersion: "0.1.0",
   harnessId: "pi",
+  harnessDeclaration: piHarnessDeclaration,
   scope: "project",
   templateLayers,
   runtimePackages: [
@@ -55,7 +68,9 @@ The package publishes `templates/plan.md.twig`, `build.md.twig`, `verify.md.twig
 
 Place a complete project override at `.neottia/templates/sdlc/<command>.md.twig`. The loader rejects unknown filenames. It applies packaged, package, global, then project precedence and records selected and shadowed checksums in compiler input provenance. A whole-template override can change lifecycle policy, so review it before installation.
 
-The Twig context exposes `command`, `instructions`, and `roles`. Provider and role packages supply checksummed fragments through those fields instead of owning command templates. The compiler publishes portable role names such as `planner`, `implementer`, `verifier`, and `release-coordinator`. Issue #118 owns assignment, requiredness, and fallback policy.
+The Twig context exposes `command`, `instructions`, and `roles`. Provider and role packages supply checksummed fragments through those fields instead of owning command templates. The compiler publishes `planner`, `researcher`, `implementer`, `reviewer`, `verifier`, `release-coordinator`, and `documentation-writer` as portable role names.
+
+Assign roles under `agents.sdlc.pi` or `agents.sdlc.opencode`. Planner, implementer, verifier, and release coordinator need explicit selected-harness assignments. Optional roles fall back to the current agent when omitted or disabled. OpenCode can project named native subagents, model hints, and step limits. Pi accepts current-agent routes only. Unsupported metadata remains advisory text and never grants permissions. See the [portable role assignment guide](../../docs/sdlc/roles.md).
 
 ## Safety boundaries
 

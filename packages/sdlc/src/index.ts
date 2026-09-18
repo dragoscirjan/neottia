@@ -63,6 +63,40 @@ export {
 } from './forge-config.js';
 export { createForgeInstructionPacks } from './forge-instructions.js';
 export {
+  SDLC_ROLE_HARNESS_IDS,
+  sdlcHarnessRoleAssignmentsPatchSchema,
+  sdlcHarnessRoleAssignmentsSchema,
+  sdlcRoleAssignmentConfigPatchSchema,
+  sdlcRoleAssignmentConfigSchema,
+  sdlcRoleAssignmentsConfigContribution,
+  sdlcRoleAssignmentsConfigPatchSchema,
+  sdlcRoleAssignmentsConfigSchema,
+  type SdlcHarnessRoleAssignments,
+  type SdlcRoleAssignmentConfig,
+  type SdlcRoleAssignmentsConfig,
+  type SdlcRoleHarnessId,
+} from './role-config.js';
+export {
+  createConfiguredSdlcRoleInstructions,
+  createSdlcRoleAgentRequests,
+  createSdlcRoleCompilerContext,
+  roleHostSupport,
+  SDLC_ROLE_DECLARATIONS,
+  SDLC_ROLE_INSTRUCTION_VERSION,
+  SDLC_ROLE_MAX_EVIDENCE,
+  SDLC_ROLE_MAX_RESULT_BYTES,
+  SDLC_ROLE_MAX_STEPS,
+  sdlcRoleCompilerContextSchema,
+  sdlcRoleConfigurationPaths,
+  validateSdlcRoleCompilerContext,
+  validateSdlcRoleHostDeclaration,
+  type SdlcProjectedRoleAgent,
+  type SdlcRoleCompilerContext,
+  type SdlcRoleDeclaration,
+  type SdlcRoleHostSupport,
+  type SdlcSelectedRoleAssignment,
+} from './role-instructions.js';
+export {
   FORGE_CAPABILITIES,
   FORGE_PROVIDERS,
   FORGE_SUPPORT_DECLARATIONS,

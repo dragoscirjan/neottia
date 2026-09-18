@@ -18,6 +18,7 @@ import {
 import {
   PACKAGE_VERSION_PATTERN,
   type HarnessAdapter,
+  type HarnessDeclaration,
   type HarnessScope,
   type HostFeature,
   type NeottiaRuntimePackageId,
@@ -52,7 +53,6 @@ import { FORGE_CAPABILITIES, FORGE_PROVIDERS, FORGE_SUPPORT_DECLARATIONS } from 
 import {
   SDLC_INSTRUCTION_SLOTS,
   selectSdlcInstructionPacks,
-  unassignedRoleInstructions,
   validateSdlcInstructionPack,
   validateSdlcRoleInstruction,
   type SdlcInstructionPack,
@@ -69,6 +69,18 @@ import {
   type SdlcLifecycleCommand,
   type SdlcRoleId,
 } from './lifecycle.js';
+import { sdlcRoleAssignmentsConfigContribution } from './role-config.js';
+import {
+  createConfiguredSdlcRoleInstructions,
+  createSdlcRoleAgentRequests,
+  createSdlcRoleCompilerContext,
+  sdlcRoleCompilerContextSchema,
+  sdlcRoleConfigurationPaths,
+  validateSdlcRoleCompilerContext,
+  validateSdlcRoleHostDeclaration,
+  type SdlcProjectedRoleAgent,
+  type SdlcRoleCompilerContext,
+} from './role-instructions.js';
 import {
   createSandboxSecurityPolicy,
   createSynchronousArrayLoader,
@@ -235,7 +247,7 @@ const configurationProvenanceSchema = z
   .strict();
 const compilerInputSchema = z
   .object({
-    schemaVersion: z.literal(2),
+    schemaVersion: z.literal(3),
     lifecycleVersion: z.literal(SDLC_LIFECYCLE_VERSION),
     compilerVersion: z.string().regex(PACKAGE_VERSION_PATTERN),
     installationId: stableIdSchema,
@@ -245,6 +257,7 @@ const compilerInputSchema = z
       .object({
         checksum: checksumSchema,
         context: configurationContextSchema,
+        roles: sdlcRoleCompilerContextSchema,
         provenance: z.array(configurationProvenanceSchema),
       })
       .strict(),
@@ -339,7 +352,7 @@ export interface SdlcConfigurationProvenance {
 
 /** Deterministic, serializable compiler input. */
 export interface SdlcCompilerInputManifest {
-  readonly schemaVersion: 2;
+  readonly schemaVersion: 3;
   readonly lifecycleVersion: string;
   readonly compilerVersion: string;
   readonly installationId: string;
@@ -348,6 +361,7 @@ export interface SdlcCompilerInputManifest {
   readonly configuration: {
     readonly checksum: Sha256;
     readonly context: SdlcCompilerContext;
+    readonly roles: SdlcRoleCompilerContext;
     readonly provenance: readonly SdlcConfigurationProvenance[];
   };
   readonly templates: readonly ResolvedTemplate[];
@@ -362,11 +376,11 @@ export interface CreateSdlcCompilerInputOptions {
   readonly compilerVersion: string;
   readonly installationId?: string;
   readonly harnessId: string;
+  readonly harnessDeclaration: HarnessDeclaration;
   readonly scope: HarnessScope;
   /** Explicit layers returned by the filesystem loader or another trusted source. */
   readonly templateLayers: readonly TemplateLayer[];
   readonly instructionPacks?: readonly SdlcInstructionPack[];
-  readonly roles?: readonly SdlcRoleInstruction[];
   readonly runtimePackages?: readonly SdlcRuntimePackage[];
 }
 
@@ -387,7 +401,7 @@ export interface CompiledSdlcCommand {
 
 /** Compiler output plus the installer handoff from #114. */
 export interface SdlcCompilerOutputManifest {
-  readonly schemaVersion: 2;
+  readonly schemaVersion: 3;
   readonly lifecycleVersion: string;
   readonly inputChecksum: Sha256;
   readonly harnessId: string;
@@ -416,8 +430,17 @@ export function createSdlcCompilerInput(
 ): SdlcCompilerInputManifest {
   if (options.compilerVersion.trim().length === 0) throw new TypeError('Compiler version is required.');
   if (!/^[a-z0-9]+(?:[.-][a-z0-9]+)*$/u.test(options.harnessId)) throw new TypeError('Harness ID is invalid.');
+  if (options.harnessDeclaration.id !== options.harnessId) {
+    throw new TypeError('Harness declaration does not match the compiler harness ID.');
+  }
   if (options.scope !== 'project' && options.scope !== 'global') throw new TypeError('Harness scope is invalid.');
   const context = createSdlcCompilerContext(snapshot);
+  const roleContext = createSdlcRoleCompilerContext(
+    snapshot,
+    options.harnessId,
+    options.harnessDeclaration,
+    options.scope,
+  );
   const templates = resolveTemplates(
     [SDLC_CONTENT_TEMPLATE_ID, SDLC_LAYOUT_TEMPLATE_ID, ...SDLC_LIFECYCLE.map((command) => command.templateId)],
     options.templateLayers,
@@ -426,16 +449,17 @@ export function createSdlcCompilerInput(
     ...createForgeInstructionPacks(context),
     ...(options.instructionPacks ?? []),
   ]);
-  const roles = prepareRoles(options.roles ?? []);
+  const roles = prepareRoles(createConfiguredSdlcRoleInstructions(roleContext));
   const runtimePackages = prepareRuntimePackages(options.runtimePackages ?? []);
-  const provenance = configurationProvenance(snapshot, context);
+  const provenance = configurationProvenance(snapshot, context, roleContext);
+  const configurationValue = Object.freeze({ context, roles: roleContext });
   const configuration = Object.freeze({
-    checksum: checksumText(canonicalJson(context)),
-    context,
+    checksum: checksumText(canonicalJson(configurationValue)),
+    ...configurationValue,
     provenance,
   });
   const unsigned = {
-    schemaVersion: 2 as const,
+    schemaVersion: 3 as const,
     lifecycleVersion: SDLC_LIFECYCLE_VERSION,
     compilerVersion: options.compilerVersion,
     installationId: options.installationId ?? `sdlc-${options.harnessId}`,
@@ -456,6 +480,8 @@ export function createSdlcCompilerInput(
 export function compileSdlc(input: SdlcCompilerInputManifest, adapter: HarnessAdapter): SdlcCompilerOutputManifest {
   validateSdlcCompilerInput(input);
   if (adapter.declaration.id !== input.harnessId) throw new TypeError('Compiler input does not match the adapter.');
+  validateSdlcRoleHostDeclaration(input.configuration.roles, adapter.declaration);
+  const roleAgents = createSdlcRoleAgentRequests(input.configuration.roles);
   const instructionText = Object.fromEntries(input.instructions.map((pack) => [pack.slot, pack.content])) as Record<
     SdlcInstructionPack['slot'],
     string
@@ -509,11 +535,15 @@ export function compileSdlc(input: SdlcCompilerInputManifest, adapter: HarnessAd
     );
   }
 
+  for (const roleAgent of roleAgents) {
+    assets.push(projectRoleAgent(roleAgent, input, adapter));
+  }
   for (const runtimePackage of input.runtimePackages) {
     assets.push(projectRuntimePackage(runtimePackage, input, adapter));
   }
   const changedFeatures: HostFeature[] = [
     'asset.prompt',
+    ...(roleAgents.length === 0 ? [] : (['asset.agent'] as const)),
     ...(input.runtimePackages.length === 0 ? [] : (['config.package'] as const)),
   ];
   const reloadNotice = requireProjection(adapter.reloadNotice({ changedFeatures }), 'Cannot create a reload notice.');
@@ -529,7 +559,7 @@ export function compileSdlc(input: SdlcCompilerInputManifest, adapter: HarnessAd
     reloadNotice,
   });
   const unsigned = {
-    schemaVersion: 2 as const,
+    schemaVersion: 3 as const,
     lifecycleVersion: input.lifecycleVersion,
     inputChecksum: input.checksum,
     harnessId: input.harnessId,
@@ -546,7 +576,10 @@ export function validateSdlcCompilerInput(input: SdlcCompilerInputManifest): voi
   const { checksum, ...unsigned } = input;
   if (checksumText(canonicalJson(unsigned)) !== checksum)
     throw new TypeError('SDLC compiler input checksum does not match.');
-  if (checksumText(canonicalJson(input.configuration.context)) !== input.configuration.checksum) {
+  if (
+    checksumText(canonicalJson({ context: input.configuration.context, roles: input.configuration.roles })) !==
+    input.configuration.checksum
+  ) {
     throw new TypeError('SDLC compiler configuration checksum does not match.');
   }
   if (
@@ -556,18 +589,50 @@ export function validateSdlcCompilerInput(input: SdlcCompilerInputManifest): voi
     throw new TypeError('SDLC compiler configuration is semantically invalid.');
   }
   validateSdlcCompilerContext(input.configuration.context);
-  validateConfigurationProvenance(input.configuration.context, input.configuration.provenance);
+  validateSdlcRoleCompilerContext(input.configuration.roles);
+  if (input.configuration.roles.scope !== input.scope) {
+    throw new TypeError('SDLC role compiler context scope does not match compiler scope.');
+  }
+  validateConfigurationProvenance(
+    input.configuration.context,
+    input.configuration.roles,
+    input.configuration.provenance,
+  );
   validateSelectedInstructions(input.configuration.context, input.instructions);
 
-  const canonicalRoles = prepareRoles(input.roles);
+  const canonicalRoles = prepareRoles(createConfiguredSdlcRoleInstructions(input.configuration.roles));
   if (canonicalJson(canonicalRoles) !== canonicalJson(input.roles)) {
-    throw new TypeError('Role instructions are not in canonical order.');
+    throw new TypeError('Role instructions do not match configured assignments.');
   }
   validateResolvedTemplates(input.templates, input.instructions, canonicalRoles);
   const canonicalPackages = prepareRuntimePackages(input.runtimePackages);
   if (canonicalJson(canonicalPackages) !== canonicalJson(input.runtimePackages)) {
     throw new TypeError('Runtime packages are not in canonical order.');
   }
+}
+
+/** Projects one selected named role through the adapter without permission grants. */
+function projectRoleAgent(
+  roleAgent: SdlcProjectedRoleAgent,
+  input: SdlcCompilerInputManifest,
+  adapter: HarnessAdapter,
+): ReturnType<typeof fileAssetFromProjection> {
+  const projected = requireProjection(
+    adapter.projectAgent(roleAgent.request),
+    `Cannot project role agent ${roleAgent.role}.`,
+  );
+  const source = createAssetSource({
+    kind: 'generated',
+    id: `sdlc.role-agent.${roleAgent.role}`,
+    version: input.compilerVersion,
+    content: canonicalJson({
+      inputChecksum: input.checksum,
+      role: roleAgent.role,
+      assignment: roleAgent.assignment,
+      request: roleAgent.request,
+    }),
+  });
+  return fileAssetFromProjection(projected, source);
 }
 
 /** Projects one explicitly requested runtime package as reviewable host configuration. */
@@ -665,11 +730,12 @@ function createTemplateRoles(
   return Object.freeze(
     command.roleSlots.map((roleSlot): SdlcTemplateRole => {
       const instruction = roles.find((role) => role.role === roleSlot);
+      if (instruction === undefined) throw new TypeError(`Role instruction ${command.id}:${roleSlot} is missing.`);
       return Object.freeze({
         id: roleSlot,
-        content: instruction?.content.trimEnd() ?? unassignedRoleInstructions([roleSlot]).trimEnd(),
-        assigned: instruction !== undefined,
-        ...(instruction === undefined ? {} : { instructionId: instruction.id }),
+        content: instruction.content.trimEnd(),
+        assigned: true,
+        instructionId: instruction.id,
       });
     }),
   );
@@ -861,15 +927,22 @@ function requiredTemplate(templates: readonly ResolvedTemplate[], id: string): R
 /** Requires selected compiler provenance paths in deterministic order. */
 function validateConfigurationProvenance(
   context: SdlcCompilerContext,
+  roleContext: SdlcRoleCompilerContext,
   provenance: readonly SdlcConfigurationProvenance[],
 ): void {
-  if (canonicalJson(provenance.map((entry) => entry.path)) !== canonicalJson(configurationProvenancePaths(context))) {
+  if (
+    canonicalJson(provenance.map((entry) => entry.path)) !==
+    canonicalJson(configurationProvenancePaths(context, roleContext))
+  ) {
     throw new TypeError('SDLC compiler configuration provenance is invalid.');
   }
 }
 
 /** Lists every selected configuration leaf that affects generated instructions. */
-function configurationProvenancePaths(context: SdlcCompilerContext): readonly (readonly string[])[] {
+function configurationProvenancePaths(
+  context: SdlcCompilerContext,
+  roleContext: SdlcRoleCompilerContext,
+): readonly (readonly string[])[] {
   const paths: string[][] = [
     ['capabilities', 'issues', 'provider'],
     ['capabilities', 'documents', 'provider'],
@@ -891,6 +964,7 @@ function configurationProvenancePaths(context: SdlcCompilerContext): readonly (r
       paths.push(['connections', 'forges', forge.provider, 'mcp', key, 'command']);
     }
   }
+  paths.push(...sdlcRoleConfigurationPaths(roleContext).map((path) => [...path]));
   return Object.freeze(paths.map((path) => Object.freeze(path)));
 }
 
@@ -1021,26 +1095,28 @@ function prepareRuntimePackages(packages: readonly SdlcRuntimePackage[]): readon
 function configurationProvenance(
   snapshot: ResolvedConfigSnapshot,
   context: SdlcCompilerContext,
+  roleContext: SdlcRoleCompilerContext,
 ): readonly SdlcConfigurationProvenance[] {
-  const fixedSources = [
-    snapshot.sourceOf(issuesCapabilityConfigContribution, ['provider']),
-    snapshot.sourceOf(documentsCapabilityConfigContribution, ['provider']),
-    snapshot.sourceOf(sourceControlCapabilityConfigContribution, ['local']),
-    snapshot.sourceOf(sourceControlCapabilityConfigContribution, ['remote']),
-    snapshot.sourceOf(sourceControlCapabilityConfigContribution, ['workspaces']),
-  ];
-  const paths = configurationProvenancePaths(context);
-  const forgeSources = paths
-    .slice(fixedSources.length)
-    .map((path) => snapshot.sourceOf(forgeConnectionsConfigContribution, path.slice(2)));
   return Object.freeze(
-    paths.map((path, index) =>
-      Object.freeze({
-        path,
-        source: portableProvenance([...fixedSources, ...forgeSources][index] ?? { kind: 'defaults' }),
-      }),
+    configurationProvenancePaths(context, roleContext).map((path) =>
+      Object.freeze({ path, source: portableProvenance(configurationSource(snapshot, path)) }),
     ),
   );
+}
+
+/** Reads one selected leaf from its owning configuration contribution. */
+function configurationSource(snapshot: ResolvedConfigSnapshot, path: readonly string[]): ConfigProvenance {
+  const source =
+    path[0] === 'agents'
+      ? snapshot.sourceOf(sdlcRoleAssignmentsConfigContribution, path.slice(2))
+      : path[0] === 'connections'
+        ? snapshot.sourceOf(forgeConnectionsConfigContribution, path.slice(2))
+        : path[1] === 'issues'
+          ? snapshot.sourceOf(issuesCapabilityConfigContribution, path.slice(2))
+          : path[1] === 'documents'
+            ? snapshot.sourceOf(documentsCapabilityConfigContribution, path.slice(2))
+            : snapshot.sourceOf(sourceControlCapabilityConfigContribution, path.slice(2));
+  return source ?? { kind: 'defaults' };
 }
 
 /** Removes machine-specific file paths while retaining the source decision trail. */

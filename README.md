@@ -109,7 +109,7 @@ Pi and OpenCode each have native Memory, Issues, Design Docs, and Searchable ext
 
 ## Canonical SDLC
 
-`@neottia/sdlc` ships Plan, Build, Verify, Release, Continue, and Refresh as provider-neutral `.md.twig` files. It loads conventional `.neottia/templates/sdlc/<command>.md.twig` overrides, inserts checksummed provider and role fragments with Twing, records provenance, and returns adapter-projected asset manifests. Built-in compile-time bundles cover GitHub, GitLab, Gitea, Forgejo, Bitbucket, Jira, and Confluence with strict connection settings, tool prerequisites, and no cross-tool mutation retry. Runtime package IDs and exact versions remain explicit inputs. See the [SDLC compiler guide](docs/sdlc/) and [provider instruction-pack guide](docs/sdlc/providers.md).
+`@neottia/sdlc` ships Plan, Build, Verify, Release, Continue, and Refresh as provider-neutral `.md.twig` files. It loads conventional `.neottia/templates/sdlc/<command>.md.twig` overrides, inserts checksummed provider and role fragments with Twing, records provenance, and returns adapter-projected asset manifests. Built-in compile-time bundles cover GitHub, GitLab, Gitea, Forgejo, Bitbucket, Jira, and Confluence with strict connection settings, tool prerequisites, and no cross-tool mutation retry. Per-harness role assignments preserve the same duties and bounded evidence contracts, with current-agent execution in Pi and supported native subagents in OpenCode. Runtime package IDs and exact versions remain explicit inputs. See the [SDLC compiler guide](docs/sdlc/), [provider instruction-pack guide](docs/sdlc/providers.md), and [portable role assignment guide](docs/sdlc/roles.md).
 
 ## Distribution
 

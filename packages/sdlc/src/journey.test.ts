@@ -23,6 +23,7 @@ import {
   sourceControlCapabilityConfigContribution,
 } from './config.js';
 import { forgeConnectionsConfigContribution } from './forge-config.js';
+import { sdlcRoleAssignmentsConfigContribution } from './role-config.js';
 import { loadSdlcTemplateLayers } from './template-loader.js';
 
 import { opencodeHarnessAdapter } from '../../../extensions/opencode-adapter/src/index.js';
@@ -32,6 +33,7 @@ const registry = createConfigRegistry([
   issueConfigContribution,
   designDocsConfigContribution,
   forgeConnectionsConfigContribution,
+  sdlcRoleAssignmentsConfigContribution,
   issuesCapabilityConfigContribution,
   documentsCapabilityConfigContribution,
   sourceControlCapabilityConfigContribution,
@@ -60,6 +62,7 @@ describe.each([
       const input = createSdlcCompilerInput(compilerSnapshot(), {
         compilerVersion: '0.1.0',
         harnessId,
+        harnessDeclaration: adapter.declaration,
         scope,
         templateLayers: await loadSdlcTemplateLayers({ projectRoot: roots.project }),
         runtimePackages,
@@ -96,6 +99,7 @@ it('completes a filesystem and local-Git Plan-to-Release journey under one tempo
     const input = createSdlcCompilerInput(compilerSnapshot(), {
       compilerVersion: '0.1.0',
       harnessId,
+      harnessDeclaration: adapter.declaration,
       scope: 'project',
       templateLayers: await loadSdlcTemplateLayers({ projectRoot: roots.project }),
       runtimePackages,
@@ -194,9 +198,16 @@ async function createRoots(): Promise<InstallRoots> {
 
 /** Creates an immutable compiler snapshot selecting built-in providers. */
 function compilerSnapshot() {
+  const requiredAssignments = {
+    planner: { agent: 'current' },
+    implementer: { agent: 'current' },
+    verifier: { agent: 'current' },
+    'release-coordinator': { agent: 'current' },
+  };
   return createResolvedConfigSnapshot(registry, {
     issues: { enabled: true },
     'design-docs': { enabled: true },
+    'sdlc-role-assignments': { pi: requiredAssignments, opencode: requiredAssignments },
   });
 }
 
