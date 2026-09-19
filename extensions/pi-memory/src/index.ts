@@ -8,6 +8,7 @@ import {
   type MemoryToolContext,
   type MemoryToolName,
 } from '@neottia/memory-core';
+import type { PiExtensionApi as BasePiExtensionApi } from '@neottia/pi-adapter';
 import { Type, type TSchema } from 'typebox';
 
 /**
@@ -21,22 +22,7 @@ import { Type, type TSchema } from 'typebox';
  */
 
 /** Minimal structural type of the pi ExtensionAPI surface we use. */
-export interface PiExtensionApi {
-  on: (event: 'session_shutdown', handler: () => Promise<void>) => unknown;
-  registerTool: (tool: {
-    name: string;
-    label?: string;
-    description: string;
-    parameters: TSchema;
-    execute: (
-      toolCallId: string,
-      params: Record<string, unknown>,
-      signal: AbortSignal,
-      onUpdate: (update: unknown) => void,
-      ctx: { cwd?: string; ui?: { confirm: (title: string, message: string) => Promise<boolean> } },
-    ) => Promise<{ content: Array<{ type: 'text'; text: string }>; details: Record<string, never> }>;
-  }) => unknown;
-}
+export type PiExtensionApi = BasePiExtensionApi<TSchema>;
 
 export interface MemoryExtensionOptions {
   /** Working directory of the project whose memory shard is used. */

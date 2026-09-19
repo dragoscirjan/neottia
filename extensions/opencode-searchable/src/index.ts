@@ -1,5 +1,6 @@
 import type { DeepReadonly, ResolvedConfigSnapshot } from '@neottia/config';
 import { resolveHostConfigSnapshot } from '@neottia/config-registry';
+import { buildOpencodeTools } from '@neottia/opencode-adapter';
 import {
   createSearchableRuntime,
   SEARCHABLE_TOOLS,
@@ -22,21 +23,7 @@ export function buildSearchableTools(
   },
   factory: OpenCodeToolFactory,
 ): Record<string, ReturnType<OpenCodeToolFactory>> {
-  return Object.fromEntries(
-    SEARCHABLE_TOOLS.map((definition) => [
-      definition.name,
-      factory({
-        description: definition.description,
-        args: definition.inputSchema.shape,
-        async execute(args: Record<string, unknown>, invocation) {
-          const signal =
-            'abort' in invocation && invocation.abort instanceof AbortSignal ? invocation.abort : undefined;
-          const result = await definition.run({ ...context, ...(signal ? { signal } : {}) }, args);
-          return JSON.stringify(result, null, 2);
-        },
-      }),
-    ]),
-  );
+  return buildOpencodeTools(SEARCHABLE_TOOLS, context, factory);
 }
 
 /** Options for snapshot, environment, overrides, and runtime injection. */

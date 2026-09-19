@@ -50,9 +50,20 @@ export function encodeCanonicalDocument(
   content: string,
   limits: DesignDocsLimits,
 ): Uint8Array {
+  return encodeDocument(metadata, content, limits, { sortMetadata: true, allowLegacySetext: false });
+}
+
+/** Encodes one document while keeping legacy presentation differences explicit. */
+function encodeDocument(
+  metadata: CanonicalDocumentMetadata,
+  content: string,
+  limits: DesignDocsLimits,
+  options: { readonly sortMetadata: boolean; readonly allowLegacySetext: boolean },
+): Uint8Array {
   validateMetadata(metadata, limits);
   const body = canonicalDocumentBody(metadata.title, content, limits.max_body_bytes);
-  validateBody(metadata.title, body, limits);
+  validateBody(metadata.title, body, limits, options.allowLegacySetext);
+  const documentMetadata = options.sortMetadata ? sortJson(metadata.metadata) : metadata.metadata;
   const source = [
     '---',
     `id: ${JSON.stringify(metadata.id)}`,
@@ -63,7 +74,7 @@ export function encodeCanonicalDocument(
     `created_at: ${JSON.stringify(metadata.created_at)}`,
     `updated_at: ${JSON.stringify(metadata.updated_at)}`,
     ...(metadata.created_by === undefined ? [] : [`created_by: ${JSON.stringify(metadata.created_by)}`]),
-    ...(metadata.metadata === undefined ? [] : [`metadata: ${JSON.stringify(sortJson(metadata.metadata))}`]),
+    ...(documentMetadata === undefined ? [] : [`metadata: ${JSON.stringify(documentMetadata)}`]),
     '---',
     '',
     body,
@@ -175,27 +186,7 @@ function encodeHarnessctlDocument(
   content: string,
   limits: DesignDocsLimits,
 ): Uint8Array {
-  validateMetadata(metadata, limits);
-  const body = canonicalDocumentBody(metadata.title, content, limits.max_body_bytes);
-  validateBody(metadata.title, body, limits, true);
-  const source = [
-    '---',
-    `id: ${JSON.stringify(metadata.id)}`,
-    `title: ${JSON.stringify(metadata.title)}`,
-    `kind: ${metadata.kind}`,
-    `status: ${metadata.status}`,
-    `version: ${metadata.version}`,
-    `created_at: ${JSON.stringify(metadata.created_at)}`,
-    `updated_at: ${JSON.stringify(metadata.updated_at)}`,
-    ...(metadata.created_by === undefined ? [] : [`created_by: ${JSON.stringify(metadata.created_by)}`]),
-    ...(metadata.metadata === undefined ? [] : [`metadata: ${JSON.stringify(metadata.metadata)}`]),
-    '---',
-    '',
-    body,
-  ].join('\n');
-  const bytes = encoder.encode(source.endsWith('\n') ? source : `${source}\n`);
-  if (bytes.byteLength > limits.max_file_bytes) limit('DOCUMENT_FILE_LIMIT', 'Document file byte limit exceeded.');
-  return bytes;
+  return encodeDocument(metadata, content, limits, { sortMetadata: false, allowLegacySetext: true });
 }
 
 function validateMetadata(metadata: CanonicalDocumentMetadata, limits: DesignDocsLimits): void {

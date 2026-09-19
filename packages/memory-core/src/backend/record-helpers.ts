@@ -19,6 +19,37 @@ export interface RecordHelperDeps {
   readonly defaultTopic: string;
 }
 
+/** Supplies backend-independent record operations to every storage backend. */
+export abstract class MemoryRecordSupport {
+  protected abstract readonly helperDeps: RecordHelperDeps;
+
+  public makeRecord(input: MemoryRecordInput, supersedes: string[], now: () => Date = () => new Date()): MemoryRecord {
+    return makeRecord(this.helperDeps, input, supersedes, now);
+  }
+
+  public makeTombstone(
+    targetId: string,
+    reason: string,
+    source: MemoryTombstone['source'],
+    createdBy: string,
+    now: () => Date = () => new Date(),
+  ): MemoryTombstone {
+    return makeTombstone(this.helperDeps, targetId, reason, source, createdBy, now);
+  }
+
+  public validateCompactness(summary: string, details: string | null | undefined, context: string): void {
+    validateCompactness(summary, details, context);
+  }
+
+  public validateRecord(value: unknown, label = 'memory record'): MemoryRecord {
+    return validateRecord(value, this.helperDeps, label);
+  }
+
+  public validateTombstone(value: unknown, label = 'memory tombstone'): MemoryTombstone {
+    return validateTombstone(value, this.helperDeps, label);
+  }
+}
+
 /** Builds a validated record with a fresh ULID and the configured scope. */
 export function makeRecord(
   deps: RecordHelperDeps,

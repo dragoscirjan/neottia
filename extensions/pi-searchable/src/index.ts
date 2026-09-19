@@ -1,6 +1,7 @@
 import { resolve } from 'node:path';
 import type { DeepReadonly } from '@neottia/config';
 import { resolveHostConfigSnapshot } from '@neottia/config-registry';
+import type { PiExtensionApi as BasePiExtensionApi } from '@neottia/pi-adapter';
 import {
   createSearchableRuntime,
   searchableToolJsonSchema,
@@ -15,22 +16,7 @@ import {
 import { Type, type TSchema } from 'typebox';
 
 /** Minimal Pi registration contract used by the extension and its tests. */
-export interface PiExtensionApi {
-  on(event: 'session_shutdown', handler: () => Promise<void>): unknown;
-  registerTool(tool: {
-    name: string;
-    label: string;
-    description: string;
-    parameters: TSchema;
-    execute(
-      callId: string,
-      params: Record<string, unknown>,
-      signal: AbortSignal,
-      onUpdate: (update: unknown) => void,
-      context: { cwd?: string; ui?: { confirm(title: string, message: string): Promise<boolean> } },
-    ): Promise<{ content: Array<{ type: 'text'; text: string }>; details: Record<string, unknown> }>;
-  }): unknown;
-}
+export type PiExtensionApi = BasePiExtensionApi<TSchema>;
 
 /** Host options for CWD routing, configuration, and deterministic runtime tests. */
 export interface SearchableExtensionOptions {

@@ -24,11 +24,9 @@ import { openMemoryCache, rebuildMemoryCache, removeMemoryCache, searchMemoryCac
 import type { MemoryRecord, MemoryTombstone, RecordType } from '../schemas.js';
 import { createSecretScanner, type SecretScanner } from '../security.js';
 import {
-  makeRecord as makeRecordHelper,
-  makeTombstone as makeTombstoneHelper,
+  MemoryRecordSupport,
   parseMemoryDocument,
   validateAndClassifySnapshot,
-  validateCompactness as validateCompactnessHelper,
   validateRecord as validateRecordHelper,
   validateTombstone as validateTombstoneHelper,
   type RecordHelperDeps,
@@ -64,13 +62,13 @@ export interface FilesystemBackendOptions {
   readonly onStaleCache?: () => boolean | Promise<boolean>;
 }
 
-export class FilesystemBackend implements StorageBackend {
+export class FilesystemBackend extends MemoryRecordSupport implements StorageBackend {
   private readonly root: string;
   private readonly limits: StorageLimits;
   private readonly scanner: SecretScanner;
   private readonly scope: NamespaceScope;
   private readonly defaultTopic: string;
-  private readonly helperDeps: RecordHelperDeps;
+  protected readonly helperDeps: RecordHelperDeps;
   private readonly cacheMaxAgeMs: number;
   private readonly stalePolicy: 'prompt' | 'rebuild' | 'fail';
   private readonly onStaleCache?: () => boolean | Promise<boolean>;
@@ -79,6 +77,7 @@ export class FilesystemBackend implements StorageBackend {
   private readonly repositoryLease = new AsyncLocalStorage<RepositoryLease>();
 
   public constructor(options: FilesystemBackendOptions) {
+    super();
     this.root = resolve(options.cwd, options.config.root);
     assertSafeMemoryRoot(this.root);
     this.cacheMaxAgeMs = options.config.cache.max_age_ms;
@@ -331,11 +330,6 @@ export class FilesystemBackend implements StorageBackend {
     return `${this.scope.organizationId}--${this.scope.projectId}`;
   }
 
-  /** Creates a validated record object with a fresh ULID and scope from config. */
-  public makeRecord(input: MemoryRecordInput, supersedes: string[], now: () => Date = () => new Date()): MemoryRecord {
-    return makeRecordHelper(this.helperDeps, input, supersedes, now);
-  }
-
   /** Builds the canonical file path for a record from its record type. */
   public recordPath(record: MemoryRecord): string {
     return `${RECORD_FOLDERS[record.record_type]}/${record.id}.yaml`;
@@ -344,30 +338,6 @@ export class FilesystemBackend implements StorageBackend {
   /** Tombstone file path inside the canonical tree. */
   public tombstonePath(tombstone: MemoryTombstone): string {
     return `tombstones/${tombstone.id}.yaml`;
-  }
-
-  /** Validates and returns a tombstone object for a target record. */
-  public makeTombstone(
-    targetId: string,
-    reason: string,
-    source: MemoryTombstone['source'],
-    createdBy: string,
-    now: () => Date = () => new Date(),
-  ): MemoryTombstone {
-    return makeTombstoneHelper(this.helperDeps, targetId, reason, source, createdBy, now);
-  }
-
-  /** Validates mutation compactness for store/supersede/import inputs. */
-  public validateCompactness(summary: string, details: string | null | undefined, context: string): void {
-    validateCompactnessHelper(summary, details, context);
-  }
-
-  public validateRecord(value: unknown, label = 'memory record'): MemoryRecord {
-    return validateRecordHelper(value, this.helperDeps, label);
-  }
-
-  public validateTombstone(value: unknown, label = 'memory tombstone'): MemoryTombstone {
-    return validateTombstoneHelper(value, this.helperDeps, label);
   }
 
   public encode(value: MemoryRecord | MemoryTombstone): Uint8Array {

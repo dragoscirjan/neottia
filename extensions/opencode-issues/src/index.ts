@@ -7,6 +7,7 @@ import {
   type IssueToolContext,
 } from '@neottia/issues';
 import { createIssuesDesignDocsComposition } from '@neottia/issues-design-docs';
+import { buildOpencodeTools } from '@neottia/opencode-adapter';
 import { tool, type Plugin } from '@opencode-ai/plugin';
 
 export type OpenCodeToolFactory = typeof tool;
@@ -16,21 +17,7 @@ export function buildIssueTools(
   context: IssueToolContext,
   factory: OpenCodeToolFactory,
 ): Record<string, ReturnType<OpenCodeToolFactory>> {
-  return Object.fromEntries(
-    ISSUE_TOOLS.map((definition) => [
-      definition.name,
-      factory({
-        description: definition.description,
-        args: definition.inputSchema.shape,
-        async execute(args: Record<string, unknown>, invocation) {
-          const signal =
-            'abort' in invocation && invocation.abort instanceof AbortSignal ? invocation.abort : undefined;
-          const result = await definition.run({ ...context, ...(signal ? { signal } : {}) }, args);
-          return JSON.stringify(result, null, 2);
-        },
-      }),
-    ]),
-  );
+  return buildOpencodeTools(ISSUE_TOOLS, context, factory);
 }
 
 export interface OpenCodeIssuesOptions {

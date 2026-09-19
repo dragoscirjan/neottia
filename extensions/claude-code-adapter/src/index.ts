@@ -1,19 +1,23 @@
 import {
-  HOST_FEATURES,
   cloneFrozen,
   defineHarnessAdapter,
   defineHarnessDeclaration,
   invalidAssetId,
   invalidContent,
+  nonblank,
+  orderHostFeatures as orderedFeatures,
   projectSkillFile,
   projectionFailure,
   projectionSuccess,
   renderMarkdown,
+  requireProjectedPath as requirePath,
   sortRecord,
   supportedFeature,
   targetPath,
   unsupportedFeature,
   unsupportedFeatureSupport,
+  validLocalMcp,
+  validRemoteMcp,
   type AgentProjectionRequest,
   type ExtensionProjectionRequest,
   type FeatureSupport,
@@ -302,50 +306,24 @@ function contentDiagnostics(
 
 /** Validates the subset of Claude stdio configuration represented by the contract. */
 function validateLocalMcp(server: LocalMcpDeclaration): ProjectionDiagnostic | undefined {
-  const validCommand =
-    Array.isArray(server.command) &&
-    server.command.length > 0 &&
-    server.command.every((part) => nonblank(part) && safeText(part));
-  const validEnvironment =
-    server.environment === undefined ||
-    Object.entries(server.environment).every(([key, value]) => nonblank(key) && safeText(key) && safeText(value));
-  if (
-    invalidAssetId(CLAUDE_CODE_ID, 'config.mcp.local', 'project', server.name) === undefined &&
-    validCommand &&
-    validEnvironment &&
-    server.cwd === undefined &&
-    server.enabled === undefined &&
-    validTimeout(server.timeout)
-  ) {
-    return undefined;
-  }
-  return invalidMcp('config.mcp.local');
+  return validLocalMcp(CLAUDE_CODE_ID, 'project', server, {
+    allowCwd: false,
+    allowEnabled: false,
+    validTimeout,
+  })
+    ? undefined
+    : invalidMcp('config.mcp.local');
 }
 
 /** Validates HTTP MCP configuration and prevents headers over plaintext transport. */
 function validateRemoteMcp(server: RemoteMcpDeclaration): ProjectionDiagnostic | undefined {
-  let protocol: string | undefined;
-  try {
-    protocol = new URL(server.url).protocol;
-  } catch {
-    protocol = undefined;
-  }
-  const validHeaders =
-    server.headers === undefined ||
-    Object.entries(server.headers).every(([key, value]) => nonblank(key) && safeText(key) && safeText(value));
-  const secureHeaders = server.headers === undefined || protocol === 'https:';
-  if (
-    invalidAssetId(CLAUDE_CODE_ID, 'config.mcp.remote', 'project', server.name) === undefined &&
-    (protocol === 'http:' || protocol === 'https:') &&
-    validHeaders &&
-    secureHeaders &&
-    server.oauth === undefined &&
-    server.enabled === undefined &&
-    validTimeout(server.timeout)
-  ) {
-    return undefined;
-  }
-  return invalidMcp('config.mcp.remote');
+  return validRemoteMcp(CLAUDE_CODE_ID, 'project', server, {
+    allowOauthFalse: false,
+    allowEnabled: false,
+    validTimeout,
+  })
+    ? undefined
+    : invalidMcp('config.mcp.remote');
 }
 
 /** Maps one host-config request kind to its declared feature. */
@@ -420,30 +398,6 @@ function invalidMcp(feature: 'config.mcp.local' | 'config.mcp.remote'): Projecti
     scope: 'project',
     message: 'The MCP declaration is not valid for Claude Code project configuration.',
   };
-}
-
-/** Extracts a path from an already checked internal projection. */
-function requirePath(result: ProjectionResult<TargetPath | HostConfigLocator>): TargetPath {
-  if (result.value === undefined || 'candidates' in result.value) {
-    throw new TypeError('Expected a projected asset path.');
-  }
-  return result.value;
-}
-
-/** Keeps reload feature ordering independent of caller order. */
-function orderedFeatures(features: readonly HostFeature[]): readonly HostFeature[] {
-  const selected = new Set(features);
-  return Object.freeze(HOST_FEATURES.filter((feature) => selected.has(feature)));
-}
-
-/** Checks string metadata without changing accepted bytes. */
-function nonblank(value: string): boolean {
-  return value.length > 0 && value.trim().length > 0;
-}
-
-/** Rejects line breaks and NUL characters in scalar host configuration values. */
-function safeText(value: string): boolean {
-  return !value.includes('\0') && !value.includes('\r') && !value.includes('\n');
 }
 
 /** Validates the documented per-server timeout lower bound. */

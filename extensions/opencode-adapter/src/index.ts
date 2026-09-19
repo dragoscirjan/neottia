@@ -1,20 +1,24 @@
 import {
-  HOST_FEATURES,
   PACKAGE_VERSION_PATTERN,
   cloneFrozen,
   defineHarnessAdapter,
   defineHarnessDeclaration,
   invalidAssetId,
   invalidContent,
+  nonblank,
+  orderHostFeatures as orderedFeatures,
   projectSkillFile,
   projectionFailure,
   projectionSuccess,
   renderMarkdown,
+  requireProjectedPath as requirePath,
   sortRecord,
   supportedFeature,
   targetPath,
   unsupportedFeature,
   unsupportedFeatureSupport,
+  validLocalMcp,
+  validRemoteMcp,
   type AgentProjectionRequest,
   type ExtensionProjectionRequest,
   type HarnessAdapter,
@@ -38,6 +42,37 @@ import {
   type TargetPath,
   type TargetRequest,
 } from '@neottia/harness-adapter';
+
+/** Builds native OpenCode tools from one canonical core registry. */
+export function buildOpencodeTools<Context extends object, Schema, Tool>(
+  definitions: readonly {
+    readonly name: string;
+    readonly description: string;
+    readonly inputSchema: { readonly shape: Schema };
+    readonly run: (context: Context, input: unknown) => Promise<unknown>;
+  }[],
+  context: Context,
+  factory: (definition: {
+    description: string;
+    args: Schema;
+    execute: (args: Record<string, unknown>, invocation: { readonly abort?: unknown }) => Promise<string>;
+  }) => Tool,
+): Record<string, Tool> {
+  return Object.fromEntries(
+    definitions.map((definition) => [
+      definition.name,
+      factory({
+        description: definition.description,
+        args: definition.inputSchema.shape,
+        async execute(args, invocation) {
+          const signal = invocation.abort instanceof AbortSignal ? invocation.abort : undefined;
+          const result = await definition.run({ ...context, ...(signal ? { signal } : {}) }, args);
+          return JSON.stringify(result, null, 2);
+        },
+      }),
+    ]),
+  );
+}
 
 /** OpenCode package names remain private to the host adapter. */
 const OPENCODE_PACKAGE_NAMES: Readonly<Record<NeottiaRuntimePackageId, string>> = Object.freeze({
@@ -355,49 +390,24 @@ function contentDiagnostics(
 
 /** Validates a local MCP declaration without returning rejected values. */
 function validateLocalMcp(scope: HarnessScope, server: LocalMcpDeclaration): ProjectionDiagnostic | undefined {
-  const validCommand =
-    Array.isArray(server.command) &&
-    server.command.length > 0 &&
-    server.command.every((part) => nonblank(part) && safeText(part));
-  const validEnvironment =
-    server.environment === undefined ||
-    Object.entries(server.environment).every(([key, value]) => nonblank(key) && safeText(key) && safeText(value));
-  const validCwd = server.cwd === undefined || (nonblank(server.cwd) && safeText(server.cwd));
-  if (
-    invalidAssetId('opencode', 'config.mcp.local', scope, server.name) === undefined &&
-    validCommand &&
-    validEnvironment &&
-    validCwd &&
-    validTimeout(server.timeout)
-  ) {
-    return undefined;
-  }
-  return invalidMcp('config.mcp.local', scope);
+  return validLocalMcp('opencode', scope, server, {
+    allowCwd: true,
+    allowEnabled: true,
+    validTimeout,
+  })
+    ? undefined
+    : invalidMcp('config.mcp.local', scope);
 }
 
 /** Validates remote MCP transport without exposing headers over plaintext HTTP. */
 function validateRemoteMcp(scope: HarnessScope, server: RemoteMcpDeclaration): ProjectionDiagnostic | undefined {
-  let protocol: string | undefined;
-  try {
-    protocol = new URL(server.url).protocol;
-  } catch {
-    protocol = undefined;
-  }
-  const validHeaders =
-    server.headers === undefined ||
-    Object.entries(server.headers).every(([key, value]) => nonblank(key) && safeText(key) && safeText(value));
-  const secureHeaders = server.headers === undefined || protocol === 'https:';
-  if (
-    invalidAssetId('opencode', 'config.mcp.remote', scope, server.name) === undefined &&
-    (protocol === 'http:' || protocol === 'https:') &&
-    validHeaders &&
-    secureHeaders &&
-    (server.oauth === undefined || server.oauth === false) &&
-    validTimeout(server.timeout)
-  ) {
-    return undefined;
-  }
-  return invalidMcp('config.mcp.remote', scope);
+  return validRemoteMcp('opencode', scope, server, {
+    allowOauthFalse: true,
+    allowEnabled: true,
+    validTimeout,
+  })
+    ? undefined
+    : invalidMcp('config.mcp.remote', scope);
 }
 
 /** Returns a typed diagnostic for a missing asset id. */
@@ -478,29 +488,6 @@ function invalidMcp(feature: 'config.mcp.local' | 'config.mcp.remote', scope: Ha
     scope,
     message: 'The MCP declaration is not valid for OpenCode.',
   };
-}
-
-/** Extracts a path from an already checked internal projection. */
-function requirePath(result: ProjectionResult<TargetPath | HostConfigLocator>): TargetPath {
-  if (result.value === undefined || 'candidates' in result.value)
-    throw new TypeError('Expected a projected asset path.');
-  return result.value;
-}
-
-/** Keeps reload feature ordering independent of caller order. */
-function orderedFeatures(features: readonly HostFeature[]): readonly HostFeature[] {
-  const selected = new Set(features);
-  return Object.freeze(HOST_FEATURES.filter((feature) => selected.has(feature)));
-}
-
-/** Checks string metadata without changing accepted bytes. */
-function nonblank(value: string): boolean {
-  return value.length > 0 && value.trim().length > 0;
-}
-
-/** Rejects line breaks and NUL characters in scalar host configuration values. */
-function safeText(value: string): boolean {
-  return !value.includes('\0') && !value.includes('\r') && !value.includes('\n');
 }
 
 /** Validates optional OpenCode timeout values. */

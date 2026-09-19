@@ -14,24 +14,10 @@ import {
   type DesignDocLinkValidator,
 } from '@neottia/design-docs';
 import { createIssuesDesignDocsComposition } from '@neottia/issues-design-docs';
+import type { PiExtensionApi as BasePiExtensionApi } from '@neottia/pi-adapter';
 import { Type, type TSchema } from 'typebox';
 
-export interface PiExtensionApi {
-  on: (event: 'session_shutdown', handler: () => Promise<void>) => unknown;
-  registerTool: (tool: {
-    name: string;
-    label?: string;
-    description: string;
-    parameters: TSchema;
-    execute: (
-      toolCallId: string,
-      params: Record<string, unknown>,
-      signal: AbortSignal,
-      onUpdate: (update: unknown) => void,
-      ctx: { cwd?: string; ui?: { confirm(title: string, message: string): Promise<boolean> } },
-    ) => Promise<{ content: Array<{ type: 'text'; text: string }>; details: Record<string, unknown> }>;
-  }) => unknown;
-}
+export type PiExtensionApi = BasePiExtensionApi<TSchema>;
 export interface DesignDocsExtensionOptions {
   readonly cwd?: string;
   readonly configOverrides?: Partial<DesignDocsConfigInput>;

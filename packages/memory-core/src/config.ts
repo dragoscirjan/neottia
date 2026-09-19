@@ -1,5 +1,12 @@
 import { join, resolve } from 'node:path';
-import { ConfigResolutionError, createConfigRegistry, defineConfigContribution, resolveConfig } from '@neottia/config';
+import {
+  ConfigResolutionError,
+  createCacheConfigPatchSchema,
+  createCacheConfigSchema,
+  createConfigRegistry,
+  defineConfigContribution,
+  resolveConfig,
+} from '@neottia/config';
 import { z } from 'zod';
 import { ConfigError } from './errors.js';
 
@@ -80,12 +87,7 @@ function createResolvedMemoryConfigSchema(credentialSchema: z.ZodString) {
           include_superseded: z.boolean().default(false),
         })
         .prefault({}),
-      cache: z
-        .object({
-          max_age_ms: z.number().int().min(0).default(300_000),
-          stale_policy: z.enum(['prompt', 'rebuild', 'fail']).default('prompt'),
-        })
-        .prefault({}),
+      cache: createCacheConfigSchema({ strict: false }),
       security: z
         .object({
           secret_patterns: z.array(z.string().min(1)).default([]),
@@ -156,13 +158,7 @@ function createMemoryConfigPatchSchema(credentialSchema: z.ZodString) {
         })
         .strict()
         .optional(),
-      cache: z
-        .object({
-          max_age_ms: z.number().int().min(0).optional(),
-          stale_policy: z.enum(['prompt', 'rebuild', 'fail']).optional(),
-        })
-        .strict()
-        .optional(),
+      cache: createCacheConfigPatchSchema(),
       security: z
         .object({
           secret_patterns: z.array(z.string().min(1)).optional(),

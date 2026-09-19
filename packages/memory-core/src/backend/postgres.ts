@@ -7,15 +7,13 @@ import { MemoryConflictError, MemoryError } from '../errors.js';
 import { isUlid } from '../identities.js';
 import type { MemoryRecord, MemoryTombstone, RecordType } from '../schemas.js';
 import { createSecretScanner, type SecretScanner } from '../security.js';
-import { RECORD_FOLDERS, safeProjectPath, type MemoryRecordInput } from './filesystem.js';
+import { RECORD_FOLDERS, safeProjectPath } from './filesystem.js';
 import {
   collectSearchResults,
-  makeRecord as makeRecordHelper,
-  makeTombstone as makeTombstoneHelper,
+  MemoryRecordSupport,
   parseMemoryDocument,
   searchableText,
   validateAndClassifySnapshot,
-  validateCompactness as validateCompactnessHelper,
   validateRecord as validateRecordHelper,
   validateTombstone as validateTombstoneHelper,
   type RecordHelperDeps,
@@ -71,10 +69,10 @@ export function resolvePgSettings(config: MemoryConfig): PgConnectionSettings {
   };
 }
 
-export class PostgresBackend implements StorageBackend {
+export class PostgresBackend extends MemoryRecordSupport implements StorageBackend {
   private readonly pool: pg.Pool;
   private readonly scope: NamespaceScope;
-  private readonly helperDeps: RecordHelperDeps;
+  protected readonly helperDeps: RecordHelperDeps;
   private readonly scanner: SecretScanner;
   private readonly limits: { maxFileBytes: number; maxFiles: number; maxTotalBytes: number };
   private textSearchKind: 'pg_textsearch' | 'tsvector' = 'tsvector';
@@ -83,6 +81,7 @@ export class PostgresBackend implements StorageBackend {
   private readonly txContext = new AsyncLocalStorage<pg.PoolClient>();
 
   public constructor(options: PostgresBackendOptions) {
+    super();
     const settings = resolvePgSettings(options.config);
     this.scope = {
       organizationId: options.config.namespace.organization_id,
@@ -571,34 +570,6 @@ export class PostgresBackend implements StorageBackend {
   /** {@inheritdoc StorageBackend.close} */
   public async close(): Promise<void> {
     await this.pool.end();
-  }
-
-  // -- record helpers (shared semantics with the filesystem backend) --------
-
-  public makeRecord(input: MemoryRecordInput, supersedes: string[], now: () => Date = () => new Date()): MemoryRecord {
-    return makeRecordHelper(this.helperDeps, input, supersedes, now);
-  }
-
-  public makeTombstone(
-    targetId: string,
-    reason: string,
-    source: MemoryTombstone['source'],
-    createdBy: string,
-    now: () => Date = () => new Date(),
-  ): MemoryTombstone {
-    return makeTombstoneHelper(this.helperDeps, targetId, reason, source, createdBy, now);
-  }
-
-  public validateCompactness(summary: string, details: string | null | undefined, context: string): void {
-    validateCompactnessHelper(summary, details, context);
-  }
-
-  public validateRecord(value: unknown, label = 'memory record'): MemoryRecord {
-    return validateRecordHelper(value, this.helperDeps, label);
-  }
-
-  public validateTombstone(value: unknown, label = 'memory tombstone'): MemoryTombstone {
-    return validateTombstoneHelper(value, this.helperDeps, label);
   }
 
   /** Row identity: folder + ULID map onto the record/tombstone tables. */

@@ -94,6 +94,15 @@ function control(input: { deadline?: number }, context: IssueToolContext): { sig
   };
 }
 
+/** Builds the stable design-document reference shared by link operations. */
+function designDocumentReference(input: { document_id: string; document_version?: number }) {
+  return {
+    kind: 'design-doc' as const,
+    id: input.document_id,
+    ...(input.document_version === undefined ? {} : { version: input.document_version }),
+  };
+}
+
 /** Shared executable registry consumed verbatim by all host surfaces. */
 export const ISSUE_TOOLS: readonly IssueToolDefinition[] = [
   makeTool(
@@ -182,16 +191,7 @@ export const ISSUE_TOOLS: readonly IssueToolDefinition[] = [
     issueToolSchemas.issue_link_document.input,
     issueToolSchemas.issue_link_document.output,
     (store, input, context) =>
-      store.linkDocument(
-        input.id,
-        {
-          kind: 'design-doc',
-          id: input.document_id,
-          ...(input.document_version === undefined ? {} : { version: input.document_version }),
-        },
-        input.expected_revision,
-        control(input, context),
-      ),
+      store.linkDocument(input.id, designDocumentReference(input), input.expected_revision, control(input, context)),
   ),
   makeTool(
     'issue_unlink_document',
@@ -199,16 +199,7 @@ export const ISSUE_TOOLS: readonly IssueToolDefinition[] = [
     issueToolSchemas.issue_unlink_document.input,
     issueToolSchemas.issue_unlink_document.output,
     (store, input, context) =>
-      store.unlinkDocument(
-        input.id,
-        {
-          kind: 'design-doc',
-          id: input.document_id,
-          ...(input.document_version === undefined ? {} : { version: input.document_version }),
-        },
-        input.expected_revision,
-        control(input, context),
-      ),
+      store.unlinkDocument(input.id, designDocumentReference(input), input.expected_revision, control(input, context)),
   ),
   makeTool(
     'issue_validate',

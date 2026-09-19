@@ -303,6 +303,19 @@ interface CacheStateSnapshot {
   readonly artifacts: Map<string, Stats>;
 }
 
+/** Binds every prepared statement operation to one connection guard. */
+function wrapGuardedStatement(
+  statement: SqliteStatement,
+  guarded: <T>(operation: () => Promise<T>) => Promise<T>,
+): SqliteStatement {
+  return {
+    run: (parameters?: SqliteParameters) => guarded(() => statement.run(parameters)),
+    get: <T>(parameters?: SqliteParameters) => guarded(() => statement.get<T>(parameters)),
+    all: <T>(parameters: SqliteParameters | undefined, bounds: { maxRows: number; maxBytes: number }) =>
+      guarded(() => statement.all<T>(parameters, bounds)),
+  };
+}
+
 /** Applies path-identity and cumulative artifact bounds to every candidate call. */
 function bindConnectionToCandidate(
   database: SqliteConnection,
@@ -324,15 +337,9 @@ function bindConnectionToCandidate(
       assertCacheSize(current, maxBytes);
     }
   };
-  const wrapStatement = (statement: SqliteStatement): SqliteStatement => ({
-    run: (parameters?: SqliteParameters) => guarded(() => statement.run(parameters)),
-    get: <T>(parameters?: SqliteParameters) => guarded(() => statement.get<T>(parameters)),
-    all: <T>(parameters: SqliteParameters | undefined, bounds: { maxRows: number; maxBytes: number }) =>
-      guarded(() => statement.all<T>(parameters, bounds)),
-  });
   return {
     exec: (sql) => guarded(() => database.exec(sql)),
-    prepare: (sql) => guarded(async () => wrapStatement(await database.prepare(sql))),
+    prepare: (sql) => guarded(async () => wrapGuardedStatement(await database.prepare(sql), guarded)),
     async close() {
       // Closing must remain possible after an operation grows past its bound.
       const before = captureContinuousCacheState(path, snapshot());
@@ -367,16 +374,10 @@ function bindConnectionToLease(
     })();
     return trackLeaseOperation(lease, pending);
   };
-  const wrapStatement = (statement: SqliteStatement): SqliteStatement => ({
-    run: (parameters?: SqliteParameters) => guarded(() => statement.run(parameters)),
-    get: <T>(parameters?: SqliteParameters) => guarded(() => statement.get<T>(parameters)),
-    all: <T>(parameters: SqliteParameters | undefined, bounds: { maxRows: number; maxBytes: number }) =>
-      guarded(() => statement.all<T>(parameters, bounds)),
-  });
   let closed = false;
   return {
     exec: (sql) => guarded(() => database.exec(sql)),
-    prepare: (sql) => guarded(async () => wrapStatement(await database.prepare(sql))),
+    prepare: (sql) => guarded(async () => wrapGuardedStatement(await database.prepare(sql), guarded)),
     async close() {
       if (closed) return;
       closed = true;

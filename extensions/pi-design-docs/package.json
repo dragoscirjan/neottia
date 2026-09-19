@@ -27,6 +27,7 @@
     "@neottia/config-registry": "workspace:^",
     "@neottia/design-docs": "workspace:*",
     "@neottia/issues-design-docs": "workspace:*",
+    "@neottia/pi-adapter": "workspace:*",
     "typebox": "^1.3.7"
   },
   "devDependencies": {
