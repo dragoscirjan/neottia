@@ -3,6 +3,20 @@ export function cloneAndFreezeConfigValue<Value>(value: Value): Value {
   return cloneValue(value, new WeakSet<object>()) as Value;
 }
 
+/** Produces a mutable recursive copy of plain configuration data. */
+export function cloneMutableConfigValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(cloneMutableConfigValue);
+  if (!isPlainConfigRecord(value)) return value;
+  return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, cloneMutableConfigValue(child)]));
+}
+
+/** Checks whether a value is a direct plain-object configuration mapping. */
+export function isPlainConfigRecord(value: unknown): value is Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value) as unknown;
+  return prototype === Object.prototype || prototype === null;
+}
+
 /** Recursively clones supported configuration values and rejects mutable class instances. */
 function cloneValue(value: unknown, ancestors: WeakSet<object>): unknown {
   if (value === null || value === undefined || ['string', 'number', 'boolean', 'bigint'].includes(typeof value)) {

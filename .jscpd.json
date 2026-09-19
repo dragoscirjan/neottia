@@ -11,6 +11,7 @@
     "**/tsconfig*.json",
     "**/*.harness.test.ts",
     "**/config.schema.json",
+    "**/CHANGELOG.md",
     "**/*.spec-helper.ts",
     "**/*.test.ts",
     "coverage/**",

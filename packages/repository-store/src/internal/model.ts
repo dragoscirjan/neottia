@@ -1,4 +1,5 @@
 import type { Stats } from 'node:fs';
+import { PathSafetyError } from '../errors.js';
 import type { StoreLimits } from '../limits.js';
 
 /** Runtime state retained outside the public managed-root handle. */
@@ -80,6 +81,20 @@ export function getRootState(root: ManagedRoot): RootState | undefined {
 /** Returns private path state only for a package-created handle. */
 export function getPathState(path: ManagedPath): PathState | undefined {
   return pathStates.get(path);
+}
+
+/** Requires private root state from a package-created handle. */
+export function requireRootState(root: ManagedRoot): RootState {
+  const state = getRootState(root);
+  if (state === undefined) throw new PathSafetyError('Managed root is not a repository-store handle.');
+  return state;
+}
+
+/** Requires private path state from a package-created handle. */
+export function requirePathState(path: ManagedPath): PathState {
+  const state = getPathState(path);
+  if (state === undefined) throw new PathSafetyError('Managed path is not a repository-store handle.');
+  return state;
 }
 
 /** Returns private lease state only for a package-created handle. */

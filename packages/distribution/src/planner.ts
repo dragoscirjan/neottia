@@ -1,6 +1,7 @@
 import { isAbsolute, relative } from 'node:path';
 
 import { applyHostUnitStates } from './host-config.js';
+import { deepFreeze } from './immutable.js';
 import {
   canonicalJson,
   checksumBytes,
@@ -328,17 +329,4 @@ function sameContainer(left: ContainerState, right: ContainerState): boolean {
 /** Detaches and freezes plan data returned to callers. */
 function freezePlan(plan: InstallationPlan): InstallationPlan {
   return deepFreeze(structuredClone(plan));
-}
-
-/** Recursively freezes a plan. */
-function deepFreeze<T>(value: T): T {
-  if (Array.isArray(value)) {
-    for (const item of value) deepFreeze(item);
-    return Object.freeze(value);
-  }
-  if (value !== null && typeof value === 'object') {
-    for (const item of Object.values(value as Record<string, unknown>)) deepFreeze(item);
-    return Object.freeze(value);
-  }
-  return value;
 }
