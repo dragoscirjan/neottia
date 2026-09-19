@@ -1,4 +1,5 @@
 /** Domain-neutral contracts for composing and accessing Neottia configuration. */
+export { createCacheConfigPatchSchema, createCacheConfigSchema } from './common-schemas.js';
 export {
   CONFIG_ROOT_SECTIONS,
   type ConfigContribution,

@@ -1,22 +1,21 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash } from 'node:crypto';
 import pg from 'pg';
-import { parseDocument, stringify } from 'yaml';
+import { stringify } from 'yaml';
 import type { MemoryConfig } from '../config.js';
 import { MemoryConflictError, MemoryError } from '../errors.js';
 import { isUlid } from '../identities.js';
 import type { MemoryRecord, MemoryTombstone, RecordType } from '../schemas.js';
 import { createSecretScanner, type SecretScanner } from '../security.js';
-import { RECORD_FOLDERS, safeProjectPath, type MemoryRecordInput } from './filesystem.js';
+import { RECORD_FOLDERS, safeProjectPath } from './filesystem.js';
 import {
   collectSearchResults,
-  makeRecord as makeRecordHelper,
-  makeTombstone as makeTombstoneHelper,
+  MemoryRecordSupport,
+  parseMemoryDocument,
   searchableText,
-  validateCompactness as validateCompactnessHelper,
+  validateAndClassifySnapshot,
   validateRecord as validateRecordHelper,
   validateTombstone as validateTombstoneHelper,
-  assertAcyclic,
   type RecordHelperDeps,
 } from './record-helpers.js';
 import type {
@@ -70,10 +69,10 @@ export function resolvePgSettings(config: MemoryConfig): PgConnectionSettings {
   };
 }
 
-export class PostgresBackend implements StorageBackend {
+export class PostgresBackend extends MemoryRecordSupport implements StorageBackend {
   private readonly pool: pg.Pool;
   private readonly scope: NamespaceScope;
-  private readonly helperDeps: RecordHelperDeps;
+  protected readonly helperDeps: RecordHelperDeps;
   private readonly scanner: SecretScanner;
   private readonly limits: { maxFileBytes: number; maxFiles: number; maxTotalBytes: number };
   private textSearchKind: 'pg_textsearch' | 'tsvector' = 'tsvector';
@@ -82,6 +81,7 @@ export class PostgresBackend implements StorageBackend {
   private readonly txContext = new AsyncLocalStorage<pg.PoolClient>();
 
   public constructor(options: PostgresBackendOptions) {
+    super();
     const settings = resolvePgSettings(options.config);
     this.scope = {
       organizationId: options.config.namespace.organization_id,
@@ -254,29 +254,13 @@ export class PostgresBackend implements StorageBackend {
     const records = recordsResult.rows.map((row) => validateRecordHelper(row.document, this.helperDeps));
     const tombstones = tombstoneResult.rows.map((row) => validateTombstoneHelper(row.document, this.helperDeps));
 
-    const recordIds = new Set(records.map((record) => record.id));
-    for (const record of records)
-      for (const target of record.supersedes)
-        if (!recordIds.has(target)) throw new MemoryError(`Broken supersedes reference: ${target}`);
-    for (const tombstone of tombstones)
-      if (!recordIds.has(tombstone.target_id))
-        throw new MemoryError(`Broken tombstone reference: ${tombstone.target_id}`);
-    assertAcyclic(records);
-
-    const inactive = new Set(records.flatMap((record) => record.supersedes));
-    tombstones.forEach((item) => inactive.add(item.target_id));
-
+    const activeIds = validateAndClassifySnapshot(records, tombstones);
     const digests = [...recordsResult.rows, ...tombstoneResult.rows].map((row) =>
       createHash('sha256').update(JSON.stringify(row.document)).digest('hex'),
     );
     const contentHash = createHash('sha256').update(digests.sort().join('\n')).digest('hex');
 
-    return {
-      records,
-      tombstones,
-      activeIds: new Set(records.filter((record) => !inactive.has(record.id)).map((record) => record.id)),
-      contentHash,
-    };
+    return { records, tombstones, activeIds, contentHash };
   }
 
   // -- mutation ---------------------------------------------------------------
@@ -345,7 +329,7 @@ export class PostgresBackend implements StorageBackend {
       );
       return;
     }
-    const document = parseDocumentBytes(replacement.bytes, replacement.path);
+    const document = parseMemoryDocument(replacement.bytes, replacement.path);
     if (parsed.table === 'memory_tombstones') {
       const tombstone = validateTombstoneHelper(document, this.helperDeps);
       if (tombstone.id !== parsed.id)
@@ -588,34 +572,6 @@ export class PostgresBackend implements StorageBackend {
     await this.pool.end();
   }
 
-  // -- record helpers (shared semantics with the filesystem backend) --------
-
-  public makeRecord(input: MemoryRecordInput, supersedes: string[], now: () => Date = () => new Date()): MemoryRecord {
-    return makeRecordHelper(this.helperDeps, input, supersedes, now);
-  }
-
-  public makeTombstone(
-    targetId: string,
-    reason: string,
-    source: MemoryTombstone['source'],
-    createdBy: string,
-    now: () => Date = () => new Date(),
-  ): MemoryTombstone {
-    return makeTombstoneHelper(this.helperDeps, targetId, reason, source, createdBy, now);
-  }
-
-  public validateCompactness(summary: string, details: string | null | undefined, context: string): void {
-    validateCompactnessHelper(summary, details, context);
-  }
-
-  public validateRecord(value: unknown, label = 'memory record'): MemoryRecord {
-    return validateRecordHelper(value, this.helperDeps, label);
-  }
-
-  public validateTombstone(value: unknown, label = 'memory tombstone'): MemoryTombstone {
-    return validateTombstoneHelper(value, this.helperDeps, label);
-  }
-
   /** Row identity: folder + ULID map onto the record/tombstone tables. */
   public recordPath(record: MemoryRecord): string {
     return `${RECORD_FOLDERS[record.record_type]}/${record.id}.yaml`;
@@ -658,25 +614,6 @@ export class PostgresBackend implements StorageBackend {
 }
 
 // -- helpers ---------------------------------------------------------------
-
-function parseDocumentBytes(bytes: Uint8Array, path: string): unknown {
-  let text: string;
-  try {
-    text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-  } catch {
-    throw new MemoryError(`Malformed UTF-8 memory YAML: ${path}`);
-  }
-  const document = parseDocument(text, { uniqueKeys: true });
-  if (document.errors.length || document.warnings.length)
-    throw new MemoryError(
-      `Malformed memory YAML ${path}: ${document.errors[0]?.message ?? document.warnings[0]?.message}`,
-    );
-  try {
-    return document.toJS({ maxAliasCount: 0 });
-  } catch (error: unknown) {
-    throw new MemoryError(`Unsafe memory YAML ${path}: ${describe(error)}`);
-  }
-}
 
 function postgresPrefixQuery(query: string): string {
   return query

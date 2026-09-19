@@ -1,6 +1,8 @@
 import { join, resolve } from 'node:path';
 import {
   ConfigResolutionError,
+  createCacheConfigPatchSchema,
+  createCacheConfigSchema,
   createConfigRegistry,
   defineConfigContribution,
   resolveConfig,
@@ -65,12 +67,7 @@ function createResolvedIssueConfigSchema() {
             .default(1024 * 1024),
         })
         .prefault({}),
-      cache: z
-        .object({
-          max_age_ms: z.number().int().nonnegative().default(300_000),
-          stale_policy: z.enum(['prompt', 'rebuild', 'fail']).default('prompt'),
-        })
-        .prefault({}),
+      cache: createCacheConfigSchema({ strict: false }),
       lock: z
         .object({ wait_ms: z.number().int().nonnegative().default(10_000), stale_ms: positive.default(60_000) })
         .prefault({}),
@@ -111,13 +108,7 @@ function createIssueConfigPatchSchema() {
         })
         .strict()
         .optional(),
-      cache: z
-        .object({
-          max_age_ms: z.number().int().nonnegative().optional(),
-          stale_policy: z.enum(['prompt', 'rebuild', 'fail']).optional(),
-        })
-        .strict()
-        .optional(),
+      cache: createCacheConfigPatchSchema(),
       lock: z
         .object({ wait_ms: z.number().int().nonnegative().optional(), stale_ms: positive.optional() })
         .strict()

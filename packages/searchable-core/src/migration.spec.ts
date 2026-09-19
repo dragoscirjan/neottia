@@ -9,16 +9,35 @@ import { createSearchableRuntime } from './runtime.js';
 const roots: string[] = [];
 afterEach(() => roots.splice(0).forEach((root) => rmSync(root, { recursive: true, force: true })));
 
-it('previews and explicitly imports an immutable legacy database', async () => {
+/** Creates one closed legacy database in a disposable project. */
+function createLegacyDatabase(
+  options: {
+    readonly columns?: string;
+    readonly seed?: (database: DatabaseSync) => void;
+  } = {},
+): { cwd: string; path: string } {
   const cwd = mkdtempSync(join(tmpdir(), 'searchable-migration-'));
   roots.push(cwd);
   const path = join(cwd, '.web_stash.db');
   const database = new DatabaseSync(path);
-  database.exec('CREATE TABLE pages (url TEXT NOT NULL, title TEXT NOT NULL, content TEXT NOT NULL)');
-  database
-    .prepare('INSERT INTO pages(url,title,content) VALUES(?,?,?)')
-    .run('https://example.com/legacy', 'Legacy page', 'migration marker content');
-  database.close();
+  try {
+    database.exec(
+      `CREATE TABLE pages (${options.columns ?? 'url TEXT NOT NULL, title TEXT NOT NULL, content TEXT NOT NULL'})`,
+    );
+    options.seed?.(database);
+  } finally {
+    database.close();
+  }
+  return { cwd, path };
+}
+
+it('previews and explicitly imports an immutable legacy database', async () => {
+  const { cwd, path } = createLegacyDatabase({
+    seed: (database) =>
+      database
+        .prepare('INSERT INTO pages(url,title,content) VALUES(?,?,?)')
+        .run('https://example.com/legacy', 'Legacy page', 'migration marker content'),
+  });
   const source = readFileSync(path);
   const runtime = createSearchableRuntime({ cwd, configOverrides: { enabled: true } });
   try {
@@ -47,15 +66,12 @@ it('previews and explicitly imports an immutable legacy database', async () => {
 });
 
 it('does not report failure after canonical publication if the legacy source changes', async () => {
-  const cwd = mkdtempSync(join(tmpdir(), 'searchable-migration-'));
-  roots.push(cwd);
-  const path = join(cwd, '.web_stash.db');
-  const database = new DatabaseSync(path);
-  database.exec('CREATE TABLE pages (url TEXT NOT NULL, title TEXT NOT NULL, content TEXT NOT NULL)');
-  database
-    .prepare('INSERT INTO pages(url,title,content) VALUES(?,?,?)')
-    .run('https://example.com/published', 'Published', 'published migration marker');
-  database.close();
+  const { cwd, path } = createLegacyDatabase({
+    seed: (database) =>
+      database
+        .prepare('INSERT INTO pages(url,title,content) VALUES(?,?,?)')
+        .run('https://example.com/published', 'Published', 'published migration marker'),
+  });
   const runtime = createSearchableRuntime({ cwd, configOverrides: { enabled: true } });
   const importPages = runtime.store.importPages.bind(runtime.store);
   vi.spyOn(runtime.store, 'importPages').mockImplementation(async (candidates, preview, context) => {
@@ -111,12 +127,7 @@ it('rejects a legacy path below a symlinked ancestor', async () => {
 });
 
 it('honors cancellation before snapshot and worker validation', async () => {
-  const cwd = mkdtempSync(join(tmpdir(), 'searchable-migration-'));
-  roots.push(cwd);
-  const path = join(cwd, '.web_stash.db');
-  const database = new DatabaseSync(path);
-  database.exec('CREATE TABLE pages (url TEXT NOT NULL, title TEXT NOT NULL, content TEXT NOT NULL)');
-  database.close();
+  const { cwd } = createLegacyDatabase();
   const controller = new AbortController();
   controller.abort();
   const runtime = createSearchableRuntime({ cwd, configOverrides: { enabled: true } });
@@ -133,12 +144,7 @@ it('honors cancellation before snapshot and worker validation', async () => {
 });
 
 it('does not extend a converted migration deadline when the wall clock moves backward', async () => {
-  const cwd = mkdtempSync(join(tmpdir(), 'searchable-migration-'));
-  roots.push(cwd);
-  const path = join(cwd, '.web_stash.db');
-  const database = new DatabaseSync(path);
-  database.exec('CREATE TABLE pages (url TEXT NOT NULL, title TEXT NOT NULL, content TEXT NOT NULL)');
-  database.close();
+  const { cwd } = createLegacyDatabase();
   const runtime = createSearchableRuntime({ cwd, configOverrides: { enabled: true } });
   const epoch = Date.now();
   const clock = vi
@@ -159,15 +165,12 @@ it('does not extend a converted migration deadline when the wall clock moves bac
 });
 
 it('rejects a legacy file above max_storage_bytes before worker validation', async () => {
-  const cwd = mkdtempSync(join(tmpdir(), 'searchable-migration-'));
-  roots.push(cwd);
-  const path = join(cwd, '.web_stash.db');
-  const database = new DatabaseSync(path);
-  database.exec('CREATE TABLE pages (url TEXT NOT NULL, title TEXT NOT NULL, content TEXT NOT NULL)');
-  database
-    .prepare('INSERT INTO pages(url,title,content) VALUES(?,?,?)')
-    .run('https://example.com/large', 'Large', 'x'.repeat(16_000));
-  database.close();
+  const { cwd } = createLegacyDatabase({
+    seed: (database) =>
+      database
+        .prepare('INSERT INTO pages(url,title,content) VALUES(?,?,?)')
+        .run('https://example.com/large', 'Large', 'x'.repeat(16_000)),
+  });
   const runtime = createSearchableRuntime({
     cwd,
     configOverrides: { enabled: true, security: { limits: { max_storage_bytes: 8_192 } } },
@@ -182,12 +185,9 @@ it('rejects a legacy file above max_storage_bytes before worker validation', asy
 });
 
 it('rejects live sidecars before reading legacy rows', async () => {
-  const cwd = mkdtempSync(join(tmpdir(), 'searchable-migration-'));
-  roots.push(cwd);
-  const path = join(cwd, '.web_stash.db');
-  const database = new DatabaseSync(path);
-  database.exec('CREATE TABLE pages (url TEXT NOT NULL, title TEXT NOT NULL, content TEXT NOT NULL, created_at TEXT)');
-  database.close();
+  const { cwd, path } = createLegacyDatabase({
+    columns: 'url TEXT NOT NULL, title TEXT NOT NULL, content TEXT NOT NULL, created_at TEXT',
+  });
   mkdirSync(`${path}-wal`);
   const runtime = createSearchableRuntime({ cwd, configOverrides: { enabled: true } });
   try {

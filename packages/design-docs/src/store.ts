@@ -149,6 +149,41 @@ export interface DesignDocumentStoreOptions {
   readonly linkValidator?: DesignDocLinkValidator;
 }
 
+/** Resolves stable document addresses against one discovered catalog. */
+function resolveCatalogAddresses(
+  catalog: DocumentCatalog,
+  addresses: readonly DocumentAddress[],
+): DocumentAddressResult[] {
+  return addresses.map((address) => {
+    const lineage = catalog.byId.get(address.id);
+    if (!lineage?.length)
+      return {
+        status: 'not_found',
+        id: address.id,
+        ...(address.version === undefined ? {} : { version: address.version }),
+        reason: 'id_not_found',
+      };
+    const entity =
+      address.version === undefined
+        ? lineage.at(-1)
+        : lineage.find((candidate) => candidate.decoded.metadata.version === address.version);
+    if (!entity)
+      return {
+        status: 'not_found',
+        id: address.id,
+        version: address.version,
+        reason: 'version_not_found',
+      };
+    return {
+      status: 'found',
+      id: address.id,
+      version: entity.decoded.metadata.version,
+      location: entity.location,
+      revision: entity.decoded.revision,
+    };
+  });
+}
+
 /** Repository-local Design Docs authority with exact revisions and durable batches. */
 export class DesignDocumentStore {
   private constructor(
@@ -214,10 +249,7 @@ export class DesignDocumentStore {
         ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
       };
       const bytes = encodeCanonicalDocument(metadata, input.body ?? '', this.config.security.limits);
-      const entity = this.newEntity(metadata, bytes, 'active');
-      const proposed = catalogFromEntities([...catalog.entities, entity], this.config);
-      await this.publish(lease, [{ kind: 'write', path: entity.managedPath, bytes, expected: 'absent' }], control);
-      return entityRecord(entity, proposed.byId.get(id) ?? []);
+      return this.publishNewEntity(catalog, lease, metadata, bytes, 'active', control);
     }, control);
   }
 
@@ -347,10 +379,7 @@ export class DesignDocumentStore {
         input.body ?? current.decoded.content,
         this.config.security.limits,
       );
-      const entity = this.newEntity(metadata, bytes, 'active');
-      const proposed = catalogFromEntities([...catalog.entities, entity], this.config);
-      await this.publish(lease, [{ kind: 'write', path: entity.managedPath, bytes, expected: 'absent' }], control);
-      return entityRecord(entity, proposed.byId.get(id) ?? []);
+      return this.publishNewEntity(catalog, lease, metadata, bytes, 'active', control);
     }, control);
   }
 
@@ -567,38 +596,7 @@ export class DesignDocumentStore {
     try {
       await recoverCanonicalTransactions(this.docsRoot, lease, control);
       const catalog = await discoverCatalog(this.docsRoot, this.folder, this.config, lease, control);
-      return {
-        status: 'ok',
-        results: addresses.map((address) => {
-          assertDocumentId(address.id);
-          const lineage = catalog.byId.get(address.id);
-          if (!lineage?.length)
-            return {
-              status: 'not_found',
-              id: address.id,
-              ...(address.version === undefined ? {} : { version: address.version }),
-              reason: 'id_not_found',
-            } as const;
-          const entity =
-            address.version === undefined
-              ? lineage.at(-1)
-              : lineage.find((candidate) => candidate.decoded.metadata.version === address.version);
-          if (!entity)
-            return {
-              status: 'not_found',
-              id: address.id,
-              version: address.version,
-              reason: 'version_not_found',
-            } as const;
-          return {
-            status: 'found',
-            id: address.id,
-            version: entity.decoded.metadata.version,
-            location: entity.location,
-            revision: entity.decoded.revision,
-          } as const;
-        }),
-      };
+      return { status: 'ok', results: resolveCatalogAddresses(catalog, addresses) };
     } catch (error: unknown) {
       const value = asDesignDocsError(error);
       if (value.code === 'AUTHORITY_MISMATCH') throw value;
@@ -628,34 +626,7 @@ export class DesignDocumentStore {
         documents,
         resolveAddresses: async (addresses) => ({
           status: 'ok',
-          results: addresses.map((address) => {
-            const lineage = catalog.byId.get(address.id);
-            if (!lineage?.length)
-              return {
-                status: 'not_found',
-                id: address.id,
-                ...(address.version === undefined ? {} : { version: address.version }),
-                reason: 'id_not_found',
-              } as const;
-            const entity =
-              address.version === undefined
-                ? lineage.at(-1)
-                : lineage.find((candidate) => candidate.decoded.metadata.version === address.version);
-            return entity
-              ? ({
-                  status: 'found',
-                  id: address.id,
-                  version: entity.decoded.metadata.version,
-                  location: entity.location,
-                  revision: entity.decoded.revision,
-                } as const)
-              : ({
-                  status: 'not_found',
-                  id: address.id,
-                  version: address.version,
-                  reason: 'version_not_found',
-                } as const);
-          }),
+          results: resolveCatalogAddresses(catalog, addresses),
         }),
       },
       control,
@@ -754,6 +725,20 @@ export class DesignDocumentStore {
         documents: (proposed.byId.get(id) ?? []).map((entity) => entitySummary(entity, proposed.byId.get(id) ?? [])),
       };
     }, control);
+  }
+
+  private async publishNewEntity(
+    catalog: DocumentCatalog,
+    lease: RepositoryLease,
+    metadata: CanonicalDocumentMetadata,
+    bytes: Uint8Array,
+    location: DocumentLocation,
+    control: OperationControl,
+  ): Promise<DocumentRecord> {
+    const entity = this.newEntity(metadata, bytes, location);
+    const proposed = catalogFromEntities([...catalog.entities, entity], this.config);
+    await this.publish(lease, [{ kind: 'write', path: entity.managedPath, bytes, expected: 'absent' }], control);
+    return entityRecord(entity, proposed.byId.get(metadata.id) ?? []);
   }
 
   private newEntity(metadata: CanonicalDocumentMetadata, bytes: Uint8Array, location: DocumentLocation): CatalogEntity {

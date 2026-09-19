@@ -184,6 +184,9 @@ importers:
       '@neottia/issues-design-docs':
         specifier: workspace:*
         version: link:../../packages/issues-design-docs
+      '@neottia/opencode-adapter':
+        specifier: workspace:*
+        version: link:../opencode-adapter
       '@opencode-ai/plugin':
         specifier: ^1.2.27
         version: 1.18.29
@@ -246,6 +249,9 @@ importers:
       '@neottia/config-registry':
         specifier: workspace:^
         version: link:../../packages/config-registry
+      '@neottia/opencode-adapter':
+        specifier: workspace:*
+        version: link:../opencode-adapter
       '@neottia/searchable-core':
         specifier: workspace:*
         version: link:../../packages/searchable-core
@@ -302,6 +308,9 @@ importers:
       '@neottia/issues-design-docs':
         specifier: workspace:*
         version: link:../../packages/issues-design-docs
+      '@neottia/pi-adapter':
+        specifier: workspace:*
+        version: link:../pi-adapter
       typebox:
         specifier: ^1.3.7
         version: 1.3.28
@@ -336,6 +345,9 @@ importers:
       '@neottia/issues-design-docs':
         specifier: workspace:*
         version: link:../../packages/issues-design-docs
+      '@neottia/pi-adapter':
+        specifier: workspace:*
+        version: link:../pi-adapter
       typebox:
         specifier: ^1.0.63
         version: 1.3.28
@@ -367,6 +379,9 @@ importers:
       '@neottia/memory-core':
         specifier: workspace:*
         version: link:../../packages/memory-core
+      '@neottia/pi-adapter':
+        specifier: workspace:*
+        version: link:../pi-adapter
       typebox:
         specifier: ^1.3.7
         version: 1.3.28
@@ -395,6 +410,9 @@ importers:
       '@neottia/config-registry':
         specifier: workspace:^
         version: link:../../packages/config-registry
+      '@neottia/pi-adapter':
+        specifier: workspace:*
+        version: link:../pi-adapter
       '@neottia/searchable-core':
         specifier: workspace:*
         version: link:../../packages/searchable-core

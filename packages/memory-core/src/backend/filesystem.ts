@@ -16,7 +16,7 @@ import {
   type ManagedRootOptions,
   type RepositoryLease,
 } from '@neottia/repository-store';
-import { parseDocument, stringify } from 'yaml';
+import { stringify } from 'yaml';
 import type { MemoryConfig } from '../config.js';
 import { MemoryConflictError, MemoryError, MemoryLockError } from '../errors.js';
 import { isUlid } from '../identities.js';
@@ -24,12 +24,11 @@ import { openMemoryCache, rebuildMemoryCache, removeMemoryCache, searchMemoryCac
 import type { MemoryRecord, MemoryTombstone, RecordType } from '../schemas.js';
 import { createSecretScanner, type SecretScanner } from '../security.js';
 import {
-  makeRecord as makeRecordHelper,
-  makeTombstone as makeTombstoneHelper,
-  validateCompactness as validateCompactnessHelper,
+  MemoryRecordSupport,
+  parseMemoryDocument,
+  validateAndClassifySnapshot,
   validateRecord as validateRecordHelper,
   validateTombstone as validateTombstoneHelper,
-  assertAcyclic,
   type RecordHelperDeps,
 } from './record-helpers.js';
 import type {
@@ -63,13 +62,13 @@ export interface FilesystemBackendOptions {
   readonly onStaleCache?: () => boolean | Promise<boolean>;
 }
 
-export class FilesystemBackend implements StorageBackend {
+export class FilesystemBackend extends MemoryRecordSupport implements StorageBackend {
   private readonly root: string;
   private readonly limits: StorageLimits;
   private readonly scanner: SecretScanner;
   private readonly scope: NamespaceScope;
   private readonly defaultTopic: string;
-  private readonly helperDeps: RecordHelperDeps;
+  protected readonly helperDeps: RecordHelperDeps;
   private readonly cacheMaxAgeMs: number;
   private readonly stalePolicy: 'prompt' | 'rebuild' | 'fail';
   private readonly onStaleCache?: () => boolean | Promise<boolean>;
@@ -78,6 +77,7 @@ export class FilesystemBackend implements StorageBackend {
   private readonly repositoryLease = new AsyncLocalStorage<RepositoryLease>();
 
   public constructor(options: FilesystemBackendOptions) {
+    super();
     this.root = resolve(options.cwd, options.config.root);
     assertSafeMemoryRoot(this.root);
     this.cacheMaxAgeMs = options.config.cache.max_age_ms;
@@ -150,7 +150,7 @@ export class FilesystemBackend implements StorageBackend {
       for (const { path, content } of await this.repositoryYamlFiles(folder)) {
         ({ files, bytes } = this.trackUsage(path, content.byteLength, files, bytes));
         track(path, content);
-        const record = this.parseCanonical(content, path);
+        const record = parseMemoryDocument(content, path);
         const validated = validateRecordHelper(record, this.helperDeps);
         this.assertFilenameIdentity(path, validated.id);
         if (validated.record_type !== recordType)
@@ -164,7 +164,7 @@ export class FilesystemBackend implements StorageBackend {
     for (const { path, content } of await this.repositoryYamlFiles('tombstones')) {
       ({ files, bytes } = this.trackUsage(path, content.byteLength, files, bytes));
       track(path, content);
-      const tombstone = this.parseCanonical(content, path);
+      const tombstone = parseMemoryDocument(content, path);
       const validatedTombstone = validateTombstoneHelper(tombstone, this.helperDeps);
       this.assertFilenameIdentity(path, validatedTombstone.id);
       if (ids.has(validatedTombstone.id)) throw new MemoryError(`Duplicate memory ID: ${validatedTombstone.id}`);
@@ -172,26 +172,11 @@ export class FilesystemBackend implements StorageBackend {
       tombstones.push(validatedTombstone);
     }
 
-    const recordIds = new Set(records.map((record) => record.id));
-    for (const record of records)
-      for (const target of record.supersedes)
-        if (!recordIds.has(target)) throw new MemoryError(`Broken supersedes reference: ${target}`);
-    for (const tombstone of tombstones)
-      if (!recordIds.has(tombstone.target_id))
-        throw new MemoryError(`Broken tombstone reference: ${tombstone.target_id}`);
-    assertAcyclic(records);
-
+    const activeIds = validateAndClassifySnapshot(records, tombstones);
     records.sort(newestFirst);
     tombstones.sort((left, right) => newestFirst(left, right));
-    const inactive = new Set(records.flatMap((record) => record.supersedes));
-    tombstones.forEach((item) => inactive.add(item.target_id));
     const contentHash = createHash('sha256').update(digests.sort().join('\n')).digest('hex');
-    return {
-      records,
-      tombstones,
-      activeIds: new Set(records.filter((record) => !inactive.has(record.id)).map((record) => record.id)),
-      contentHash,
-    };
+    return { records, tombstones, activeIds, contentHash };
   }
 
   /** {@inheritdoc StorageBackend.applyBatch} */
@@ -345,11 +330,6 @@ export class FilesystemBackend implements StorageBackend {
     return `${this.scope.organizationId}--${this.scope.projectId}`;
   }
 
-  /** Creates a validated record object with a fresh ULID and scope from config. */
-  public makeRecord(input: MemoryRecordInput, supersedes: string[], now: () => Date = () => new Date()): MemoryRecord {
-    return makeRecordHelper(this.helperDeps, input, supersedes, now);
-  }
-
   /** Builds the canonical file path for a record from its record type. */
   public recordPath(record: MemoryRecord): string {
     return `${RECORD_FOLDERS[record.record_type]}/${record.id}.yaml`;
@@ -358,30 +338,6 @@ export class FilesystemBackend implements StorageBackend {
   /** Tombstone file path inside the canonical tree. */
   public tombstonePath(tombstone: MemoryTombstone): string {
     return `tombstones/${tombstone.id}.yaml`;
-  }
-
-  /** Validates and returns a tombstone object for a target record. */
-  public makeTombstone(
-    targetId: string,
-    reason: string,
-    source: MemoryTombstone['source'],
-    createdBy: string,
-    now: () => Date = () => new Date(),
-  ): MemoryTombstone {
-    return makeTombstoneHelper(this.helperDeps, targetId, reason, source, createdBy, now);
-  }
-
-  /** Validates mutation compactness for store/supersede/import inputs. */
-  public validateCompactness(summary: string, details: string | null | undefined, context: string): void {
-    validateCompactnessHelper(summary, details, context);
-  }
-
-  public validateRecord(value: unknown, label = 'memory record'): MemoryRecord {
-    return validateRecordHelper(value, this.helperDeps, label);
-  }
-
-  public validateTombstone(value: unknown, label = 'memory tombstone'): MemoryTombstone {
-    return validateTombstoneHelper(value, this.helperDeps, label);
   }
 
   public encode(value: MemoryRecord | MemoryTombstone): Uint8Array {
@@ -396,10 +352,6 @@ export class FilesystemBackend implements StorageBackend {
     return result;
   }
 
-  private parseCanonical(bytes: Uint8Array, path: string): unknown {
-    return parseYamlBytes(bytes, path);
-  }
-
   private assertFilenameIdentity(path: string, id: string): void {
     const filenameId = basename(path).replace(/\.yaml$/u, '');
     if (!isUlid(filenameId) || filenameId !== id)
@@ -410,7 +362,7 @@ export class FilesystemBackend implements StorageBackend {
     const safe = safeProjectPath(path);
     const filenameId = basename(safe).replace(/\.yaml$/u, '');
     if (!isUlid(filenameId)) throw new MemoryError(`Invalid memory filename: ${path}`);
-    const document = parseYamlBytes(bytes, path);
+    const document = parseMemoryDocument(bytes, path);
     if (safe === `tombstones/${filenameId}.yaml`) {
       const tombstone = validateTombstoneHelper(document, this.helperDeps);
       if (tombstone.id !== filenameId) throw new MemoryError(`Memory filename does not match document ID: ${path}`);
@@ -495,29 +447,6 @@ export function newestFirst(left: { created_at: string }, right: { created_at: s
   return right.created_at.localeCompare(left.created_at);
 }
 
-function parseYamlBytes(bytes: Uint8Array, path: string): unknown {
-  let text: string;
-  try {
-    text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-  } catch {
-    throw new MemoryError(`Malformed UTF-8 memory YAML: ${path}`);
-  }
-  const document = parseDocument(text, { uniqueKeys: true });
-  if (document.errors.length || document.warnings.length)
-    throw new MemoryError(
-      `Malformed memory YAML ${path}: ${document.errors[0]?.message ?? document.warnings[0]?.message}`,
-    );
-  try {
-    return document.toJS({ maxAliasCount: 0 });
-  } catch (error: unknown) {
-    throw new MemoryError(`Unsafe memory YAML ${path}: ${describe(error)}`);
-  }
-}
-
 function isCode(error: unknown, code: string): boolean {
   return error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === code;
-}
-
-function describe(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

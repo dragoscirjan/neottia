@@ -37,6 +37,30 @@ function tool(name: string) {
   return definition;
 }
 
+/** Runs one failing search through the public tool boundary. */
+async function failingSearch(error: Error, credential: string): Promise<SearchableError> {
+  const injected: SearchableServices = {
+    ...services(),
+    search: vi.fn(async () => {
+      throw error;
+    }),
+  };
+  try {
+    await tool('web_search').run(
+      {
+        cwd,
+        services: injected,
+        configOverrides: { search: { credentials: { brave_api_key: credential } } },
+      },
+      { query: 'subject' },
+    );
+  } catch (failure: unknown) {
+    expect(failure).toBeInstanceOf(SearchableError);
+    return failure as SearchableError;
+  }
+  throw new Error('Expected web_search to fail.');
+}
+
 describe('SEARCHABLE_TOOLS', () => {
   it('rejects a disabled capability before calling an injected service', async () => {
     const injected = services();
@@ -282,61 +306,27 @@ describe('SEARCHABLE_TOOLS', () => {
   });
 
   it('redacts resolved credentials and URL secrets from service failures', async () => {
-    const injected: SearchableServices = {
-      ...services(),
-      search: vi.fn(async () => {
-        throw new Error('request secret-token failed at https://user:password@example.com/path?api_key=secret-token');
-      }),
-    };
+    const failure = await failingSearch(
+      new Error('request secret-token failed at https://user:password@example.com/path?api_key=secret-token'),
+      'secret-token',
+    );
 
-    let failure: unknown;
-    try {
-      await tool('web_search').run(
-        {
-          cwd: cwd,
-          services: injected,
-          configOverrides: { search: { credentials: { brave_api_key: 'secret-token' } } },
-        },
-        { query: 'subject' },
-      );
-    } catch (error: unknown) {
-      failure = error;
-    }
-
-    expect(failure).toBeInstanceOf(SearchableError);
-    expect((failure as Error).message).not.toMatch(/secret-token|password|api_key/u);
-    expect((failure as Error).message).toContain('https://example.com/path');
+    expect(failure.message).not.toMatch(/secret-token|password|api_key/u);
+    expect(failure.message).toContain('https://example.com/path');
   });
 
   it('redacts percent-encoded credentials from diagnostic URL paths', async () => {
     const credential = 'key/part';
     const partiallyEncoded = '%6bey%2Fpart';
     const fullyEncoded = '%6B%65%79%2f%70%61%72%74';
-    const injected: SearchableServices = {
-      ...services(),
-      search: vi.fn(async () => {
-        throw new Error(`failed at https://example.com/${partiallyEncoded} and https://example.com/${fullyEncoded}`);
-      }),
-    };
+    const failure = await failingSearch(
+      new Error(`failed at https://example.com/${partiallyEncoded} and https://example.com/${fullyEncoded}`),
+      credential,
+    );
 
-    let failure: unknown;
-    try {
-      await tool('web_search').run(
-        {
-          cwd,
-          services: injected,
-          configOverrides: { search: { credentials: { brave_api_key: credential } } },
-        },
-        { query: 'subject' },
-      );
-    } catch (error: unknown) {
-      failure = error;
-    }
-
-    expect(failure).toBeInstanceOf(SearchableError);
-    expect((failure as Error).message).not.toContain(partiallyEncoded);
-    expect((failure as Error).message).not.toContain(fullyEncoded);
-    expect((failure as Error).message).toContain('https://example.com/<redacted>');
+    expect(failure.message).not.toContain(partiallyEncoded);
+    expect(failure.message).not.toContain(fullyEncoded);
+    expect(failure.message).toContain('https://example.com/<redacted>');
   });
 
   it('recursively redacts every serialized field of structured service errors', async () => {
@@ -351,35 +341,18 @@ describe('SEARCHABLE_TOOLS', () => {
       },
     };
     details['self'] = details;
-    const injected: SearchableServices = {
-      ...services(),
-      search: vi.fn(async () => {
-        throw new SearchableError(
-          'service',
-          `REMOTE_${secret}`,
-          `failed ${secret}`,
-          [`https://user:password@example.com/path?api_key=${secret}`],
-          details,
-        );
-      }),
-    };
+    const failure = await failingSearch(
+      new SearchableError(
+        'service',
+        `REMOTE_${secret}`,
+        `failed ${secret}`,
+        [`https://user:password@example.com/path?api_key=${secret}`],
+        details,
+      ),
+      secret,
+    );
 
-    let failure: unknown;
-    try {
-      await tool('web_search').run(
-        {
-          cwd,
-          services: injected,
-          configOverrides: { search: { credentials: { brave_api_key: secret } } },
-        },
-        { query: 'subject' },
-      );
-    } catch (error: unknown) {
-      failure = error;
-    }
-
-    expect(failure).toBeInstanceOf(SearchableError);
-    const serialized = serializeSearchableError(failure as SearchableError);
+    const serialized = serializeSearchableError(failure);
     const json = JSON.stringify(serialized);
     expect(json).not.toMatch(/secret-token|user:password|api_key/u);
     expect(serialized.code).toBe('REMOTE_<redacted>');
@@ -403,30 +376,13 @@ describe('SEARCHABLE_TOOLS', () => {
         throw new Error(`raw getter exception ${secret}`);
       },
     });
-    const injected: SearchableServices = {
-      ...services(),
-      search: vi.fn(async () => {
-        throw new SearchableError('service', 'REMOTE_FAILURE', 'Remote failure.', [], details);
-      }),
-    };
-
-    let failure: unknown;
-    try {
-      await tool('web_search').run(
-        {
-          cwd,
-          services: injected,
-          configOverrides: { search: { credentials: { brave_api_key: secret } } },
-        },
-        { query: 'subject' },
-      );
-    } catch (error: unknown) {
-      failure = error;
-    }
+    const failure = await failingSearch(
+      new SearchableError('service', 'REMOTE_FAILURE', 'Remote failure.', [], details),
+      secret,
+    );
 
     expect(getterCalled).toBe(false);
-    expect(failure).toBeInstanceOf(SearchableError);
-    const serialized = serializeSearchableError(failure as SearchableError);
+    const serialized = serializeSearchableError(failure);
     expect(serialized.details).toEqual({ danger: '<accessor>' });
     expect(JSON.stringify(serialized)).not.toMatch(/getter-secret|raw getter exception/u);
   });
@@ -441,29 +397,12 @@ describe('SEARCHABLE_TOOLS', () => {
         },
       },
     );
-    const injected: SearchableServices = {
-      ...services(),
-      search: vi.fn(async () => {
-        throw new SearchableError('service', 'REMOTE_FAILURE', 'Remote failure.', [], details);
-      }),
-    };
+    const failure = await failingSearch(
+      new SearchableError('service', 'REMOTE_FAILURE', 'Remote failure.', [], details),
+      secret,
+    );
 
-    let failure: unknown;
-    try {
-      await tool('web_search').run(
-        {
-          cwd,
-          services: injected,
-          configOverrides: { search: { credentials: { brave_api_key: secret } } },
-        },
-        { query: 'subject' },
-      );
-    } catch (error: unknown) {
-      failure = error;
-    }
-
-    expect(failure).toBeInstanceOf(SearchableError);
-    const serialized = serializeSearchableError(failure as SearchableError);
+    const serialized = serializeSearchableError(failure);
     expect(serialized).toEqual({
       category: 'service',
       code: 'SERVICE_FAILED',

@@ -6,11 +6,14 @@ import {
   type HarnessAdapterRegistry,
   type HarnessDeclaration,
   type HarnessScope,
+  type HostConfigLocator,
   type HostFeature,
+  type LocalMcpDeclaration,
   type NonEmptyDiagnostics,
   type ProjectedFile,
   type ProjectionDiagnostic,
   type ProjectionResult,
+  type RemoteMcpDeclaration,
   type SkillProjectionRequest,
   type TargetPath,
 } from './types.js';
@@ -234,6 +237,19 @@ export function projectionSuccess<T>(value: T): ProjectionResult<T> {
 export function projectionFailure<T>(diagnostics: readonly ProjectionDiagnostic[]): ProjectionResult<T> {
   if (diagnostics.length === 0) throw new TypeError('A failed projection requires at least one diagnostic.');
   return Object.freeze({ diagnostics: cloneFrozen(diagnostics) as NonEmptyDiagnostics });
+}
+
+/** Extracts an asset path from an already validated projection. */
+export function requireProjectedPath(result: ProjectionResult<TargetPath | HostConfigLocator>): TargetPath {
+  if (result.value === undefined || 'candidates' in result.value)
+    throw new TypeError('Expected a projected asset path.');
+  return result.value;
+}
+
+/** Keeps feature ordering independent of caller input order. */
+export function orderHostFeatures(features: readonly HostFeature[]): readonly HostFeature[] {
+  const selected = new Set(features);
+  return Object.freeze(HOST_FEATURES.filter((feature) => selected.has(feature)));
 }
 
 /** Invokes one captured adapter method after request validation. */
@@ -520,8 +536,75 @@ function hasOwnProperties(value: Record<string, unknown>, required: readonly str
 }
 
 /** Rejects blank user-facing metadata. */
-function nonblank(value: unknown): value is string {
+export function nonblank(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0 && value.trim().length > 0;
+}
+
+/** Rejects line breaks and NUL characters in scalar host values. */
+export function safeHostText(value: string): boolean {
+  return !value.includes('\0') && !value.includes('\r') && !value.includes('\n');
+}
+
+/** Validates common local MCP fields under host-specific optional-field policy. */
+export function validLocalMcp(
+  hostId: string,
+  scope: HarnessScope,
+  server: LocalMcpDeclaration,
+  options: {
+    readonly allowCwd: boolean;
+    readonly allowEnabled: boolean;
+    readonly validTimeout: (timeout: number | undefined) => boolean;
+  },
+): boolean {
+  const validCommand =
+    Array.isArray(server.command) &&
+    server.command.length > 0 &&
+    server.command.every((part) => nonblank(part) && safeHostText(part));
+  const validEnvironment =
+    server.environment === undefined ||
+    Object.entries(server.environment).every(
+      ([key, value]) => nonblank(key) && safeHostText(key) && safeHostText(value),
+    );
+  const validCwd = server.cwd === undefined || (options.allowCwd && nonblank(server.cwd) && safeHostText(server.cwd));
+  return (
+    invalidAssetId(hostId, 'config.mcp.local', scope, server.name) === undefined &&
+    validCommand &&
+    validEnvironment &&
+    validCwd &&
+    (options.allowEnabled || server.enabled === undefined) &&
+    options.validTimeout(server.timeout)
+  );
+}
+
+/** Validates common remote MCP fields and rejects credentials over plaintext. */
+export function validRemoteMcp(
+  hostId: string,
+  scope: HarnessScope,
+  server: RemoteMcpDeclaration,
+  options: {
+    readonly allowOauthFalse: boolean;
+    readonly allowEnabled: boolean;
+    readonly validTimeout: (timeout: number | undefined) => boolean;
+  },
+): boolean {
+  let protocol: string | undefined;
+  try {
+    protocol = new URL(server.url).protocol;
+  } catch {
+    protocol = undefined;
+  }
+  const validHeaders =
+    server.headers === undefined ||
+    Object.entries(server.headers).every(([key, value]) => nonblank(key) && safeHostText(key) && safeHostText(value));
+  return (
+    invalidAssetId(hostId, 'config.mcp.remote', scope, server.name) === undefined &&
+    (protocol === 'http:' || protocol === 'https:') &&
+    validHeaders &&
+    (server.headers === undefined || protocol === 'https:') &&
+    (server.oauth === undefined || options.allowOauthFalse) &&
+    (options.allowEnabled || server.enabled === undefined) &&
+    options.validTimeout(server.timeout)
+  );
 }
 
 /** Rejects traversal, separators, dot segments, and normalization changes. */

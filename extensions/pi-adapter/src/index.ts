@@ -1,15 +1,17 @@
 import {
-  HOST_FEATURES,
   PACKAGE_VERSION_PATTERN,
   cloneFrozen,
   defineHarnessAdapter,
   defineHarnessDeclaration,
   invalidAssetId,
   invalidContent,
+  nonblank,
+  orderHostFeatures as orderedFeatures,
   projectSkillFile,
   projectionFailure,
   projectionSuccess,
   renderMarkdown,
+  requireProjectedPath as requirePath,
   supportedFeature,
   targetPath,
   unsupportedFeature,
@@ -35,6 +37,24 @@ import {
   type TargetPath,
   type TargetRequest,
 } from '@neottia/harness-adapter';
+
+/** Structural Pi API consumed by first-party extensions without a Pi runtime dependency. */
+export interface PiExtensionApi<Schema = unknown> {
+  on(event: 'session_shutdown', handler: () => Promise<void>): unknown;
+  registerTool(tool: {
+    name: string;
+    label?: string;
+    description: string;
+    parameters: Schema;
+    execute(
+      toolCallId: string,
+      params: Record<string, unknown>,
+      signal: AbortSignal,
+      onUpdate: (update: unknown) => void,
+      context: { cwd?: string; ui?: { confirm(title: string, message: string): Promise<boolean> } },
+    ): Promise<{ content: Array<{ type: 'text'; text: string }>; details: Record<string, unknown> }>;
+  }): unknown;
+}
 
 /** Pi package names remain adapter-owned so callers use logical package ids. */
 const PI_PACKAGE_NAMES: Readonly<Record<NeottiaRuntimePackageId, string>> = Object.freeze({
@@ -316,24 +336,6 @@ function invalidPackage(scope: HarnessScope): ProjectionDiagnostic {
     scope,
     message: 'The package declaration is not valid for Pi.',
   };
-}
-
-/** Extracts a path from an already checked internal projection. */
-function requirePath(result: ProjectionResult<TargetPath | HostConfigLocator>): TargetPath {
-  if (result.value === undefined || 'candidates' in result.value)
-    throw new TypeError('Expected a projected asset path.');
-  return result.value;
-}
-
-/** Keeps reload feature ordering independent of caller order. */
-function orderedFeatures(features: readonly HostFeature[]): readonly HostFeature[] {
-  const selected = new Set(features);
-  return Object.freeze(HOST_FEATURES.filter((feature) => selected.has(feature)));
-}
-
-/** Checks user-facing string metadata. */
-function nonblank(value: string): boolean {
-  return value.length > 0 && value.trim().length > 0;
 }
 
 export default piHarnessAdapter;
