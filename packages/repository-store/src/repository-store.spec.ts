@@ -879,6 +879,26 @@ describe('repository authority lease', () => {
     await expect(withRepositoryLease(root, async () => 'recovered', { staleMs: 1 })).resolves.toBe('recovered');
   });
 
+  it('retries when a live claim is removed during owner verification', async () => {
+    const root = await fixture();
+    await withRepositoryLease(root, async () => undefined);
+    const control = join(root.authorityRoot, '.neottia', 'repository-store');
+    const claim = join(control, 'authority.claim');
+    writeOwnerMetadata(claim, control, process.pid, new Date());
+    let removed = false;
+    setFilesystemFaultInjectorForTests((event, target) => {
+      if (removed || event !== 'bounded-read-opened' || target !== claim) return;
+      removed = true;
+      rmSync(claim);
+    });
+
+    await expect(withRepositoryLease(root, async () => 'acquired', { pollMs: 1, waitMs: 1_000 })).resolves.toBe(
+      'acquired',
+    );
+    expect(removed).toBe(true);
+    expect(existsSync(claim)).toBe(false);
+  });
+
   it('reclaims a stale claim whose same-host owner is conclusively dead', async () => {
     const root = await fixture();
     await withRepositoryLease(root, async () => undefined);
