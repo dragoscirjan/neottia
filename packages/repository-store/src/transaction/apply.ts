@@ -15,8 +15,8 @@ import type { ApplyCanonicalBatchOptions, CanonicalOperation, JournalEntry, Jour
 import { emitTransactionFault } from '../internal/fault-injection.js';
 import { assertSafeRegular, hasCode, syncDirectory } from '../internal/filesystem.js';
 import {
-  getPathState,
-  getRootState,
+  requirePathState,
+  requireRootState,
   type ManagedPath,
   type ManagedRoot,
   type RepositoryLease,
@@ -335,16 +335,4 @@ function removePreparationArtifacts(directory: string, token: string): void {
   }
   for (const entry of entries) rmSync(join(directory, entry));
   rmdirSync(directory);
-}
-
-function requireRootState(root: ManagedRoot): NonNullable<ReturnType<typeof getRootState>> {
-  const state = getRootState(root);
-  if (state === undefined) throw new PathSafetyError('Managed root is not a repository-store handle.');
-  return state;
-}
-
-function requirePathState(path: ManagedPath): NonNullable<ReturnType<typeof getPathState>> {
-  const state = getPathState(path);
-  if (state === undefined) throw new PathSafetyError('Managed path is not a repository-store handle.');
-  return state;
 }

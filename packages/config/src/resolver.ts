@@ -10,6 +10,7 @@ import {
   type ResolvedConfigSnapshot,
   type UnknownConfigContribution,
 } from './contracts.js';
+import { cloneMutableConfigValue as cloneMutable, isPlainConfigRecord as isRecord } from './immutable.js';
 import { getRegistryState } from './registry.js';
 import { createResolvedConfigSnapshotWithMetadata } from './snapshot.js';
 
@@ -861,20 +862,6 @@ function setAtPath(target: unknown, pathSegments: readonly string[], value: unkn
     current = current[segment] as Record<string, unknown>;
   }
   current[pathSegments.at(-1) as string] = value;
-}
-
-/** Clones plain configuration data before mutable resolution begins. */
-function cloneMutable(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(cloneMutable);
-  if (!isRecord(value)) return value;
-  return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, cloneMutable(child)]));
-}
-
-/** Plain mappings are the only values merged recursively. */
-function isRecord(value: unknown): value is Record<string, unknown> {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
-  const prototype = Object.getPrototypeOf(value) as unknown;
-  return prototype === Object.prototype || prototype === null;
 }
 
 /** Tests exact path equality. */

@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash } from 'node:crypto';
 import pg from 'pg';
-import { parseDocument, stringify } from 'yaml';
+import { stringify } from 'yaml';
 import type { MemoryConfig } from '../config.js';
 import { MemoryConflictError, MemoryError } from '../errors.js';
 import { isUlid } from '../identities.js';
@@ -12,11 +12,12 @@ import {
   collectSearchResults,
   makeRecord as makeRecordHelper,
   makeTombstone as makeTombstoneHelper,
+  parseMemoryDocument,
   searchableText,
+  validateAndClassifySnapshot,
   validateCompactness as validateCompactnessHelper,
   validateRecord as validateRecordHelper,
   validateTombstone as validateTombstoneHelper,
-  assertAcyclic,
   type RecordHelperDeps,
 } from './record-helpers.js';
 import type {
@@ -254,29 +255,13 @@ export class PostgresBackend implements StorageBackend {
     const records = recordsResult.rows.map((row) => validateRecordHelper(row.document, this.helperDeps));
     const tombstones = tombstoneResult.rows.map((row) => validateTombstoneHelper(row.document, this.helperDeps));
 
-    const recordIds = new Set(records.map((record) => record.id));
-    for (const record of records)
-      for (const target of record.supersedes)
-        if (!recordIds.has(target)) throw new MemoryError(`Broken supersedes reference: ${target}`);
-    for (const tombstone of tombstones)
-      if (!recordIds.has(tombstone.target_id))
-        throw new MemoryError(`Broken tombstone reference: ${tombstone.target_id}`);
-    assertAcyclic(records);
-
-    const inactive = new Set(records.flatMap((record) => record.supersedes));
-    tombstones.forEach((item) => inactive.add(item.target_id));
-
+    const activeIds = validateAndClassifySnapshot(records, tombstones);
     const digests = [...recordsResult.rows, ...tombstoneResult.rows].map((row) =>
       createHash('sha256').update(JSON.stringify(row.document)).digest('hex'),
     );
     const contentHash = createHash('sha256').update(digests.sort().join('\n')).digest('hex');
 
-    return {
-      records,
-      tombstones,
-      activeIds: new Set(records.filter((record) => !inactive.has(record.id)).map((record) => record.id)),
-      contentHash,
-    };
+    return { records, tombstones, activeIds, contentHash };
   }
 
   // -- mutation ---------------------------------------------------------------
@@ -345,7 +330,7 @@ export class PostgresBackend implements StorageBackend {
       );
       return;
     }
-    const document = parseDocumentBytes(replacement.bytes, replacement.path);
+    const document = parseMemoryDocument(replacement.bytes, replacement.path);
     if (parsed.table === 'memory_tombstones') {
       const tombstone = validateTombstoneHelper(document, this.helperDeps);
       if (tombstone.id !== parsed.id)
@@ -658,25 +643,6 @@ export class PostgresBackend implements StorageBackend {
 }
 
 // -- helpers ---------------------------------------------------------------
-
-function parseDocumentBytes(bytes: Uint8Array, path: string): unknown {
-  let text: string;
-  try {
-    text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-  } catch {
-    throw new MemoryError(`Malformed UTF-8 memory YAML: ${path}`);
-  }
-  const document = parseDocument(text, { uniqueKeys: true });
-  if (document.errors.length || document.warnings.length)
-    throw new MemoryError(
-      `Malformed memory YAML ${path}: ${document.errors[0]?.message ?? document.warnings[0]?.message}`,
-    );
-  try {
-    return document.toJS({ maxAliasCount: 0 });
-  } catch (error: unknown) {
-    throw new MemoryError(`Unsafe memory YAML ${path}: ${describe(error)}`);
-  }
-}
 
 function postgresPrefixQuery(query: string): string {
   return query

@@ -6,6 +6,7 @@ import { dirname, join, relative } from 'node:path';
 
 import { targetPath } from '@neottia/harness-adapter';
 
+import { deepFreeze } from './immutable.js';
 import { checksumBytes, checksumText, compareCodeUnits } from './manifest.js';
 import type { FileAsset, StageExternalSkillsOptions } from './types.js';
 
@@ -217,17 +218,4 @@ function decodeUtf8(bytes: Uint8Array): string | undefined {
   } catch {
     return undefined;
   }
-}
-
-/** Recursively freezes detached staged assets. */
-function deepFreeze<T>(value: T): T {
-  if (Array.isArray(value)) {
-    for (const item of value) deepFreeze(item);
-    return Object.freeze(value);
-  }
-  if (value !== null && typeof value === 'object') {
-    for (const item of Object.values(value as Record<string, unknown>)) deepFreeze(item);
-    return Object.freeze(value);
-  }
-  return value;
 }

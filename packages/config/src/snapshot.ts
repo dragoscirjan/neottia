@@ -7,7 +7,11 @@ import type {
   ResolvedConfigSnapshot,
   UnknownConfigContribution,
 } from './contracts.js';
-import { cloneAndFreezeConfigValue } from './immutable.js';
+import {
+  cloneAndFreezeConfigValue,
+  cloneMutableConfigValue as cloneMutable,
+  isPlainConfigRecord as isRecord,
+} from './immutable.js';
 import { getRegistryState } from './registry.js';
 
 /** Stable categories for immutable snapshot construction and access failures. */
@@ -250,23 +254,9 @@ function freezeSource(source: ConfigProvenance): ConfigProvenance {
   });
 }
 
-/** Snapshot construction accepts only a direct plain-object ID map. */
-function isRecord(value: unknown): value is Record<string, unknown> {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
-  const prototype = Object.getPrototypeOf(value) as unknown;
-  return prototype === Object.prototype || prototype === null;
-}
-
 /** Encodes paths without dot-segment ambiguity. */
 function pathKey(path: readonly string[]): string {
   return JSON.stringify(path);
-}
-
-/** Produces a mutable data copy used only to construct redacted serialization. */
-function cloneMutable(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(cloneMutable);
-  if (!isRecord(value)) return value;
-  return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, cloneMutable(child)]));
 }
 
 /** Reads one canonical path without interpreting dots inside segments. */

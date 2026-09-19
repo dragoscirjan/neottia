@@ -16,9 +16,9 @@ import {
   syncRegularFile,
 } from '../internal/filesystem.js';
 import {
-  getPathState,
-  getRootState,
   managedPathBelongsToRoot,
+  requirePathState,
+  requireRootState,
   type ManagedPath,
   type ManagedRoot,
   type RepositoryLease,
@@ -585,18 +585,6 @@ async function verifyDatabase(
     throw healthError;
   if (healthError !== undefined) return 'contradictory';
   return undefined;
-}
-
-function requireRootState(root: ManagedRoot): NonNullable<ReturnType<typeof getRootState>> {
-  const state = getRootState(root);
-  if (state === undefined) throw new PathSafetyError('Managed root is not a repository-store handle.');
-  return state;
-}
-
-function requirePathState(path: ManagedPath): NonNullable<ReturnType<typeof getPathState>> {
-  const state = getPathState(path);
-  if (state === undefined) throw new PathSafetyError('Managed path is not a repository-store handle.');
-  return state;
 }
 
 function assertCachePath(root: ManagedRoot, path: ManagedPath): void {

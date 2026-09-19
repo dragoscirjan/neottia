@@ -3,6 +3,7 @@ import { isAbsolute, relative, resolve } from 'node:path';
 
 import type { ProjectedFile, TargetPath } from '@neottia/harness-adapter';
 
+import { deepFreeze } from './immutable.js';
 import type {
   AssetManifest,
   AssetManifestInput,
@@ -308,19 +309,6 @@ function validateChecksum(value: string, label: string): asserts value is Sha256
 /** Checks required strings. */
 function nonblank(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
-}
-
-/** Recursively freezes detached API output. */
-function deepFreeze<T>(value: T): T {
-  if (Array.isArray(value)) {
-    for (const item of value) deepFreeze(item);
-    return Object.freeze(value);
-  }
-  if (value !== null && typeof value === 'object') {
-    for (const item of Object.values(value as Record<string, unknown>)) deepFreeze(item);
-    return Object.freeze(value);
-  }
-  return value;
 }
 
 /** Sorts JSON object keys without changing array order. */
