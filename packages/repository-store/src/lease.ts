@@ -599,16 +599,17 @@ function readOwner(path: string, allowInterruptedClaimLink = false): VerifiedOwn
       allowedLinkCounts: allowInterruptedClaimLink ? [1, 2] : [1],
     });
   } catch (error: unknown) {
-    if (initialIdentity === undefined || !(error instanceof PathSafetyError) || error.code !== 'IDENTITY_CHANGED')
-      throw error;
+    const recoverableReadRace =
+      error instanceof PathSafetyError && (error.code === 'IDENTITY_CHANGED' || error.code === 'UNSAFE_HARD_LINK');
+    if (initialIdentity === undefined || !recoverableReadRace) throw error;
+    // A claim owner can unlink the path while this contender still holds an
+    // open descriptor. Preserve persistent unsafe links, but classify an
+    // absent or replaced claim as the normal contention race handled by the caller.
     const stabilized = lstatSync(path);
-    if (
-      stabilized.isSymbolicLink() ||
-      !stabilized.isFile() ||
-      stabilized.nlink !== 1 ||
-      !sameIdentity(initialIdentity, stabilized)
-    )
-      throw error;
+    if (stabilized.isSymbolicLink() || !stabilized.isFile()) throw error;
+    if (!sameIdentity(initialIdentity, stabilized))
+      throw new PathSafetyError('Interrupted claim identity changed during owner verification.', 'IDENTITY_CHANGED');
+    if (stabilized.nlink !== 1) throw error;
     // Retry only the legitimate staging-link finalization transition.
     file = readRegularFileWithIdentity(path, MAX_LEASE_METADATA_BYTES);
   }
