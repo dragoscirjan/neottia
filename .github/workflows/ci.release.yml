@@ -28,7 +28,7 @@ jobs:
       - run: mise run deps:sync:pnpm
       - name: Select release mode
         id: mode
-        uses: changesets/action/select-mode@22ccf9aa43179fe9e27dc62e575971d28cce197c # v2.0.0
+        uses: changesets/action/select-mode@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
 
   version:
     needs: select-mode
@@ -48,7 +48,7 @@ jobs:
           cache: true
       - run: mise run deps:sync:pnpm
       - name: Create or update release pull request
-        uses: changesets/action/version@22ccf9aa43179fe9e27dc62e575971d28cce197c # v2.0.0
+        uses: changesets/action/version@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: pnpm run version:modules
@@ -83,7 +83,7 @@ jobs:
         run: mise run validate
       - name: Publish changed packages
         id: publish
-        uses: changesets/action/publish@22ccf9aa43179fe9e27dc62e575971d28cce197c # v2.0.0
+        uses: changesets/action/publish@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: pnpm run release:modules
