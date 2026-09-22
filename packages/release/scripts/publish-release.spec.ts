@@ -83,6 +83,53 @@ describe('publishPreparedRelease', () => {
     expect(delayImpl).toHaveBeenCalledOnce();
   });
 
+  it('retries transient registry failures while waiting for modules', async () => {
+    const fetchImpl = registryFetch({ '@neottia/config': ['0.2.0'] });
+    fetchImpl
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: 'Not found' }), { status: 404 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: 'Unavailable' }), { status: 503 }))
+      .mockResolvedValueOnce(Response.json({ name: '@neottia/core', versions: { '0.1.0': { version: '0.1.0' } } }));
+    const delayImpl = vi.fn(async () => undefined);
+
+    await expect(
+      publishPreparedRelease({
+        manifest,
+        environment: { NODE_AUTH_TOKEN: 'test-token' },
+        fetchImpl,
+        spawnImpl: vi.fn(() => ({ status: 0 })),
+        delayImpl,
+        maxAttempts: 2,
+        retryDelayMs: 1,
+        log: vi.fn(),
+      }),
+    ).resolves.toBe('published');
+    expect(delayImpl).toHaveBeenCalledOnce();
+  });
+
+  it('rejects non-retryable registry responses immediately', async () => {
+    const fetchImpl = registryFetch({});
+    fetchImpl
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: 'Not found' }), { status: 404 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 }));
+    const delayImpl = vi.fn(async () => undefined);
+    const spawnImpl = vi.fn();
+
+    await expect(
+      publishPreparedRelease({
+        manifest,
+        environment: { NODE_AUTH_TOKEN: 'test-token' },
+        fetchImpl,
+        spawnImpl,
+        delayImpl,
+        maxAttempts: 3,
+        retryDelayMs: 1,
+        log: vi.fn(),
+      }),
+    ).rejects.toThrow('npm returned HTTP 401 for @neottia/core.');
+    expect(delayImpl).not.toHaveBeenCalled();
+    expect(spawnImpl).not.toHaveBeenCalled();
+  });
+
   it('rejects publication when a pinned module version stays unavailable', async () => {
     const fetchImpl = registryFetch({ '@neottia/config': ['0.2.0'] });
     const spawnImpl = vi.fn();

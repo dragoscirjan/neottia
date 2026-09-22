@@ -14,6 +14,14 @@ import { fileURLToPath } from 'node:url';
 const releaseDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const defaultRegistry = 'https://registry.npmjs.org';
 
+/** Preserves an npm registry status so retry policy remains explicit. */
+class RegistryResponseError extends Error {
+  constructor(packageName, status) {
+    super(`npm returned HTTP ${status} for ${packageName}.`);
+    this.status = status;
+  }
+}
+
 /** Builds the canonical registry URL for one scoped or unscoped package. */
 function packageUrl(registry, packageName) {
   const encodedName = encodeURIComponent(packageName).replace('%40', '@');
@@ -26,9 +34,7 @@ async function readPackageMetadata(packageName, registry, fetchImpl) {
     headers: { accept: 'application/vnd.npm.install-v1+json' },
   });
   if (response.status === 404) return null;
-  if (!response.ok) {
-    throw new Error(`npm returned HTTP ${response.status} for ${packageName}.`);
-  }
+  if (!response.ok) throw new RegistryResponseError(packageName, response.status);
   return response.json();
 }
 
@@ -43,11 +49,20 @@ function exactWorkspaceVersion(packageName, specification) {
 
 /** Waits for npm's public registry to expose one exact package version. */
 async function waitForPackageVersion(packageName, version, options) {
+  let lastTransientError;
   for (let attempt = 1; attempt <= options.maxAttempts; attempt += 1) {
-    const metadata = await readPackageMetadata(packageName, options.registry, options.fetchImpl);
-    if (metadata?.versions?.[version]) return;
+    try {
+      const metadata = await readPackageMetadata(packageName, options.registry, options.fetchImpl);
+      if (metadata?.versions?.[version]) return;
+    } catch (error) {
+      const status = error instanceof RegistryResponseError ? error.status : undefined;
+      const retryable = status === undefined || status === 429 || status >= 500;
+      if (!retryable) throw error;
+      lastTransientError = error;
+    }
     if (attempt < options.maxAttempts) await options.delayImpl(options.retryDelayMs);
   }
+  if (lastTransientError) throw lastTransientError;
   throw new Error(`${packageName}@${version} is not publicly available from npm.`);
 }
 
