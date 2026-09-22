@@ -1,0 +1,24 @@
+version: 1
+engine: changesets
+
+project:
+  path: .
+  executor: pnpm
+  package_manager: pnpm
+  # Use the repository-pinned pnpm version for versioning and publication.
+  use_mise: true
+
+versioning:
+  update_lockfile: true
+
+publishing:
+  # The publish job starts from a clean checkout, so rebuild package artifacts.
+  before:
+    - build
+  create_github_releases: true
+  push_git_tags: true
+
+pull_request:
+  title: 'chore: version packages'
+  commit_message: 'chore: version packages'
+  base_branch: main
