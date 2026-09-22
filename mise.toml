@@ -185,6 +185,10 @@ description = "Prepare a global release that pins every module version"
 run = "pnpm run release:global --"
 raw_args = true
 
+[tasks."release:global:publish"]
+description = "Publish the prepared global release when its exact version is absent"
+run = "pnpm --filter @neottia/release release:publish"
+
 ############################################################################
 # Dependencies                                                             #
 ############################################################################
