@@ -1,6 +1,33 @@
 {
-  "version": "0.1.0",
+  "version": "0.2.0",
   "modules": {
-    "@neottia/core": "0.1.0"
+    "@neottia/claude-code-adapter": "0.2.0",
+    "@neottia/cli": "0.2.0",
+    "@neottia/config": "0.2.0",
+    "@neottia/config-registry": "0.2.0",
+    "@neottia/core": "0.1.0",
+    "@neottia/design-docs": "0.2.0",
+    "@neottia/design-docs-mcp": "0.2.0",
+    "@neottia/distribution": "0.2.0",
+    "@neottia/harness-adapter": "0.2.0",
+    "@neottia/issues": "0.2.0",
+    "@neottia/issues-design-docs": "0.2.0",
+    "@neottia/issues-mcp": "0.2.0",
+    "@neottia/memory-core": "0.2.0",
+    "@neottia/memory-mcp": "0.2.0",
+    "@neottia/opencode-adapter": "0.2.0",
+    "@neottia/opencode-design-docs": "0.2.0",
+    "@neottia/opencode-issues": "0.2.0",
+    "@neottia/opencode-memory": "0.1.1",
+    "@neottia/opencode-searchable": "0.2.0",
+    "@neottia/pi-adapter": "0.2.0",
+    "@neottia/pi-design-docs": "0.2.0",
+    "@neottia/pi-issues": "0.2.0",
+    "@neottia/pi-memory": "0.1.1",
+    "@neottia/pi-searchable": "0.2.0",
+    "@neottia/repository-store": "0.2.0",
+    "@neottia/sdlc": "0.2.0",
+    "@neottia/searchable-core": "0.2.0",
+    "@neottia/searchable-mcp": "0.2.0"
   }
 }

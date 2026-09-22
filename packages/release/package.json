@@ -1,6 +1,6 @@
 {
   "name": "@neottia/release",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Immutable bill of materials for a Neottia global release",
   "author": "Dragos Cirjan",
   "license": "MIT",
@@ -15,9 +15,38 @@
     "access": "public"
   },
   "dependencies": {
-    "@neottia/core": "workspace:0.1.0"
+    "@neottia/claude-code-adapter": "workspace:0.2.0",
+    "@neottia/cli": "workspace:0.2.0",
+    "@neottia/config": "workspace:0.2.0",
+    "@neottia/config-registry": "workspace:0.2.0",
+    "@neottia/core": "workspace:0.1.0",
+    "@neottia/design-docs": "workspace:0.2.0",
+    "@neottia/design-docs-mcp": "workspace:0.2.0",
+    "@neottia/distribution": "workspace:0.2.0",
+    "@neottia/harness-adapter": "workspace:0.2.0",
+    "@neottia/issues": "workspace:0.2.0",
+    "@neottia/issues-design-docs": "workspace:0.2.0",
+    "@neottia/issues-mcp": "workspace:0.2.0",
+    "@neottia/memory-core": "workspace:0.2.0",
+    "@neottia/memory-mcp": "workspace:0.2.0",
+    "@neottia/opencode-adapter": "workspace:0.2.0",
+    "@neottia/opencode-design-docs": "workspace:0.2.0",
+    "@neottia/opencode-issues": "workspace:0.2.0",
+    "@neottia/opencode-memory": "workspace:0.1.1",
+    "@neottia/opencode-searchable": "workspace:0.2.0",
+    "@neottia/pi-adapter": "workspace:0.2.0",
+    "@neottia/pi-design-docs": "workspace:0.2.0",
+    "@neottia/pi-issues": "workspace:0.2.0",
+    "@neottia/pi-memory": "workspace:0.1.1",
+    "@neottia/pi-searchable": "workspace:0.2.0",
+    "@neottia/repository-store": "workspace:0.2.0",
+    "@neottia/sdlc": "workspace:0.2.0",
+    "@neottia/searchable-core": "workspace:0.2.0",
+    "@neottia/searchable-mcp": "workspace:0.2.0"
   },
   "scripts": {
-    "release:prepare": "node scripts/prepare-release.mjs"
+    "release:prepare": "node scripts/prepare-release.mjs",
+    "release:publish": "node scripts/publish-release.mjs",
+    "test": "vitest run --root ../.. packages/release/scripts/publish-release.spec.ts"
   }
 }

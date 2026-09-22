@@ -42,6 +42,12 @@ jobs:
           config: .github/tempel-release.yml
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # A global release is prepared explicitly and remains outside Changesets.
+      - name: Publish the prepared global release
+        if: steps.release.outputs.mode != 'version'
+        run: mise run release:global:publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       # GITHUB_TOKEN-created pull requests do not trigger pull_request workflows.
       - name: Validate the version pull request
         if: steps.release.outputs.pr-number != ''
