@@ -19,6 +19,6 @@ const manifest = JSON.parse(await readFile(join(dirname(packageFile), "release-m
 console.log(manifest.version, manifest.modules);
 ```
 
-The checked-in 0.1.0 snapshot prints `0.1.0` and an object containing only `@neottia/core: 0.1.0`. Compatibility claims apply only to module entries present in a published manifest. Release preparation is maintainer work documented in the repository root README.
+The manifest records the global release version and every module version included in that release. Compatibility claims apply only to module entries present in the published manifest. The repository root README documents release preparation.
 
 Read the [Release metadata reference](https://github.com/dragoscirjan/neottia/blob/main/docs/reference/release.md).
