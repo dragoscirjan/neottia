@@ -25,6 +25,8 @@ jobs:
     needs: quality
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
+      # The release workflow dispatches validation for token-created version PRs.
+      actions: write
       contents: write
       pull-requests: write
     uses: ./.github/workflows/ci.release.yml
