@@ -43,13 +43,13 @@
     "@neottia/config": "workspace:^",
     "@neottia/config-registry": "workspace:^",
     "@neottia/memory-core": "workspace:*",
-    "zod": "^4.1.8"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@templ-project/tsconfig": "^0.2.2",
-    "@types/node": "^25.0.3",
-    "typescript": "^5.9.3",
-    "vitest": "^4.1.11",
-    "yaml": "^2.9.0"
+    "@templ-project/tsconfig": "^0.4.2",
+    "@types/node": "^26.6.2",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.1",
+    "yaml": "^2.9.1"
   }
 }

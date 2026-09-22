@@ -29,13 +29,13 @@
     "@neottia/config-registry": "workspace:^",
     "@neottia/pi-adapter": "workspace:*",
     "@neottia/searchable-core": "workspace:*",
-    "typebox": "^1.0.63"
+    "typebox": "^1.3.34"
   },
   "devDependencies": {
     "@neottia/testkit": "workspace:*",
-    "@templ-project/tsconfig": "^0.2.2",
-    "@types/node": "^25.0.3",
-    "typescript": "^5.9.3",
-    "vitest": "^4.1.11"
+    "@templ-project/tsconfig": "^0.4.2",
+    "@types/node": "^26.6.2",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.1"
   }
 }
