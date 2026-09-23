@@ -1,10 +1,66 @@
 # Shared configuration
 
-Put project configuration in `.neottia/config.yml`. The root requires `version: 1`; each package reads only its own `skills` shard.
+## Initialize a project
+
+The `neottia` CLI writes the smallest valid project configuration:
+
+```sh
+neottia init --harness pi
+neottia init --harness opencode --harness pi
+```
+
+`--harness` is repeatable and accepts `pi` and `opencode`. Repeated values are ignored, and argument order does not change the result. Run the command from the project root, or pass `--project DIR`.
+
+The command never replaces an existing `.neottia/config.yml`. Edit that file instead of rerunning `init`.
+
+`init` enables filesystem Issues and Design Docs, selects local Git with no remote provider, and adds one project installation target per selected harness. Each harness receives its own required SDLC role assignments, so contributors can use different harnesses in one repository. For `neottia init --harness opencode --harness pi`, the generated file is:
 
 ```yaml
 version: 1
-skills:
+modules:
+  issues:
+    enabled: true
+  design_docs:
+    enabled: true
+capabilities:
+  issues:
+    provider: filesystem
+  documents:
+    provider: filesystem
+  source_control:
+    local: git
+    remote: false
+    workspaces: false
+harnesses:
+  install:
+    targets:
+      - id: opencode
+        scope: project
+      - id: pi
+        scope: project
+agents:
+  sdlc:
+    opencode:
+      planner: { agent: current }
+      implementer: { agent: current }
+      verifier: { agent: current }
+      release-coordinator: { agent: current }
+    pi:
+      planner: { agent: current }
+      implementer: { agent: current }
+      verifier: { agent: current }
+      release-coordinator: { agent: current }
+```
+
+Add or remove harness targets under `harnesses.install.targets`. Change providers under `capabilities`, customize the required roles under `agents.sdlc.<harness>`, and enable more modules under `modules` as described below.
+
+## Manual configuration
+
+Put project configuration in `.neottia/config.yml`. The root requires `version: 1`; each package reads only its own module shard.
+
+```yaml
+version: 1
+modules:
   memory:
     enabled: true
   issues:
