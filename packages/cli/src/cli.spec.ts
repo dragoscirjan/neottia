@@ -2,11 +2,17 @@ import { access, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from '
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { resolveConfig } from '@neottia/config';
+import { resolveConfig, ConfigResolutionError } from '@neottia/config';
 import { officialConfigRegistry } from '@neottia/config-registry';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { main, type CliOutput } from './index.js';
+
+/* Keeps the real resolver for every test except the one that forces a validation failure. */
+vi.mock('@neottia/config', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@neottia/config')>();
+  return { ...actual, resolveConfig: vi.fn(actual.resolveConfig) };
+});
 
 const roots: string[] = [];
 
@@ -77,7 +83,7 @@ describe('Neottia CLI', () => {
     expect(result.logs.join('\n')).toContain('neottia apply');
   });
 
-  it('initializes one project-local Pi configuration', async () => {
+  it('initializes one project-local Pi configuration and creates the missing config directory', async () => {
     const root = await fixture();
     const result = capture();
 
@@ -90,7 +96,6 @@ describe('Neottia CLI', () => {
       'Harnesses: pi',
       'Next: neottia plan --manifest <manifest.json> --output install.plan.json',
     ]);
-    expect((await stat(configPath)).mode & 0o777).toBe(0o600);
     expect(resolveGeneratedConfig(root).toJSON()).toMatchObject({
       version: 1,
       modules: {
@@ -109,6 +114,15 @@ describe('Neottia CLI', () => {
         },
       },
     });
+  });
+
+  // Windows does not implement POSIX owner/group/other permission bits.
+  it.skipIf(process.platform === 'win32')('writes the configuration with owner-only permissions', async () => {
+    const root = await fixture();
+
+    expect(await main(['init', '--harness', 'pi', '--project', root], capture().output)).toBe(0);
+
+    expect((await stat(join(root, '.neottia', 'config.yml'))).mode & 0o777).toBe(0o600);
   });
 
   it('writes canonical multi-harness output independent of argument order', async () => {
@@ -166,6 +180,21 @@ describe('Neottia CLI', () => {
     expect(await readFile(configPath, 'utf8')).toBe('version: 1\n# user-owned\n');
     expect(result.errors).toEqual([`Configuration already exists: ${configPath}`]);
     expect(await readdir(directory)).toEqual(['config.yml']);
+  });
+
+  it('reports registry validation failure without writing the configuration', async () => {
+    const root = await fixture();
+    const result = capture();
+    vi.mocked(resolveConfig).mockImplementationOnce(() => {
+      throw new ConfigResolutionError([
+        { code: 'VERSION', message: 'configuration version must be the supported integer version 1' },
+      ]);
+    });
+
+    expect(await main(['init', '--harness', 'pi', '--project', root], result.output)).toBe(1);
+
+    expect(result.errors.join('\n')).toContain('Configuration resolution failed');
+    expect(await exists(join(root, '.neottia'))).toBe(false);
   });
 
   it.each([
