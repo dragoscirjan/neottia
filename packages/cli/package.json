@@ -35,10 +35,13 @@
   },
   "scripts": {
     "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
+    "pretest": "node ../../scripts/run-unless-workspace-prebuilt.mjs pnpm --filter @neottia/cli... run build",
     "test": "vitest run --root ../.. packages/cli/src",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@neottia/config": "workspace:^",
+    "@neottia/config-registry": "workspace:^",
     "@neottia/distribution": "workspace:^"
   },
   "devDependencies": {

@@ -1,8 +1,11 @@
-import { readFile, writeFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
+import { link, lstat, mkdir, open, readFile, unlink, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
+import { resolveConfig } from '@neottia/config';
+import { officialConfigRegistry } from '@neottia/config-registry';
 import {
   applyInstallationPlan,
   authorizePlan,
@@ -19,6 +22,9 @@ import {
   type InstallRoots,
   type InstallationPlan,
 } from '@neottia/distribution';
+
+const SUPPORTED_INIT_HARNESSES = Object.freeze(['opencode', 'pi'] as const);
+type SupportedInitHarness = (typeof SUPPORTED_INIT_HARNESSES)[number];
 
 /** Injectable output used by tests and embedding callers. */
 export interface CliOutput {
@@ -38,16 +44,50 @@ export async function main(
       output.log(help());
       return 0;
     }
-    if (command === 'apply') return applyCommand(arguments_, output);
-    if (command === 'recover') return recoverCommand(arguments_, output);
-    if (command === 'doctor') return doctorCommand(arguments_, output, env);
-    if (command === 'uninstall') return uninstallCommand(arguments_, output, env);
-    if (command === 'plan') return planCommand(arguments_, output, env);
+    if (command === 'apply') return await applyCommand(arguments_, output);
+    if (command === 'init') return await initCommand(arguments_, output);
+    if (command === 'recover') return await recoverCommand(arguments_, output);
+    if (command === 'doctor') return await doctorCommand(arguments_, output, env);
+    if (command === 'uninstall') return await uninstallCommand(arguments_, output, env);
+    if (command === 'plan') return await planCommand(arguments_, output, env);
     throw new TypeError(`Unknown command: ${command}`);
   } catch (error) {
     output.error(error instanceof Error ? error.message : String(error));
     return 1;
   }
+}
+
+/** Creates the first project-local configuration for selected harnesses. */
+async function initCommand(arguments_: readonly string[], output: CliOutput): Promise<number> {
+  const { values } = parseArgs({
+    args: [...arguments_],
+    strict: true,
+    allowPositionals: false,
+    options: {
+      harness: { type: 'string', multiple: true, default: [] },
+      project: { type: 'string' },
+    },
+  });
+  const harnesses = normalizeInitHarnesses(values.harness);
+  const project = resolve(values.project ?? process.cwd());
+  const document = createInitDocument(harnesses);
+
+  // Validate the exact root shape through the official registry without reading
+  // ambient global or project configuration.
+  resolveConfig(officialConfigRegistry, {
+    cwd: project,
+    env: {},
+    globalFile: false,
+    projectFile: false,
+    overrides: document,
+  });
+
+  const configPath = join(project, '.neottia', 'config.yml');
+  await publishNewConfig(configPath, renderInitConfig(harnesses));
+  output.log(`Created ${configPath}`);
+  output.log(`Harnesses: ${harnesses.join(', ')}`);
+  output.log('Next: neottia plan --manifest <manifest.json> --output install.plan.json');
+  return 0;
 }
 
 /** Generates and optionally saves an install or update plan. */
@@ -170,6 +210,135 @@ function roots(values: CommonValues, env: NodeJS.ProcessEnv): InstallRoots {
   };
 }
 
+/** Validates, deduplicates, and orders initializer harness arguments. */
+function normalizeInitHarnesses(values: readonly string[]): readonly SupportedInitHarness[] {
+  if (values.length === 0) throw new TypeError('init requires at least one --harness.');
+  const unsupported = values.find(
+    (value): value is string => !SUPPORTED_INIT_HARNESSES.includes(value as SupportedInitHarness),
+  );
+  if (unsupported !== undefined) {
+    throw new TypeError(
+      `Unsupported init harness: ${unsupported}. Expected one of: ${SUPPORTED_INIT_HARNESSES.join(', ')}.`,
+    );
+  }
+  return Object.freeze(
+    [...new Set(values as readonly SupportedInitHarness[])].sort((left, right) => left.localeCompare(right)),
+  );
+}
+
+/** Builds the minimal owned shards for the initializer. The file adds `version`. */
+function createInitDocument(harnesses: readonly SupportedInitHarness[]): Readonly<Record<string, unknown>> {
+  const assignments = Object.fromEntries(
+    harnesses.map((harness) => [
+      harness,
+      {
+        planner: { agent: 'current' },
+        implementer: { agent: 'current' },
+        verifier: { agent: 'current' },
+        'release-coordinator': { agent: 'current' },
+      },
+    ]),
+  );
+  return Object.freeze({
+    modules: {
+      issues: { enabled: true },
+      design_docs: { enabled: true },
+    },
+    capabilities: {
+      issues: { provider: 'filesystem' },
+      documents: { provider: 'filesystem' },
+      source_control: { local: 'git', remote: false, workspaces: false },
+    },
+    harnesses: {
+      install: { targets: harnesses.map((id) => ({ id, scope: 'project' })) },
+    },
+    agents: { sdlc: assignments },
+  });
+}
+
+/** Renders stable human-editable YAML for the minimal configuration. */
+function renderInitConfig(harnesses: readonly SupportedInitHarness[]): string {
+  const targets = harnesses.flatMap((harness) => [`      - id: ${harness}`, '        scope: project']);
+  const assignments = harnesses.flatMap((harness) => [
+    `    ${harness}:`,
+    '      planner: {agent: current}',
+    '      implementer: {agent: current}',
+    '      verifier: {agent: current}',
+    '      release-coordinator: {agent: current}',
+  ]);
+  return [
+    'version: 1',
+    'modules:',
+    '  issues:',
+    '    enabled: true',
+    '  design_docs:',
+    '    enabled: true',
+    'capabilities:',
+    '  issues:',
+    '    provider: filesystem',
+    '  documents:',
+    '    provider: filesystem',
+    '  source_control:',
+    '    local: git',
+    '    remote: false',
+    '    workspaces: false',
+    'harnesses:',
+    '  install:',
+    '    targets:',
+    ...targets,
+    'agents:',
+    '  sdlc:',
+    ...assignments,
+    '',
+  ].join('\n');
+}
+
+/** Publishes a complete file without replacing an existing configuration. */
+async function publishNewConfig(path: string, content: string): Promise<void> {
+  const directory = dirname(path);
+  await ensureConfigDirectory(directory);
+  const temporary = join(directory, `.config.yml.${process.pid}.${randomUUID()}.tmp`);
+  let handle: Awaited<ReturnType<typeof open>> | undefined;
+  try {
+    handle = await open(temporary, 'wx', 0o600);
+    await handle.writeFile(content, 'utf8');
+    await handle.sync();
+    await handle.close();
+    handle = undefined;
+    await link(temporary, path);
+  } catch (error) {
+    if (hasErrorCode(error, 'EEXIST')) throw new TypeError(`Configuration already exists: ${path}`);
+    throw error;
+  } finally {
+    await handle?.close().catch(() => undefined);
+    await unlink(temporary).catch((error: unknown) => {
+      if (!hasErrorCode(error, 'ENOENT')) throw error;
+    });
+  }
+}
+
+/** Creates or verifies the canonical configuration directory. */
+async function ensureConfigDirectory(path: string): Promise<void> {
+  try {
+    const metadata = await lstat(path);
+    if (!metadata.isDirectory() || metadata.isSymbolicLink()) {
+      throw new TypeError(`Configuration parent is not a regular directory: ${path}`);
+    }
+  } catch (error) {
+    if (!hasErrorCode(error, 'ENOENT')) throw error;
+    await mkdir(path, { recursive: true, mode: 0o700 });
+    const metadata = await lstat(path);
+    if (!metadata.isDirectory() || metadata.isSymbolicLink()) {
+      throw new TypeError(`Configuration parent is not a regular directory: ${path}`);
+    }
+  }
+}
+
+/** Narrows Node filesystem errors without exposing rejected content. */
+function hasErrorCode(error: unknown, code: string): error is NodeJS.ErrnoException {
+  return error instanceof Error && 'code' in error && error.code === code;
+}
+
 /** Reads and verifies one compiler-produced manifest. */
 async function readManifest(path: string): Promise<AssetManifest> {
   const manifest = JSON.parse(await readFile(path, 'utf8')) as AssetManifest;
@@ -188,6 +357,7 @@ async function emitPlan(plan: InstallationPlan, path: string | undefined, output
 function help(): string {
   return [
     'Usage:',
+    '  neottia init --harness pi|opencode [--harness pi|opencode]... [--project DIR]',
     '  neottia plan --manifest FILE [--action install|update] [--output FILE] [--approve ID]...',
     '  neottia apply --plan FILE',
     '  neottia uninstall --receipt FILE [--output FILE] [--approve ID]...',
