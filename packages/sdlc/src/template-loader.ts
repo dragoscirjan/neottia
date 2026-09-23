@@ -9,6 +9,7 @@ import {
   SDLC_CONTENT_TEMPLATE_ID,
   SDLC_LAYOUT_TEMPLATE_ID,
   SDLC_LIFECYCLE_VERSION,
+  SDLC_PROTOCOL_TEMPLATE_ID,
 } from './lifecycle.js';
 
 /** Default byte limit for one packaged or override template directory. */
@@ -22,6 +23,7 @@ const PACKAGED_TEMPLATE_FILENAMES = new Map<string, string>([
   ...COMMAND_TEMPLATE_FILENAMES,
   ['layout.md.twig', SDLC_LAYOUT_TEMPLATE_ID],
   ['lifecycle.json', SDLC_CONTENT_TEMPLATE_ID],
+  ['protocol.md', SDLC_PROTOCOL_TEMPLATE_ID],
 ]);
 
 /** Filesystem locations and package layers used before pure compilation. */
@@ -60,7 +62,7 @@ export async function loadSdlcTemplateLayers(
   return Object.freeze([...layers]);
 }
 
-/** Loads command templates, shared layout, and lifecycle prose from the SDLC package. */
+/** Loads command templates, the shared layout, lifecycle prose, and the operating protocol from the SDLC package. */
 export async function loadPackagedSdlcTemplateLayer(maxBytes = SDLC_TEMPLATE_LAYER_MAX_BYTES): Promise<TemplateLayer> {
   if (!Number.isSafeInteger(maxBytes) || maxBytes < 1) throw new TypeError('SDLC template byte limit is invalid.');
   const directory = fileURLToPath(new URL('../templates/', import.meta.url));
@@ -68,7 +70,7 @@ export async function loadPackagedSdlcTemplateLayer(maxBytes = SDLC_TEMPLATE_LAY
     directory,
     maxBytes,
     PACKAGED_TEMPLATE_FILENAMES,
-    SDLC_COMMAND_IDS.length + 2,
+    SDLC_COMMAND_IDS.length + 3,
   );
   return freezeLayer({
     tier: 'packaged',

@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 import { resolveTemplates } from '@neottia/distribution';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { SDLC_LIFECYCLE } from './lifecycle.js';
+import { SDLC_LIFECYCLE, SDLC_PROTOCOL_TEMPLATE_ID } from './lifecycle.js';
 import { loadPackagedSdlcTemplateLayer, loadSdlcTemplateLayers } from './template-loader.js';
 
 const temporaryRoots: string[] = [];
@@ -21,7 +21,12 @@ describe('SDLC template loader', () => {
 
     expect(layer.tier).toBe('packaged');
     expect(layer.files.map((file) => file.id).sort()).toEqual(
-      ['neottia.sdlc.layout', 'neottia.sdlc.lifecycle', ...SDLC_LIFECYCLE.map((command) => command.templateId)].sort(),
+      [
+        'neottia.sdlc.layout',
+        'neottia.sdlc.lifecycle',
+        SDLC_PROTOCOL_TEMPLATE_ID,
+        ...SDLC_LIFECYCLE.map((command) => command.templateId),
+      ].sort(),
     );
     const layout = layer.files.find((template) => template.id === 'neottia.sdlc.layout')!;
     const lifecycle = JSON.parse(layer.files.find((template) => template.id === 'neottia.sdlc.lifecycle')!.content) as {

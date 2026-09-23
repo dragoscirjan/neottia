@@ -78,7 +78,8 @@ describe.each([
       await applyInstallationPlan(plan);
 
       const promptAssets = first.assets.assets.filter((asset) => asset.kind === 'file');
-      expect(promptAssets).toHaveLength(6);
+      expect(promptAssets).toHaveLength(7);
+      expect(promptAssets.some((asset) => asset.id === 'asset.skill.neottia-sdlc')).toBe(true);
       for (const asset of promptAssets) {
         expect(await readFile(resolveTarget(asset.target, roots), 'utf8')).toContain(
           'They do not grant host permissions.',
@@ -182,6 +183,57 @@ it('completes a filesystem and local-Git Plan-to-Release journey under one tempo
   expect(existsSync(join(roots.project, '.opencode', 'commands', 'release.md'))).toBe(true);
   expect(existsSync(join(roots.project, '.neottia', 'issues'))).toBe(true);
   expect(existsSync(join(roots.project, '.neottia', 'design-docs'))).toBe(true);
+
+  // The operating protocol records durable phase progress as append-only
+  // checkpoint comments on one owning Epic, and stale revisions fail closed.
+  const checkpoint = (phase: string, step: string, status: string, evidence: string, next: string): string =>
+    [
+      '<!-- neottia-sdlc:checkpoint',
+      `phase: ${phase}`,
+      `step: ${step}`,
+      `status: ${status}`,
+      `evidence: ${evidence}`,
+      `next: ${next}`,
+      '-->',
+    ].join('\n');
+  const epic = await issues.create({
+    type: 'epic',
+    title: 'Own the canonical lifecycle journey',
+    body: 'The single owning Epic carrying the operating-protocol checkpoints.',
+    created_by: 'test-operator',
+  });
+  const approved = await issues.comment(
+    epic.id,
+    'test-reviewer',
+    `Plan approval for the scope tracked by ${issue.id} and document ${document.id}.`,
+    epic.revision,
+  );
+  expect(approved.comments.at(-1)?.body).toContain('Plan approval');
+  let checkpointed = await issues.comment(
+    epic.id,
+    'test-planner',
+    checkpoint('plan', 'P-1', 'completed', `document ${document.id}@${document.revision}`, 'build'),
+    approved.revision,
+  );
+  checkpointed = await issues.comment(
+    epic.id,
+    'test-implementer',
+    checkpoint('build', issue.id, 'completed', `commit ${git(roots.project, 'log', '-1', '--pretty=%h')}`, 'verify'),
+    checkpointed.revision,
+  );
+  checkpointed = await issues.comment(
+    epic.id,
+    'test-implementer',
+    checkpoint('build', issue.id, 'blocked', 'check npm test=failing', 'same-phase step'),
+    checkpointed.revision,
+  );
+  const recorded = checkpointed.comments.filter((comment) => comment.body.includes('neottia-sdlc:checkpoint'));
+  expect(recorded).toHaveLength(3);
+  expect(checkpointed.comments.at(-1)?.body).toContain('status: blocked');
+  // A stale revision must fail closed instead of overwriting the record.
+  await expect(issues.comment(epic.id, 'test-operator', 'stale write', 'v1:' + '0'.repeat(64))).rejects.toThrow(
+    /Stale issue revision/u,
+  );
 });
 
 /** Creates one isolated install root set. */

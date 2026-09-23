@@ -164,6 +164,7 @@ describe('canonical SDLC compiler', () => {
       '.pi/prompts/refresh.md',
       '.pi/prompts/release.md',
       '.pi/prompts/verify.md',
+      '.pi/skills/neottia-sdlc/SKILL.md',
     ]);
     expect(promptAssets(opencode).map((asset) => asset.target.segments.join('/'))).toEqual([
       '.opencode/commands/build.md',
@@ -172,7 +173,11 @@ describe('canonical SDLC compiler', () => {
       '.opencode/commands/refresh.md',
       '.opencode/commands/release.md',
       '.opencode/commands/verify.md',
+      '.opencode/skills/neottia-sdlc/SKILL.md',
     ]);
+    const skillBody = promptBody(promptAssets(pi).at(-1)!);
+    expect(skillBody).toContain('neottia-sdlc:checkpoint');
+    expect(skillBody).toContain('They do not grant host permissions.');
     expect(pi.assets.assets.filter((asset): asset is HostConfigAsset => asset.kind === 'host-config')).toHaveLength(2);
     expect(
       opencode.assets.assets.filter((asset): asset is HostConfigAsset => asset.kind === 'host-config'),
@@ -212,6 +217,7 @@ describe('canonical SDLC compiler', () => {
       '.claude/commands/refresh.md',
       '.claude/commands/release.md',
       '.claude/commands/verify.md',
+      '.claude/skills/neottia-sdlc/SKILL.md',
     ]);
     expect(claude.assets.assets.filter((asset) => asset.kind === 'host-config')).toEqual([]);
   });

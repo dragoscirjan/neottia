@@ -10,6 +10,18 @@ export const SDLC_CONTENT_TEMPLATE_ID = 'neottia.sdlc.lifecycle';
 /** Internal packaged Twig layout shared by the six command templates. */
 export const SDLC_LAYOUT_TEMPLATE_ID = 'neottia.sdlc.layout';
 
+/** Internal packaged operating protocol projected as the shared lifecycle skill. */
+export const SDLC_PROTOCOL_TEMPLATE_ID = 'neottia.sdlc.protocol';
+
+/** Shared skill identifier that references the packaged operating protocol. */
+export const SDLC_PROTOCOL_SKILL_ID = 'neottia-sdlc';
+
+/** Stable skill description rendered into every projected protocol asset. */
+export const SDLC_PROTOCOL_SKILL_DESCRIPTION =
+  'Canonical Neottia SDLC operating protocol. Defines the Epic-first Plan, Build, Verify, Release, Continue, and ' +
+  'Refresh procedures plus the durable checkpoint format, evidence, approval, and handback rules that every compiled ' +
+  'lifecycle command shares.';
+
 /** Stable identifier for one canonical command. */
 export type SdlcCommandId = (typeof SDLC_COMMAND_IDS)[number];
 

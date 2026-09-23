@@ -64,6 +64,9 @@ import {
   SDLC_LAYOUT_TEMPLATE_ID,
   SDLC_LIFECYCLE,
   SDLC_LIFECYCLE_VERSION,
+  SDLC_PROTOCOL_SKILL_DESCRIPTION,
+  SDLC_PROTOCOL_SKILL_ID,
+  SDLC_PROTOCOL_TEMPLATE_ID,
   SDLC_ROLE_IDS,
   type SdlcCommandId,
   type SdlcLifecycleCommand,
@@ -144,6 +147,15 @@ const TWIG_CONTEXT_PROPERTIES = [
 ];
 const checksumSchema = z.string().regex(SHA256_PATTERN);
 const stableIdSchema = z.string().regex(STABLE_ID_PATTERN);
+const protocolSourceSchema = z
+  .object({
+    templateId: stableIdSchema,
+    sourceId: z.string().min(1),
+    version: z.string().min(1),
+    content: z.string().min(1).max(MAX_TEMPLATE_BYTES),
+    checksum: checksumSchema,
+  })
+  .strict();
 const forgeMcpServiceContextSchema = forgeMcpServiceSchema;
 const configurationContextSchema = z
   .object({
@@ -247,7 +259,7 @@ const configurationProvenanceSchema = z
   .strict();
 const compilerInputSchema = z
   .object({
-    schemaVersion: z.literal(3),
+    schemaVersion: z.literal(4),
     lifecycleVersion: z.literal(SDLC_LIFECYCLE_VERSION),
     compilerVersion: z.string().regex(PACKAGE_VERSION_PATTERN),
     installationId: stableIdSchema,
@@ -262,6 +274,7 @@ const compilerInputSchema = z
       })
       .strict(),
     templates: z.array(resolvedTemplateSchema),
+    protocol: protocolSourceSchema,
     instructions: z.array(instructionPackSchema),
     roles: z.array(roleInstructionSchema),
     runtimePackages: z.array(runtimePackageSchema),
@@ -350,9 +363,18 @@ export interface SdlcConfigurationProvenance {
   };
 }
 
+/** Checksummed packaged source of the shared operating-protocol skill. */
+export interface SdlcProtocolSource {
+  readonly templateId: string;
+  readonly sourceId: string;
+  readonly version: string;
+  readonly content: string;
+  readonly checksum: Sha256;
+}
+
 /** Deterministic, serializable compiler input. */
 export interface SdlcCompilerInputManifest {
-  readonly schemaVersion: 3;
+  readonly schemaVersion: 4;
   readonly lifecycleVersion: string;
   readonly compilerVersion: string;
   readonly installationId: string;
@@ -365,6 +387,7 @@ export interface SdlcCompilerInputManifest {
     readonly provenance: readonly SdlcConfigurationProvenance[];
   };
   readonly templates: readonly ResolvedTemplate[];
+  readonly protocol: SdlcProtocolSource;
   readonly instructions: readonly SdlcInstructionPack[];
   readonly roles: readonly SdlcRoleInstruction[];
   readonly runtimePackages: readonly SdlcRuntimePackage[];
@@ -401,7 +424,7 @@ export interface CompiledSdlcCommand {
 
 /** Compiler output plus the installer handoff from #114. */
 export interface SdlcCompilerOutputManifest {
-  readonly schemaVersion: 3;
+  readonly schemaVersion: 4;
   readonly lifecycleVersion: string;
   readonly inputChecksum: Sha256;
   readonly harnessId: string;
@@ -445,6 +468,14 @@ export function createSdlcCompilerInput(
     [SDLC_CONTENT_TEMPLATE_ID, SDLC_LAYOUT_TEMPLATE_ID, ...SDLC_LIFECYCLE.map((command) => command.templateId)],
     options.templateLayers,
   );
+  const [resolvedProtocol] = resolveTemplates([SDLC_PROTOCOL_TEMPLATE_ID], options.templateLayers);
+  const protocol: SdlcProtocolSource = Object.freeze({
+    templateId: resolvedProtocol.id,
+    sourceId: resolvedProtocol.sourceId,
+    version: resolvedProtocol.version,
+    content: resolvedProtocol.content,
+    checksum: resolvedProtocol.checksum,
+  });
   const instructions = selectSdlcInstructionPacks(context, [
     ...createForgeInstructionPacks(context),
     ...(options.instructionPacks ?? []),
@@ -459,7 +490,7 @@ export function createSdlcCompilerInput(
     provenance,
   });
   const unsigned = {
-    schemaVersion: 3 as const,
+    schemaVersion: 4 as const,
     lifecycleVersion: SDLC_LIFECYCLE_VERSION,
     compilerVersion: options.compilerVersion,
     installationId: options.installationId ?? `sdlc-${options.harnessId}`,
@@ -467,6 +498,7 @@ export function createSdlcCompilerInput(
     scope: options.scope,
     configuration,
     templates,
+    protocol,
     instructions,
     roles,
     runtimePackages,
@@ -541,8 +573,10 @@ export function compileSdlc(input: SdlcCompilerInputManifest, adapter: HarnessAd
   for (const runtimePackage of input.runtimePackages) {
     assets.push(projectRuntimePackage(runtimePackage, input, adapter));
   }
+  assets.push(projectProtocolSkill(input, adapter));
   const changedFeatures: HostFeature[] = [
     'asset.prompt',
+    'asset.skill',
     ...(roleAgents.length === 0 ? [] : (['asset.agent'] as const)),
     ...(input.runtimePackages.length === 0 ? [] : (['config.package'] as const)),
   ];
@@ -559,7 +593,7 @@ export function compileSdlc(input: SdlcCompilerInputManifest, adapter: HarnessAd
     reloadNotice,
   });
   const unsigned = {
-    schemaVersion: 3 as const,
+    schemaVersion: 4 as const,
     lifecycleVersion: input.lifecycleVersion,
     inputChecksum: input.checksum,
     harnessId: input.harnessId,
@@ -605,6 +639,12 @@ export function validateSdlcCompilerInput(input: SdlcCompilerInputManifest): voi
     throw new TypeError('Role instructions do not match configured assignments.');
   }
   validateResolvedTemplates(input.templates, input.instructions, canonicalRoles);
+  if (input.protocol.templateId !== SDLC_PROTOCOL_TEMPLATE_ID) {
+    throw new TypeError('SDLC protocol template ID is invalid.');
+  }
+  if (checksumText(input.protocol.content) !== input.protocol.checksum) {
+    throw new TypeError('SDLC protocol checksum does not match.');
+  }
   const canonicalPackages = prepareRuntimePackages(input.runtimePackages);
   if (canonicalJson(canonicalPackages) !== canonicalJson(input.runtimePackages)) {
     throw new TypeError('Runtime packages are not in canonical order.');
@@ -665,6 +705,37 @@ function projectRuntimePackage(
     plan,
     source,
   });
+}
+
+/** Projects the shared operating-protocol skill through the adapter without permission grants. */
+function projectProtocolSkill(
+  input: SdlcCompilerInputManifest,
+  adapter: HarnessAdapter,
+): ReturnType<typeof fileAssetFromProjection> {
+  const projected = requireProjection(
+    adapter.projectSkill({
+      id: SDLC_PROTOCOL_SKILL_ID,
+      scope: input.scope,
+      description: SDLC_PROTOCOL_SKILL_DESCRIPTION,
+      body: input.protocol.content,
+      license: 'MIT',
+    }),
+    'Cannot project the SDLC operating protocol skill.',
+  );
+  const source = createAssetSource({
+    kind: 'generated',
+    id: 'sdlc.protocol',
+    version: input.compilerVersion,
+    content: canonicalJson({
+      skillId: SDLC_PROTOCOL_SKILL_ID,
+      templateId: input.protocol.templateId,
+      sourceId: input.protocol.sourceId,
+      version: input.protocol.version,
+      checksum: input.protocol.checksum,
+      bodyChecksum: checksumText(input.protocol.content),
+    }),
+  });
+  return fileAssetFromProjection(projected, source);
 }
 
 /** Creates provenance for a command assembled from template and instruction inputs. */
