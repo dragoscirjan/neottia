@@ -1,0 +1,51 @@
+name: Code review
+
+# Pull request review through the dragoscirjan/code-review action.
+# The action runs the review backend in a hardened container, publishes a
+# validated summary through the PAT actor, and never executes PR code.
+on:
+  pull_request_target:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+
+permissions: {}
+
+concurrency:
+  group: code-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Review pull request
+        # v1.0.0
+        uses: dragoscirjan/code-review@467df2f8d92fa9f93d4478a93fe40cca98ca7375
+        with:
+          github-token: ${{ secrets.GH_TOKEN }}
+          container-engine: podman
+          backend: pi
+          # Symbol, caller, and hierarchy context for the reviewed base revision.
+          code-indexer: cgc
+          model-config: |
+            {
+              "version": 1,
+              "provider": {
+                "api": "openai-completions",
+                "baseUrl": "https://openrouter.ai/api/v1",
+                "network": "remote",
+                "credential": "review-provider"
+              },
+              "model": {
+                "id": "z-ai/glm-5.3-flash",
+                "contextWindow": 131072,
+                "maxOutputTokens": 8192
+              }
+            }
+          model-credentials: ${{ secrets.REVIEW_MODEL_CREDENTIALS }}
+          prompt: Focus on correctness, security, regressions, and missing tests. This repository uses pnpm and mise only; module versions change only through Changesets.
