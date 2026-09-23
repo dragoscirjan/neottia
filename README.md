@@ -64,6 +64,12 @@ mise run docs:serve      # Serve user documentation locally
 
 Use `mise tasks` for the complete task list. Mise remains the project task interface; its tasks delegate package operations to pnpm.
 
+## Code review
+
+Every non-draft pull request receives a model review from the [Code review](.github/workflows/code-review.yml) workflow. The [code-review action](https://github.com/dragoscirjan/code-review) runs the Pi backend in a hardened container, adds `cgc` code-index context for the reviewed base revision, and publishes a validated summary through the token's actor. It never executes pull request code.
+
+The workflow needs two repository secrets. `GH_TOKEN` is a personal access token with pull request read and write access, because managed review comments must be actor-owned. `REVIEW_MODEL_CREDENTIALS` maps the configured credential reference to a provider token, for example `{"review-provider":{"type":"bearer","value":"<token>"}}`. The provider model is configured in the workflow file itself and holds no secrets.
+
 ## Releases
 
 Modules are independently versioned with [Changesets](https://github.com/changesets/changesets). Describe every user-visible change as a changeset before merging:
