@@ -438,6 +438,12 @@ importers:
 
   packages/cli:
     dependencies:
+      '@neottia/config':
+        specifier: workspace:^
+        version: link:../config
+      '@neottia/config-registry':
+        specifier: workspace:^
+        version: link:../config-registry
       '@neottia/distribution':
         specifier: workspace:^
         version: link:../distribution
