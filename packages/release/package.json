@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@neottia/claude-code-adapter": "workspace:0.2.0",
-    "@neottia/cli": "workspace:0.2.0",
+    "@neottia/cli": "workspace:0.3.0",
     "@neottia/config": "workspace:0.2.0",
     "@neottia/config-registry": "workspace:0.2.0",
     "@neottia/core": "workspace:0.1.0",
