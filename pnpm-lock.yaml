@@ -849,13 +849,13 @@ importers:
         specifier: workspace:0.2.0
         version: link:../../extensions/claude-code-adapter
       '@neottia/cli':
-        specifier: workspace:0.3.0
+        specifier: workspace:0.4.0
         version: link:../cli
       '@neottia/config':
         specifier: workspace:0.2.0
         version: link:../config
       '@neottia/config-registry':
-        specifier: workspace:0.2.0
+        specifier: workspace:0.2.1
         version: link:../config-registry
       '@neottia/core':
         specifier: workspace:0.1.0
@@ -921,7 +921,7 @@ importers:
         specifier: workspace:0.2.0
         version: link:../repository-store
       '@neottia/sdlc':
-        specifier: workspace:0.2.0
+        specifier: workspace:0.3.0
         version: link:../sdlc
       '@neottia/searchable-core':
         specifier: workspace:0.2.0

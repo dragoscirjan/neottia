@@ -1,6 +1,6 @@
 {
   "name": "@neottia/sdlc",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Canonical Neottia lifecycle configuration and asset compiler",
   "author": "Dragos Cirjan",
   "license": "MIT",

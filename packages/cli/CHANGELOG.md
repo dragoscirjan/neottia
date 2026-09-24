@@ -1,5 +1,17 @@
 # @neottia/cli
 
+## 0.4.0
+
+### Minor Changes
+
+- [#168](https://github.com/dragoscirjan/neottia/pull/168) [`9c1027d`](https://github.com/dragoscirjan/neottia/commit/9c1027de7d311bb098a6322d0b1040ca9020b52f) Thanks [@dragoscirjan](https://github.com/dragoscirjan)! - Add the config-driven lifecycle workflow: `neottia apply` compiles and installs the SDLC lifecycle from project configuration for every configured harness (skipping conflicting files with per-file warnings and a non-zero exit), `neottia doctor` validates configuration and statically reports missing modules and installs, and `neottia init` validates an existing `.neottia/config.yml` instead of refusing to touch it. A compatibility catalog pins exact runtime package versions per harness, never resolved from a registry. The advanced manifest-driven commands remain unchanged.
+
+### Patch Changes
+
+- Updated dependencies [[`af87851`](https://github.com/dragoscirjan/neottia/commit/af87851be1ca1371c19f5176f1a53fd070830816)]:
+  - @neottia/sdlc@0.3.0
+  - @neottia/config-registry@0.2.1
+
 ## 0.3.0
 
 ### Minor Changes
