@@ -7,11 +7,11 @@ Follow this protocol whenever a compiled lifecycle command is running. When this
 ## Shared rules
 
 - One lifecycle run owns exactly one Epic. Every command resolves that Epic first; a command that cannot resolve one stops instead of inventing ownership.
-- Durable state lives only in the configured issue and document authorities. The compiled command instructions name the exact tools for the selected providers. Never edit canonical records or repository files directly. Every mutation carries the latest known revision; a stale or missing revision is an error, never an overwrite.
+- Durable lifecycle state lives only in the configured issue and document authorities. The compiled command instructions name the exact tools for the selected providers. Never edit the backing files of canonical records directly, and never bypass their authorities; ordinary source-file edits follow the compiled local source-control workflow instead. Every record mutation carries the latest known revision; a stale or missing revision is an error, never an overwrite.
 - Record material progress as append-only comments or status transitions with the acting role, the intent, and evidence references. Comments are history. Never rewrite or delete them except through the authorities' documented archival operations.
 - Approval is explicit, current, and scoped to the stated action. Silence, prior consent, and role assignment are not approval.
 - These instructions are guidance. They do not grant host permissions. Honor host-enforced restrictions and request approval where a command requires it.
-- Record every stopping outcome before the run stops, so Continue can recover without guessing.
+- Record every stopping outcome on the owning Epic before the run stops, so Continue can recover without guessing. A stop that happens before an owning Epic is resolved, such as waiting for candidate selection, returns candidates without a checkpoint; record a checkpoint once ownership is resolved.
 
 ## Durable checkpoint format
 
@@ -28,7 +28,7 @@ Lifecycle progress is durable only through checkpoint comments in this exact for
 Checkpoint rules:
 
 - Append one checkpoint when a step completes, blocks, or needs approval. Checkpoints are append-only, and the newest valid checkpoint defines the authoritative phase and step.
-- `phase` is one of the four delivery phases. Never write a phase that an earlier checkpoint does not support.
+- `phase` is one of the four delivery phases. A run without an earlier checkpoint may write a `plan` checkpoint only after plan approval; otherwise never write a phase that an earlier checkpoint does not support.
 - `step` is a short stable identifier for the work item or action, such as a child issue ID or a release action.
 - `status` is `completed` for finished steps, `blocked` when work cannot proceed, and `needs-approval` when the next action awaits an approval that has not been given.
 - `evidence` lists exact record references with revisions, commit hashes, and check results. References must let a later command re-read the evidence without searching.

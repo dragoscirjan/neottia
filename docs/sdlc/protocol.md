@@ -28,7 +28,7 @@ next: verify
 -->
 ```
 
-`phase` is one of the four delivery phases and a checkpoint never writes a phase an earlier checkpoint does not support. `step` is a short stable identifier for the work item or action. `status` is `completed`, `blocked`, or `needs-approval`. `evidence` lists exact record references with revisions, commit hashes, and check results. `next` names one supported next public command or the next same-phase step as a recommendation, never an invocation.
+`phase` is one of the four delivery phases. A run without an earlier checkpoint may write a `plan` checkpoint only after plan approval; otherwise a checkpoint never writes a phase an earlier checkpoint does not support. `step` is a short stable identifier for the work item or action. `status` is `completed`, `blocked`, or `needs-approval`. `evidence` lists exact record references with revisions, commit hashes, and check results. `next` names one supported next public command or the next same-phase step as a recommendation, never an invocation.
 
 Rules: checkpoints are append-only, the newest valid checkpoint defines the authoritative phase and step, and malformed, incomplete, or out-of-order checkpoints are ignored. Never reconstruct a missing phase from prose or memory.
 
@@ -49,7 +49,7 @@ The protocol ships as a packaged template with ID `neottia.sdlc.protocol` under 
 
 1. packaged file;
 2. explicit installed-package layer;
-3. a global override at `<global root>/sdlc/protocol.md`;
+3. a global override at `<global root>/.neottia/templates/sdlc/protocol.md`;
 4. a project override at `.neottia/templates/sdlc/protocol.md`.
 
 A replacement must keep the checkpoint marker `neottia-sdlc:checkpoint`, the three checkpoint statuses, the six command sections, the exact sentence "They do not grant host permissions.", and provider-neutral wording. The compiler checks the protocol checksum, and the protocol tests enforce these invariants on the packaged body.

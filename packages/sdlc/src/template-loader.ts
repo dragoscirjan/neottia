@@ -19,6 +19,11 @@ const TEMPLATE_DIRECTORY_SEGMENTS = ['.neottia', 'templates', 'sdlc'] as const;
 const COMMAND_TEMPLATE_FILENAMES = new Map<string, string>(
   SDLC_COMMAND_IDS.map((command) => [`${command}.md.twig`, `neottia.sdlc.command.${command}`]),
 );
+/** Override layers accept every command template plus the operating protocol. */
+const OVERRIDE_TEMPLATE_FILENAMES = new Map<string, string>([
+  ...COMMAND_TEMPLATE_FILENAMES,
+  ['protocol.md', SDLC_PROTOCOL_TEMPLATE_ID],
+]);
 const PACKAGED_TEMPLATE_FILENAMES = new Map<string, string>([
   ...COMMAND_TEMPLATE_FILENAMES,
   ['layout.md.twig', SDLC_LAYOUT_TEMPLATE_ID],
@@ -88,7 +93,7 @@ async function loadOverrideLayer(
 ): Promise<TemplateLayer | undefined> {
   const directory = await conventionalTemplateDirectory(root);
   if (directory === undefined) return undefined;
-  const files = await loadTemplateDirectory(directory, maxBytes, COMMAND_TEMPLATE_FILENAMES);
+  const files = await loadTemplateDirectory(directory, maxBytes, OVERRIDE_TEMPLATE_FILENAMES);
   if (files.length === 0) return undefined;
   return freezeLayer({
     tier,

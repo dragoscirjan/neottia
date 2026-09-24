@@ -68,6 +68,24 @@ describe('SDLC template loader', () => {
     expect(plan.shadowed.map((source) => source.sourceId)).toEqual(['@neottia/sdlc', 'neottia-global-sdlc']);
   });
 
+  it('resolves a project protocol override above the packaged protocol', async () => {
+    const projectRoot = await temporaryRoot('neottia-sdlc-protocol-');
+    const packaged = await loadPackagedSdlcTemplateLayer();
+    const packagedProtocol = packaged.files.find((file) => file.id === SDLC_PROTOCOL_TEMPLATE_ID)!;
+    const projectContent = packagedProtocol.content.replace(
+      '# Neottia SDLC operating protocol',
+      '# Project SDLC operating protocol',
+    );
+    await writeOverride(projectRoot, 'protocol.md', projectContent);
+
+    const layers = await loadSdlcTemplateLayers({ projectRoot });
+    const [protocol] = resolveTemplates([SDLC_PROTOCOL_TEMPLATE_ID], layers);
+
+    expect(protocol.content).toBe(projectContent);
+    expect(protocol.sourceId).toBe('neottia-project-sdlc');
+    expect(protocol.shadowed.map((source) => source.sourceId)).toEqual(['@neottia/sdlc']);
+  });
+
   it('rejects unknown command filenames instead of ignoring them', async () => {
     const projectRoot = await temporaryRoot('neottia-sdlc-unknown-');
     await writeOverride(projectRoot, 'deploy.md.twig', '# Deploy\n');

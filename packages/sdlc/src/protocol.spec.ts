@@ -53,7 +53,17 @@ describe('packaged SDLC operating protocol', () => {
     }
     expect(body).toContain('append-only');
     expect(body).toContain('newest valid checkpoint defines the authoritative phase and step');
+    expect(body).toContain('may write a `plan` checkpoint only after plan approval');
     expect(body).toContain('Malformed, incomplete, or out-of-order checkpoints are ignored');
+  });
+
+  it('exempts pre-ownership stops and source-file edits from the strictest rules', async () => {
+    const body = await protocolBody();
+    expect(body).toContain('returns candidates without a checkpoint');
+    expect(body).toContain('record a checkpoint once ownership is resolved');
+    expect(body).toContain('Never edit the backing files of canonical records directly');
+    expect(body).toContain('ordinary source-file edits follow the compiled local source-control workflow');
+    expect(body).toContain('a stale or missing revision is an error, never an overwrite');
   });
 
   it('gives every command authoritative inputs and stopping outcomes', async () => {
