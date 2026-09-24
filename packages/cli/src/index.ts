@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { link, lstat, mkdir, open, readFile, unlink, writeFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -63,7 +64,7 @@ export async function main(
       return 0;
     }
     if (command === 'apply') return await applyCommand(arguments_, output, env);
-    if (command === 'init') return await initCommand(arguments_, output);
+    if (command === 'init') return await initCommand(arguments_, output, env);
     if (command === 'recover') return await recoverCommand(arguments_, output);
     if (command === 'doctor') return await doctorCommand(arguments_, output, env);
     if (command === 'uninstall') return await uninstallCommand(arguments_, output, env);
@@ -76,7 +77,7 @@ export async function main(
 }
 
 /** Creates or validates the project-local configuration for selected harnesses. */
-async function initCommand(arguments_: readonly string[], output: CliOutput): Promise<number> {
+async function initCommand(arguments_: readonly string[], output: CliOutput, env: NodeJS.ProcessEnv): Promise<number> {
   const { values } = parseArgs({
     args: [...arguments_],
     strict: true,
@@ -89,8 +90,9 @@ async function initCommand(arguments_: readonly string[], output: CliOutput): Pr
   const project = resolve(values.project ?? process.cwd());
   const configPath = join(project, '.neottia', 'config.yml');
   if (values.harness.length === 0 && (await isRegularFile(configPath))) {
-    // Existing configuration: validate it instead of creating or touching it.
-    resolveConfig(officialConfigRegistry, { cwd: project, env: {} });
+    // Existing configuration: validate it with the caller's environment so
+    // environment-backed secret references resolve exactly as at apply time.
+    resolveConfig(officialConfigRegistry, { cwd: project, env });
     output.log(`Validated ${configPath}`);
     output.log('Next: neottia apply');
     return 0;
@@ -166,9 +168,15 @@ async function applyCommand(arguments_: readonly string[], output: CliOutput, en
     throw new TypeError('Run neottia init first. Missing project configuration.');
   }
   const harnesses = selectHarnesses(values.harness, project, env);
-  const scope = parseScope(values.scope);
+  const override = values.scope === undefined ? undefined : parseScope(values.scope);
+  const configuredScopes = new Map(
+    resolveConfig(officialConfigRegistry, { cwd: project, env })
+      .get(harnessInstallConfigContribution)
+      .targets.map((target) => [target.id, target.scope] as const),
+  );
   let skipped = 0;
   for (const harnessId of harnesses) {
+    const scope = override ?? configuredScopes.get(harnessId) ?? 'project';
     skipped += await installHarness(harnessId, { project, env, scope }, output);
   }
   if (skipped > 0) {
@@ -224,8 +232,9 @@ async function installHarness(
   return conflicts.length;
 }
 
-/** Version of this CLI, used as the compiler version for config-driven installs. */
-const CLI_VERSION = '0.3.0';
+/** Version of this CLI package, read at runtime so releases never drift from it. */
+const CLI_VERSION: string = createRequire(import.meta.url)('../package.json').version;
+void (CLI_VERSION satisfies string);
 
 /** Resolves the harness list: explicit arguments, else every configured target. */
 function selectHarnesses(
@@ -338,10 +347,22 @@ async function doctorCommand(
       }
     }
   }
+  const configuredScopes = new Map(
+    snapshot.get(harnessInstallConfigContribution).targets.map((target) => [target.id, target.scope] as const),
+  );
   for (const harnessId of harnesses) {
-    const receiptPath = receiptPathFor(harnessId, 'project', installRootsFor(project, env));
-    if (await isRegularFile(receiptPath)) continue;
-    output.error(`${WARN_PREFIX}${harnessId} lifecycle is not installed. Run neottia apply.`);
+    const scope = configuredScopes.get(harnessId) ?? 'project';
+    const installRoots = installRootsFor(project, env);
+    const receiptPath = receiptPathFor(harnessId, scope, installRoots);
+    if (await isRegularFile(receiptPath)) {
+      // Receipt presence alone does not prove the lifecycle is intact; report
+      // drift through the same diagnosis the manifest flow uses.
+      const inspected = await inspectUninstall(receiptPath, installRoots);
+      if (!diagnoseSnapshot(inspected).some((result) => result.status === 'error')) continue;
+      output.error(`${WARN_PREFIX}${harnessId} lifecycle is installed but drifted. Rerun neottia apply.`);
+    } else {
+      output.error(`${WARN_PREFIX}${harnessId} lifecycle is not installed. Run neottia apply.`);
+    }
     failures += 1;
   }
   if (failures === 0) output.log('No missing modules or installs detected.');

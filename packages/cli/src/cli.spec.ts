@@ -224,6 +224,39 @@ describe('Neottia CLI', () => {
     expect(await readFile(join(root, '.neottia', 'install', 'sdlc-pi.receipt.json'), 'utf8')).toBe(planPath);
   }, 30000);
 
+  it('installs a globally scoped target under the caller home and reports it from doctor', async () => {
+    if (process.platform === 'win32') return; // POSIX-only XDG path assertions.
+    const root = await fixture();
+    await main(['init', '--harness', 'pi', '--project', root], capture().output);
+    const configPath = join(root, '.neottia', 'config.yml');
+    await writeFile(
+      configPath,
+      (await readFile(configPath, 'utf8')).replace('scope: project', 'scope: global'),
+      'utf8',
+    );
+    const home = join(root, 'home');
+    const xdgState = join(root, 'xdg-state');
+    await mkdir(home, { recursive: true });
+    await mkdir(xdgState, { recursive: true });
+    process.env.HOME = home;
+    process.env.XDG_STATE_HOME = xdgState;
+    try {
+      const result = capture();
+      expect(await main(['apply', '--project', root], result.output)).toBe(0);
+
+      expect(await exists(join(xdgState, 'neottia', 'install', 'sdlc-pi.receipt.json'))).toBe(true);
+      expect(await exists(join(home, '.pi', 'agent', 'skills', 'neottia-sdlc', 'SKILL.md'))).toBe(true);
+      expect(await exists(join(root, '.neottia', 'install', 'sdlc-pi.receipt.json'))).toBe(false);
+
+      const doctor = capture();
+      expect(await main(['doctor', '--project', root], doctor.output)).toBe(0);
+      expect(doctor.logs.join('\n')).toContain('No missing modules or installs detected.');
+    } finally {
+      delete process.env.HOME;
+      delete process.env.XDG_STATE_HOME;
+    }
+  }, 30000);
+
   it('skips conflicting files with warnings, installs the rest, and exits non-zero', async () => {
     const root = await fixture();
     await main(['init', '--harness', 'pi', '--project', root], capture().output);
