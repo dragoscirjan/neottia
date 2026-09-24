@@ -95,6 +95,8 @@ mise run release:global -- 1.0.0
 
 This updates `packages/release/package.json` and `packages/release/release-manifest.json`. The published `@neottia/release` package converts exact `workspace:` references into exact registry versions, making the global release reproducible.
 
+Every successful release also publishes the documentation site: the [Docs » Publish](.github/workflows/docs.publish.yml) workflow builds the VitePress site, then calls the reusable publishing workflow in [dragoscirjan/dragoscirjan.github.io](https://github.com/dragoscirjan/dragoscirjan.github.io), which replaces `projects/neottia/` and triggers that repository's Pages deployment. It reuses the existing `GH_TOKEN` secret, which must have `contents:write` on `dragoscirjan/dragoscirjan.github.io`.
+
 ## Configuration
 
 `@neottia/config` composes domain-owned schemas into one immutable snapshot. It loads optional global and project YAML, applies profiles, environment bindings, and explicit overrides in a fixed order, tracks value-free leaf provenance, and redacts declared secrets. `@neottia/config-registry` supplies the strict official registry used by Neottia hosts, so all published module and SDLC capability shards can coexist in one root file. `@neottia/sdlc` validates compile-time provider selections and compiles the canonical lifecycle for Pi, OpenCode, or Claude Code. Use the [unified configuration guide](docs/configuration.md) for files, profiles, precedence, SDLC provider selection, secrets, diagnostics, embedding, and `skills.*` migration. The config package publishes the complete editor schema as `@neottia/config/config.schema.json`.

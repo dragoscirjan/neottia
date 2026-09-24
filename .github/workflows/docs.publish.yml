@@ -1,0 +1,49 @@
+name: Docs » Publish site
+
+# Publishes the built documentation site to dragoscirjan/dragoscirjan.github.io
+# under projects/neottia/ after every successful release. The reusable workflow
+# there commits to main, which triggers its Pages deployment automatically.
+
+on:
+  workflow_call: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-publish-neottia
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@v4
+        with:
+          install: true
+          cache: true
+      - run: mise run deps:sync:pnpm
+      # VitePress reads DOCS_BASE so the deployment build emits asset and
+      # navigation URLs under the pages project path; local builds keep '/'.
+      - name: Build the documentation site
+        run: mise run docs
+        env:
+          DOCS_BASE: /projects/neottia/
+      - name: Upload the built site
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: docs-site
+          path: docs/.vitepress/dist
+      - name: Publish to dragoscirjan.github.io
+        uses: dragoscirjan/dragoscirjan.github.io/.github/workflows/docs.yml@main
+        with:
+          project: neottia
+        secrets:
+          # Reuses the actor-owned PAT already stored for the code-review
+          # workflow; it must have contents:write on the pages repository.
+          token: ${{ secrets.GH_TOKEN }}

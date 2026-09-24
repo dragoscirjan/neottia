@@ -1,9 +1,13 @@
 import { defineConfig } from 'vitepress';
 
+/** Deployment base path for the published site; local builds keep '/'. */
+const base = process.env.DOCS_BASE ?? '/';
+
 // Navigation groups follow user tasks rather than workspace layout.
 export default defineConfig({
   title: 'Neottia',
   description: 'A shared SDLC for AI coding harnesses',
+  base,
   cleanUrls: true,
   lastUpdated: true,
   themeConfig: {
