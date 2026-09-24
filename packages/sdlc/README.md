@@ -1,6 +1,6 @@
 # @neottia/sdlc
 
-`@neottia/sdlc` compiles one canonical Plan, Build, Verify, Release, Continue, and Refresh lifecycle into assets for a Neottia harness adapter. The package ships six Markdown/Twig templates and loads them before pure compilation. The compiler returns a checksummed `AssetManifest` for `@neottia/distribution` and does not read files, run providers, or install assets.
+`@neottia/sdlc` compiles one canonical Plan, Build, Verify, Release, Continue, and Refresh lifecycle into assets for a Neottia harness adapter. The package ships six Markdown/Twig templates plus one plain-markdown operating-protocol template, projected as a shared `neottia-sdlc` skill through every adapter, and loads them before pure compilation. The compiler returns a checksummed `AssetManifest` for `@neottia/distribution` and does not read files, run providers, or install assets.
 
 See the [SDLC compiler guide](../../docs/sdlc/) and [configuration reference](../../docs/configuration.md#sdlc-provider-selection).
 
@@ -64,7 +64,7 @@ See the [provider instruction-pack guide](../../docs/sdlc/providers.md) for conf
 
 ## Templates and roles
 
-The package publishes `templates/plan.md.twig`, `build.md.twig`, `verify.md.twig`, `release.md.twig`, `continue.md.twig`, and `refresh.md.twig`, plus their shared `layout.md.twig` and `lifecycle.json` prose. Twing renders the selected command with strict variables and no HTML escaping. The shared layout has one named block per instruction slot, and command templates leave unused blocks empty. The renderer rejects nondeterministic Twig functions, duplicate instruction fragments, and missing or duplicate role fragments.
+The package publishes `templates/plan.md.twig`, `build.md.twig`, `verify.md.twig`, `release.md.twig`, `continue.md.twig`, and `refresh.md.twig`, plus their shared `layout.md.twig`, `lifecycle.json` prose, and `protocol.md`, the operating-protocol skill body with ID `neottia.sdlc.protocol`. Twing renders the selected command with strict variables and no HTML escaping. The shared layout has one named block per instruction slot, and command templates leave unused blocks empty. The renderer rejects nondeterministic Twig functions, duplicate instruction fragments, and missing or duplicate role fragments.
 
 Place a complete project override at `.neottia/templates/sdlc/<command>.md.twig`. The loader rejects unknown filenames. It applies packaged, package, global, then project precedence and records selected and shadowed checksums in compiler input provenance. A whole-template override can change lifecycle policy, so review it before installation.
 

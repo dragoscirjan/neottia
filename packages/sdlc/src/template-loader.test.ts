@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 import { resolveTemplates } from '@neottia/distribution';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { SDLC_LIFECYCLE } from './lifecycle.js';
+import { SDLC_LIFECYCLE, SDLC_PROTOCOL_TEMPLATE_ID } from './lifecycle.js';
 import { loadPackagedSdlcTemplateLayer, loadSdlcTemplateLayers } from './template-loader.js';
 
 const temporaryRoots: string[] = [];
@@ -21,7 +21,12 @@ describe('SDLC template loader', () => {
 
     expect(layer.tier).toBe('packaged');
     expect(layer.files.map((file) => file.id).sort()).toEqual(
-      ['neottia.sdlc.layout', 'neottia.sdlc.lifecycle', ...SDLC_LIFECYCLE.map((command) => command.templateId)].sort(),
+      [
+        'neottia.sdlc.layout',
+        'neottia.sdlc.lifecycle',
+        SDLC_PROTOCOL_TEMPLATE_ID,
+        ...SDLC_LIFECYCLE.map((command) => command.templateId),
+      ].sort(),
     );
     const layout = layer.files.find((template) => template.id === 'neottia.sdlc.layout')!;
     const lifecycle = JSON.parse(layer.files.find((template) => template.id === 'neottia.sdlc.lifecycle')!.content) as {
@@ -61,6 +66,24 @@ describe('SDLC template loader', () => {
     expect(plan.content).toBe(projectContent);
     expect(plan.sourceId).toBe('neottia-project-sdlc');
     expect(plan.shadowed.map((source) => source.sourceId)).toEqual(['@neottia/sdlc', 'neottia-global-sdlc']);
+  });
+
+  it('resolves a project protocol override above the packaged protocol', async () => {
+    const projectRoot = await temporaryRoot('neottia-sdlc-protocol-');
+    const packaged = await loadPackagedSdlcTemplateLayer();
+    const packagedProtocol = packaged.files.find((file) => file.id === SDLC_PROTOCOL_TEMPLATE_ID)!;
+    const projectContent = packagedProtocol.content.replace(
+      '# Neottia SDLC operating protocol',
+      '# Project SDLC operating protocol',
+    );
+    await writeOverride(projectRoot, 'protocol.md', projectContent);
+
+    const layers = await loadSdlcTemplateLayers({ projectRoot });
+    const [protocol] = resolveTemplates([SDLC_PROTOCOL_TEMPLATE_ID], layers);
+
+    expect(protocol.content).toBe(projectContent);
+    expect(protocol.sourceId).toBe('neottia-project-sdlc');
+    expect(protocol.shadowed.map((source) => source.sourceId)).toEqual(['@neottia/sdlc']);
   });
 
   it('rejects unknown command filenames instead of ignoring them', async () => {

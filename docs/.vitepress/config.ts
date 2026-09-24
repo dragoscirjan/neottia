@@ -71,6 +71,7 @@ export default defineConfig({
           text: 'SDLC',
           items: [
             { text: 'Compile the canonical lifecycle', link: '/sdlc/' },
+            { text: 'Operating protocol', link: '/sdlc/protocol' },
             { text: 'Configure provider packs', link: '/sdlc/providers' },
             { text: 'Configure portable roles', link: '/sdlc/roles' },
           ],

@@ -2,6 +2,8 @@
 
 `@neottia/sdlc` compiles six lifecycle commands into Pi or OpenCode prompt assets. The compiler chooses provider instructions before installation. Generated commands do not route between providers at runtime.
 
+Each installation also projects one shared operating-protocol skill, `neottia-sdlc`, which defines owning-Epic resolution, durable evidence, checkpointing, and handback rules for every command. See [the operating protocol](/sdlc/protocol).
+
 ## Commands
 
 | Command  | Instruction blocks                                 | Required behavior                                                                                                                       |
@@ -26,7 +28,7 @@ Release instructions never authorize an autonomous merge, publication, or deploy
 - runtime package IDs with exact versions;
 - one harness adapter and installation scope.
 
-`createSdlcCompilerInput()` resolves template precedence, selects one instruction pack for each configured capability, and derives role instructions from the selected harness map. Each command template renders only the provider and role blocks that command uses. `compileSdlc()` records those rendered packs in the command provenance, then projects the six prompts, supported native role agents, and explicit package configuration through the adapter. The returned output manifest contains semantic command records and a checksummed distribution `AssetManifest`.
+`createSdlcCompilerInput()` resolves template precedence, selects one instruction pack for each configured capability, and derives role instructions from the selected harness map. Each command template renders only the provider and role blocks that command uses. `compileSdlc()` records those rendered packs in the command provenance, then projects the six prompts, the shared operating-protocol skill, supported native role agents, and explicit package configuration through the adapter. The returned output manifest contains semantic command records and a checksummed distribution `AssetManifest`.
 
 The compiler does not read files, invoke Git, contact providers, install packages, or change host configuration.
 
