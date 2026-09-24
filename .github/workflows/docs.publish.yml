@@ -40,4 +40,6 @@ jobs:
         with:
           project: neottia
         secrets:
-          token: ${{ secrets.PAGES_DOCS_TOKEN }}
+          # Reuses the actor-owned PAT already stored for the code-review
+          # workflow; it must have contents:write on the pages repository.
+          token: ${{ secrets.GH_TOKEN }}

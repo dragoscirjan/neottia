@@ -95,7 +95,7 @@ mise run release:global -- 1.0.0
 
 This updates `packages/release/package.json` and `packages/release/release-manifest.json`. The published `@neottia/release` package converts exact `workspace:` references into exact registry versions, making the global release reproducible.
 
-Every successful release also publishes the documentation site: the [Docs » Publish](.github/workflows/docs.publish.yml) workflow builds the VitePress site, then calls the reusable publishing workflow in [dragoscirjan/dragoscirjan.github.io](https://github.com/dragoscirjan/dragoscirjan.github.io), which replaces `projects/neottia/` and triggers that repository's Pages deployment. It needs one repository secret: `PAGES_DOCS_TOKEN`, a personal access token with `contents:write` on `dragoscirjan/dragoscirjan.github.io`.
+Every successful release also publishes the documentation site: the [Docs » Publish](.github/workflows/docs.publish.yml) workflow builds the VitePress site, then calls the reusable publishing workflow in [dragoscirjan/dragoscirjan.github.io](https://github.com/dragoscirjan/dragoscirjan.github.io), which replaces `projects/neottia/` and triggers that repository's Pages deployment. It reuses the existing `GH_TOKEN` secret, which must have `contents:write` on `dragoscirjan/dragoscirjan.github.io`.
 
 ## Configuration
 
