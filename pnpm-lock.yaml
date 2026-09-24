@@ -444,9 +444,33 @@ importers:
       '@neottia/config-registry':
         specifier: workspace:^
         version: link:../config-registry
+      '@neottia/design-docs':
+        specifier: workspace:^
+        version: link:../design-docs
       '@neottia/distribution':
         specifier: workspace:^
         version: link:../distribution
+      '@neottia/harness-adapter':
+        specifier: workspace:^
+        version: link:../harness-adapter
+      '@neottia/issues':
+        specifier: workspace:^
+        version: link:../issues
+      '@neottia/memory-core':
+        specifier: workspace:^
+        version: link:../memory-core
+      '@neottia/opencode-adapter':
+        specifier: workspace:^
+        version: link:../../extensions/opencode-adapter
+      '@neottia/pi-adapter':
+        specifier: workspace:^
+        version: link:../../extensions/pi-adapter
+      '@neottia/sdlc':
+        specifier: workspace:^
+        version: link:../sdlc
+      '@neottia/searchable-core':
+        specifier: workspace:^
+        version: link:../searchable-core
     devDependencies:
       '@templ-project/tsconfig':
         specifier: ^0.2.2

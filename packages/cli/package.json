@@ -42,7 +42,15 @@
   "dependencies": {
     "@neottia/config": "workspace:^",
     "@neottia/config-registry": "workspace:^",
-    "@neottia/distribution": "workspace:^"
+    "@neottia/design-docs": "workspace:^",
+    "@neottia/distribution": "workspace:^",
+    "@neottia/harness-adapter": "workspace:^",
+    "@neottia/issues": "workspace:^",
+    "@neottia/memory-core": "workspace:^",
+    "@neottia/opencode-adapter": "workspace:^",
+    "@neottia/pi-adapter": "workspace:^",
+    "@neottia/sdlc": "workspace:^",
+    "@neottia/searchable-core": "workspace:^"
   },
   "devDependencies": {
     "@templ-project/tsconfig": "^0.2.2",
