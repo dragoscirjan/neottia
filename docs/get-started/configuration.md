@@ -11,7 +11,20 @@ neottia init --harness opencode --harness pi
 
 `--harness` is repeatable and accepts `pi` and `opencode`. Repeated values are ignored, and argument order does not change the result. Run the command from the project root, or pass `--project DIR`.
 
-The command never replaces an existing `.neottia/config.yml`. Edit that file instead of rerunning `init`.
+When `.neottia/config.yml` already exists, run `neottia init` without `--harness` to validate it. The command reports `Validated <path>` and changes nothing.
+
+## Compile and install
+
+```sh
+neottia apply
+neottia apply --harness pi
+```
+
+`apply` validates the project configuration, compiles the six lifecycle commands plus the shared operating-protocol skill for every configured harness, resolves exact runtime package versions from the built-in compatibility catalog for the enabled modules, and installs everything in one run. No plan file is produced.
+
+Files you changed or created at generated paths are never overwritten. Each conflict is printed as a `WARN` line with its path and reason, skipped, and everything else still installs. `apply` exits non-zero when files were skipped so scripts notice; resolve or remove the named files and run `apply` again.
+
+`neottia doctor` validates the configuration and reports missing runtime packages or uninstalled harnesses. It changes nothing.
 
 `init` enables filesystem Issues and Design Docs, selects local Git with no remote provider, and adds one project installation target per selected harness. Each harness receives its own required SDLC role assignments, so contributors can use different harnesses in one repository. For `neottia init --harness opencode --harness pi`, the generated file is:
 
