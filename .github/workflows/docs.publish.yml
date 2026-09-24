@@ -15,8 +15,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  publish:
-    name: Build and publish
+  build:
+    name: Build the site
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -39,11 +39,17 @@ jobs:
         with:
           name: docs-site
           path: docs/.vitepress/dist
-      - name: Publish to dragoscirjan.github.io
-        uses: dragoscirjan/dragoscirjan.github.io/.github/workflows/docs.yml@main
-        with:
-          project: neottia
-        secrets:
-          # Reuses the actor-owned PAT already stored for the code-review
-          # workflow; it must have contents:write on the pages repository.
-          token: ${{ secrets.GH_TOKEN }}
+
+  # Reusable workflows may only be called at the job level. The upstream
+  # workflow downloads the docs-site artifact, replaces projects/neottia/,
+  # and pushes, which triggers the pages deployment there.
+  publish:
+    name: Publish to dragoscirjan.github.io
+    needs: build
+    uses: dragoscirjan/dragoscirjan.github.io/.github/workflows/docs.yml@main
+    with:
+      project: neottia
+    secrets:
+      # Reuses the actor-owned PAT already stored for the code-review
+      # workflow; it must have contents:write on the pages repository.
+      token: ${{ secrets.GH_TOKEN }}
