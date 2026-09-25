@@ -1,0 +1,12 @@
+name: NP runner
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  start:
+    uses: ./.github/workflows/np-wrapper.yml
+    secrets: inherit
