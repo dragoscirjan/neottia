@@ -138,7 +138,7 @@ export class FilesystemBackend extends MemoryRecordSupport implements StorageBac
     // Public low-level callers retain their historical no-wrapper behavior,
     // while every read now first acquires the repository authority and recovers.
     if (this.repositoryLease.getStore() === undefined)
-      return this.withRepositoryAccess(async () => this.loadState(control));
+      return this.withRepositoryAccess(async () => this.loadState(control), control);
     const records: MemoryRecord[] = [];
     const tombstones: MemoryTombstone[] = [];
     const ids = new Set<string>();
@@ -222,7 +222,7 @@ export class FilesystemBackend extends MemoryRecordSupport implements StorageBac
           throw new MemoryConflictError(`Memory canonical revision changed during mutation: ${error.message}`);
         throw error;
       }
-    });
+    }, control);
   }
 
   /** {@inheritdoc StorageBackend.search} — BM25 over a disposable projection. */
@@ -253,7 +253,7 @@ export class FilesystemBackend extends MemoryRecordSupport implements StorageBac
       }
       if (primaryError !== undefined) throw primaryError;
       return result as MemoryRecord[];
-    });
+    }, control);
   }
 
   /** {@inheritdoc StorageBackend.withLock} */
