@@ -162,6 +162,24 @@ describe('pi memory extension', () => {
     await expect(get.execute('call-1', { id: 'nope' })).rejects.toThrow(/memory_get input/i);
   });
 
+  it('forwards the pi request signal: cancelled calls reject without mutating', async () => {
+    const cwd = fixture();
+    const { api, registered } = fakePi();
+    registerMemoryTools(api, { cwd });
+    const store = registered.find((tool) => tool.name === 'memory_store') as {
+      execute: (id: string, params: unknown, signal?: AbortSignal) => Promise<unknown>;
+    };
+
+    const cancelled = new AbortController();
+    cancelled.abort();
+    await expect(store.execute('call-1', FACT, cancelled.signal)).rejects.toMatchObject({ code: 'ABORTED' });
+    expect(existsSync(join(cwd, '.neottia', 'memory'))).toBe(false);
+
+    // A live signal must not disturb normal execution.
+    await store.execute('call-2', FACT, new AbortController().signal);
+    expect(existsSync(join(cwd, '.neottia', 'memory', 'facts'))).toBe(true);
+  });
+
   it('is usable as the default entry point against a temp project', async () => {
     const cwd = fixture();
     const { api, registered } = fakePi();

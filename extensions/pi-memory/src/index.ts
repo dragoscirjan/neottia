@@ -58,7 +58,7 @@ export function registerMemoryTools(pi: PiExtensionApi, options: MemoryExtension
         .replace(/(^|_)([a-z])/gu, (_, __, character: string) => character.toUpperCase()),
       description: tool.description,
       parameters,
-      async execute(_toolCallId, params, _signal, _onUpdate, toolContext = {}) {
+      async execute(_toolCallId, params, signal, _onUpdate, toolContext = {}) {
         const cwd = resolve(toolContext.cwd ?? defaultCwd);
         let context = contexts.get(cwd);
         if (!context) {
@@ -78,6 +78,9 @@ export function registerMemoryTools(pi: PiExtensionApi, options: MemoryExtension
         }
         const callContext: MemoryToolContext = {
           ...context,
+          // Forward the pi request signal so cancelled calls reject before any
+          // backend, lease, or cache work.
+          ...(signal ? { signal } : {}),
           onStaleCache:
             options.onStaleCache ??
             (() => toolContext.ui?.confirm('Memory cache is stale', 'Rebuild the memory search cache now?') ?? true),

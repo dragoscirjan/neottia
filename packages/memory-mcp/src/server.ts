@@ -96,7 +96,7 @@ export function createMemoryServer(options: CreateMemoryServerOptions = {}): Ser
     }),
   }));
 
-  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
     const tool = findMemoryTool(request.params.name);
     if (!tool)
       return {
@@ -104,7 +104,11 @@ export function createMemoryServer(options: CreateMemoryServerOptions = {}): Ser
         isError: true,
       };
     try {
-      const result = await tool.run(context, (request.params.arguments ?? {}) as Record<string, unknown>);
+      // Forward the MCP request signal so cancelled calls reject before any
+      // backend, lease, or cache work.
+      const callContext: MemoryToolContext =
+        extra.signal === undefined ? context : { ...context, signal: extra.signal };
+      const result = await tool.run(callContext, (request.params.arguments ?? {}) as Record<string, unknown>);
       const outputSchema = objectOutputSchema(tool.name);
       return {
         content: [{ type: 'text', text: typeof result === 'string' ? result : JSON.stringify(result, null, 2) }],

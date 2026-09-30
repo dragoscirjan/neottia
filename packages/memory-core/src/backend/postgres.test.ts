@@ -438,6 +438,32 @@ describe.skipIf(!enabled)('postgres backend (docker pg_textsearch)', () => {
     }
   });
 
+  it('rejects already-aborted PostgreSQL operations with the stable cancellation error', async () => {
+    const store = pgStore();
+    const controller = new AbortController();
+    controller.abort();
+    const signal = { signal: controller.signal };
+    const record = await store.store(fact('Postgres cancellation seed'));
+    const exported = await store.export();
+
+    await expect(store.store(fact('Cancelled'), signal)).rejects.toMatchObject({ code: 'ABORTED' });
+    await expect(store.get(record.id, signal)).rejects.toMatchObject({ code: 'ABORTED' });
+    await expect(store.list({}, signal)).rejects.toMatchObject({ code: 'ABORTED' });
+    await expect(store.search({ query: 'seed' }, signal)).rejects.toMatchObject({ code: 'ABORTED' });
+    await expect(store.export(signal)).rejects.toMatchObject({ code: 'ABORTED' });
+    await expect(store.import(exported, false, signal)).rejects.toMatchObject({ code: 'ABORTED' });
+    expect(await store.validate(signal)).toMatchObject({
+      valid: false,
+      records: 0,
+      tombstones: 0,
+      cache: { outcome: 'skipped' },
+    });
+    // Canonical rows are untouched.
+    expect(await store.list()).toHaveLength(1);
+    expect(await store.export()).toBe(exported);
+    await store.close();
+  });
+
   it('validates and rebuilds a stale non-empty search cache', async () => {
     const record = await store.store(fact('Validate me'));
     const client = new pg.Client({ connectionString: connectionString() });

@@ -17,8 +17,9 @@ import {
   type RepositoryLease,
 } from '@neottia/repository-store';
 import { stringify } from 'yaml';
+import { assertMemoryControl, type MemoryOperationControl } from '../cancellation.js';
 import type { MemoryConfig } from '../config.js';
-import { MemoryConflictError, MemoryError, MemoryLockError } from '../errors.js';
+import { MemoryConflictError, MemoryCancellationError, MemoryError, MemoryLockError } from '../errors.js';
 import { isUlid } from '../identities.js';
 import { openMemoryCache, rebuildMemoryCache, removeMemoryCache, searchMemoryCache } from '../index-sqlite.js';
 import type { MemoryRecord, MemoryTombstone, RecordType } from '../schemas.js';
@@ -132,10 +133,12 @@ export class FilesystemBackend extends MemoryRecordSupport implements StorageBac
   }
 
   /** {@inheritdoc StorageBackend.loadState} */
-  public async loadState(): Promise<ShardState> {
+  public async loadState(control: MemoryOperationControl = {}): Promise<ShardState> {
+    assertMemoryControl(control, 'memory read');
     // Public low-level callers retain their historical no-wrapper behavior,
     // while every read now first acquires the repository authority and recovers.
-    if (this.repositoryLease.getStore() === undefined) return this.withRepositoryAccess(async () => this.loadState());
+    if (this.repositoryLease.getStore() === undefined)
+      return this.withRepositoryAccess(async () => this.loadState(control));
     const records: MemoryRecord[] = [];
     const tombstones: MemoryTombstone[] = [];
     const ids = new Set<string>();
@@ -180,7 +183,11 @@ export class FilesystemBackend extends MemoryRecordSupport implements StorageBac
   }
 
   /** {@inheritdoc StorageBackend.applyBatch} */
-  public async applyBatch(replacements: readonly StorageReplacement[]): Promise<void> {
+  public async applyBatch(
+    replacements: readonly StorageReplacement[],
+    control: MemoryOperationControl = {},
+  ): Promise<void> {
+    assertMemoryControl(control, 'memory write');
     return this.withRepositoryAccess(async (root, lease) => {
       if (replacements.length > this.limits.maxFiles) throw new MemoryError('Memory batch path limit exceeded.');
       const operations = [];
@@ -219,7 +226,13 @@ export class FilesystemBackend extends MemoryRecordSupport implements StorageBac
   }
 
   /** {@inheritdoc StorageBackend.search} — BM25 over a disposable projection. */
-  public async search(state: ShardState, query: string, options: BackendSearchOptions): Promise<MemoryRecord[]> {
+  public async search(
+    state: ShardState,
+    query: string,
+    options: BackendSearchOptions,
+    control: MemoryOperationControl = {},
+  ): Promise<MemoryRecord[]> {
+    assertMemoryControl(control, 'memory search');
     return this.withRepositoryAccess(async (root, lease) => {
       let cache = await openMemoryCache(root, lease, state, this.cacheMaxAgeMs);
       if (cache === undefined) {
@@ -244,8 +257,9 @@ export class FilesystemBackend extends MemoryRecordSupport implements StorageBac
   }
 
   /** {@inheritdoc StorageBackend.withLock} */
-  public async withLock<T>(operation: () => Promise<T>): Promise<T> {
-    return this.withRepositoryAccess(async () => operation());
+  public async withLock<T>(operation: () => Promise<T>, control: MemoryOperationControl = {}): Promise<T> {
+    assertMemoryControl(control, 'memory operation');
+    return this.withRepositoryAccess(async () => operation(), control);
   }
 
   /** Lazily resolves storage so disabled construction remains side-effect free. */
@@ -264,16 +278,27 @@ export class FilesystemBackend extends MemoryRecordSupport implements StorageBac
   /** Runs under an existing lease or acquires the shared repository authority. */
   private async withRepositoryAccess<T>(
     operation: (root: ManagedRoot, lease: RepositoryLease) => Promise<T>,
+    control: MemoryOperationControl = {},
   ): Promise<T> {
+    // Reject before resolving storage roots or touching lease state.
+    assertMemoryControl(control, 'memory operation');
     try {
       const root = await this.getRepositoryRoot();
       const existing = this.repositoryLease.getStore();
       if (existing !== undefined) return await operation(root, existing);
-      return await withRepositoryLease(root, async (lease) =>
-        this.repositoryLease.run(lease, async () => operation(root, lease)),
+      return await withRepositoryLease(
+        root,
+        async (lease) => this.repositoryLease.run(lease, async () => operation(root, lease)),
+        {
+          ...(control.signal === undefined ? {} : { signal: control.signal }),
+          ...(control.deadline === undefined ? {} : { deadline: control.deadline }),
+        },
       );
     } catch (error: unknown) {
       if (!(error instanceof RepositoryStoreError)) throw error;
+      if (error.code === 'ABORTED') throw new MemoryCancellationError('Memory operation was aborted.', 'ABORTED');
+      if (error.code === 'DEADLINE_EXCEEDED')
+        throw new MemoryCancellationError('Memory operation deadline was exceeded.', 'DEADLINE_EXCEEDED');
       if (error.category === 'contention') throw new MemoryLockError(error.message, { cause: error });
       if (error.code === 'REVISION_MISMATCH') throw new MemoryConflictError(error.message);
       if (error.code === 'LIMIT_EXCEEDED' && /byte (?:count|limit)/u.test(error.message))
@@ -287,7 +312,8 @@ export class FilesystemBackend extends MemoryRecordSupport implements StorageBac
   }
 
   /** {@inheritdoc StorageBackend.checkOrRebuildCache} */
-  public async checkOrRebuildCache(state: ShardState): Promise<CacheValidation> {
+  public async checkOrRebuildCache(state: ShardState, control: MemoryOperationControl = {}): Promise<CacheValidation> {
+    assertMemoryControl(control, 'memory cache maintenance');
     return this.withRepositoryAccess(async (root, lease) => {
       const opened = await openMemoryCache(root, lease, state, this.cacheMaxAgeMs);
       if (opened !== undefined) {
@@ -297,7 +323,7 @@ export class FilesystemBackend extends MemoryRecordSupport implements StorageBac
       const rebuilt = await rebuildMemoryCache(root, lease, state);
       await rebuilt.close();
       return { outcome: 'rebuilt', evidence: 'canonical_snapshot_rebuild_verified' };
-    });
+    }, control);
   }
 
   /** {@inheritdoc StorageBackend.resetCache} */

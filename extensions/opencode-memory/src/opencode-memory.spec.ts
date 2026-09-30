@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadMemoryConfig, MemoryStore, MEMORY_TOOLS } from '@neottia/memory-core';
@@ -122,5 +122,23 @@ describe('opencode memory plugin', () => {
     MEMORY_TOOLS.forEach((tool, index) => {
       expect(seen[index]?.args).toBe((tool.inputSchema as { shape: unknown }).shape);
     });
+  });
+
+  it('forwards the OpenCode abort signal: cancelled calls reject without mutating', async () => {
+    const cwd = fixture();
+    const hooks = (await NeottiaMemoryPlugin({ directory: cwd } as never)) as {
+      tool: Record<string, { execute: (args: unknown, context?: unknown) => Promise<string> }>;
+    };
+
+    const cancelled = new AbortController();
+    cancelled.abort();
+    await expect(hooks.tool['memory_store'].execute(FACT, { abort: cancelled.signal })).rejects.toMatchObject({
+      code: 'ABORTED',
+    });
+    expect(existsSync(join(cwd, '.neottia', 'memory'))).toBe(false);
+
+    // A live signal must not disturb normal execution.
+    await hooks.tool['memory_store'].execute(FACT, { abort: new AbortController().signal });
+    expect(existsSync(join(cwd, '.neottia', 'memory', 'facts'))).toBe(true);
   });
 });
