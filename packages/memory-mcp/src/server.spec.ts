@@ -114,6 +114,31 @@ describe('memory MCP server', () => {
     expect(exported.structuredContent).toBeUndefined();
   });
 
+  it('defaults memory_import to preview-only and publishes only on preview=false', async () => {
+    const source = await connect(fixture());
+    const client = await connect(fixture());
+    const { tools } = await client.listTools();
+    expect(tools.find((tool) => tool.name === 'memory_import')?.description).toMatch(/preview=false/u);
+
+    const stored = await source.callTool({ name: 'memory_store', arguments: FACT });
+    const record = JSON.parse((stored.content?.[0]?.text as string) ?? '{}');
+    const exported = await source.callTool({ name: 'memory_export', arguments: {} });
+    const content = exported.content?.[0]?.text as string;
+
+    // Omitted preview validates without writing.
+    const omitted = await client.callTool({ name: 'memory_import', arguments: { content } });
+    expect(omitted.isError).toBeFalsy();
+    expect(omitted.structuredContent).toMatchObject({ valid: true, records: 1, tombstones: 0 });
+    const empty = await client.callTool({ name: 'memory_list', arguments: {} });
+    expect(JSON.parse((empty.content?.[0]?.text as string) ?? '[]')).toHaveLength(0);
+
+    // Publication requires explicit preview=false.
+    const published = await client.callTool({ name: 'memory_import', arguments: { content, preview: false } });
+    expect(published.isError).toBeFalsy();
+    const listed = await client.callTool({ name: 'memory_list', arguments: {} });
+    expect(JSON.parse((listed.content?.[0]?.text as string) ?? '[]')).toMatchObject([{ id: record.id }]);
+  });
+
   it('surfaces tool errors as isError results with the message', async () => {
     const client = await connect(fixture());
     const bad = await client.callTool({ name: 'memory_get', arguments: { id: 'not-a-ulid' } });

@@ -105,8 +105,8 @@ A record is **active** when nothing supersedes it and no tombstone targets it. `
 `memory_export` produces JSONL (one record or tombstone per line). `memory_import` accepts it back, with:
 
 - **full validation before any write**: schema, namespaces, duplicate IDs, supersession references, cycles, compactness;
-- a **preview mode** (`preview: true`) that reports what would happen without writing anything;
-- identical diagnostics for preview and real import, including line numbers.
+- a **preview mode** that is the safe default: omitted `preview` behaves as `preview: true` and reports what would happen without writing anything;
+- identical diagnostics for preview and real import, including line numbers; publication requires explicit `preview: false`.
 
 ## Why files instead of a database
 

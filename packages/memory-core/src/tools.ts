@@ -175,10 +175,10 @@ export const MEMORY_TOOLS: readonly MemoryToolDefinition[] = [
   ),
   makeTool(
     'memory_import',
-    'Import memory records/tombstones from JSONL; pass preview=true to validate without writing.',
+    'Import memory records/tombstones from JSONL; validates without writing unless preview=false.',
     importInputSchema,
     memoryToolSchemas.memory_import.output,
-    async (context, input) => storeFor(context).import(input.content, input.preview ?? false),
+    async (context, input) => storeFor(context).import(input.content, input.preview ?? true),
   ),
 ];
 
