@@ -25,13 +25,45 @@ export function registerImportLifecycleContract(name: string, createStore: Impor
 
     async function rejectWithoutMutation(store: MemoryStore, content: string, message: RegExp): Promise<void> {
       const before = await store.export();
+      // Omitted preview is the safe default: identical diagnostics, no mutation.
+      const omitted = await store.import(content);
+      expect(omitted).toMatchObject({ valid: false, records: 0, tombstones: 0 });
+      expect(omitted.errors[0]).toMatch(message);
+      expect(await store.export()).toBe(before);
       const preview = await store.import(content, true);
       expect(preview).toMatchObject({ valid: false, records: 0, tombstones: 0 });
       expect(preview.errors[0]).toMatch(message);
       expect(await store.export()).toBe(before);
-      await expect(store.import(content)).rejects.toThrow(message);
+      await expect(store.import(content, false)).rejects.toThrow(message);
       expect(await store.export()).toBe(before);
     }
+
+    it('treats omitted preview as preview-only and publishes only on explicit preview=false', async () => {
+      const source = await open('safe-default-source');
+      const seed = await source.store(fact('Safe default seed'));
+      const exported = await source.export();
+      const destination = await open('safe-default-destination');
+
+      // Omitted preview validates without touching authority or cache state.
+      await expect(destination.import(exported)).resolves.toMatchObject({
+        valid: true,
+        records: 1,
+        tombstones: 0,
+      });
+      expect(await destination.export()).toBe('\n');
+      await expect(destination.validate()).resolves.toMatchObject({ valid: true });
+
+      // Explicit preview=false publishes both records and tombstones.
+      await source.delete(seed.id, 'Contract retirement', seed.source, 'contract-test');
+      const withTombstone = await source.export();
+      expect(await destination.import(withTombstone, false)).toMatchObject({
+        valid: true,
+        records: 1,
+        tombstones: 1,
+      });
+      expect(await destination.get(seed.id)).toMatchObject({ id: seed.id });
+      expect(await destination.list()).toEqual([]);
+    });
 
     it('rejects foreign namespaces, secrets, and overflow identities', async () => {
       const namespaceStore = await open('namespace');

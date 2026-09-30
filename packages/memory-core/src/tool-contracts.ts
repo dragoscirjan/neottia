@@ -153,7 +153,8 @@ export const exportInputSchema = z.object({}).strict();
 export const importInputSchema = z
   .object({
     content: byteBoundedText(MEMORY_TOOL_LIMITS.importBytes, 'Import content'),
-    preview: z.boolean().optional(),
+    // Omitted preview is safe: validation only. Publication requires preview=false.
+    preview: z.boolean().describe('Defaults to true: validate without writing. Pass false to publish.').optional(),
   })
   .strict();
 

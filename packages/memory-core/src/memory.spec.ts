@@ -79,7 +79,7 @@ async function expectImportRejectionWithoutMutation(
   expect(preview).toMatchObject({ valid: false, records: 0, tombstones: 0 });
   expect(preview.errors[0]).toMatch(message);
   expect(await store.export()).toBe(before);
-  await expect(store.import(content)).rejects.toThrow(message);
+  await expect(store.import(content, false)).rejects.toThrow(message);
   expect(await store.export()).toBe(before);
 }
 
@@ -264,14 +264,14 @@ describe('memory store (filesystem + SQLite index)', () => {
     const foreign = await destination.import(await source.export(), true);
     expect(foreign.valid).toBe(false);
     expect(foreign.errors[0]).toMatch(/scope|namespace/u);
-    await expect(destination.import(await source.export())).rejects.toThrow(/scope|namespace/u);
+    await expect(destination.import(await source.export(), false)).rejects.toThrow(/scope|namespace/u);
     expect(await destination.list()).toEqual([]);
 
     const secret = { ...stored, organization_id: 'local', summary: 'token=ghp_012345678901234567890123456789' };
     const secretResult = await destination.import(`${JSON.stringify(secret)}\n`, true);
     expect(secretResult.valid).toBe(false);
     expect(secretResult.errors[0]).toMatch(/secret/u);
-    await expect(destination.import(`${JSON.stringify(secret)}\n`)).rejects.toThrow(/secret/u);
+    await expect(destination.import(`${JSON.stringify(secret)}\n`, false)).rejects.toThrow(/secret/u);
     expect(await destination.list()).toEqual([]);
   });
 
@@ -347,7 +347,7 @@ describe('memory store (filesystem + SQLite index)', () => {
     const preview = await destination.import(content, true);
     expect(preview.valid).toBe(false);
     expect(preview.errors[0]).toMatch(/Cyclic supersession/u);
-    await expect(destination.import(content)).rejects.toThrow(/Cyclic supersession/u);
+    await expect(destination.import(content, false)).rejects.toThrow(/Cyclic supersession/u);
     expect(await destination.list()).toEqual([]);
   });
 
@@ -359,7 +359,7 @@ describe('memory store (filesystem + SQLite index)', () => {
     const exported = await source.export();
     const second = await source.store(fact('Second limited record'));
     const batch = `${exported}${JSON.stringify(second)}\n`;
-    await expect(destination.import(batch)).rejects.toThrow(/limit/u);
+    await expect(destination.import(batch, false)).rejects.toThrow(/limit/u);
     expect(await destination.list()).toEqual([]);
 
     const one = await destination.store(fact('Byte boundary record'));
@@ -409,7 +409,7 @@ describe('memory store (filesystem + SQLite index)', () => {
     await expect(store.search({ query: 'artifact' })).rejects.toThrow(/cache artifact|managed memory path/u);
   });
 
-  it('exports portable JSONL and validates imports without mutation in preview, then synchronizes the cache', async () => {
+  it('exports portable JSONL, defaults to preview, then synchronizes the cache on explicit publication', async () => {
     const source = storeFor(fixture());
     const destination = storeFor(fixture());
     const stored = await source.store(fact('Portable fact'));
@@ -417,9 +417,13 @@ describe('memory store (filesystem + SQLite index)', () => {
     expect(exported).toContain(stored.id);
     expect(await destination.import(exported, true)).toMatchObject({ valid: true, records: 1 });
     expect(await destination.list()).toHaveLength(0);
+    // Omitted preview never mutates the authority state.
     expect(await destination.import(exported)).toMatchObject({ valid: true, records: 1 });
+    expect(await destination.list()).toHaveLength(0);
+    // Publication requires explicit preview=false.
+    expect(await destination.import(exported, false)).toMatchObject({ valid: true, records: 1 });
     expect(await destination.list()).toHaveLength(1);
-    await expect(destination.import(exported)).rejects.toThrow(MemoryConflictError);
+    await expect(destination.import(exported, false)).rejects.toThrow(MemoryConflictError);
     expect(await destination.validate()).toMatchObject({
       valid: true,
       cache: { outcome: 'checked', evidence: 'canonical_snapshot_match_verified' },
@@ -430,7 +434,7 @@ describe('memory store (filesystem + SQLite index)', () => {
     const source = storeFor(fixture());
     const destination = storeFor(fixture(), { cache: { max_age_ms: 300_000, stale_policy: 'fail' } });
     const stored = await source.store(fact('Imported cache synchronization'));
-    await expect(destination.import(await source.export())).resolves.toMatchObject({ valid: true, records: 1 });
+    await expect(destination.import(await source.export(), false)).resolves.toMatchObject({ valid: true, records: 1 });
     expect(await destination.list()).toEqual([stored]);
     await expect(destination.search({ query: 'synchronization' })).resolves.toEqual([stored]);
   });
@@ -447,7 +451,12 @@ describe('memory store (filesystem + SQLite index)', () => {
     expect(preview.errors[0]).toMatch(
       /memory_import line 2 record 01ARZ3NDEKTSV4RRFFQ69G5FAW: summary has 241 Unicode characters; limit is 240/u,
     );
-    await expect(destination.import(content)).rejects.toThrow(preview.errors[0]);
+    // The omitted-preview safe default shares the identical diagnostics without mutation.
+    const omitted = await destination.import(content);
+    expect(omitted).toMatchObject({ valid: false, records: 0, tombstones: 0 });
+    expect(omitted.errors[0]).toBe(preview.errors[0]);
+    expect(await destination.list()).toEqual([]);
+    await expect(destination.import(content, false)).rejects.toThrow(preview.errors[0]);
     expect(await destination.list()).toEqual([]);
   });
 
@@ -469,7 +478,7 @@ describe('memory store (filesystem + SQLite index)', () => {
     const preview = await destination.import(exported, true);
     expect(preview.valid).toBe(false);
     expect(preview.errors[0]).toMatch(/summary has 1000 Unicode characters; limit is 240/u);
-    await expect(destination.import(exported)).rejects.toThrow(preview.errors[0]);
+    await expect(destination.import(exported, false)).rejects.toThrow(preview.errors[0]);
     expect(await destination.list()).toEqual([]);
   });
 

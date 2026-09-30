@@ -2,10 +2,10 @@
 
 `memory_export` returns JSONL containing every record and tombstone. Treat it as a portable validated representation. Filesystem canonical YAML remains the Git authority; PostgreSQL backup remains a database operation.
 
-Memory import differs from Issues and Design Docs because omission currently commits. Preview explicitly:
+Memory import is preview-only by default, matching the Issues and Design Docs behavior. Omitted `preview` validates without writing; publication requires explicit `preview: false`:
 
 ```ts
-const preview = await store.import(content, true);
+const preview = await store.import(content); // omitted preview behaves as preview: true
 if (preview.valid) {
   await store.import(content, false);
 }

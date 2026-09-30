@@ -69,7 +69,13 @@ describe('secret scanning', () => {
       supersedes: [],
       tags: [],
     };
-    await expect(store.import(`${JSON.stringify(imported)}\n`)).rejects.toThrow(/Suspected secret/u);
+    // Omitted preview is safe by default: report the secret without mutating.
+    const omitted = await store.import(`${JSON.stringify(imported)}\n`);
+    expect(omitted).toMatchObject({ valid: false, records: 0, tombstones: 0 });
+    expect(omitted.errors[0]).toMatch(/Suspected secret/u);
+    expect(canonicalFiles(join(cwd, config.root))).toEqual([]);
+    await expect(store.import(`${JSON.stringify(imported)}\n`, false)).rejects.toThrow(/Suspected secret/u);
+    expect(canonicalFiles(join(cwd, config.root))).toEqual([]);
     expect(canonicalFiles(join(cwd, config.root))).toEqual([]);
     await store.close();
   });

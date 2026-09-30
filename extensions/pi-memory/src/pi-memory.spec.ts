@@ -77,6 +77,11 @@ describe('pi memory extension', () => {
       (memoryToolParameters.memory_search as { properties: Record<string, { description?: string }> }).properties.query
         .description,
     ).toContain('UTF-8 bytes');
+    // The safe default is part of the public tool contract.
+    expect(
+      (memoryToolParameters.memory_import as { properties: Record<string, { description?: string }> }).properties
+        .preview.description,
+    ).toContain('Defaults to true');
   });
 
   it('isolates stores and snapshots by invocation cwd', async () => {
@@ -115,6 +120,36 @@ describe('pi memory extension', () => {
     // Deterministic check: canonical YAML on disk inside the temp project.
     const yaml = readFileSync(join(cwd, '.neottia', 'memory', 'facts', `${record.id}.yaml`), 'utf8');
     expect(yaml).toContain('in process');
+  });
+
+  it('imports with the safe default: omitted preview never mutates, preview=false publishes', async () => {
+    const source = fixture();
+    const destination = fixture();
+    const { api, registered } = fakePi();
+    const close = registerMemoryTools(api);
+    const find = (name: string) =>
+      registered.find((tool) => tool.name === name) as {
+        execute: (id: string, params: unknown, ...rest: unknown[]) => Promise<{ content: Array<{ text: string }> }>;
+      };
+    const at = (tool: ReturnType<typeof find>, cwd: string) => (id: string, params: unknown) =>
+      tool.execute(id, params, undefined, undefined, { cwd });
+    const storeTool = find('memory_store');
+    const exportTool = find('memory_export');
+    const importTool = find('memory_import');
+    const listTool = find('memory_list');
+
+    await at(storeTool, source)('call-1', FACT);
+    const exported = (await at(exportTool, source)('exp-1', {})).content[0].text;
+
+    // Omitted preview validates without writing.
+    const omitted = JSON.parse((await at(importTool, destination)('imp-1', { content: exported })).content[0].text);
+    expect(omitted).toMatchObject({ valid: true, records: 1, tombstones: 0 });
+    expect((await at(listTool, destination)('list-1', {})).content[0].text).not.toContain('in process');
+
+    // Publication requires explicit preview=false.
+    await at(importTool, destination)('imp-2', { content: exported, preview: false });
+    expect((await at(listTool, destination)('list-2', {})).content[0].text).toContain('in process');
+    await close();
   });
 
   it('rejects invalid tool input with the store contract message', async () => {

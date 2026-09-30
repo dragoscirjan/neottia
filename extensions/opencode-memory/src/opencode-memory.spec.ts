@@ -87,6 +87,26 @@ describe('opencode memory plugin', () => {
     expect(text).toContain(seeded.id);
   });
 
+  it('imports with the safe default: omitted preview never mutates, preview=false publishes', async () => {
+    const source = (await NeottiaMemoryPlugin({ directory: fixture() } as never)) as {
+      tool: Record<string, { execute: (args: unknown) => Promise<string> }>;
+    };
+    const destination = (await NeottiaMemoryPlugin({ directory: fixture() } as never)) as {
+      tool: Record<string, { execute: (args: unknown) => Promise<string> }>;
+    };
+    await source.tool['memory_store'].execute(FACT);
+    const exported = await source.tool['memory_export'].execute({});
+
+    // Omitted preview validates without writing.
+    const omitted = JSON.parse(await destination.tool['memory_import'].execute({ content: exported }));
+    expect(omitted).toMatchObject({ valid: true, records: 1, tombstones: 0 });
+    expect(await destination.tool['memory_list'].execute({})).not.toContain('in process');
+
+    // Publication requires explicit preview=false.
+    await destination.tool['memory_import'].execute({ content: exported, preview: false });
+    expect(await destination.tool['memory_list'].execute({})).toContain('in process');
+  });
+
   it('builds tools through the injected factory (host contract check)', () => {
     const cwd = fixture();
     const seen: Array<{ description: string; args: unknown }> = [];

@@ -294,8 +294,8 @@ describe.skipIf(!enabled)('postgres backend (docker pg_textsearch)', () => {
       .join('\n')}\n`;
     const otherOrganization = pgStore({ organization_id: organization });
     try {
-      await scoped.import(exported);
-      await otherOrganization.import(crossOrganizationPayload);
+      await scoped.import(exported, false);
+      await otherOrganization.import(crossOrganizationPayload, false);
       expect(await scoped.get(record.id)).toMatchObject({ id: record.id });
       expect(await scoped.get(tombstone.id)).toMatchObject({ id: tombstone.id });
       expect(await otherOrganization.get(record.id)).toMatchObject({ id: record.id });
@@ -429,8 +429,10 @@ describe.skipIf(!enabled)('postgres backend (docker pg_textsearch)', () => {
       expect(await destination.import(exported, true)).toMatchObject({ valid: true, records: 1 });
       expect(await destination.list()).toHaveLength(0);
       expect(await destination.import(exported)).toMatchObject({ valid: true, records: 1 });
+      expect(await destination.list()).toHaveLength(0);
+      expect(await destination.import(exported, false)).toMatchObject({ valid: true, records: 1 });
       expect(await destination.list()).toHaveLength(1);
-      await expect(destination.import(exported)).rejects.toThrow(MemoryConflictError);
+      await expect(destination.import(exported, false)).rejects.toThrow(MemoryConflictError);
     } finally {
       await destination.close();
     }

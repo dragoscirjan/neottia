@@ -186,8 +186,8 @@ export class MemoryStore {
     });
   }
 
-  /** Imports a JSONL payload; preview validates without writing. */
-  public async import(content: string, preview = false): Promise<ImportReport> {
+  /** Imports a JSONL payload; preview validates without writing. Preview is the safe default. */
+  public async import(content: string, preview = true): Promise<ImportReport> {
     if (Buffer.byteLength(content, 'utf8') > MEMORY_TOOL_LIMITS.importBytes)
       throw new MemoryError('memory import exceeds the 64 MiB payload limit.');
 
