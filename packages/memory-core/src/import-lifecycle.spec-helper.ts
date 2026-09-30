@@ -17,12 +17,14 @@ export function registerImportLifecycleContract(name: string, createStore: Impor
       while (stores.length > 0) await stores.pop()?.close();
     });
 
+    /** Opens and tracks one isolated store for automatic cleanup. */
     async function open(caseId: string): Promise<MemoryStore> {
       const store = await createStore(caseId);
       stores.push(store);
       return store;
     }
 
+    /** Verifies rejected preview and publication paths leave authority unchanged. */
     async function rejectWithoutMutation(store: MemoryStore, content: string, message: RegExp): Promise<void> {
       const before = await store.export();
       // Omitted preview is the safe default: identical diagnostics, no mutation.
