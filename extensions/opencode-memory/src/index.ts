@@ -36,8 +36,13 @@ export function buildMemoryTools(
       const definition = toolFactory({
         description: memoryTool.description,
         args: memoryTool.inputSchema.shape,
-        async execute(args: Record<string, unknown>) {
-          const result = await memoryTool.run(context, args);
+        async execute(args: Record<string, unknown>, rawContext: unknown) {
+          // OpenCode passes the invocation context as the second execute
+          // argument; forward its abort signal into the tool run.
+          const call = (rawContext ?? {}) as { abort?: AbortSignal };
+          const callContext: MemoryToolContext =
+            call.abort === undefined ? context : { ...context, signal: call.abort };
+          const result = await memoryTool.run(callContext, args);
           return typeof result === 'string' ? result : JSON.stringify(result, null, 2);
         },
       });

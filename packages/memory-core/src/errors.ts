@@ -36,6 +36,19 @@ export class MemoryLockError extends MemoryError {
   }
 }
 
+export type MemoryCancellationCode = 'ABORTED' | 'DEADLINE_EXCEEDED';
+
+/** Stable call-level cancellation failure; surfaced verbatim by every transport. */
+export class MemoryCancellationError extends MemoryError {
+  public constructor(
+    message: string,
+    public readonly code: MemoryCancellationCode,
+  ) {
+    super(message);
+    this.name = 'MemoryCancellationError';
+  }
+}
+
 /** Formats a Zod error as an indented, user-readable issue list. */
 export function formatSchemaError(error: ZodError): string {
   return error.issues

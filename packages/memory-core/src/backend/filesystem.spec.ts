@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DEFAULT_STORE_LIMITS, resolveManagedRoot, withRepositoryLease } from '@neottia/repository-store';
 import { afterEach, describe, expect, it } from 'vitest';
 import { loadMemoryConfig } from '../config.js';
 import type { MemoryRecord } from '../schemas.js';
@@ -21,6 +22,50 @@ describe('repository-backed filesystem publication', () => {
     await backend.applyBatch([{ path: backend.recordPath(record), bytes: backend.encode(record), exclusive: true }]);
 
     expect((await backend.loadState()).records).toEqual([record]);
+  });
+
+  it('cancels direct backend calls while they wait for repository authority', async () => {
+    const { backend, cwd } = fixture();
+    const state = await backend.loadState();
+    const root = await resolveManagedRoot({
+      authorityRoot: cwd,
+      managedPath: '.neottia/memory',
+      limits: DEFAULT_STORE_LIMITS,
+    });
+    let markAcquired!: () => void;
+    let release!: () => void;
+    const acquired = new Promise<void>((resolve) => (markAcquired = resolve));
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    // Hold the authority as a competing process so each direct call waits.
+    const holding = withRepositoryLease(
+      root,
+      async () => {
+        markAcquired();
+        await gate;
+      },
+      { waitMs: 10_000 },
+    );
+    await acquired;
+
+    const controller = new AbortController();
+    const control = { signal: controller.signal };
+    const pending = Promise.allSettled([
+      backend.loadState(control),
+      backend.applyBatch([], control),
+      backend.search(state, 'seed', { limit: 10, maxChars: 1_000, activeIds: state.activeIds }, control),
+    ]);
+    setTimeout(() => controller.abort(), 20);
+    try {
+      const results = await pending;
+      const cancelled = {
+        status: 'rejected',
+        reason: expect.objectContaining({ code: 'ABORTED' }),
+      };
+      expect(results).toEqual([cancelled, cancelled, cancelled]);
+    } finally {
+      release();
+      await holding;
+    }
   });
 
   it('uses the strict ULID range for canonical paths', async () => {

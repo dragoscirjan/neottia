@@ -732,4 +732,100 @@ describe('memory store (filesystem + SQLite index)', () => {
     const listTool = findMemoryTool('memory_list');
     expect(await listTool?.run(context, {})).toHaveLength(1);
   });
+
+  it('rejects already-aborted calls with a stable cancellation error before any backend work', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const signal = { signal: controller.signal };
+
+    // Disabled backend resolution must never start for a cancelled call.
+    const fresh = fixture();
+    const freshStore = storeFor(fresh);
+    await expect(freshStore.store(fact('Cancelled store'), signal)).rejects.toMatchObject({ code: 'ABORTED' });
+    expect(existsSync(join(fresh, '.neottia', 'memory'))).toBe(false);
+
+    const store = storeFor(fixture());
+    const seeded = await store.store(fact('Cancellation seed'));
+    const before = await store.export();
+    await expect(store.get(createUlid(), signal)).rejects.toMatchObject({ code: 'ABORTED' });
+    await expect(store.list({}, signal)).rejects.toMatchObject({ code: 'ABORTED' });
+    await expect(store.search({ query: 'seed' }, signal)).rejects.toMatchObject({ code: 'ABORTED' });
+    await expect(store.export(signal)).rejects.toMatchObject({ code: 'ABORTED' });
+    await expect(store.supersede(createUlid(), fact('Cancelled supersede'), signal)).rejects.toMatchObject({
+      code: 'ABORTED',
+    });
+    await expect(store.delete(createUlid(), 'Cancelled', seeded.source, 'test-user', signal)).rejects.toMatchObject({
+      code: 'ABORTED',
+    });
+    await expect(store.import(before, false, signal)).rejects.toMatchObject({ code: 'ABORTED' });
+    // validate returns its report shape for cancellation, like every other
+    // validation failure, with the stable aborted message and skipped cache.
+    expect(await store.validate(signal)).toMatchObject({
+      valid: false,
+      records: 0,
+      tombstones: 0,
+      cache: { outcome: 'skipped' },
+    });
+    expect((await store.validate(signal)).errors[0]).toMatch(/memory_validate was aborted\./u);
+    // Canonical authority and cache state are untouched.
+    expect(await store.list()).toEqual([seeded]);
+    expect(await store.export()).toBe(before);
+  });
+
+  it('rejects expired deadlines with the stable deadline cancellation error', async () => {
+    const cwd = fixture();
+    const store = storeFor(cwd);
+    await expect(store.store(fact('Deadline store'), { deadline: Date.now() - 1 })).rejects.toMatchObject({
+      code: 'DEADLINE_EXCEEDED',
+    });
+    expect(existsSync(join(cwd, '.neottia', 'memory'))).toBe(false);
+  });
+
+  it('cancels an in-flight import while it waits for the repository authority lease', async () => {
+    const cwd = fixture();
+    const source = storeFor(cwd);
+    await source.store(fact('Cancellation payload'));
+    const exported = await source.export();
+    const destination = storeFor(cwd);
+
+    // Hold the repository authority directly, like a competing process would.
+    const root = await resolveManagedRoot({
+      authorityRoot: cwd,
+      managedPath: '.neottia/memory',
+      limits: DEFAULT_STORE_LIMITS,
+    });
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const holding = withRepositoryLease(root, async () => gate, { waitMs: 10_000 });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    const controller = new AbortController();
+    const pending = destination.import(exported, false, { signal: controller.signal });
+    setTimeout(() => controller.abort(), 20);
+    await expect(pending).rejects.toMatchObject({ code: 'ABORTED' });
+    release();
+    await holding;
+
+    // No publication happened (exactly the source's record exists) and the
+    // authority remains healthy.
+    expect(await destination.list()).toHaveLength(1);
+    expect(await destination.export()).toBe(exported);
+    expect(await destination.validate()).toMatchObject({ valid: true });
+  });
+
+  it('forwards tool-context cancellation into store operations', async () => {
+    const cwd = fixture();
+    const controller = new AbortController();
+    controller.abort();
+    const { findMemoryTool } = await import('./tools.js');
+    const storeTool = findMemoryTool('memory_store');
+    await expect(
+      storeTool?.run({ cwd, interactive: true, signal: controller.signal }, fact('Cancelled tool call')),
+    ).rejects.toMatchObject({ code: 'ABORTED' });
+    const importTool = findMemoryTool('memory_import');
+    await expect(
+      importTool?.run({ cwd, interactive: true, signal: controller.signal }, { content: '{}\n', preview: false }),
+    ).rejects.toMatchObject({ code: 'ABORTED' });
+    expect(existsSync(join(cwd, '.neottia', 'memory'))).toBe(false);
+  });
 });

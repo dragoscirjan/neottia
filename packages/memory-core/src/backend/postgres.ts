@@ -2,6 +2,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash } from 'node:crypto';
 import pg from 'pg';
 import { stringify } from 'yaml';
+import { assertMemoryControl, type MemoryOperationControl } from '../cancellation.js';
 import type { MemoryConfig } from '../config.js';
 import { MemoryConflictError, MemoryError } from '../errors.js';
 import { isUlid } from '../identities.js';
@@ -235,7 +236,8 @@ export class PostgresBackend extends MemoryRecordSupport implements StorageBacke
   // -- state ----------------------------------------------------------------
 
   /** {@inheritdoc StorageBackend.loadState} */
-  public async loadState(): Promise<ShardState> {
+  public async loadState(control: MemoryOperationControl = {}): Promise<ShardState> {
+    assertMemoryControl(control, 'memory read');
     await this.ensureSchema();
     const executor = this.currentClient() ?? this.pool;
     const recordsResult = await executor.query(
@@ -266,10 +268,14 @@ export class PostgresBackend extends MemoryRecordSupport implements StorageBacke
   // -- mutation ---------------------------------------------------------------
 
   /** {@inheritdoc StorageBackend.applyBatch} — upserts in one transaction. */
-  public async applyBatch(replacements: readonly StorageReplacement[]): Promise<void> {
+  public async applyBatch(
+    replacements: readonly StorageReplacement[],
+    control: MemoryOperationControl = {},
+  ): Promise<void> {
+    assertMemoryControl(control, 'memory write');
     const bound = this.currentClient();
     if (!bound) {
-      await this.withLock(() => this.applyBatch(replacements));
+      await this.withLock(() => this.applyBatch(replacements), control);
       return;
     }
     // Calculate the resulting shard inventory before the first mutation, so
@@ -425,10 +431,16 @@ export class PostgresBackend extends MemoryRecordSupport implements StorageBacke
   // -- search ---------------------------------------------------------------
 
   /** {@inheritdoc StorageBackend.search} */
-  public async search(state: ShardState, query: string, options: BackendSearchOptions): Promise<MemoryRecord[]> {
+  public async search(
+    state: ShardState,
+    query: string,
+    options: BackendSearchOptions,
+    control: MemoryOperationControl = {},
+  ): Promise<MemoryRecord[]> {
+    assertMemoryControl(control, 'memory search');
     await this.ensureSchema();
     if (!query.trim()) return [];
-    await this.checkOrRebuildCache(state);
+    await this.checkOrRebuildCache(state, control);
     const byId = new Map(state.records.map((record) => [record.id, record]));
     const batchSize = Math.max(options.limit, 50);
     const results: MemoryRecord[] = [];
@@ -491,11 +503,15 @@ export class PostgresBackend extends MemoryRecordSupport implements StorageBacke
   // -- locking and cache ----------------------------------------------------
 
   /** {@inheritdoc StorageBackend.withLock} — advisory lock + snapshot. */
-  public async withLock<T>(operation: () => Promise<T>): Promise<T> {
+  public async withLock<T>(operation: () => Promise<T>, control: MemoryOperationControl = {}): Promise<T> {
+    assertMemoryControl(control, 'memory operation');
     await this.ensureSchema();
     // Re-entrant calls share the same transaction, lock, and snapshot.
     if (this.txContext.getStore()) return operation();
     for (let attempt = 0; attempt < 2; attempt += 1) {
+      // Cancellation is safe between attempts; inside a transaction the
+      // rollback path below already guarantees atomicity.
+      assertMemoryControl(control, 'memory operation');
       let client: pg.PoolClient | undefined;
       try {
         client = await this.pool.connect();
@@ -527,7 +543,8 @@ export class PostgresBackend extends MemoryRecordSupport implements StorageBacke
   }
 
   /** {@inheritdoc StorageBackend.checkOrRebuildCache} — the DB is the index. */
-  public async checkOrRebuildCache(state: ShardState): Promise<CacheValidation> {
+  public async checkOrRebuildCache(state: ShardState, control: MemoryOperationControl = {}): Promise<CacheValidation> {
+    assertMemoryControl(control, 'memory cache maintenance');
     await this.ensureSchema();
     const executor = this.currentClient() ?? this.pool;
     const result = await executor.query(

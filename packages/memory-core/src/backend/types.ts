@@ -1,3 +1,4 @@
+import type { MemoryOperationControl } from '../cancellation.js';
 import type { MemoryRecord, MemoryTombstone } from '../schemas.js';
 import type { MemoryRecordInput } from './filesystem.js';
 
@@ -56,19 +57,24 @@ export interface CacheValidation {
 
 export interface StorageBackend {
   /** Loads the full shard state. */
-  loadState(): Promise<ShardState>;
+  loadState(control?: MemoryOperationControl): Promise<ShardState>;
   /** Applies file replacements atomically with rollback. */
-  applyBatch(replacements: readonly StorageReplacement[]): Promise<void>;
+  applyBatch(replacements: readonly StorageReplacement[], control?: MemoryOperationControl): Promise<void>;
   /** BM25-ranked search scoped to the shard. */
-  search(state: ShardState, query: string, options: BackendSearchOptions): Promise<MemoryRecord[]>;
+  search(
+    state: ShardState,
+    query: string,
+    options: BackendSearchOptions,
+    control?: MemoryOperationControl,
+  ): Promise<MemoryRecord[]>;
   /**
    * Runs the operation while holding the shard-scoped lock. Remote backends
    * use transaction-scoped advisory locks; the filesystem backend uses its
-   * lock directory.
+   * lock directory. Cancellation interrupts acquisition and wait phases only.
    */
-  withLock<T>(operation: () => Promise<T>): Promise<T>;
+  withLock<T>(operation: () => Promise<T>, control?: MemoryOperationControl): Promise<T>;
   /** Verifies (and rebuilds when stale) the backend's search index. */
-  checkOrRebuildCache(state: ShardState): Promise<CacheValidation>;
+  checkOrRebuildCache(state: ShardState, control?: MemoryOperationControl): Promise<CacheValidation>;
   /** Disposes the search index (used by tests and cache invalidation). */
   resetCache(): Promise<void>;
   /** Releases backend resources (connections, watchers). */

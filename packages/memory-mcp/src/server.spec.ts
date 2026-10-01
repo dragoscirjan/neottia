@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { memoryToolJsonSchema, MEMORY_TOOLS } from '@neottia/memory-core';
+import { DEFAULT_STORE_LIMITS, resolveManagedRoot, withRepositoryLease } from '@neottia/repository-store';
 import { afterEach, describe, expect, it } from 'vitest';
 import { stringify } from 'yaml';
 import { createMemoryServer, effectiveStalePolicy } from './server.js';
@@ -137,6 +138,43 @@ describe('memory MCP server', () => {
     expect(published.isError).toBeFalsy();
     const listed = await client.callTool({ name: 'memory_list', arguments: {} });
     expect(JSON.parse((listed.content?.[0]?.text as string) ?? '[]')).toMatchObject([{ id: record.id }]);
+  });
+
+  it('cancels an in-flight memory_import when the client request is cancelled', async () => {
+    const cwd = fixture();
+    const client = await connect(cwd);
+    const stored = await client.callTool({ name: 'memory_store', arguments: FACT });
+    const record = JSON.parse((stored.content?.[0]?.text as string) ?? '{}');
+    const exported = await client.callTool({ name: 'memory_export', arguments: {} });
+    const content = exported.content?.[0]?.text as string;
+
+    // Hold the repository authority, like a competing process would, so the
+    // import blocks in its lease-wait phase and cancellation arrives mid-flight.
+    const root = await resolveManagedRoot({
+      authorityRoot: cwd,
+      managedPath: '.neottia/memory',
+      limits: DEFAULT_STORE_LIMITS,
+    });
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const holding = withRepositoryLease(root, async () => gate, { waitMs: 10_000 });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    const controller = new AbortController();
+    const pending = client.callTool({ name: 'memory_import', arguments: { content, preview: false } }, undefined, {
+      signal: controller.signal,
+    });
+    setTimeout(() => controller.abort(), 20);
+    await expect(pending).rejects.toThrow();
+    release();
+    await holding;
+
+    // The cancelled call never published: exactly the original record remains.
+    const listed = await client.callTool({ name: 'memory_list', arguments: {} });
+    expect(JSON.parse((listed.content?.[0]?.text as string) ?? '[]')).toMatchObject([{ id: record.id }]);
+    expect(await client.callTool({ name: 'memory_validate', arguments: {} })).toMatchObject({
+      content: [{ text: expect.stringMatching(/"valid": true/u) }],
+    });
   });
 
   it('surfaces tool errors as isError results with the message', async () => {

@@ -15,7 +15,15 @@ export {
   type MemoryTombstone,
 } from './schemas.js';
 
-export { ConfigError, MemoryConflictError, MemoryError, MemoryLockError, formatSchemaError } from './errors.js';
+export {
+  ConfigError,
+  MemoryCancellationError,
+  MemoryConflictError,
+  MemoryError,
+  MemoryLockError,
+  formatSchemaError,
+} from './errors.js';
+export { assertMemoryControl, type MemoryOperationControl } from './cancellation.js';
 export { MemoryConfigPatternError, MemorySecretError } from './security.js';
 
 export {

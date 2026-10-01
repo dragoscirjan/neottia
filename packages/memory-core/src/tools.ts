@@ -29,6 +29,8 @@ export interface MemoryToolContext {
   readonly cwd: string;
   /** Whether the host harness can prompt the user (extensions: yes, MCP: no). */
   readonly interactive: boolean;
+  /** Host request cancellation signal; forwarded into every store operation. */
+  readonly signal?: AbortSignal;
   /** Pre-resolved immutable shard supplied by a shared host snapshot. */
   readonly config?: DeepReadonly<MemoryConfig>;
   /** Deprecated standalone overrides used only when no resolved shard is supplied. */
@@ -53,6 +55,11 @@ export interface MemoryToolDefinition {
 
 const contextStores = new WeakMap<object, MemoryStore>();
 const staleCacheCallbacks = new AsyncLocalStorage<MemoryToolContext['onStaleCache']>();
+
+/** Call-level cancellation controls derived from the host request signal. */
+function toolControl(context: MemoryToolContext): { signal?: AbortSignal } {
+  return context.signal === undefined ? {} : { signal: context.signal };
+}
 
 function storeFor(context: MemoryToolContext): MemoryStore {
   const key = context.storeKey ?? context;
@@ -119,7 +126,7 @@ export const MEMORY_TOOLS: readonly MemoryToolDefinition[] = [
     'Store a new memory record (fact/decision/event/lesson) in the project memory shard.',
     storeInputSchema,
     memoryToolSchemas.memory_store.output,
-    async (context, input) => storeFor(context).store(input as StoreMemoryInput),
+    async (context, input) => storeFor(context).store(input as StoreMemoryInput, toolControl(context)),
   ),
   makeTool(
     'memory_supersede',
@@ -128,7 +135,7 @@ export const MEMORY_TOOLS: readonly MemoryToolDefinition[] = [
     memoryToolSchemas.memory_supersede.output,
     async (context, input) => {
       const { target_id, ...rest } = input;
-      return storeFor(context).supersede(target_id, rest as StoreMemoryInput);
+      return storeFor(context).supersede(target_id, rest as StoreMemoryInput, toolControl(context));
     },
   ),
   makeTool(
@@ -136,49 +143,50 @@ export const MEMORY_TOOLS: readonly MemoryToolDefinition[] = [
     'Tombstone an active memory record with a reason; canonical files are never deleted.',
     deleteInputSchema,
     memoryToolSchemas.memory_delete.output,
-    async (context, input) => storeFor(context).delete(input.target_id, input.reason, input.source, input.created_by),
+    async (context, input) =>
+      storeFor(context).delete(input.target_id, input.reason, input.source, input.created_by, toolControl(context)),
   ),
   makeTool(
     'memory_get',
     'Fetch a memory record or tombstone by its ULID.',
     getInputSchema,
     memoryToolSchemas.memory_get.output,
-    async (context, input) => storeFor(context).get(input.id),
+    async (context, input) => storeFor(context).get(input.id, toolControl(context)),
   ),
   makeTool(
     'memory_list',
     'List active memory records, newest first, optionally filtered by topic and memory_type.',
     listInputSchema,
     memoryToolSchemas.memory_list.output,
-    async (context, input) => storeFor(context).list(input),
+    async (context, input) => storeFor(context).list(input, toolControl(context)),
   ),
   makeTool(
     'memory_search',
     'Backend-ranked full-text search over the memory shard (SQLite FTS5, pg_textsearch, or PostgreSQL tsvector).',
     searchInputSchema,
     memoryToolSchemas.memory_search.output,
-    async (context, input) => storeFor(context).search(input as SearchMemoryInput),
+    async (context, input) => storeFor(context).search(input as SearchMemoryInput, toolControl(context)),
   ),
   makeTool(
     'memory_validate',
     'Validate canonical memory records and verify or rebuild the SQLite cache.',
     validateInputSchema,
     memoryToolSchemas.memory_validate.output,
-    async (context) => storeFor(context).validate(),
+    async (context) => storeFor(context).validate(toolControl(context)),
   ),
   makeTool(
     'memory_export',
     'Export all memory records and tombstones as JSONL.',
     exportInputSchema,
     memoryToolSchemas.memory_export.output,
-    async (context) => storeFor(context).export(),
+    async (context) => storeFor(context).export(toolControl(context)),
   ),
   makeTool(
     'memory_import',
     'Import memory records/tombstones from JSONL; validates without writing unless preview=false.',
     importInputSchema,
     memoryToolSchemas.memory_import.output,
-    async (context, input) => storeFor(context).import(input.content, input.preview ?? true),
+    async (context, input) => storeFor(context).import(input.content, input.preview ?? true, toolControl(context)),
   ),
 ];
 

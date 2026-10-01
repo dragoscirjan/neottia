@@ -2,6 +2,7 @@ import { FilesystemBackend } from './backend/filesystem.js';
 import { PostgresBackend } from './backend/postgres.js';
 import { assertAcyclic } from './backend/record-helpers.js';
 import type { BackendSearchOptions, ShardState, StorageBackend, StorageReplacement } from './backend/types.js';
+import { assertMemoryControl, type MemoryOperationControl } from './cancellation.js';
 import type { MemoryConfig } from './config.js';
 import { MemoryConflictError, MemoryError } from './errors.js';
 import { isUlid } from './identities.js';
@@ -75,19 +76,25 @@ export class MemoryStore {
   }
 
   /** Stores a new active memory record. */
-  public async store(input: StoreMemoryInput): Promise<MemoryRecord> {
+  public async store(input: StoreMemoryInput, control: MemoryOperationControl = {}): Promise<MemoryRecord> {
+    assertMemoryControl(control, 'memory_store');
     this.backend.validateCompactness(input.summary, input.details, 'memory_store');
-    return this.executeMutation(() => this.writeRecord(this.backend.makeRecord(input, [], this.now)));
+    return this.executeMutation(() => this.writeRecord(this.backend.makeRecord(input, [], this.now), control), control);
   }
 
   /** Stores a replacement record that supersedes an active target. */
-  public async supersede(targetId: string, input: StoreMemoryInput): Promise<MemoryRecord> {
+  public async supersede(
+    targetId: string,
+    input: StoreMemoryInput,
+    control: MemoryOperationControl = {},
+  ): Promise<MemoryRecord> {
+    assertMemoryControl(control, 'memory_supersede');
     assertUlid(targetId, 'target_id');
     this.backend.validateCompactness(input.summary, input.details, 'memory_supersede');
     return this.executeMutation(async () => {
-      this.requireActiveTarget(await this.loadState(), targetId);
-      return this.writeRecord(this.backend.makeRecord(input, [targetId], this.now));
-    });
+      this.requireActiveTarget(await this.loadState(control), targetId);
+      return this.writeRecord(this.backend.makeRecord(input, [targetId], this.now), control);
+    }, control);
   }
 
   /** Tombstones an active record; canonical data is never deleted. */
@@ -96,32 +103,37 @@ export class MemoryStore {
     reason: string,
     source: MemorySource,
     createdBy: string,
+    control: MemoryOperationControl = {},
   ): Promise<MemoryTombstone> {
+    assertMemoryControl(control, 'memory_delete');
     assertUlid(targetId, 'target_id');
     return this.executeMutation(async () => {
-      const state = await this.loadState();
+      const state = await this.loadState(control);
       this.requireActiveTarget(state, targetId);
       const tombstone = this.backend.makeTombstone(targetId, reason, source, createdBy, this.now);
       this.assertUniqueId(state, tombstone.id);
-      await this.applyBatch([
-        { path: this.backend.tombstonePath(tombstone), bytes: this.backend.encode(tombstone), exclusive: true },
-      ]);
+      await this.applyBatch(
+        [{ path: this.backend.tombstonePath(tombstone), bytes: this.backend.encode(tombstone), exclusive: true }],
+        control,
+      );
       return tombstone;
-    });
+    }, control);
   }
 
   /** Fetches one record or tombstone by ULID. */
-  public async get(id: string): Promise<MemoryRecord | MemoryTombstone> {
+  public async get(id: string, control: MemoryOperationControl = {}): Promise<MemoryRecord | MemoryTombstone> {
+    assertMemoryControl(control, 'memory_get');
     assertUlid(id, 'id');
     return this.executeRead((state) => {
       const result = [...state.records, ...state.tombstones].find((item) => item.id === id);
       if (!result) throw new MemoryError(`Memory record not found: ${id}`);
       return result;
-    });
+    }, control);
   }
 
   /** Lists records, newest first, with optional topic/type filters. */
-  public async list(input: SearchMemoryInput = {}): Promise<MemoryRecord[]> {
+  public async list(input: SearchMemoryInput = {}, control: MemoryOperationControl = {}): Promise<MemoryRecord[]> {
+    assertMemoryControl(control, 'memory_list');
     return this.executeRead((state) => {
       const includeSuperseded = input.include_superseded ?? this.config.retrieval.include_superseded;
       const limit = bounded(input.limit ?? this.config.retrieval.limit, 1, 100, 'limit');
@@ -130,11 +142,12 @@ export class MemoryStore {
         .filter((record) => !input.topic || record.topic === input.topic)
         .filter((record) => !input.memory_type || record.memory_type === input.memory_type)
         .slice(0, limit);
-    });
+    }, control);
   }
 
   /** BM25-ranked search through the backend index. */
-  public async search(input: SearchMemoryInput = {}): Promise<MemoryRecord[]> {
+  public async search(input: SearchMemoryInput = {}, control: MemoryOperationControl = {}): Promise<MemoryRecord[]> {
+    assertMemoryControl(control, 'memory_search');
     const query = input.query;
     if (!query || !query.trim()) throw new MemoryError('query must contain searchable text.');
     if (Buffer.byteLength(query, 'utf8') > MEMORY_TOOL_LIMITS.queryBytes)
@@ -143,7 +156,7 @@ export class MemoryStore {
     const maxChars = bounded(input.max_chars ?? this.config.retrieval.max_chars, 256, 100_000, 'max_chars');
 
     return this.withBarrier(async () => {
-      const state = await this.loadState();
+      const state = await this.loadState(control);
       const options: BackendSearchOptions = {
         limit,
         maxChars,
@@ -152,16 +165,20 @@ export class MemoryStore {
         includeSuperseded: input.include_superseded ?? this.config.retrieval.include_superseded,
         activeIds: state.activeIds,
       };
-      return this.backend.search(state, query, options);
-    });
+      return this.backend.search(state, query, options, control);
+    }, control);
   }
 
   /** Validates canonical records and verifies or rebuilds the search index. */
-  public async validate(): Promise<MemoryValidationReport> {
+  public async validate(control: MemoryOperationControl = {}): Promise<MemoryValidationReport> {
     try {
+      // Cancellation surfaces through the report contract, like other failures.
+      assertMemoryControl(control, 'memory_validate');
       this.assertEnabled();
       return await this.withBarrier(async () => {
-        const state = await this.loadState();
+        const state = await this.loadState(control);
+        // Cache rebuild is bounded work, but cancelling before it starts is safe.
+        assertMemoryControl(control, 'memory_validate');
         const report = {
           valid: true,
           records: state.records.length,
@@ -170,32 +187,35 @@ export class MemoryStore {
         };
         const cache = await this.backend.checkOrRebuildCache(state);
         return { ...report, cache };
-      });
+      }, control);
     } catch (error: unknown) {
       return invalidMemoryValidationReport(error);
     }
   }
 
   /** Exports all records and tombstones as JSONL (one document per line). */
-  public async export(): Promise<string> {
+  public async export(control: MemoryOperationControl = {}): Promise<string> {
+    assertMemoryControl(control, 'memory_export');
     return this.executeRead((state) => {
       const result = `${[...state.records, ...state.tombstones].map((item) => JSON.stringify(item)).join('\n')}\n`;
       if (Buffer.byteLength(result, 'utf8') > MEMORY_TOOL_LIMITS.exportBytes)
         throw new MemoryError('memory export exceeds the 64 MiB payload limit.');
       return result;
-    });
+    }, control);
   }
 
   /** Imports a JSONL payload; preview validates without writing. Preview is the safe default. */
-  public async import(content: string, preview = true): Promise<ImportReport> {
+  public async import(content: string, preview = true, control: MemoryOperationControl = {}): Promise<ImportReport> {
+    assertMemoryControl(control, 'memory_import');
     if (Buffer.byteLength(content, 'utf8') > MEMORY_TOOL_LIMITS.importBytes)
       throw new MemoryError('memory import exceeds the 64 MiB payload limit.');
 
     try {
       this.assertEnabled();
       return await this.withBarrier(async () => {
+        assertMemoryControl(control, 'memory_import');
         const candidates = parseImportCandidates(content);
-        const validated = this.validateImportBatch(candidates, await this.loadState());
+        const validated = this.validateImportBatch(candidates, await this.loadState(control));
         if (preview)
           return {
             valid: true,
@@ -216,7 +236,7 @@ export class MemoryStore {
             exclusive: true,
           })),
         ];
-        if (replacements.length) await this.applyBatch(replacements);
+        if (replacements.length) await this.applyBatch(replacements, control);
         // Imports bypass executeMutation because preview shares this path;
         // synchronize the disposable cache only after canonical publication.
         if (!replacements.length)
@@ -238,7 +258,7 @@ export class MemoryStore {
           };
         }
         return { valid: true, records: validated.records.length, tombstones: validated.tombstones.length, errors: [] };
-      });
+      }, control);
     } catch (error: unknown) {
       if (preview) return { valid: false, records: 0, tombstones: 0, errors: [describe(error)] };
       if (error instanceof MemoryError || error instanceof MemoryConflictError) throw error;
@@ -249,11 +269,12 @@ export class MemoryStore {
   // -- internals ------------------------------------------------------------
 
   /** Exclusively writes one validated record; rejects duplicate identities. */
-  private async writeRecord(record: MemoryRecord): Promise<MemoryRecord> {
-    this.assertUniqueId(await this.loadState(), record.id);
-    await this.applyBatch([
-      { path: this.backend.recordPath(record), bytes: this.backend.encode(record), exclusive: true },
-    ]);
+  private async writeRecord(record: MemoryRecord, control: MemoryOperationControl = {}): Promise<MemoryRecord> {
+    this.assertUniqueId(await this.loadState(control), record.id);
+    await this.applyBatch(
+      [{ path: this.backend.recordPath(record), bytes: this.backend.encode(record), exclusive: true }],
+      control,
+    );
     return record;
   }
 
@@ -293,15 +314,16 @@ export class MemoryStore {
     return { records, tombstones };
   }
 
-  private async executeRead<T>(operation: (state: ShardState) => T): Promise<T> {
-    return this.withBarrier(async () => operation(await this.loadState()));
+  private async executeRead<T>(operation: (state: ShardState) => T, control: MemoryOperationControl = {}): Promise<T> {
+    return this.withBarrier(async () => operation(await this.loadState(control)), control);
   }
 
-  private async executeMutation<T>(operation: () => Promise<T>): Promise<T> {
+  private async executeMutation<T>(operation: () => Promise<T>, control: MemoryOperationControl = {}): Promise<T> {
     return this.withBarrier(async () => {
       // Pre-validate canonical state, run the mutation, then re-validate and
-      // resynchronize the backend search index.
-      await this.loadState();
+      // resynchronize the backend search index. Post-commit cache maintenance
+      // is bounded and non-interruptible: the publication already committed.
+      await this.loadState(control);
       const result = await operation();
       const state = await this.loadState();
       try {
@@ -314,19 +336,22 @@ export class MemoryStore {
         });
       }
       return result;
-    });
+    }, control);
   }
 
-  private withBarrier<T>(operation: () => Promise<T>): Promise<T> {
+  private withBarrier<T>(operation: () => Promise<T>, control: MemoryOperationControl = {}): Promise<T> {
     this.assertEnabled();
-    return this.backend.withLock(operation);
+    return this.backend.withLock(operation, control);
   }
 
-  private loadState(): Promise<ShardState> {
-    return this.backend.loadState();
+  private loadState(control: MemoryOperationControl = {}): Promise<ShardState> {
+    return this.backend.loadState(control);
   }
 
-  private applyBatch(replacements: readonly StorageReplacement[]): Promise<void> {
+  private applyBatch(replacements: readonly StorageReplacement[], control: MemoryOperationControl = {}): Promise<void> {
+    // The atomic batch is the commit boundary; the pre-batch check is the last
+    // safe interruption point before publication.
+    assertMemoryControl(control, 'memory publication');
     return this.backend.applyBatch(replacements);
   }
 
