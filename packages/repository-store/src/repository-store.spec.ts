@@ -951,6 +951,71 @@ describe('repository authority lease', () => {
     expect(existsSync(claim)).toBe(false);
   });
 
+  it('treats a claim released during a reclaim read as contention, not tampering', async () => {
+    // Deterministic replay of the CI race behind issue #123: the contender's
+    // bounded claim read holds an open descriptor while the live owner's
+    // unlink lands, so the descriptor observes nlink zero mid-read.
+    const root = await fixture();
+    await withRepositoryLease(root, async () => undefined);
+    const control = join(root.authorityRoot, '.neottia', 'repository-store');
+    const claim = join(control, 'authority.claim');
+    const staging = join(control, `authority.claim.prepare-${randomUUID()}`);
+    writeOwnerMetadata(staging, control, process.pid, new Date());
+    linkSync(staging, claim);
+    rmSync(staging);
+
+    const worker = fileURLToPath(new URL('./lease-worker.fixture.ts', import.meta.url));
+    const openedMarker = join(root.authorityRoot, 'race-opened-released');
+    const resumeMarker = join(root.authorityRoot, 'race-resume-released');
+    const pending = runWorkerProcess(
+      worker,
+      [root.authorityRoot, 'released', '1', 'released'],
+      'claim release race worker',
+      (code) => code === 0,
+    );
+    await waitForCondition(() => existsSync(openedMarker));
+    rmSync(claim);
+    writeFileSync(resumeMarker, 'go');
+    await pending;
+
+    // The contender reclaimed the released slot and completed a full lease.
+    expect(existsSync(claim)).toBe(false);
+    expect(readdirSync(control).filter((name) => name.startsWith('authority.'))).toEqual([]);
+    await expect(withRepositoryLease(root, async () => 'steady')).resolves.toBe('steady');
+  });
+
+  it('fails closed when the claim is substituted during a reclaim read', async () => {
+    const root = await fixture();
+    await withRepositoryLease(root, async () => undefined);
+    const control = join(root.authorityRoot, '.neottia', 'repository-store');
+    const claim = join(control, 'authority.claim');
+    const staging = join(control, `authority.claim.prepare-${randomUUID()}`);
+    writeOwnerMetadata(staging, control, process.pid, new Date());
+    linkSync(staging, claim);
+    rmSync(staging);
+    const target = join(root.authorityRoot, 'operator-owned.yaml');
+    writeFileSync(target, 'operator');
+
+    const worker = fileURLToPath(new URL('./lease-worker.fixture.ts', import.meta.url));
+    const openedMarker = join(root.authorityRoot, 'race-opened-substituted');
+    const resumeMarker = join(root.authorityRoot, 'race-resume-substituted');
+    const pending = runWorkerProcess(
+      worker,
+      [root.authorityRoot, 'substituted', '1', 'substituted'],
+      'claim substitution race worker',
+      (code) => code === 0,
+    );
+    await waitForCondition(() => existsSync(openedMarker));
+    rmSync(claim);
+    symlinkSync(target, claim);
+    writeFileSync(resumeMarker, 'go');
+    await expect(pending).rejects.toThrow(/unsafe hard-link/i);
+
+    // The substituted artifact and its target remain untouched.
+    expect(lstatSync(claim).isSymbolicLink()).toBe(true);
+    expect(readFileSync(target, 'utf8')).toBe('operator');
+  });
+
   it('interrupts a contention wait promptly when its signal aborts', async () => {
     const root = await fixture();
     await withRepositoryLease(root, async () => undefined);
