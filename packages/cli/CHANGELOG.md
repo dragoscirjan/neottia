@@ -1,5 +1,13 @@
 # @neottia/cli
 
+## 0.4.1
+
+### Patch Changes
+
+- Updated dependencies [[`545c986`](https://github.com/dragoscirjan/neottia/commit/545c98617fbca8eec316564f66a67893e1d26fed), [`bbd40be`](https://github.com/dragoscirjan/neottia/commit/bbd40be53f4f7af19388856e5516c06909b63bba)]:
+  - @neottia/memory-core@0.3.0
+  - @neottia/config-registry@0.2.2
+
 ## 0.4.0
 
 ### Minor Changes
