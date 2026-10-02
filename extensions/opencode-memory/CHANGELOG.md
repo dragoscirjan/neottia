@@ -1,5 +1,19 @@
 # @neottia/opencode-memory
 
+## 0.2.0
+
+### Minor Changes
+
+- [#176](https://github.com/dragoscirjan/neottia/pull/176) [`545c986`](https://github.com/dragoscirjan/neottia/commit/545c98617fbca8eec316564f66a67893e1d26fed) Thanks [@dragoscirjan](https://github.com/dragoscirjan)! - Propagate host cancellation through Memory: the pi tool call signal, the OpenCode invocation abort, and the MCP request signal now flow into every `memory_*` tool, and `MemoryStore`/backend operations accept a `MemoryOperationControl` (`{ signal, deadline }`). Already-aborted calls reject with the stable `MemoryCancellationError` (`ABORTED` / `DEADLINE_EXCEEDED`) before any backend, lease, or cache work; cancellation is checked at safe phase boundaries while the atomic publication batch and post-commit cache maintenance remain non-interruptible. Adds Pi, OpenCode, and MCP cancellation contract tests plus representative filesystem/PostgreSQL coverage.
+
+- [#175](https://github.com/dragoscirjan/neottia/pull/175) [`bbd40be`](https://github.com/dragoscirjan/neottia/commit/bbd40be53f4f7af19388856e5516c06909b63bba) Thanks [@dragoscirjan](https://github.com/dragoscirjan)! - Make omitted `preview` the safe default for `memory_import`: it now validates without writing (previously it committed), matching the Issues and Design Docs import behavior. Publishing records and tombstones requires explicit `preview: false`, with identical diagnostics between preview and mutation, and updated docs plus Pi, OpenCode, and MCP contract tests for the new default.
+
+### Patch Changes
+
+- Updated dependencies [[`545c986`](https://github.com/dragoscirjan/neottia/commit/545c98617fbca8eec316564f66a67893e1d26fed), [`bbd40be`](https://github.com/dragoscirjan/neottia/commit/bbd40be53f4f7af19388856e5516c06909b63bba)]:
+  - @neottia/memory-core@0.3.0
+  - @neottia/config-registry@0.2.2
+
 ## 0.1.1
 
 ### Patch Changes

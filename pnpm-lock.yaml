@@ -852,13 +852,13 @@ importers:
         specifier: workspace:0.2.0
         version: link:../../extensions/claude-code-adapter
       '@neottia/cli':
-        specifier: workspace:0.4.0
+        specifier: workspace:0.4.1
         version: link:../cli
       '@neottia/config':
         specifier: workspace:0.2.0
         version: link:../config
       '@neottia/config-registry':
-        specifier: workspace:0.2.1
+        specifier: workspace:0.2.2
         version: link:../config-registry
       '@neottia/core':
         specifier: workspace:0.1.0
@@ -885,10 +885,10 @@ importers:
         specifier: workspace:0.2.0
         version: link:../issues-mcp
       '@neottia/memory-core':
-        specifier: workspace:0.2.0
+        specifier: workspace:0.3.0
         version: link:../memory-core
       '@neottia/memory-mcp':
-        specifier: workspace:0.2.0
+        specifier: workspace:0.3.0
         version: link:../memory-mcp
       '@neottia/opencode-adapter':
         specifier: workspace:0.2.0
@@ -900,7 +900,7 @@ importers:
         specifier: workspace:0.2.0
         version: link:../../extensions/opencode-issues
       '@neottia/opencode-memory':
-        specifier: workspace:0.1.1
+        specifier: workspace:0.2.0
         version: link:../../extensions/opencode-memory
       '@neottia/opencode-searchable':
         specifier: workspace:0.2.0
@@ -915,7 +915,7 @@ importers:
         specifier: workspace:0.2.0
         version: link:../../extensions/pi-issues
       '@neottia/pi-memory':
-        specifier: workspace:0.1.1
+        specifier: workspace:0.2.0
         version: link:../../extensions/pi-memory
       '@neottia/pi-searchable':
         specifier: workspace:0.2.0
