@@ -605,7 +605,16 @@ function readOwner(path: string, allowInterruptedClaimLink = false): VerifiedOwn
     // A claim owner can unlink the path while this contender still holds an
     // open descriptor. Preserve persistent unsafe links, but classify an
     // absent or replaced claim as the normal contention race handled by the caller.
-    const stabilized = lstatSync(path);
+    let stabilized: Stats;
+    try {
+      stabilized = lstatSync(path);
+    } catch (stabilizationError: unknown) {
+      // The read raced a full release; classify it through the same
+      // contention contract instead of leaking a raw ENOENT.
+      if (hasCode(stabilizationError, 'ENOENT'))
+        throw new PathSafetyError('Interrupted claim was released during owner verification.', 'IDENTITY_CHANGED');
+      throw stabilizationError;
+    }
     if (stabilized.isSymbolicLink() || !stabilized.isFile()) throw error;
     if (!sameIdentity(initialIdentity, stabilized))
       throw new PathSafetyError('Interrupted claim identity changed during owner verification.', 'IDENTITY_CHANGED');
@@ -660,7 +669,14 @@ function interruptedClaimPeer(path: string, observed?: Stats): { readonly token:
   // A legitimate publisher can unlink the sole staging peer between the
   // claim's nlink observation and directory scan. Accept only that stabilized
   // transition: the claim must still be the same regular inode with one link.
-  const stabilized = lstatSync(path);
+  let stabilized: Stats;
+  try {
+    stabilized = lstatSync(path);
+  } catch (stabilizationError: unknown) {
+    if (hasCode(stabilizationError, 'ENOENT'))
+      throw new PathSafetyError('Interrupted claim was released during peer verification.', 'IDENTITY_CHANGED');
+    throw stabilizationError;
+  }
   if (!stabilized.isSymbolicLink() && stabilized.isFile() && stabilized.nlink === 1 && sameIdentity(stat, stabilized))
     return undefined;
   throw new PathSafetyError('Interrupted claim hard link is not package-owned.', 'UNSAFE_HARD_LINK');
