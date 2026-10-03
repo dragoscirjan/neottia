@@ -10,6 +10,7 @@ import {
   issuesCapabilityConfigContribution,
   memoryCapabilityConfigContribution,
   sdlcRoleAssignmentsConfigContribution,
+  searchableCapabilityConfigContribution,
   sourceControlCapabilityConfigContribution,
 } from '@neottia/sdlc';
 import { searchableConfigContribution } from '@neottia/searchable-core';
@@ -51,6 +52,7 @@ export const officialConfigContributions = Object.freeze([
   issuesCapabilityConfigContribution,
   documentsCapabilityConfigContribution,
   memoryCapabilityConfigContribution,
+  searchableCapabilityConfigContribution,
   sourceControlCapabilityConfigContribution,
 ] as const);
 

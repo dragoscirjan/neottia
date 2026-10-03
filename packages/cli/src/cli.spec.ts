@@ -140,7 +140,19 @@ describe('Neottia CLI', () => {
 
     expect(
       await main(
-        ['init', '--harness', 'pi', '--enable', 'memory', '--enable', 'memory', '--project', root],
+        [
+          'init',
+          '--harness',
+          'pi',
+          '--enable',
+          'memory',
+          '--enable',
+          'searchable',
+          '--enable',
+          'searchable',
+          '--project',
+          root,
+        ],
         deduped.output,
       ),
     ).toBe(0);
@@ -148,17 +160,18 @@ describe('Neottia CLI', () => {
     expect(await readFile(join(root, '.neottia', 'config.yml'), 'utf8')).toBe(
       await (async () => {
         const other = await fixture();
-        await main(['init', '--harness', 'pi', '--enable', 'memory', '--project', other], capture().output);
+        await main(
+          ['init', '--harness', 'pi', '--enable', 'searchable', '--enable', 'memory', '--project', other],
+          capture().output,
+        );
         return readFile(join(other, '.neottia', 'config.yml'), 'utf8');
       })(),
     );
 
     const rejected = await fixture();
     const result = capture();
-    expect(
-      await main(['init', '--harness', 'pi', '--enable', 'searchable', '--project', rejected], result.output),
-    ).toBe(1);
-    expect(result.errors).toEqual(['Unsupported --enable module: searchable. Expected one of: memory.']);
+    expect(await main(['init', '--harness', 'pi', '--enable', 'bogus', '--project', rejected], result.output)).toBe(1);
+    expect(result.errors).toEqual(['Unsupported --enable module: bogus. Expected one of: memory, searchable.']);
     expect(await exists(join(rejected, '.neottia'))).toBe(false);
   });
 

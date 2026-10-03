@@ -44,7 +44,7 @@ const HARNESS_ADAPTERS: Readonly<Record<SupportedHarness, typeof piHarnessAdapte
   Object.freeze({ pi: piHarnessAdapter, opencode: opencodeHarnessAdapter });
 
 /** Optional modules the initializer can enable; each maps to its capability provider. */
-const ENABLED_MODULE_CAPABILITIES = Object.freeze({ memory: 'filesystem' } as const);
+const ENABLED_MODULE_CAPABILITIES = Object.freeze({ memory: 'filesystem', searchable: 'web' } as const);
 type EnableModule = keyof typeof ENABLED_MODULE_CAPABILITIES;
 
 /** Warn prefix used for every skipped conflict and diagnostic line. */

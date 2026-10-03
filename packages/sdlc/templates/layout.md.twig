@@ -30,6 +30,10 @@
 
 {{ instructions.memory }}
 {% endblock %}
+{% block searchable_instructions %}## Compiled Searchable instructions
+
+{{ instructions.searchable }}
+{% endblock %}
 {% block local_source_control_instructions %}## Compiled local source-control instructions
 
 {{ instructions.sourceControl.local }}
