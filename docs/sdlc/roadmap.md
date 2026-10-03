@@ -14,7 +14,7 @@ Neottia ships the SDLC as bounded slices. This page states what each capability 
 ## Available
 
 - **Project initialization** — `neottia init` writes the minimal project configuration for Pi and OpenCode with the `local` preset. See [shared configuration](/get-started/configuration).
-- **Lifecycle installation** — `neottia plan --manifest manifest.json` plus `neottia apply` compile and install the six commands, the operating-protocol skill, and exact runtime package entries; `neottia doctor` reports gaps without changing anything. The config-driven `neottia sdlc plan` flow arrives with [#179](https://github.com/dragoscirjan/neottia/pull/179).
+- **Lifecycle installation** — `neottia plan --manifest manifest.json`, the config-driven `neottia sdlc plan`, and `neottia apply` compile and install the six commands, the operating-protocol skill, and exact runtime package entries; `neottia doctor` reports gaps without changing anything.
 - **Receipt-driven updates and uninstall** — plans are digest-protected, repeated installs are idempotent, and uninstall removes only receipt-owned files and host-configuration entries.
 - **Filesystem Issues and Design Docs** — enabled by initialization; canonical records live under `.neottia/issues/` and `.neottia/design-docs/`.
 - **Local Git source control** — commits stay scoped and reviewable; push, pull requests, and merges require explicit authorization.
