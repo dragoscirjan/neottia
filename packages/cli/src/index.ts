@@ -99,6 +99,9 @@ async function initCommand(arguments_: readonly string[], output: CliOutput, env
   const project = resolve(values.project ?? process.cwd());
   const configPath = join(project, '.neottia', 'config.yml');
   if (values.harness.length === 0 && (await isRegularFile(configPath))) {
+    if (values.enable.length > 0) {
+      throw new TypeError('--enable cannot be used when validating an existing configuration.');
+    }
     // Existing configuration: validate it with the caller's environment so
     // environment-backed secret references resolve exactly as at apply time.
     resolveConfig(officialConfigRegistry, { cwd: project, env });

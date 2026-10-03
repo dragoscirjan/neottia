@@ -541,6 +541,7 @@ export function compileSdlc(input: SdlcCompilerInputManifest, adapter: HarnessAd
       instructionText,
       templateRoles,
     );
+    requireMemoryFragment(definition.templateId, rendered.instructionSlots);
     const renderedInstructions = input.instructions.filter((pack) => rendered.instructionSlots.includes(pack.slot));
     const body = rendered.body;
     const projected = requireProjection(
@@ -851,6 +852,13 @@ function instructionSlotForFragment(slot: string): SdlcInstructionPack['slot'] |
   return undefined;
 }
 
+/** Every command must state its memory boundary so overrides cannot silently drop it. */
+function requireMemoryFragment(templateId: string, renderedSlots: readonly SdlcInstructionPack['slot'][]): void {
+  if (!renderedSlots.includes('memory')) {
+    throw new TypeError(`Lifecycle template ${templateId} must render the memory boundary fragment.`);
+  }
+}
+
 /** Builds a validation context whose fragment objects record exact output. */
 function createTrackedTemplateContext(
   command: SdlcLifecycleCommand,
@@ -1083,7 +1091,7 @@ function validateResolvedTemplates(
       definition,
       roles.filter((role) => role.command === definition.id),
     );
-    renderTrackedLifecycleTemplate(
+    const validated = renderTrackedLifecycleTemplate(
       renderer,
       definition.templateId,
       definition,
@@ -1091,6 +1099,7 @@ function validateResolvedTemplates(
       instructionText,
       templateRoles,
     );
+    requireMemoryFragment(definition.templateId, validated.instructionSlots);
   }
 }
 

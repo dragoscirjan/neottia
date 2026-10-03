@@ -224,6 +224,18 @@ describe('Neottia CLI', () => {
     expect(result.errors).toEqual([]);
   });
 
+  it('rejects --enable in validation-only mode without changing the configuration', async () => {
+    const root = await fixture();
+    await main(['init', '--harness', 'pi', '--project', root], capture().output);
+    const before = await readFile(join(root, '.neottia', 'config.yml'), 'utf8');
+    const result = capture();
+
+    expect(await main(['init', '--enable', 'memory', '--project', root], result.output)).toBe(1);
+
+    expect(result.errors).toEqual(['--enable cannot be used when validating an existing configuration.']);
+    expect(await readFile(join(root, '.neottia', 'config.yml'), 'utf8')).toBe(before);
+  });
+
   it('fails validation of a corrupt existing configuration without rewriting it', async () => {
     const root = await fixture();
     const configPath = join(root, '.neottia', 'config.yml');

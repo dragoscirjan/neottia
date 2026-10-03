@@ -166,6 +166,32 @@ describe('canonical SDLC compiler', () => {
     expect(enabled.commands.some((command) => command.instructionPackIds.includes('neottia.memory.none'))).toBe(false);
   });
 
+  it('rejects command overrides that drop the memory boundary fragment', () => {
+    const overrideLayer = {
+      tier: 'project' as const,
+      sourceId: 'project-override',
+      version: '0.0.0',
+      files: [
+        {
+          id: 'neottia.sdlc.command.plan',
+          content:
+            '{% extends "neottia.sdlc.layout" %}\n{% block title %}Plan{% endblock %}\n{% block purpose %}Override.{% endblock %}\n{% block sequence %}1. Override.{% endblock %}\n{% block memory_instructions %}{% endblock %}\n{% block remote_source_control_instructions %}{% endblock %}\n',
+        },
+      ],
+    };
+    expect(() =>
+      createSdlcCompilerInput(
+        snapshot({ memory: { enabled: true }, 'sdlc-memory-capability': { provider: 'filesystem' } }),
+        {
+          compilerVersion: '0.0.0',
+          harnessId: 'pi',
+          scope: 'project',
+          templateLayers: [overrideLayer],
+        },
+      ),
+    ).toThrow(/must render the memory boundary fragment/u);
+  });
+
   it('compiles equivalent Pi and OpenCode semantics with host-owned paths', () => {
     const piInput = createSdlcCompilerInput(snapshot(), {
       compilerVersion: '0.1.0',
