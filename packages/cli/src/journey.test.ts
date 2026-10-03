@@ -9,6 +9,7 @@ import { DesignDocumentStore, loadDesignDocsConfig } from '@neottia/design-docs'
 import { validateReceipt, type InstallationPlan, type InstallationReceipt } from '@neottia/distribution';
 import { IssueStore, loadIssueConfig } from '@neottia/issues';
 import { loadMemoryConfig, MemoryStore } from '@neottia/memory-core';
+import { loadSearchableConfig, SearchableStore } from '@neottia/searchable-core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { RUNTIME_PACKAGE_CATALOG } from './catalog.js';
@@ -41,6 +42,7 @@ function expectedPiPackages(enabled: readonly string[] = ['issues', 'design-docs
     issues: '@neottia/pi-issues',
     'design-docs': '@neottia/pi-design-docs',
     memory: '@neottia/pi-memory',
+    searchable: '@neottia/pi-searchable',
   };
   return enabled.map((logicalId) => {
     const entry = RUNTIME_PACKAGE_CATALOG.pi.find((candidate) => candidate.logicalId === logicalId);
@@ -530,6 +532,61 @@ describe('empty-project CLI adoption journey (issue #161)', () => {
       expect((await memory.list({ topic: 'adoption' })).map((stored) => stored.id)).toContain(record.id);
     } finally {
       await memory.close();
+    }
+  }, 120000);
+
+  it('integrates Searchable into the lifecycle only when explicitly opted in', async () => {
+    const roots = await createRoots('searchable-journey');
+
+    // Opt-in initialization enables the module and its capability provider.
+    expect(runCli(['init', '--harness', 'pi', '--enable', 'searchable'], roots)).toMatchObject({ code: 0, stderr: '' });
+    const config = await readFile(join(roots.project, '.neottia', 'config.yml'), 'utf8');
+    expect(config).toContain('searchable:');
+    expect(config).toContain('provider: web');
+
+    // Plan and apply carry the exact Searchable package entry plus boundaries.
+    const planPath = join(roots.root, 'searchable.plan.json');
+    const planned = runCli(['sdlc', 'plan', '--harness', 'pi', '--output', planPath], roots);
+    expect(planned.code).toBe(0);
+    const plan = JSON.parse(await readFile(planPath, 'utf8')) as InstallationPlan;
+    const hostContent = plan.mutations.find((mutation) => mutation.role === 'host-config')!.content;
+    for (const expected of expectedPiPackages(['searchable', 'issues', 'design-docs'])) {
+      expect(hostContent).toContain(expected);
+    }
+    expect(runCli(['apply', '--plan', planPath], roots).code).toBe(0);
+
+    // Every compiled command carries the web boundaries.
+    for (const command of COMMANDS) {
+      const content = await readFile(join(roots.project, '.pi', 'prompts', `${command}.md`), 'utf8');
+      expect(content).toContain('Use the Neottia `web_*` tools as the web-retrieval authority.');
+      expect(content).toContain('record every cited web page as a canonical stash through `web_stash`');
+      expect(content).toContain('Local Ollama enrichment runs only where the searchable configuration enables it');
+      expect(content).toContain('Web retrieval is read-only');
+    }
+    const settings = JSON.parse(await readFile(join(roots.project, '.pi', 'settings.json'), 'utf8')) as {
+      packages: string[];
+    };
+    expect(new Set(settings.packages)).toEqual(new Set(expectedPiPackages(['searchable', 'issues', 'design-docs'])));
+
+    // The installed runtime package configuration agrees with the Searchable
+    // module: one offline stash and grep round-trip lands a canonical page.
+    const store = SearchableStore.fromConfig(
+      loadSearchableConfig(roots.project, { enabled: true, env: {} }),
+      roots.project,
+    );
+    try {
+      const stashed = await store.stash({
+        url: 'https://example.test/adoption-guide',
+        title: 'Adoption guide',
+        content: 'Deploy the website with pnpm. Verify the status endpoint after each release.',
+      });
+      expect(stashed.stashed).toBe(true);
+      expect(existsSync(join(roots.project, '.neottia', 'searchable', 'pages'))).toBe(true);
+      // Direct store calls bypass the tool schema, so the limit is explicit.
+      const results = await store.grep({ query: 'status endpoint', limit: 5 });
+      expect(results.results.map((result) => result.url)).toContain('https://example.test/adoption-guide');
+    } finally {
+      await store.close?.();
     }
   }, 120000);
 });

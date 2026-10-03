@@ -651,6 +651,11 @@
           "properties": { "provider": { "type": "string", "enum": ["none", "filesystem", "postgres"] } },
           "additionalProperties": false
         },
+        "searchable": {
+          "type": "object",
+          "properties": { "provider": { "type": "string", "enum": ["none", "web"] } },
+          "additionalProperties": false
+        },
         "source_control": {
           "type": "object",
           "properties": {
@@ -2493,6 +2498,11 @@
               "memory": {
                 "type": "object",
                 "properties": { "provider": { "type": "string", "enum": ["none", "filesystem", "postgres"] } },
+                "additionalProperties": false
+              },
+              "searchable": {
+                "type": "object",
+                "properties": { "provider": { "type": "string", "enum": ["none", "web"] } },
                 "additionalProperties": false
               },
               "source_control": {

@@ -39,9 +39,11 @@ import {
   LOCAL_SOURCE_CONTROL_PROVIDERS,
   MEMORY_PROVIDERS,
   REMOTE_SOURCE_CONTROL_PROVIDERS,
+  SEARCHABLE_PROVIDERS,
   documentsCapabilityConfigContribution,
   issuesCapabilityConfigContribution,
   memoryCapabilityConfigContribution,
+  searchableCapabilityConfigContribution,
   sourceControlCapabilityConfigContribution,
 } from './config.js';
 import {
@@ -144,6 +146,7 @@ const TWIG_CONTEXT_PROPERTIES = [
   'revindex',
   'revindex0',
   'roleSlots',
+  'searchable',
   'sourceControl',
   'stopConditions',
   'templateId',
@@ -165,6 +168,7 @@ const configurationContextSchema = z
     issues: z.object({ provider: z.enum(ISSUE_PROVIDERS) }).strict(),
     documents: z.object({ provider: z.enum(DOCUMENT_PROVIDERS) }).strict(),
     memory: z.object({ provider: z.enum(MEMORY_PROVIDERS) }).strict(),
+    searchable: z.object({ provider: z.enum(SEARCHABLE_PROVIDERS) }).strict(),
     sourceControl: z
       .object({
         local: z.enum(LOCAL_SOURCE_CONTROL_PROVIDERS),
@@ -348,6 +352,7 @@ export interface SdlcTemplateContext {
     readonly issues: string;
     readonly documents: string;
     readonly memory: string;
+    readonly searchable: string;
     readonly sourceControl: {
       readonly local: string;
       readonly remote: string;
@@ -541,7 +546,7 @@ export function compileSdlc(input: SdlcCompilerInputManifest, adapter: HarnessAd
       instructionText,
       templateRoles,
     );
-    requireMemoryFragment(definition.templateId, rendered.instructionSlots);
+    requireCapabilityFragment(definition.templateId, rendered.instructionSlots);
     const renderedInstructions = input.instructions.filter((pack) => rendered.instructionSlots.includes(pack.slot));
     const body = rendered.body;
     const projected = requireProjection(
@@ -847,15 +852,18 @@ function instructionSlotForFragment(slot: string): SdlcInstructionPack['slot'] |
   if (slot === 'instructions.issues') return 'issues';
   if (slot === 'instructions.documents') return 'documents';
   if (slot === 'instructions.memory') return 'memory';
+  if (slot === 'instructions.searchable') return 'searchable';
   if (slot === 'instructions.sourceControl.local') return 'source-control.local';
   if (slot === 'instructions.sourceControl.remote') return 'source-control.remote';
   return undefined;
 }
 
-/** Every command must state its memory boundary so overrides cannot silently drop it. */
-function requireMemoryFragment(templateId: string, renderedSlots: readonly SdlcInstructionPack['slot'][]): void {
-  if (!renderedSlots.includes('memory')) {
-    throw new TypeError(`Lifecycle template ${templateId} must render the memory boundary fragment.`);
+/** Every command must state its optional-capability boundaries so overrides cannot silently drop them. */
+function requireCapabilityFragment(templateId: string, renderedSlots: readonly SdlcInstructionPack['slot'][]): void {
+  for (const slot of ['memory', 'searchable'] as const) {
+    if (!renderedSlots.includes(slot)) {
+      throw new TypeError(`Lifecycle template ${templateId} must render the ${slot} boundary fragment.`);
+    }
   }
 }
 
@@ -891,6 +899,7 @@ function createTrackedTemplateContext(
         issues: tracked('instructions.issues', instructions.issues.trimEnd()),
         documents: tracked('instructions.documents', instructions.documents.trimEnd()),
         memory: tracked('instructions.memory', instructions.memory.trimEnd()),
+        searchable: tracked('instructions.searchable', instructions.searchable.trimEnd()),
         sourceControl: Object.freeze({
           local: tracked('instructions.sourceControl.local', instructions['source-control.local'].trimEnd()),
           remote: tracked('instructions.sourceControl.remote', instructions['source-control.remote'].trimEnd()),
@@ -1033,6 +1042,7 @@ function configurationProvenancePaths(
     ['capabilities', 'issues', 'provider'],
     ['capabilities', 'documents', 'provider'],
     ['capabilities', 'memory', 'provider'],
+    ['capabilities', 'searchable', 'provider'],
     ['capabilities', 'source_control', 'local'],
     ['capabilities', 'source_control', 'remote'],
     ['capabilities', 'source_control', 'workspaces'],
@@ -1099,7 +1109,7 @@ function validateResolvedTemplates(
       instructionText,
       templateRoles,
     );
-    requireMemoryFragment(definition.templateId, validated.instructionSlots);
+    requireCapabilityFragment(definition.templateId, validated.instructionSlots);
   }
 }
 
@@ -1112,6 +1122,7 @@ function validateSelectedInstructions(
     issues: context.issues.provider,
     documents: context.documents.provider,
     memory: context.memory.provider,
+    searchable: context.searchable.provider,
     'source-control.local': context.sourceControl.local,
     'source-control.remote': context.sourceControl.remote.enabled ? context.sourceControl.remote.provider : 'none',
   });
@@ -1206,7 +1217,9 @@ function configurationSource(snapshot: ResolvedConfigSnapshot, path: readonly st
             ? snapshot.sourceOf(documentsCapabilityConfigContribution, path.slice(2))
             : path[1] === 'memory'
               ? snapshot.sourceOf(memoryCapabilityConfigContribution, path.slice(2))
-              : snapshot.sourceOf(sourceControlCapabilityConfigContribution, path.slice(2));
+              : path[1] === 'searchable'
+                ? snapshot.sourceOf(searchableCapabilityConfigContribution, path.slice(2))
+                : snapshot.sourceOf(sourceControlCapabilityConfigContribution, path.slice(2));
   return source ?? { kind: 'defaults' };
 }
 

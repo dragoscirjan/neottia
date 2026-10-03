@@ -21,6 +21,7 @@ import {
   documentsCapabilityConfigContribution,
   issuesCapabilityConfigContribution,
   memoryCapabilityConfigContribution,
+  searchableCapabilityConfigContribution,
   sourceControlCapabilityConfigContribution,
 } from './config.js';
 import { forgeConnectionsConfigContribution } from './forge-config.js';
@@ -39,6 +40,7 @@ const registry = createConfigRegistry([
   issuesCapabilityConfigContribution,
   documentsCapabilityConfigContribution,
   memoryCapabilityConfigContribution,
+  searchableCapabilityConfigContribution,
   sourceControlCapabilityConfigContribution,
 ]);
 const temporaryRoots: string[] = [];

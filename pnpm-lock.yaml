@@ -972,6 +972,9 @@ importers:
       '@neottia/memory-core':
         specifier: workspace:^
         version: link:../memory-core
+      '@neottia/searchable-core':
+        specifier: workspace:^
+        version: link:../searchable-core
       capitalize:
         specifier: 1.0.0
         version: 1.0.0

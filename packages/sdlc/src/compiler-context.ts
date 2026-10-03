@@ -3,16 +3,19 @@ import { designDocsConfigContribution } from '@neottia/design-docs';
 import { canonicalJson, compareCodeUnits } from '@neottia/distribution';
 import { issueConfigContribution } from '@neottia/issues';
 import { memoryConfigContribution } from '@neottia/memory-core';
+import { searchableConfigContribution } from '@neottia/searchable-core';
 import {
   documentsCapabilityConfigContribution,
   issuesCapabilityConfigContribution,
   memoryCapabilityConfigContribution,
+  searchableCapabilityConfigContribution,
   sourceControlCapabilityConfigContribution,
   type DocumentProvider,
   type IssueProvider,
   type LocalSourceControlProvider,
   type MemoryProvider,
   type RemoteSourceControlProvider,
+  type SearchableProvider,
 } from './config.js';
 import { forgeConnectionsConfigContribution, type ForgeMcpConfig, type ForgeMcpService } from './forge-config.js';
 import {
@@ -32,6 +35,7 @@ export type SdlcConfigProblemCode =
   | 'ISSUES_MODULE_DISABLED'
   | 'MEMORY_BACKEND_MISMATCH'
   | 'MEMORY_MODULE_DISABLED'
+  | 'SEARCHABLE_MODULE_DISABLED'
   | 'ROLE_AGENT_DUPLICATED'
   | 'ROLE_ASSIGNMENT_REQUIRED'
   | 'ROLE_ASSIGNMENT_UNSUPPORTED'
@@ -80,6 +84,7 @@ export interface SdlcCompilerContext {
   readonly issues: { readonly provider: IssueProvider };
   readonly documents: { readonly provider: DocumentProvider };
   readonly memory: { readonly provider: MemoryProvider };
+  readonly searchable: { readonly provider: SearchableProvider };
   readonly sourceControl: {
     readonly local: LocalSourceControlProvider;
     readonly remote:
@@ -95,6 +100,7 @@ export function createSdlcCompilerContext(snapshot: ResolvedConfigSnapshot): Sdl
   const documents = snapshot.get(documentsCapabilityConfigContribution);
   const sourceControl = snapshot.get(sourceControlCapabilityConfigContribution);
   const memory = snapshot.get(memoryCapabilityConfigContribution);
+  const searchable = snapshot.get(searchableCapabilityConfigContribution);
   const connections = snapshot.get(forgeConnectionsConfigContribution);
   const selected = selectedForgeCapabilities(issues.provider, documents.provider, sourceControl.remote);
   const problems: SdlcConfigProblem[] = [];
@@ -131,6 +137,13 @@ export function createSdlcCompilerContext(snapshot: ResolvedConfigSnapshot): Sdl
         message: `The Memory capability provider must match the module backend (${backend}).`,
       });
     }
+  }
+  if (searchable.provider !== 'none' && !snapshot.get(searchableConfigContribution).enabled) {
+    problems.push({
+      code: 'SEARCHABLE_MODULE_DISABLED',
+      path: ['modules', 'searchable', 'enabled'],
+      message: 'The Searchable module must be enabled for the selected authority.',
+    });
   }
   if (sourceControl.workspaces && sourceControl.local !== 'git') {
     problems.push({
@@ -197,6 +210,7 @@ export function createSdlcCompilerContext(snapshot: ResolvedConfigSnapshot): Sdl
     documents: Object.freeze({ provider: documents.provider }),
     issues: Object.freeze({ provider: issues.provider }),
     memory: Object.freeze({ provider: memory.provider }),
+    searchable: Object.freeze({ provider: searchable.provider }),
     sourceControl: Object.freeze({ local: sourceControl.local, remote, workspaces: sourceControl.workspaces }),
     forges: Object.freeze(forges),
   });

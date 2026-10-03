@@ -85,6 +85,13 @@ export const OFFICIAL_CONFIG_CONTRIBUTIONS = Object.freeze([
     path: Object.freeze(['capabilities', 'memory']),
   }),
   Object.freeze({
+    exportName: 'searchableCapabilityConfigContribution',
+    packageName: '@neottia/sdlc',
+    sourceFile: 'packages/sdlc/src/config.ts',
+    builtFile: 'packages/sdlc/dist/config.js',
+    path: Object.freeze(['capabilities', 'searchable']),
+  }),
+  Object.freeze({
     exportName: 'sourceControlCapabilityConfigContribution',
     packageName: '@neottia/sdlc',
     sourceFile: 'packages/sdlc/src/config.ts',
