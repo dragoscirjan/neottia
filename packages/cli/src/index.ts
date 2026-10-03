@@ -22,6 +22,7 @@ import {
   runDoctor,
   validateManifest,
   type AssetManifest,
+  type InstallationSnapshot,
   type InstallRoots,
   type InstallationPlan,
 } from '@neottia/distribution';
@@ -69,6 +70,7 @@ export async function main(
     if (command === 'doctor') return await doctorCommand(arguments_, output, env);
     if (command === 'uninstall') return await uninstallCommand(arguments_, output, env);
     if (command === 'plan') return await planCommand(arguments_, output, env);
+    if (command === 'sdlc') return await sdlcCommand(arguments_, output, env);
     throw new TypeError(`Unknown command: ${command}`);
   } catch (error) {
     output.error(error instanceof Error ? error.message : String(error));
@@ -84,9 +86,11 @@ async function initCommand(arguments_: readonly string[], output: CliOutput, env
     allowPositionals: false,
     options: {
       harness: { type: 'string', multiple: true, default: [] },
+      preset: { type: 'string', default: 'local' },
       project: { type: 'string' },
     },
   });
+  if (values.preset !== 'local') throw new TypeError(`Unsupported preset: ${values.preset}. Expected: local.`);
   const project = resolve(values.project ?? process.cwd());
   const configPath = join(project, '.neottia', 'config.yml');
   if (values.harness.length === 0 && (await isRegularFile(configPath))) {
@@ -193,21 +197,7 @@ async function installHarness(
   context: { readonly project: string; readonly env: NodeJS.ProcessEnv; readonly scope: 'project' | 'global' },
   output: CliOutput,
 ): Promise<number> {
-  const adapter = HARNESS_ADAPTERS[harnessId];
-  const snapshot = resolveConfig(officialConfigRegistry, { cwd: context.project, env: context.env });
-  const templateLayers = await loadSdlcTemplateLayers({ projectRoot: context.project });
-  const runtimePackages = selectedRuntimePackages(harnessId, snapshot);
-  const input = createSdlcCompilerInput(snapshot, {
-    compilerVersion: CLI_VERSION,
-    harnessId,
-    harnessDeclaration: adapter.declaration,
-    scope: context.scope,
-    templateLayers,
-    runtimePackages,
-  });
-  const compiled = compileSdlc(input, adapter);
-  const installRoots = installRootsFor(context.project, context.env);
-  const inspected = await inspectInstallation(compiled.assets, installRoots);
+  const { inspected } = await compileHarnessLifecycle(harnessId, context);
   const action = inspected.receipt === undefined ? 'install' : 'update';
   const plan = createInstallationPlan(inspected, action);
   const conflicts = plan.conflicts.filter((conflict) => !conflict.approved);
@@ -230,6 +220,91 @@ async function installHarness(
   );
   if (result.reloadNotice !== undefined) output.log(result.reloadNotice.message);
   return conflicts.length;
+}
+
+/** Compiles the configured lifecycle for one harness and inspects the target. */
+async function compileHarnessLifecycle(
+  harnessId: SupportedHarness,
+  context: { readonly project: string; readonly env: NodeJS.ProcessEnv; readonly scope: 'project' | 'global' },
+): Promise<{
+  readonly compiled: ReturnType<typeof compileSdlc>;
+  readonly installRoots: InstallRoots;
+  readonly inspected: InstallationSnapshot;
+}> {
+  const adapter = HARNESS_ADAPTERS[harnessId];
+  const snapshot = resolveConfig(officialConfigRegistry, { cwd: context.project, env: context.env });
+  const templateLayers = await loadSdlcTemplateLayers({ projectRoot: context.project });
+  const runtimePackages = selectedRuntimePackages(harnessId, snapshot);
+  const input = createSdlcCompilerInput(snapshot, {
+    compilerVersion: CLI_VERSION,
+    harnessId,
+    harnessDeclaration: adapter.declaration,
+    scope: context.scope,
+    templateLayers,
+    runtimePackages,
+  });
+  const compiled = compileSdlc(input, adapter);
+  const installRoots = installRootsFor(context.project, context.env);
+  const inspected = await inspectInstallation(compiled.assets, installRoots);
+  return { compiled, installRoots, inspected };
+}
+
+/** Generates and optionally saves a config-driven install or update plan. */
+async function sdlcPlanCommand(
+  arguments_: readonly string[],
+  output: CliOutput,
+  env: NodeJS.ProcessEnv,
+): Promise<number> {
+  const values = parseArgs({
+    args: [...arguments_],
+    strict: true,
+    allowPositionals: false,
+    options: {
+      harness: { type: 'string' },
+      scope: { type: 'string' },
+      output: { type: 'string' },
+      manifest: { type: 'string' },
+      approve: { type: 'string', multiple: true, default: [] },
+      project: { type: 'string' },
+    },
+  }).values;
+  if (values.harness === undefined) throw new TypeError('sdlc plan requires --harness.');
+  const project = resolve(values.project ?? process.cwd());
+  if (!(await isRegularFile(join(project, '.neottia', 'config.yml')))) {
+    throw new TypeError('Run neottia init first. Missing project configuration.');
+  }
+  const harnessId = normalizeInitHarnesses([values.harness])[0];
+  const override = values.scope === undefined ? undefined : parseScope(values.scope);
+  const configuredScopes = new Map(
+    resolveConfig(officialConfigRegistry, { cwd: project, env })
+      .get(harnessInstallConfigContribution)
+      .targets.map((target) => [target.id, target.scope] as const),
+  );
+  const scope = override ?? configuredScope(harnessId, configuredScopes);
+  const { compiled, inspected } = await compileHarnessLifecycle(harnessId, {
+    project,
+    env,
+    scope,
+  });
+  const action = inspected.receipt === undefined ? 'install' : 'update';
+  const plan = authorizePlan(createInstallationPlan(inspected, action), values.approve);
+  await emitPlan(plan, values.output, output);
+  if (values.manifest !== undefined) {
+    await writeFile(values.manifest, canonicalJson(compiled.assets), { encoding: 'utf8', mode: 0o600 });
+  }
+  const unapproved = plan.conflicts.filter((conflict) => !conflict.approved);
+  output.log(`Plan ${plan.id}: ${plan.mutations.length} mutation(s), ${unapproved.length} conflict(s).`);
+  for (const conflict of unapproved)
+    output.error(`${WARN_PREFIX}conflict ${conflict.id}: ${conflict.path} (${conflict.reason})`);
+  if (plan.reloadNotice !== undefined) output.log(plan.reloadNotice.message);
+  return unapproved.length > 0 ? 2 : 0;
+}
+
+/** Dispatches the sdlc command group. */
+async function sdlcCommand(arguments_: readonly string[], output: CliOutput, env: NodeJS.ProcessEnv): Promise<number> {
+  const [subcommand] = arguments_;
+  if (subcommand === 'plan') return await sdlcPlanCommand(arguments_.slice(1), output, env);
+  throw new TypeError(`Unknown sdlc command: ${String(subcommand)}. Expected: plan.`);
 }
 
 /** Version of this CLI package, read at runtime so releases never drift from it. */
@@ -273,6 +348,14 @@ function selectedRuntimePackages(
     packages.push({ logicalId, version: entry.version });
   }
   return Object.freeze(packages);
+}
+
+/** Reads one harness's configured scope, defaulting to project installation. */
+function configuredScope(
+  harnessId: SupportedHarness,
+  configuredScopes: ReadonlyMap<string, 'project' | 'global'>,
+): 'project' | 'global' {
+  return configuredScopes.get(harnessId) ?? 'project';
 }
 
 /** Maps the shared scope argument onto the compiler and installer vocabulary. */
@@ -579,9 +662,10 @@ async function emitPlan(plan: InstallationPlan, path: string | undefined, output
 function help(): string {
   return [
     'Usage:',
-    '  neottia init [--harness pi|opencode]... [--project DIR]   # create, or validate if present',
+    '  neottia init [--harness pi|opencode]... [--preset local] [--project DIR]   # create, or validate if present',
     '  neottia apply [--harness ID]... [--scope project|global] [--project DIR]',
     '  neottia doctor [--project DIR]                            # static config + install report',
+    '  neottia sdlc plan --harness ID [--scope project|global] [--output FILE] [--manifest FILE] [--approve ID]...',
     '  neottia plan --manifest FILE [--action install|update] [--output FILE] [--approve ID]...',
     '  neottia apply --plan FILE',
     '  neottia uninstall --receipt FILE [--output FILE] [--approve ID]...',
