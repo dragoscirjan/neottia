@@ -78,6 +78,7 @@ export default defineConfig({
             { text: 'Operating protocol', link: '/sdlc/protocol' },
             { text: 'Configure provider packs', link: '/sdlc/providers' },
             { text: 'Configure portable roles', link: '/sdlc/roles' },
+            { text: 'Capability roadmap', link: '/sdlc/roadmap' },
           ],
         },
       ],
