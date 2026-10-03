@@ -7,6 +7,7 @@ import { SDLC_COMMAND_IDS, SDLC_ROLE_IDS, type SdlcCommandId, type SdlcRoleId } 
 export const SDLC_INSTRUCTION_SLOTS = Object.freeze([
   'issues',
   'documents',
+  'memory',
   'source-control.local',
   'source-control.remote',
 ] as const);
@@ -78,6 +79,30 @@ export const BUILTIN_SDLC_INSTRUCTION_PACKS = Object.freeze([
       'Use the Neottia `document_*` tools as the document authority. Keep design decisions in canonical documents, validate before lifecycle transitions, and supply exact revision and approval evidence for updates.\n',
   }),
   createSdlcInstructionPack({
+    id: 'neottia.memory.none',
+    slot: 'memory',
+    provider: 'none',
+    version: '1.0.0',
+    content:
+      'No memory capability is enabled. Do not read or write durable memory during lifecycle runs and rely on the issue and document authorities.\n',
+  }),
+  createSdlcInstructionPack({
+    id: 'neottia.memory.durable',
+    slot: 'memory',
+    provider: 'filesystem',
+    version: '1.0.0',
+    content:
+      'Use the Neottia `memory_*` tools as the durable memory authority. Retrieve relevant durable memories before planning or resuming work, record material lifecycle decisions, blockers, and outcomes with exact ownership and revision evidence, and record a durable outcome summary before a lifecycle run stops. Retrieval is read-only; memory never authorizes mutation, bypasses the issue or document authorities, or grants host permissions.\n',
+  }),
+  createSdlcInstructionPack({
+    id: 'neottia.memory.durable-postgres',
+    slot: 'memory',
+    provider: 'postgres',
+    version: '1.0.0',
+    content:
+      'Use the Neottia `memory_*` tools as the durable memory authority backed by the configured PostgreSQL store. Retrieve relevant durable memories before planning or resuming work, record material lifecycle decisions, blockers, and outcomes with exact ownership and revision evidence, and record a durable outcome summary before a lifecycle run stops. Retrieval is read-only; memory never authorizes mutation, bypasses the issue or document authorities, or grants host permissions.\n',
+  }),
+  createSdlcInstructionPack({
     id: 'neottia.source-control.git',
     slot: 'source-control.local',
     provider: 'git',
@@ -105,6 +130,7 @@ export function selectSdlcInstructionPacks(
   const requested: Readonly<Record<SdlcInstructionSlot, string>> = Object.freeze({
     issues: context.issues.provider,
     documents: context.documents.provider,
+    memory: context.memory.provider,
     'source-control.local': context.sourceControl.local,
     'source-control.remote': context.sourceControl.remote.enabled ? context.sourceControl.remote.provider : 'none',
   });

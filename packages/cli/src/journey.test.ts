@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { DesignDocumentStore, loadDesignDocsConfig } from '@neottia/design-docs';
 import { validateReceipt, type InstallationPlan, type InstallationReceipt } from '@neottia/distribution';
 import { IssueStore, loadIssueConfig } from '@neottia/issues';
+import { loadMemoryConfig, MemoryStore } from '@neottia/memory-core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { RUNTIME_PACKAGE_CATALOG } from './catalog.js';
@@ -34,13 +35,17 @@ const temporaryRoots: string[] = [];
 /** Canonical command order compiled for every harness. */
 const COMMANDS = ['plan', 'build', 'verify', 'release', 'continue', 'refresh'] as const;
 
-/** Expected exact Pi package entries, derived from the shipped catalog. */
-function expectedPiPackages(): readonly string[] {
-  return ['issues', 'design-docs'].map((logicalId) => {
+/** Expected exact Pi package entries for the enabled modules, from the shipped catalog. */
+function expectedPiPackages(enabled: readonly string[] = ['issues', 'design-docs']): readonly string[] {
+  const names: Record<string, string> = {
+    issues: '@neottia/pi-issues',
+    'design-docs': '@neottia/pi-design-docs',
+    memory: '@neottia/pi-memory',
+  };
+  return enabled.map((logicalId) => {
     const entry = RUNTIME_PACKAGE_CATALOG.pi.find((candidate) => candidate.logicalId === logicalId);
     if (entry === undefined) throw new Error(`Catalog is missing the ${logicalId} runtime package.`);
-    const name = logicalId === 'issues' ? '@neottia/pi-issues' : '@neottia/pi-design-docs';
-    return `npm:${name}@${entry.version}`;
+    return `npm:${names[logicalId]}@${entry.version}`;
   });
 }
 
@@ -149,7 +154,7 @@ describe('empty-project CLI adoption journey (issue #161)', () => {
 
   it('fails closed on an incompatible runtime package catalog entry', async () => {
     const roots = await createRoots('catalog-gap');
-    expect(runCli(['init', '--harness', 'pi'], roots).code).toBe(0);
+    expect(runCli(['init', '--harness', 'pi', '--enable', 'memory'], roots).code).toBe(0);
     catalogGap.harness = 'pi';
     const logs: string[] = [];
     const errors: string[] = [];
@@ -158,7 +163,8 @@ describe('empty-project CLI adoption journey (issue #161)', () => {
       error: (message: string) => void errors.push(message),
     });
     expect(code).toBe(1);
-    expect(errors).toEqual(['No compatible runtime package for pi issues.']);
+    // Memory is the first catalog candidate, so the gap surfaces there.
+    expect(errors).toEqual(['No compatible runtime package for pi memory.']);
     expect(existsSync(join(roots.project, '.pi'))).toBe(false);
   }, 30000);
 
@@ -470,6 +476,62 @@ describe('empty-project CLI adoption journey (issue #161)', () => {
     expect(existsSync(receiptPath)).toBe(false);
     expect(existsSync(join(roots.project, '.neottia', 'config.yml'))).toBe(true);
   }, 180000);
+
+  it('integrates Memory into the lifecycle only when explicitly opted in', async () => {
+    const roots = await createRoots('memory-journey');
+
+    // Opt-in initialization enables the module and its capability provider.
+    expect(runCli(['init', '--harness', 'pi', '--enable', 'memory'], roots)).toMatchObject({ code: 0, stderr: '' });
+    const config = await readFile(join(roots.project, '.neottia', 'config.yml'), 'utf8');
+    expect(config).toContain('memory:');
+    expect(config).toContain('provider: filesystem');
+
+    // Plan and apply carry the exact Memory package entry plus boundaries.
+    const planPath = join(roots.root, 'memory.plan.json');
+    const planned = runCli(['sdlc', 'plan', '--harness', 'pi', '--output', planPath], roots);
+    expect(planned.code).toBe(0);
+    expect(planned.stdout).toContain('Plan install.sdlc-pi: 9 mutation(s), 0 conflict(s).');
+    const plan = JSON.parse(await readFile(planPath, 'utf8')) as InstallationPlan;
+    const hostContent = plan.mutations.find((mutation) => mutation.role === 'host-config')!.content;
+    for (const expected of expectedPiPackages(['memory', 'issues', 'design-docs'])) {
+      expect(hostContent).toContain(expected);
+    }
+    expect(runCli(['apply', '--plan', planPath], roots).code).toBe(0);
+
+    // Every compiled command carries retrieval, checkpoint, and shutdown boundaries.
+    for (const command of COMMANDS) {
+      const content = await readFile(join(roots.project, '.pi', 'prompts', `${command}.md`), 'utf8');
+      expect(content).toContain('Use the Neottia `memory_*` tools as the durable memory authority.');
+      expect(content).toContain('Retrieve relevant durable memories before planning or resuming work');
+      expect(content).toContain('Retrieval is read-only');
+      expect(content).toContain('durable outcome summary before a lifecycle run stops');
+    }
+    const settings = JSON.parse(await readFile(join(roots.project, '.pi', 'settings.json'), 'utf8')) as {
+      packages: string[];
+    };
+    expect(new Set(settings.packages)).toEqual(new Set(expectedPiPackages(['memory', 'issues', 'design-docs'])));
+
+    // The installed runtime package configuration agrees with the Memory module:
+    // one store round-trip lands a canonical record under the configured root.
+    const memory = MemoryStore.fromConfig(loadMemoryConfig(roots.project, { env: {} }), roots.project);
+    try {
+      const record = await memory.store({
+        memory_type: 'semantic',
+        record_type: 'fact',
+        topic: 'adoption',
+        summary: 'Adopt the compiled SDLC with durable Memory evidence.',
+        source: { kind: 'user-confirmed', ref: null, revision: null },
+        created_by: 'journey',
+        confidence: 'confirmed',
+        tags: ['adoption'],
+      });
+      expect(record.id).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/u);
+      expect(existsSync(join(roots.project, '.neottia', 'memory', 'facts'))).toBe(true);
+      expect((await memory.list({ topic: 'adoption' })).map((stored) => stored.id)).toContain(record.id);
+    } finally {
+      await memory.close();
+    }
+  }, 120000);
 });
 
 /** Compiler manifest shape used by the journey assertions. */

@@ -20,6 +20,7 @@ import { compileSdlc, createSdlcCompilerInput } from './compiler.js';
 import {
   documentsCapabilityConfigContribution,
   issuesCapabilityConfigContribution,
+  memoryCapabilityConfigContribution,
   sourceControlCapabilityConfigContribution,
 } from './config.js';
 import { forgeConnectionsConfigContribution } from './forge-config.js';
@@ -37,6 +38,7 @@ const registry = createConfigRegistry([
   sdlcRoleAssignmentsConfigContribution,
   issuesCapabilityConfigContribution,
   documentsCapabilityConfigContribution,
+  memoryCapabilityConfigContribution,
   sourceControlCapabilityConfigContribution,
 ]);
 const temporaryRoots: string[] = [];

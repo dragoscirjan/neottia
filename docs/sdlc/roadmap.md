@@ -18,13 +18,13 @@ Neottia ships the SDLC as bounded slices. This page states what each capability 
 - **Receipt-driven updates and uninstall** — plans are digest-protected, repeated installs are idempotent, and uninstall removes only receipt-owned files and host-configuration entries.
 - **Filesystem Issues and Design Docs** — enabled by initialization; canonical records live under `.neottia/issues/` and `.neottia/design-docs/`.
 - **Local Git source control** — commits stay scoped and reviewable; push, pull requests, and merges require explicit authorization.
+- **Memory lifecycle capability** — `neottia init --enable memory` (or `capabilities.memory.provider`) wires durable memory into every compiled command with read-only retrieval, checkpoint-evidence, and shutdown boundaries; disabled by default. See [shared configuration](/get-started/configuration) and [the Memory capability](/sdlc/).
 - **Global-scope installation** — available through explicit `scope: global` targets in the project configuration or the `neottia apply --scope global` override; project scope remains the default.
 
 ## Experimental
 
 These modules already ship runtime packages and CLI catalog entries, so a project that enables them manually receives exact package configuration through `neottia apply`. They are experimental because the compiled lifecycle commands carry no capability boundaries for them yet.
 
-- **Memory** (`modules.memory.enabled`) — durable memory records under `.neottia/memory/`. Lifecycle integration (retrieval, checkpoint, and shutdown boundaries) is tracked in [#181](https://github.com/dragoscirjan/neottia/issues/181).
 - **Searchable** (`modules.searchable.enabled`) — stashed web records under `.neottia/searchable/`. Lifecycle integration (network, stash, citation, and local-Ollama boundaries) is tracked in [#182](https://github.com/dragoscirjan/neottia/issues/182).
 
 ## Planned

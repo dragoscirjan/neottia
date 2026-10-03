@@ -1,6 +1,7 @@
 import { createConfigRegistry, createResolvedConfigSnapshot, type ConfigShardValues } from '@neottia/config';
 import { designDocsConfigContribution } from '@neottia/design-docs';
 import { issueConfigContribution } from '@neottia/issues';
+import { memoryConfigContribution } from '@neottia/memory-core';
 import { describe, expect, it } from 'vitest';
 import { createSdlcCompilerContext, SdlcConfigError } from './compiler-context.js';
 import {
@@ -13,19 +14,25 @@ import {
   issuesCapabilityConfigPatchSchema,
   issuesCapabilityConfigSchema,
   LOCAL_SOURCE_CONTROL_PROVIDERS,
+  MEMORY_PROVIDERS,
   REMOTE_SOURCE_CONTROL_PROVIDERS,
   sourceControlCapabilityConfigContribution,
   sourceControlCapabilityConfigPatchSchema,
   sourceControlCapabilityConfigSchema,
+  memoryCapabilityConfigContribution,
+  memoryCapabilityConfigPatchSchema,
+  memoryCapabilityConfigSchema,
 } from './config.js';
 import { forgeConnectionsConfigContribution } from './forge-config.js';
 
 const registry = createConfigRegistry([
   issueConfigContribution,
   designDocsConfigContribution,
+  memoryConfigContribution,
   forgeConnectionsConfigContribution,
   issuesCapabilityConfigContribution,
   documentsCapabilityConfigContribution,
+  memoryCapabilityConfigContribution,
   sourceControlCapabilityConfigContribution,
 ]);
 
@@ -44,8 +51,10 @@ describe('SDLC capability schemas', () => {
     expect(DOCUMENT_PROVIDERS).toEqual(['filesystem', 'github', 'gitlab', 'gitea', 'forgejo', 'confluence']);
     expect(LOCAL_SOURCE_CONTROL_PROVIDERS).toEqual(['git', 'jj']);
     expect(REMOTE_SOURCE_CONTROL_PROVIDERS).toEqual(['github', 'gitlab', 'gitea', 'forgejo', 'bitbucket']);
+    expect(MEMORY_PROVIDERS).toEqual(['none', 'filesystem', 'postgres']);
     expect(issuesCapabilityConfigSchema.parse({})).toEqual({ provider: 'filesystem' });
     expect(documentsCapabilityConfigSchema.parse({})).toEqual({ provider: 'filesystem' });
+    expect(memoryCapabilityConfigSchema.parse({})).toEqual({ provider: 'none' });
     expect(sourceControlCapabilityConfigSchema.parse({})).toEqual({
       local: 'git',
       remote: false,
@@ -83,8 +92,42 @@ describe('SDLC capability schemas', () => {
   it('keeps every source patch default-free and closed', () => {
     expect(issuesCapabilityConfigPatchSchema.parse({})).toEqual({});
     expect(documentsCapabilityConfigPatchSchema.parse({})).toEqual({});
+    expect(memoryCapabilityConfigPatchSchema.parse({ provider: 'postgres' })).toEqual({ provider: 'postgres' });
+    expect(memoryCapabilityConfigPatchSchema.safeParse({ provider: 'redis' }).success).toBe(false);
+    expect(memoryCapabilityConfigPatchSchema.safeParse({ unknown: true }).success).toBe(false);
     expect(sourceControlCapabilityConfigPatchSchema.parse({ remote: 'github' })).toEqual({ remote: 'github' });
     expect(sourceControlCapabilityConfigPatchSchema.safeParse({ unknown: true }).success).toBe(false);
+  });
+});
+
+describe('SDLC memory capability', () => {
+  it('stays outside the lifecycle by default', () => {
+    const context = createSdlcCompilerContext(snapshot());
+    expect(context.memory).toEqual({ provider: 'none' });
+  });
+
+  it('pulls the Memory module in when the lifecycle selects a provider', () => {
+    const context = createSdlcCompilerContext(
+      snapshot({ memory: { enabled: true }, 'sdlc-memory-capability': { provider: 'filesystem' } }),
+    );
+    expect(context.memory).toEqual({ provider: 'filesystem' });
+  });
+
+  it('requires the Memory module before the lifecycle can select a provider', () => {
+    expect(() => createSdlcCompilerContext(snapshot({ 'sdlc-memory-capability': { provider: 'filesystem' } }))).toThrow(
+      /The Memory module must be enabled/u,
+    );
+  });
+
+  it('rejects a lifecycle provider that disagrees with the Memory module backend', () => {
+    expect(() =>
+      createSdlcCompilerContext(
+        snapshot({
+          memory: { enabled: true, backend: 'postgres' },
+          'sdlc-memory-capability': { provider: 'filesystem' },
+        }),
+      ),
+    ).toThrow(/must match the module backend \(postgres\)/u);
   });
 });
 
@@ -95,6 +138,7 @@ describe('SDLC compiler context', () => {
     expect(context).toEqual({
       issues: { provider: 'filesystem' },
       documents: { provider: 'filesystem' },
+      memory: { provider: 'none' },
       sourceControl: { local: 'git', remote: { enabled: false }, workspaces: false },
       forges: [],
     });
@@ -144,6 +188,7 @@ describe('SDLC compiler context', () => {
     expect(context).toEqual({
       issues: { provider: 'jira' },
       documents: { provider: 'confluence' },
+      memory: { provider: 'none' },
       sourceControl: {
         local: 'jj',
         remote: { enabled: true, provider: 'bitbucket' },

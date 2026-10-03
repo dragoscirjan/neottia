@@ -112,6 +112,56 @@ describe('Neottia CLI', () => {
     });
   });
 
+  it('enables Memory only through an explicit opt-in flag', async () => {
+    const root = await fixture();
+    const result = capture();
+
+    expect(await main(['init', '--harness', 'pi', '--enable', 'memory', '--project', root], result.output)).toBe(0);
+
+    expect(result.errors).toEqual([]);
+    expect(resolveGeneratedConfig(root).toJSON()).toMatchObject({
+      modules: {
+        issues: { enabled: true },
+        design_docs: { enabled: true },
+        memory: { enabled: true },
+      },
+      capabilities: {
+        memory: { provider: 'filesystem' },
+      },
+    });
+    const yaml = await readFile(join(root, '.neottia', 'config.yml'), 'utf8');
+    expect(yaml).toContain('memory:');
+    expect(yaml.indexOf('memory:')).toBeGreaterThan(yaml.indexOf('design_docs:'));
+  });
+
+  it('deduplicates repeated --enable values and rejects unsupported modules', async () => {
+    const root = await fixture();
+    const deduped = capture();
+
+    expect(
+      await main(
+        ['init', '--harness', 'pi', '--enable', 'memory', '--enable', 'memory', '--project', root],
+        deduped.output,
+      ),
+    ).toBe(0);
+
+    expect(await readFile(join(root, '.neottia', 'config.yml'), 'utf8')).toBe(
+      await (async () => {
+        const other = await fixture();
+        await main(['init', '--harness', 'pi', '--enable', 'memory', '--project', other], capture().output);
+        return readFile(join(other, '.neottia', 'config.yml'), 'utf8');
+      })(),
+    );
+
+    const rejected = await fixture();
+    const result = capture();
+    expect(
+      await main(['init', '--harness', 'pi', '--enable', 'searchable', '--project', rejected], result.output),
+    ).toBe(1);
+    expect(result.errors).toEqual(['Unsupported --enable module: searchable. Expected one of: memory.']);
+    expect(await exists(join(rejected, '.neottia'))).toBe(false);
+  });
+
   // Windows does not implement POSIX owner/group/other permission bits.
   it.skipIf(process.platform === 'win32')('writes the configuration with owner-only permissions', async () => {
     const root = await fixture();

@@ -43,6 +43,10 @@ type SupportedHarness = (typeof SUPPORTED_HARNESSES)[number];
 const HARNESS_ADAPTERS: Readonly<Record<SupportedHarness, typeof piHarnessAdapter | typeof opencodeHarnessAdapter>> =
   Object.freeze({ pi: piHarnessAdapter, opencode: opencodeHarnessAdapter });
 
+/** Optional modules the initializer can enable; each maps to its capability provider. */
+const ENABLED_MODULE_CAPABILITIES = Object.freeze({ memory: 'filesystem' } as const);
+type EnableModule = keyof typeof ENABLED_MODULE_CAPABILITIES;
+
 /** Warn prefix used for every skipped conflict and diagnostic line. */
 const WARN_PREFIX = 'WARN: ';
 
@@ -86,6 +90,7 @@ async function initCommand(arguments_: readonly string[], output: CliOutput, env
     allowPositionals: false,
     options: {
       harness: { type: 'string', multiple: true, default: [] },
+      enable: { type: 'string', multiple: true, default: [] },
       preset: { type: 'string', default: 'local' },
       project: { type: 'string' },
     },
@@ -102,7 +107,8 @@ async function initCommand(arguments_: readonly string[], output: CliOutput, env
     return 0;
   }
   const harnesses = normalizeInitHarnesses(values.harness);
-  const document = createInitDocument(harnesses);
+  const enabledModules = normalizeEnableModules(values.enable);
+  const document = createInitDocument(harnesses, enabledModules);
 
   // Validate the exact root shape through the official registry without reading
   // ambient global or project configuration.
@@ -114,7 +120,7 @@ async function initCommand(arguments_: readonly string[], output: CliOutput, env
     overrides: document,
   });
 
-  await publishNewConfig(configPath, renderInitConfig(harnesses));
+  await publishNewConfig(configPath, renderInitConfig(harnesses, enabledModules));
   output.log(`Created ${configPath}`);
   output.log(`Harnesses: ${harnesses.join(', ')}`);
   output.log('Next: neottia apply');
@@ -519,6 +525,19 @@ function roots(values: CommonValues, env: NodeJS.ProcessEnv): InstallRoots {
   };
 }
 
+/** Validates, deduplicates, and orders optional module enablement. */
+function normalizeEnableModules(values: readonly string[]): readonly EnableModule[] {
+  const unsupported = values.find((value) => !(value in ENABLED_MODULE_CAPABILITIES));
+  if (unsupported !== undefined) {
+    throw new TypeError(
+      `Unsupported --enable module: ${unsupported}. Expected one of: ${Object.keys(ENABLED_MODULE_CAPABILITIES).join(', ')}.`,
+    );
+  }
+  return Object.freeze(
+    [...new Set(values as readonly EnableModule[])].sort((left, right) => left.localeCompare(right)),
+  );
+}
+
 /** Validates, deduplicates, and orders harness arguments. */
 function normalizeInitHarnesses(values: readonly string[]): readonly SupportedHarness[] {
   if (values.length === 0) throw new TypeError('At least one --harness is required.');
@@ -532,7 +551,10 @@ function normalizeInitHarnesses(values: readonly string[]): readonly SupportedHa
 }
 
 /** Builds the minimal owned shards for the initializer. The file adds `version`. */
-function createInitDocument(harnesses: readonly SupportedHarness[]): Readonly<Record<string, unknown>> {
+function createInitDocument(
+  harnesses: readonly SupportedHarness[],
+  enabledModules: readonly EnableModule[] = [],
+): Readonly<Record<string, unknown>> {
   const assignments = Object.fromEntries(
     harnesses.map((harness) => [
       harness,
@@ -548,10 +570,14 @@ function createInitDocument(harnesses: readonly SupportedHarness[]): Readonly<Re
     modules: {
       issues: { enabled: true },
       design_docs: { enabled: true },
+      ...Object.fromEntries(enabledModules.map((module) => [module, { enabled: true }])),
     },
     capabilities: {
       issues: { provider: 'filesystem' },
       documents: { provider: 'filesystem' },
+      ...Object.fromEntries(
+        enabledModules.map((module) => [module, { provider: ENABLED_MODULE_CAPABILITIES[module] }]),
+      ),
       source_control: { local: 'git', remote: false, workspaces: false },
     },
     harnesses: {
@@ -562,8 +588,16 @@ function createInitDocument(harnesses: readonly SupportedHarness[]): Readonly<Re
 }
 
 /** Renders stable human-editable YAML for the minimal configuration. */
-function renderInitConfig(harnesses: readonly SupportedHarness[]): string {
+function renderInitConfig(
+  harnesses: readonly SupportedHarness[],
+  enabledModules: readonly EnableModule[] = [],
+): string {
   const targets = harnesses.flatMap((harness) => [`      - id: ${harness}`, '        scope: project']);
+  const moduleShards = enabledModules.map((module) => [`  ${module}:`, '    enabled: true']);
+  const capabilityShards = enabledModules.map((module) => [
+    `  ${module}:`,
+    `    provider: ${ENABLED_MODULE_CAPABILITIES[module]}`,
+  ]);
   const assignments = harnesses.flatMap((harness) => [
     `    ${harness}:`,
     '      planner: {agent: current}',
@@ -578,11 +612,13 @@ function renderInitConfig(harnesses: readonly SupportedHarness[]): string {
     '    enabled: true',
     '  design_docs:',
     '    enabled: true',
+    ...moduleShards.flat(),
     'capabilities:',
     '  issues:',
     '    provider: filesystem',
     '  documents:',
     '    provider: filesystem',
+    ...capabilityShards.flat(),
     '  source_control:',
     '    local: git',
     '    remote: false',
@@ -662,7 +698,7 @@ async function emitPlan(plan: InstallationPlan, path: string | undefined, output
 function help(): string {
   return [
     'Usage:',
-    '  neottia init [--harness pi|opencode]... [--preset local] [--project DIR]   # create, or validate if present',
+    '  neottia init [--harness pi|opencode]... [--enable memory] [--preset local] [--project DIR]   # create, or validate if present',
     '  neottia apply [--harness ID]... [--scope project|global] [--project DIR]',
     '  neottia doctor [--project DIR]                            # static config + install report',
     '  neottia sdlc plan --harness ID [--scope project|global] [--output FILE] [--manifest FILE] [--approve ID]...',

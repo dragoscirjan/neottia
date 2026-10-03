@@ -37,9 +37,11 @@ import {
   DOCUMENT_PROVIDERS,
   ISSUE_PROVIDERS,
   LOCAL_SOURCE_CONTROL_PROVIDERS,
+  MEMORY_PROVIDERS,
   REMOTE_SOURCE_CONTROL_PROVIDERS,
   documentsCapabilityConfigContribution,
   issuesCapabilityConfigContribution,
+  memoryCapabilityConfigContribution,
   sourceControlCapabilityConfigContribution,
 } from './config.js';
 import {
@@ -136,6 +138,7 @@ const TWIG_CONTEXT_PROPERTIES = [
   'last',
   'length',
   'local',
+  'memory',
   'parent',
   'remote',
   'revindex',
@@ -161,6 +164,7 @@ const configurationContextSchema = z
   .object({
     issues: z.object({ provider: z.enum(ISSUE_PROVIDERS) }).strict(),
     documents: z.object({ provider: z.enum(DOCUMENT_PROVIDERS) }).strict(),
+    memory: z.object({ provider: z.enum(MEMORY_PROVIDERS) }).strict(),
     sourceControl: z
       .object({
         local: z.enum(LOCAL_SOURCE_CONTROL_PROVIDERS),
@@ -343,6 +347,7 @@ export interface SdlcTemplateContext {
   readonly instructions: {
     readonly issues: string;
     readonly documents: string;
+    readonly memory: string;
     readonly sourceControl: {
       readonly local: string;
       readonly remote: string;
@@ -840,6 +845,7 @@ function renderTrackedLifecycleTemplate(
 function instructionSlotForFragment(slot: string): SdlcInstructionPack['slot'] | undefined {
   if (slot === 'instructions.issues') return 'issues';
   if (slot === 'instructions.documents') return 'documents';
+  if (slot === 'instructions.memory') return 'memory';
   if (slot === 'instructions.sourceControl.local') return 'source-control.local';
   if (slot === 'instructions.sourceControl.remote') return 'source-control.remote';
   return undefined;
@@ -876,6 +882,7 @@ function createTrackedTemplateContext(
       instructions: Object.freeze({
         issues: tracked('instructions.issues', instructions.issues.trimEnd()),
         documents: tracked('instructions.documents', instructions.documents.trimEnd()),
+        memory: tracked('instructions.memory', instructions.memory.trimEnd()),
         sourceControl: Object.freeze({
           local: tracked('instructions.sourceControl.local', instructions['source-control.local'].trimEnd()),
           remote: tracked('instructions.sourceControl.remote', instructions['source-control.remote'].trimEnd()),
@@ -1017,6 +1024,7 @@ function configurationProvenancePaths(
   const paths: string[][] = [
     ['capabilities', 'issues', 'provider'],
     ['capabilities', 'documents', 'provider'],
+    ['capabilities', 'memory', 'provider'],
     ['capabilities', 'source_control', 'local'],
     ['capabilities', 'source_control', 'remote'],
     ['capabilities', 'source_control', 'workspaces'],
@@ -1094,6 +1102,7 @@ function validateSelectedInstructions(
   const expectedProviders: Readonly<Record<SdlcInstructionPack['slot'], string>> = Object.freeze({
     issues: context.issues.provider,
     documents: context.documents.provider,
+    memory: context.memory.provider,
     'source-control.local': context.sourceControl.local,
     'source-control.remote': context.sourceControl.remote.enabled ? context.sourceControl.remote.provider : 'none',
   });
@@ -1186,7 +1195,9 @@ function configurationSource(snapshot: ResolvedConfigSnapshot, path: readonly st
           ? snapshot.sourceOf(issuesCapabilityConfigContribution, path.slice(2))
           : path[1] === 'documents'
             ? snapshot.sourceOf(documentsCapabilityConfigContribution, path.slice(2))
-            : snapshot.sourceOf(sourceControlCapabilityConfigContribution, path.slice(2));
+            : path[1] === 'memory'
+              ? snapshot.sourceOf(memoryCapabilityConfigContribution, path.slice(2))
+              : snapshot.sourceOf(sourceControlCapabilityConfigContribution, path.slice(2));
   return source ?? { kind: 'defaults' };
 }
 
