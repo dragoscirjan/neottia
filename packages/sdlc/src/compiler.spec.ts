@@ -2,6 +2,7 @@ import { createConfigRegistry, createResolvedConfigSnapshot, type ConfigShardVal
 import { designDocsConfigContribution } from '@neottia/design-docs';
 import { canonicalJson, checksumText, runDoctor, type FileAsset, type HostConfigAsset } from '@neottia/distribution';
 import { issueConfigContribution } from '@neottia/issues';
+import { memoryConfigContribution } from '@neottia/memory-core';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -14,6 +15,7 @@ import {
 import {
   documentsCapabilityConfigContribution,
   issuesCapabilityConfigContribution,
+  memoryCapabilityConfigContribution,
   sourceControlCapabilityConfigContribution,
 } from './config.js';
 import { forgeConnectionsConfigContribution } from './forge-config.js';
@@ -29,10 +31,12 @@ import { piHarnessAdapter } from '../../../extensions/pi-adapter/src/index.js';
 const registry = createConfigRegistry([
   issueConfigContribution,
   designDocsConfigContribution,
+  memoryConfigContribution,
   forgeConnectionsConfigContribution,
   sdlcRoleAssignmentsConfigContribution,
   issuesCapabilityConfigContribution,
   documentsCapabilityConfigContribution,
+  memoryCapabilityConfigContribution,
   sourceControlCapabilityConfigContribution,
 ]);
 const runtimePackages = [
@@ -129,6 +133,63 @@ describe('canonical SDLC compiler', () => {
       expect(template.content).not.toMatch(/\b(?:github|gitlab|bitbucket|jira|confluence|filesystem)\b/iu);
       expect(template.content).not.toMatch(/`(?:issue_|document_|git\b)/u);
     }
+  });
+
+  it('compiles durable-memory boundaries only when the lifecycle selects Memory', () => {
+    const commandPrompts = (output: ReturnType<typeof compileSdlc>): readonly FileAsset[] =>
+      promptAssets(output).filter((asset) => asset.target.segments.includes('prompts'));
+
+    const disabled = compileSdlc(
+      createSdlcCompilerInput(snapshot(), { compilerVersion: '0.0.0', harnessId: 'pi', scope: 'project' }),
+      piHarnessAdapter,
+    );
+    for (const asset of commandPrompts(disabled)) {
+      expect(asset.content).toContain('No memory capability is enabled.');
+      expect(asset.content).not.toContain('memory_*` tools as the durable memory authority');
+    }
+    expect(disabled.commands.every((command) => command.instructionPackIds.includes('neottia.memory.none'))).toBe(true);
+
+    const enabled = compileSdlc(
+      createSdlcCompilerInput(
+        snapshot({ memory: { enabled: true }, 'sdlc-memory-capability': { provider: 'filesystem' } }),
+        { compilerVersion: '0.0.0', harnessId: 'pi', scope: 'project' },
+      ),
+      piHarnessAdapter,
+    );
+    for (const asset of commandPrompts(enabled)) {
+      expect(asset.content).toContain('Use the Neottia `memory_*` tools as the durable memory authority.');
+      expect(asset.content).toContain('Retrieval is read-only');
+    }
+    expect(enabled.commands.every((command) => command.instructionPackIds.includes('neottia.memory.durable'))).toBe(
+      true,
+    );
+    expect(enabled.commands.some((command) => command.instructionPackIds.includes('neottia.memory.none'))).toBe(false);
+  });
+
+  it('rejects command overrides that drop the memory boundary fragment', () => {
+    const overrideLayer = {
+      tier: 'project' as const,
+      sourceId: 'project-override',
+      version: '0.0.0',
+      files: [
+        {
+          id: 'neottia.sdlc.command.plan',
+          content:
+            '{% extends "neottia.sdlc.layout" %}\n{% block title %}Plan{% endblock %}\n{% block purpose %}Override.{% endblock %}\n{% block sequence %}1. Override.{% endblock %}\n{% block memory_instructions %}{% endblock %}\n{% block remote_source_control_instructions %}{% endblock %}\n',
+        },
+      ],
+    };
+    expect(() =>
+      createSdlcCompilerInput(
+        snapshot({ memory: { enabled: true }, 'sdlc-memory-capability': { provider: 'filesystem' } }),
+        {
+          compilerVersion: '0.0.0',
+          harnessId: 'pi',
+          scope: 'project',
+          templateLayers: [overrideLayer],
+        },
+      ),
+    ).toThrow(/must render the memory boundary fragment/u);
   });
 
   it('compiles equivalent Pi and OpenCode semantics with host-owned paths', () => {

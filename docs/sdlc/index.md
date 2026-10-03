@@ -99,6 +99,10 @@ export const runtimePackages = [
 
 Use the exact versions from the application or release manifest. The compiler sorts and validates this list, rejects duplicate IDs and version ranges, then asks the selected adapter to produce `config.package` operations. It never infers the list from `capabilities.issues` or `capabilities.documents`.
 
+## Memory capability
+
+Memory is optional. `capabilities.memory.provider` defaults to `none`, which renders a boundary fragment that keeps durable memory out of every lifecycle run. Selecting `filesystem` or `postgres` requires the Memory module to be enabled and to use the same backend; resolution fails closed otherwise. The enabled fragments define the only permitted memory interactions: read-only retrieval before planning or resuming work, checkpoint evidence recorded through the `memory_*` authority with exact ownership and revision evidence, and a durable outcome summary before a lifecycle run stops. Memory never authorizes mutation, bypasses the issue or document authorities, or grants host permissions.
+
 ## Template layers
 
 The package publishes six `.md.twig` command files, their shared `layout.md.twig`, and `lifecycle.json` under `templates/`. The JSON file contains command descriptions, approval text, and stop-condition text. TypeScript retains stable IDs and graph structure, not rendered lifecycle prose. Twing renders the resolved template from an in-memory loader with strict missing-variable checks and Markdown output without HTML escaping.

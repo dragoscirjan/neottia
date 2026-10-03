@@ -646,6 +646,11 @@
           },
           "additionalProperties": false
         },
+        "memory": {
+          "type": "object",
+          "properties": { "provider": { "type": "string", "enum": ["none", "filesystem", "postgres"] } },
+          "additionalProperties": false
+        },
         "source_control": {
           "type": "object",
           "properties": {
@@ -2483,6 +2488,11 @@
                     "enum": ["filesystem", "github", "gitlab", "gitea", "forgejo", "jira"]
                   }
                 },
+                "additionalProperties": false
+              },
+              "memory": {
+                "type": "object",
+                "properties": { "provider": { "type": "string", "enum": ["none", "filesystem", "postgres"] } },
                 "additionalProperties": false
               },
               "source_control": {

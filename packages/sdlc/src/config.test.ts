@@ -9,6 +9,7 @@ import { createSdlcCompilerContext } from './compiler-context.js';
 import {
   documentsCapabilityConfigContribution,
   issuesCapabilityConfigContribution,
+  memoryCapabilityConfigContribution,
   sourceControlCapabilityConfigContribution,
 } from './config.js';
 import { forgeConnectionsConfigContribution } from './forge-config.js';
@@ -22,6 +23,7 @@ const registry = createConfigRegistry([
   sdlcRoleAssignmentsConfigContribution,
   issuesCapabilityConfigContribution,
   documentsCapabilityConfigContribution,
+  memoryCapabilityConfigContribution,
   sourceControlCapabilityConfigContribution,
 ]);
 
@@ -51,6 +53,7 @@ modules:
     expect(createSdlcCompilerContext(snapshot)).toEqual({
       issues: { provider: 'filesystem' },
       documents: { provider: 'filesystem' },
+      memory: { provider: 'none' },
       sourceControl: { local: 'git', remote: { enabled: false }, workspaces: false },
       forges: [],
     });
@@ -103,6 +106,7 @@ profiles:
     expect(createSdlcCompilerContext(snapshot)).toEqual({
       issues: { provider: 'jira' },
       documents: { provider: 'confluence' },
+      memory: { provider: 'none' },
       sourceControl: {
         local: 'jj',
         remote: { enabled: true, provider: 'bitbucket' },
@@ -293,6 +297,7 @@ capabilities:
     expect(createSdlcCompilerContext(snapshot)).toEqual({
       issues: { provider: 'github' },
       documents: { provider: 'github' },
+      memory: { provider: 'none' },
       sourceControl: { local: 'git', remote: { enabled: false }, workspaces: false },
       forges: [
         {

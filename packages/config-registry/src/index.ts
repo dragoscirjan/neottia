@@ -8,6 +8,7 @@ import {
   documentsCapabilityConfigContribution,
   forgeConnectionsConfigContribution,
   issuesCapabilityConfigContribution,
+  memoryCapabilityConfigContribution,
   sdlcRoleAssignmentsConfigContribution,
   sourceControlCapabilityConfigContribution,
 } from '@neottia/sdlc';
@@ -49,6 +50,7 @@ export const officialConfigContributions = Object.freeze([
   sdlcRoleAssignmentsConfigContribution,
   issuesCapabilityConfigContribution,
   documentsCapabilityConfigContribution,
+  memoryCapabilityConfigContribution,
   sourceControlCapabilityConfigContribution,
 ] as const);
 

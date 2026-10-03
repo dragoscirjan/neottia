@@ -75,9 +75,10 @@ templates:
       'sdlc-role-assignments',
       'sdlc-issues-capability',
       'sdlc-documents-capability',
+      'sdlc-memory-capability',
       'sdlc-source-control-capability',
     ]);
-    expect(officialConfigRegistry.contributions).toHaveLength(12);
+    expect(officialConfigRegistry.contributions).toHaveLength(13);
     expect(snapshot.get(memoryConfigContribution).enabled).toBe(true);
     expect(snapshot.get(issueConfigContribution).enabled).toBe(true);
     expect(snapshot.get(designDocsConfigContribution).enabled).toBe(true);

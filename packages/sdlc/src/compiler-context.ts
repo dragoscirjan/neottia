@@ -2,13 +2,16 @@ import type { ResolvedConfigSnapshot } from '@neottia/config';
 import { designDocsConfigContribution } from '@neottia/design-docs';
 import { canonicalJson, compareCodeUnits } from '@neottia/distribution';
 import { issueConfigContribution } from '@neottia/issues';
+import { memoryConfigContribution } from '@neottia/memory-core';
 import {
   documentsCapabilityConfigContribution,
   issuesCapabilityConfigContribution,
+  memoryCapabilityConfigContribution,
   sourceControlCapabilityConfigContribution,
   type DocumentProvider,
   type IssueProvider,
   type LocalSourceControlProvider,
+  type MemoryProvider,
   type RemoteSourceControlProvider,
 } from './config.js';
 import { forgeConnectionsConfigContribution, type ForgeMcpConfig, type ForgeMcpService } from './forge-config.js';
@@ -27,6 +30,8 @@ export type SdlcConfigProblemCode =
   | 'FORGE_INSECURE_HTTP_REQUIRES_OPT_IN'
   | 'FORGE_MCP_REQUIRED'
   | 'ISSUES_MODULE_DISABLED'
+  | 'MEMORY_BACKEND_MISMATCH'
+  | 'MEMORY_MODULE_DISABLED'
   | 'ROLE_AGENT_DUPLICATED'
   | 'ROLE_ASSIGNMENT_REQUIRED'
   | 'ROLE_ASSIGNMENT_UNSUPPORTED'
@@ -74,6 +79,7 @@ export interface SdlcForgeConnectionContext {
 export interface SdlcCompilerContext {
   readonly issues: { readonly provider: IssueProvider };
   readonly documents: { readonly provider: DocumentProvider };
+  readonly memory: { readonly provider: MemoryProvider };
   readonly sourceControl: {
     readonly local: LocalSourceControlProvider;
     readonly remote:
@@ -88,6 +94,7 @@ export function createSdlcCompilerContext(snapshot: ResolvedConfigSnapshot): Sdl
   const issues = snapshot.get(issuesCapabilityConfigContribution);
   const documents = snapshot.get(documentsCapabilityConfigContribution);
   const sourceControl = snapshot.get(sourceControlCapabilityConfigContribution);
+  const memory = snapshot.get(memoryCapabilityConfigContribution);
   const connections = snapshot.get(forgeConnectionsConfigContribution);
   const selected = selectedForgeCapabilities(issues.provider, documents.provider, sourceControl.remote);
   const problems: SdlcConfigProblem[] = [];
@@ -105,6 +112,25 @@ export function createSdlcCompilerContext(snapshot: ResolvedConfigSnapshot): Sdl
       path: ['modules', 'design_docs', 'enabled'],
       message: 'The Design Docs module must be enabled for the selected authority.',
     });
+  }
+  // Memory is optional: a non-'none' capability selection pulls the module in
+  // and must agree with the module's own backend so instructions never lie.
+  if (memory.provider !== 'none' && !snapshot.get(memoryConfigContribution).enabled) {
+    problems.push({
+      code: 'MEMORY_MODULE_DISABLED',
+      path: ['modules', 'memory', 'enabled'],
+      message: 'The Memory module must be enabled for the selected authority.',
+    });
+  }
+  if (memory.provider !== 'none' && snapshot.get(memoryConfigContribution).enabled) {
+    const backend = snapshot.get(memoryConfigContribution).backend;
+    if (memory.provider !== backend) {
+      problems.push({
+        code: 'MEMORY_BACKEND_MISMATCH',
+        path: ['capabilities', 'memory', 'provider'],
+        message: `The Memory capability provider must match the module backend (${backend}).`,
+      });
+    }
   }
   if (sourceControl.workspaces && sourceControl.local !== 'git') {
     problems.push({
@@ -170,6 +196,7 @@ export function createSdlcCompilerContext(snapshot: ResolvedConfigSnapshot): Sdl
   const context = Object.freeze({
     documents: Object.freeze({ provider: documents.provider }),
     issues: Object.freeze({ provider: issues.provider }),
+    memory: Object.freeze({ provider: memory.provider }),
     sourceControl: Object.freeze({ local: sourceControl.local, remote, workspaces: sourceControl.workspaces }),
     forges: Object.freeze(forges),
   });
