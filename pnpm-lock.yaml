@@ -852,7 +852,7 @@ importers:
         specifier: workspace:0.2.0
         version: link:../../extensions/claude-code-adapter
       '@neottia/cli':
-        specifier: workspace:0.4.1
+        specifier: workspace:0.5.0
         version: link:../cli
       '@neottia/config':
         specifier: workspace:0.2.0
