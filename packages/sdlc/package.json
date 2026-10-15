@@ -55,14 +55,14 @@
     "snake-case": "2.1.0",
     "source-map": "0.6.1",
     "twig-lexer": "0.9.2",
-    "zod": "^4.5.4",
+    "zod": "^4.6.5",
     "@neottia/memory-core": "workspace:^",
     "@neottia/searchable-core": "workspace:^"
   },
   "devDependencies": {
-    "@templ-project/tsconfig": "^0.2.2",
-    "@types/node": "^25.0.3",
+    "@templ-project/tsconfig": "^0.4.2",
+    "@types/node": "^26.6.4",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.11"
+    "vitest": "^5.0.3"
   }
 }

@@ -1,6 +1,8 @@
 {
   "extends": "@templ-project/tsconfig/esm",
   "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "declaration": true,
     "declarationMap": true,
     "lib": ["ES2020"],
