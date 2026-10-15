@@ -1,5 +1,12 @@
 # @neottia/opencode-searchable
 
+## 0.2.2
+
+### Patch Changes
+
+- Updated dependencies [[`0430f7e`](https://github.com/dragoscirjan/neottia/commit/0430f7e936a4d729cc4e2943317b3cb4aad8c9ba)]:
+  - @neottia/config-registry@0.4.0
+
 ## 0.2.1
 
 ### Patch Changes
