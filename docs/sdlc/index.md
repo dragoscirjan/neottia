@@ -99,6 +99,10 @@ export const runtimePackages = [
 
 Use the exact versions from the application or release manifest. The compiler sorts and validates this list, rejects duplicate IDs and version ranges, then asks the selected adapter to produce `config.package` operations. It never infers the list from `capabilities.issues` or `capabilities.documents`.
 
+## Searchable capability
+
+Searchable is optional. `capabilities.searchable.provider` defaults to `none`, which renders a boundary fragment that keeps web retrieval out of every lifecycle run. Selecting `web` requires the Searchable module to be enabled. The enabled fragment defines the only permitted web interactions: search and fetch stay bounded to the enabled capability, every cited page is stashed canonically through `web_stash`, and local Ollama enrichment runs only where the searchable configuration enables it. Web retrieval never authorizes repository mutation, acquires credentials, contacts undeclared hosts, or bypasses the issue and document authorities.
+
 ## Memory capability
 
 Memory is optional. `capabilities.memory.provider` defaults to `none`, which renders a boundary fragment that keeps durable memory out of every lifecycle run. Selecting `filesystem` or `postgres` requires the Memory module to be enabled and to use the same backend; resolution fails closed otherwise. The enabled fragments define the only permitted memory interactions: read-only retrieval before planning or resuming work, checkpoint evidence recorded through the `memory_*` authority with exact ownership and revision evidence, and a durable outcome summary before a lifecycle run stops. Memory never authorizes mutation, bypasses the issue or document authorities, or grants host permissions.

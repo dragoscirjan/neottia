@@ -10,6 +10,7 @@ import {
   documentsCapabilityConfigContribution,
   issuesCapabilityConfigContribution,
   memoryCapabilityConfigContribution,
+  searchableCapabilityConfigContribution,
   sourceControlCapabilityConfigContribution,
 } from './config.js';
 import { forgeConnectionsConfigContribution } from './forge-config.js';
@@ -24,6 +25,7 @@ const registry = createConfigRegistry([
   issuesCapabilityConfigContribution,
   documentsCapabilityConfigContribution,
   memoryCapabilityConfigContribution,
+  searchableCapabilityConfigContribution,
   sourceControlCapabilityConfigContribution,
 ]);
 
@@ -54,6 +56,7 @@ modules:
       issues: { provider: 'filesystem' },
       documents: { provider: 'filesystem' },
       memory: { provider: 'none' },
+      searchable: { provider: 'none' },
       sourceControl: { local: 'git', remote: { enabled: false }, workspaces: false },
       forges: [],
     });
@@ -107,6 +110,7 @@ profiles:
       issues: { provider: 'jira' },
       documents: { provider: 'confluence' },
       memory: { provider: 'none' },
+      searchable: { provider: 'none' },
       sourceControl: {
         local: 'jj',
         remote: { enabled: true, provider: 'bitbucket' },
@@ -298,6 +302,7 @@ capabilities:
       issues: { provider: 'github' },
       documents: { provider: 'github' },
       memory: { provider: 'none' },
+      searchable: { provider: 'none' },
       sourceControl: { local: 'git', remote: { enabled: false }, workspaces: false },
       forges: [
         {

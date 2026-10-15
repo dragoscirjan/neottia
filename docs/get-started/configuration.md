@@ -11,10 +11,10 @@ neottia init --harness opencode --harness pi
 
 `--harness` is repeatable and accepts `pi` and `opencode`. Repeated values are ignored, and argument order does not change the result. `--preset` selects the initial configuration shape; `local` (the default) is the only supported preset. Run the command from the project root, or pass `--project DIR`.
 
-Optional modules join the lifecycle only through an explicit opt-in. `--enable memory` (repeatable; Memory is the only supported module today) writes `modules.memory.enabled: true` and `capabilities.memory.provider: filesystem`:
+Optional modules join the lifecycle only through an explicit opt-in. `--enable` is repeatable and accepts `memory` and `searchable`; each value writes the module enablement and the matching capability provider (`capabilities.memory.provider: filesystem`, `capabilities.searchable.provider: web`):
 
 ```sh
-neottia init --harness pi --enable memory
+neottia init --harness pi --enable memory --enable searchable
 ```
 
 When `.neottia/config.yml` already exists, run `neottia init` without `--harness` to validate it. The command reports `Validated <path>` and changes nothing.
@@ -100,6 +100,8 @@ agents:
 Add or remove harness targets under `harnesses.install.targets`. Change providers under `capabilities`, customize the required roles under `agents.sdlc.<harness>`, and enable more modules under `modules` as described below.
 
 Memory stays outside the lifecycle unless `capabilities.memory.provider` selects a provider (`filesystem` or `postgres`). A selected provider requires `modules.memory.enabled: true` and must match the Memory module's own `backend` setting; the compiler fails closed on a mismatch. When enabled, every compiled command carries durable-memory boundaries: read-only retrieval before planning or resuming work, checkpoint evidence recorded through the `memory_*` authority with exact ownership and revision evidence, and a durable outcome summary before a lifecycle run stops.
+
+Searchable stays outside the lifecycle unless `capabilities.searchable.provider` is `web`, which requires `modules.searchable.enabled: true`. When enabled, every compiled command carries web-retrieval boundaries: search and fetch stay bounded to the enabled capability, every cited web page is recorded as a canonical stash through `web_stash` so citations carry a stable reference, and local Ollama enrichment runs only where the searchable configuration enables it. Web retrieval is read-only: it never authorizes repository mutation, acquires credentials, contacts undeclared hosts, or bypasses the issue and document authorities.
 
 ## Manual configuration
 

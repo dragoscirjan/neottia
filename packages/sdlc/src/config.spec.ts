@@ -2,6 +2,7 @@ import { createConfigRegistry, createResolvedConfigSnapshot, type ConfigShardVal
 import { designDocsConfigContribution } from '@neottia/design-docs';
 import { issueConfigContribution } from '@neottia/issues';
 import { memoryConfigContribution } from '@neottia/memory-core';
+import { searchableConfigContribution } from '@neottia/searchable-core';
 import { describe, expect, it } from 'vitest';
 import { createSdlcCompilerContext, SdlcConfigError } from './compiler-context.js';
 import {
@@ -16,12 +17,16 @@ import {
   LOCAL_SOURCE_CONTROL_PROVIDERS,
   MEMORY_PROVIDERS,
   REMOTE_SOURCE_CONTROL_PROVIDERS,
+  SEARCHABLE_PROVIDERS,
   sourceControlCapabilityConfigContribution,
   sourceControlCapabilityConfigPatchSchema,
   sourceControlCapabilityConfigSchema,
   memoryCapabilityConfigContribution,
   memoryCapabilityConfigPatchSchema,
   memoryCapabilityConfigSchema,
+  searchableCapabilityConfigContribution,
+  searchableCapabilityConfigPatchSchema,
+  searchableCapabilityConfigSchema,
 } from './config.js';
 import { forgeConnectionsConfigContribution } from './forge-config.js';
 
@@ -29,10 +34,12 @@ const registry = createConfigRegistry([
   issueConfigContribution,
   designDocsConfigContribution,
   memoryConfigContribution,
+  searchableConfigContribution,
   forgeConnectionsConfigContribution,
   issuesCapabilityConfigContribution,
   documentsCapabilityConfigContribution,
   memoryCapabilityConfigContribution,
+  searchableCapabilityConfigContribution,
   sourceControlCapabilityConfigContribution,
 ]);
 
@@ -52,9 +59,11 @@ describe('SDLC capability schemas', () => {
     expect(LOCAL_SOURCE_CONTROL_PROVIDERS).toEqual(['git', 'jj']);
     expect(REMOTE_SOURCE_CONTROL_PROVIDERS).toEqual(['github', 'gitlab', 'gitea', 'forgejo', 'bitbucket']);
     expect(MEMORY_PROVIDERS).toEqual(['none', 'filesystem', 'postgres']);
+    expect(SEARCHABLE_PROVIDERS).toEqual(['none', 'web']);
     expect(issuesCapabilityConfigSchema.parse({})).toEqual({ provider: 'filesystem' });
     expect(documentsCapabilityConfigSchema.parse({})).toEqual({ provider: 'filesystem' });
     expect(memoryCapabilityConfigSchema.parse({})).toEqual({ provider: 'none' });
+    expect(searchableCapabilityConfigSchema.parse({})).toEqual({ provider: 'none' });
     expect(sourceControlCapabilityConfigSchema.parse({})).toEqual({
       local: 'git',
       remote: false,
@@ -95,6 +104,9 @@ describe('SDLC capability schemas', () => {
     expect(memoryCapabilityConfigPatchSchema.parse({ provider: 'postgres' })).toEqual({ provider: 'postgres' });
     expect(memoryCapabilityConfigPatchSchema.safeParse({ provider: 'redis' }).success).toBe(false);
     expect(memoryCapabilityConfigPatchSchema.safeParse({ unknown: true }).success).toBe(false);
+    expect(searchableCapabilityConfigPatchSchema.parse({ provider: 'web' })).toEqual({ provider: 'web' });
+    expect(searchableCapabilityConfigPatchSchema.safeParse({ provider: 'email' }).success).toBe(false);
+    expect(searchableCapabilityConfigPatchSchema.safeParse({ unknown: true }).success).toBe(false);
     expect(sourceControlCapabilityConfigPatchSchema.parse({ remote: 'github' })).toEqual({ remote: 'github' });
     expect(sourceControlCapabilityConfigPatchSchema.safeParse({ unknown: true }).success).toBe(false);
   });
@@ -104,6 +116,7 @@ describe('SDLC memory capability', () => {
   it('stays outside the lifecycle by default', () => {
     const context = createSdlcCompilerContext(snapshot());
     expect(context.memory).toEqual({ provider: 'none' });
+    expect(context.searchable).toEqual({ provider: 'none' });
   });
 
   it('pulls the Memory module in when the lifecycle selects a provider', () => {
@@ -117,6 +130,19 @@ describe('SDLC memory capability', () => {
     expect(() => createSdlcCompilerContext(snapshot({ 'sdlc-memory-capability': { provider: 'filesystem' } }))).toThrow(
       /The Memory module must be enabled/u,
     );
+  });
+
+  it('requires the Searchable module before the lifecycle can select a provider', () => {
+    expect(() => createSdlcCompilerContext(snapshot({ 'sdlc-searchable-capability': { provider: 'web' } }))).toThrow(
+      /The Searchable module must be enabled/u,
+    );
+  });
+
+  it('accepts web retrieval with the Searchable module enabled', () => {
+    const context = createSdlcCompilerContext(
+      snapshot({ searchable: { enabled: true }, 'sdlc-searchable-capability': { provider: 'web' } }),
+    );
+    expect(context.searchable).toEqual({ provider: 'web' });
   });
 
   it('rejects a lifecycle provider that disagrees with the Memory module backend', () => {
@@ -139,6 +165,7 @@ describe('SDLC compiler context', () => {
       issues: { provider: 'filesystem' },
       documents: { provider: 'filesystem' },
       memory: { provider: 'none' },
+      searchable: { provider: 'none' },
       sourceControl: { local: 'git', remote: { enabled: false }, workspaces: false },
       forges: [],
     });
@@ -189,6 +216,7 @@ describe('SDLC compiler context', () => {
       issues: { provider: 'jira' },
       documents: { provider: 'confluence' },
       memory: { provider: 'none' },
+      searchable: { provider: 'none' },
       sourceControl: {
         local: 'jj',
         remote: { enabled: true, provider: 'bitbucket' },

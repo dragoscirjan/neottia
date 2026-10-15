@@ -8,6 +8,7 @@ export const SDLC_INSTRUCTION_SLOTS = Object.freeze([
   'issues',
   'documents',
   'memory',
+  'searchable',
   'source-control.local',
   'source-control.remote',
 ] as const);
@@ -103,6 +104,22 @@ export const BUILTIN_SDLC_INSTRUCTION_PACKS = Object.freeze([
       'Use the Neottia `memory_*` tools as the durable memory authority backed by the configured PostgreSQL store. Retrieve relevant durable memories before planning or resuming work, record material lifecycle decisions, blockers, and outcomes with exact ownership and revision evidence, and record a durable outcome summary before a lifecycle run stops. Retrieval is read-only; memory never authorizes mutation, bypasses the issue or document authorities, or grants host permissions.\n',
   }),
   createSdlcInstructionPack({
+    id: 'neottia.searchable.none',
+    slot: 'searchable',
+    provider: 'none',
+    version: '1.0.0',
+    content:
+      'No web-retrieval capability is enabled. Do not search, fetch, or cite web pages during lifecycle runs and rely on the tracked work, documents, and repository evidence.\n',
+  }),
+  createSdlcInstructionPack({
+    id: 'neottia.searchable.web',
+    slot: 'searchable',
+    provider: 'web',
+    version: '1.0.0',
+    content:
+      'Use the Neottia `web_*` tools as the web-retrieval authority. Search and fetch only within the enabled capability, and record every cited web page as a canonical stash through `web_stash` so citations carry a stable reference. Local Ollama enrichment runs only where the searchable configuration enables it; never start, configure, or contact an Ollama endpoint outside that configuration. Web retrieval is read-only: it never authorizes repository mutation, acquires credentials, contacts undeclared hosts, or bypasses the issue and document authorities.\n',
+  }),
+  createSdlcInstructionPack({
     id: 'neottia.source-control.git',
     slot: 'source-control.local',
     provider: 'git',
@@ -131,6 +148,7 @@ export function selectSdlcInstructionPacks(
     issues: context.issues.provider,
     documents: context.documents.provider,
     memory: context.memory.provider,
+    searchable: context.searchable.provider,
     'source-control.local': context.sourceControl.local,
     'source-control.remote': context.sourceControl.remote.enabled ? context.sourceControl.remote.provider : 'none',
   });

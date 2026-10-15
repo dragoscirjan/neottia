@@ -3,6 +3,7 @@ import { designDocsConfigContribution } from '@neottia/design-docs';
 import { canonicalJson, checksumText, runDoctor, type FileAsset, type HostConfigAsset } from '@neottia/distribution';
 import { issueConfigContribution } from '@neottia/issues';
 import { memoryConfigContribution } from '@neottia/memory-core';
+import { searchableConfigContribution } from '@neottia/searchable-core';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -16,6 +17,7 @@ import {
   documentsCapabilityConfigContribution,
   issuesCapabilityConfigContribution,
   memoryCapabilityConfigContribution,
+  searchableCapabilityConfigContribution,
   sourceControlCapabilityConfigContribution,
 } from './config.js';
 import { forgeConnectionsConfigContribution } from './forge-config.js';
@@ -32,11 +34,13 @@ const registry = createConfigRegistry([
   issueConfigContribution,
   designDocsConfigContribution,
   memoryConfigContribution,
+  searchableConfigContribution,
   forgeConnectionsConfigContribution,
   sdlcRoleAssignmentsConfigContribution,
   issuesCapabilityConfigContribution,
   documentsCapabilityConfigContribution,
   memoryCapabilityConfigContribution,
+  searchableCapabilityConfigContribution,
   sourceControlCapabilityConfigContribution,
 ]);
 const runtimePackages = [
@@ -135,7 +139,7 @@ describe('canonical SDLC compiler', () => {
     }
   });
 
-  it('compiles durable-memory boundaries only when the lifecycle selects Memory', () => {
+  it('compiles optional-capability boundaries only when the lifecycle selects them', () => {
     const commandPrompts = (output: ReturnType<typeof compileSdlc>): readonly FileAsset[] =>
       promptAssets(output).filter((asset) => asset.target.segments.includes('prompts'));
 
@@ -151,7 +155,12 @@ describe('canonical SDLC compiler', () => {
 
     const enabled = compileSdlc(
       createSdlcCompilerInput(
-        snapshot({ memory: { enabled: true }, 'sdlc-memory-capability': { provider: 'filesystem' } }),
+        snapshot({
+          memory: { enabled: true },
+          searchable: { enabled: true },
+          'sdlc-memory-capability': { provider: 'filesystem' },
+          'sdlc-searchable-capability': { provider: 'web' },
+        }),
         { compilerVersion: '0.0.0', harnessId: 'pi', scope: 'project' },
       ),
       piHarnessAdapter,
@@ -159,14 +168,21 @@ describe('canonical SDLC compiler', () => {
     for (const asset of commandPrompts(enabled)) {
       expect(asset.content).toContain('Use the Neottia `memory_*` tools as the durable memory authority.');
       expect(asset.content).toContain('Retrieval is read-only');
+      expect(asset.content).toContain('Use the Neottia `web_*` tools as the web-retrieval authority.');
+      expect(asset.content).toContain(
+        'Local Ollama enrichment runs only where the searchable configuration enables it',
+      );
     }
     expect(enabled.commands.every((command) => command.instructionPackIds.includes('neottia.memory.durable'))).toBe(
       true,
     );
     expect(enabled.commands.some((command) => command.instructionPackIds.includes('neottia.memory.none'))).toBe(false);
+    expect(enabled.commands.some((command) => command.instructionPackIds.includes('neottia.searchable.none'))).toBe(
+      false,
+    );
   });
 
-  it('rejects command overrides that drop the memory boundary fragment', () => {
+  it('rejects command overrides that drop a capability boundary fragment', () => {
     const overrideLayer = {
       tier: 'project' as const,
       sourceId: 'project-override',
@@ -190,6 +206,28 @@ describe('canonical SDLC compiler', () => {
         },
       ),
     ).toThrow(/must render the memory boundary fragment/u);
+
+    const searchableOverride = {
+      ...overrideLayer,
+      files: [
+        {
+          id: 'neottia.sdlc.command.plan',
+          content:
+            '{% extends "neottia.sdlc.layout" %}\n{% block title %}Plan{% endblock %}\n{% block purpose %}Override.{% endblock %}\n{% block sequence %}1. Override.{% endblock %}\n{% block searchable_instructions %}{% endblock %}\n{% block remote_source_control_instructions %}{% endblock %}\n',
+        },
+      ],
+    };
+    expect(() =>
+      createSdlcCompilerInput(
+        snapshot({ searchable: { enabled: true }, 'sdlc-searchable-capability': { provider: 'web' } }),
+        {
+          compilerVersion: '0.0.0',
+          harnessId: 'pi',
+          scope: 'project',
+          templateLayers: [searchableOverride],
+        },
+      ),
+    ).toThrow(/must render the searchable boundary fragment/u);
   });
 
   it('compiles equivalent Pi and OpenCode semantics with host-owned paths', () => {
