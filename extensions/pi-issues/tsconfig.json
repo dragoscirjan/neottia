@@ -1,6 +1,12 @@
 {
   "extends": "@templ-project/tsconfig/esm",
-  "compilerOptions": { "lib": ["ES2022"], "noEmit": true, "types": ["node"] },
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022"],
+    "noEmit": true,
+    "types": ["node"]
+  },
   "include": ["src/**/*.ts"],
   "exclude": ["src/**/*.spec.ts"]
 }
