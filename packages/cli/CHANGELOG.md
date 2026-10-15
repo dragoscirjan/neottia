@@ -1,5 +1,17 @@
 # @neottia/cli
 
+## 0.6.0
+
+### Minor Changes
+
+- [#185](https://github.com/dragoscirjan/neottia/pull/185) [`8873b4f`](https://github.com/dragoscirjan/neottia/commit/8873b4f696b6a3fe1d03d7b24eb611511fdd4cbc) Thanks [@dragoscirjan](https://github.com/dragoscirjan)! - Integrate Memory as an optional SDLC lifecycle capability ([#181](https://github.com/dragoscirjan/neottia/issues/181)). The compiler gains a `capabilities.memory` contribution (`none` | `filesystem` | `postgres`, default `none`) with fail-closed semantics: a non-`none` selection requires `modules.memory.enabled` and must match the Memory module's own backend, and the published configuration schema covers the new shard. When enabled, every compiled lifecycle command renders durable-memory boundaries — read-only retrieval before planning or resuming work, checkpoint evidence recorded through the `memory_*` authority with exact ownership and revision evidence, and a durable outcome summary before a lifecycle run stops; memory never authorizes mutation or bypasses the issue and document authorities. The CLI initializer gains `--enable memory`, which writes the module enablement and the matching capability provider while keeping Memory disabled by default.
+
+### Patch Changes
+
+- Updated dependencies [[`8873b4f`](https://github.com/dragoscirjan/neottia/commit/8873b4f696b6a3fe1d03d7b24eb611511fdd4cbc)]:
+  - @neottia/sdlc@0.4.0
+  - @neottia/config-registry@0.3.0
+
 ## 0.5.0
 
 ### Minor Changes

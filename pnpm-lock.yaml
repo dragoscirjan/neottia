@@ -852,13 +852,13 @@ importers:
         specifier: workspace:0.2.0
         version: link:../../extensions/claude-code-adapter
       '@neottia/cli':
-        specifier: workspace:0.5.0
+        specifier: workspace:0.6.0
         version: link:../cli
       '@neottia/config':
         specifier: workspace:0.2.0
         version: link:../config
       '@neottia/config-registry':
-        specifier: workspace:0.2.2
+        specifier: workspace:0.3.0
         version: link:../config-registry
       '@neottia/core':
         specifier: workspace:0.1.0
@@ -867,7 +867,7 @@ importers:
         specifier: workspace:0.2.0
         version: link:../design-docs
       '@neottia/design-docs-mcp':
-        specifier: workspace:0.2.0
+        specifier: workspace:0.2.1
         version: link:../design-docs-mcp
       '@neottia/distribution':
         specifier: workspace:0.2.0
@@ -882,55 +882,55 @@ importers:
         specifier: workspace:0.2.0
         version: link:../issues-design-docs
       '@neottia/issues-mcp':
-        specifier: workspace:0.2.0
+        specifier: workspace:0.2.1
         version: link:../issues-mcp
       '@neottia/memory-core':
         specifier: workspace:0.3.0
         version: link:../memory-core
       '@neottia/memory-mcp':
-        specifier: workspace:0.3.0
+        specifier: workspace:0.3.1
         version: link:../memory-mcp
       '@neottia/opencode-adapter':
         specifier: workspace:0.2.0
         version: link:../../extensions/opencode-adapter
       '@neottia/opencode-design-docs':
-        specifier: workspace:0.2.0
+        specifier: workspace:0.2.1
         version: link:../../extensions/opencode-design-docs
       '@neottia/opencode-issues':
-        specifier: workspace:0.2.0
+        specifier: workspace:0.2.1
         version: link:../../extensions/opencode-issues
       '@neottia/opencode-memory':
-        specifier: workspace:0.2.0
+        specifier: workspace:0.2.1
         version: link:../../extensions/opencode-memory
       '@neottia/opencode-searchable':
-        specifier: workspace:0.2.0
+        specifier: workspace:0.2.1
         version: link:../../extensions/opencode-searchable
       '@neottia/pi-adapter':
         specifier: workspace:0.2.0
         version: link:../../extensions/pi-adapter
       '@neottia/pi-design-docs':
-        specifier: workspace:0.2.0
+        specifier: workspace:0.2.1
         version: link:../../extensions/pi-design-docs
       '@neottia/pi-issues':
-        specifier: workspace:0.2.0
+        specifier: workspace:0.2.1
         version: link:../../extensions/pi-issues
       '@neottia/pi-memory':
-        specifier: workspace:0.2.0
+        specifier: workspace:0.2.1
         version: link:../../extensions/pi-memory
       '@neottia/pi-searchable':
-        specifier: workspace:0.2.0
+        specifier: workspace:0.2.1
         version: link:../../extensions/pi-searchable
       '@neottia/repository-store':
         specifier: workspace:0.2.0
         version: link:../repository-store
       '@neottia/sdlc':
-        specifier: workspace:0.3.0
+        specifier: workspace:0.4.0
         version: link:../sdlc
       '@neottia/searchable-core':
         specifier: workspace:0.2.0
         version: link:../searchable-core
       '@neottia/searchable-mcp':
-        specifier: workspace:0.2.0
+        specifier: workspace:0.2.1
         version: link:../searchable-mcp
 
   packages/repository-store:

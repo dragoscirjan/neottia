@@ -1,5 +1,12 @@
 # @neottia/design-docs-mcp
 
+## 0.2.1
+
+### Patch Changes
+
+- Updated dependencies [[`8873b4f`](https://github.com/dragoscirjan/neottia/commit/8873b4f696b6a3fe1d03d7b24eb611511fdd4cbc)]:
+  - @neottia/config-registry@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes
