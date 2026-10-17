@@ -1,0 +1,1818 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Copy/Paste Detector Report</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background: #f7fafc; color: #2d3748; }
+    a { color: #3182ce; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .header { background: #fff; box-shadow: 0 1px 3px 0 rgba(0,0,0,.1), 0 1px 2px 0 rgba(0,0,0,.06); padding: 1rem 0; }
+    .header-inner { max-width: 80rem; margin: 0 auto; padding: 0 1rem; }
+    .header h1 { font-size: 1.875rem; font-weight: 600; color: #2d3748; margin: 0; }
+    .main { max-width: 80rem; margin: 2rem auto; padding: 0 1rem; }
+    .card { background: #fff; box-shadow: 0 1px 3px 0 rgba(0,0,0,.1), 0 1px 2px 0 rgba(0,0,0,.06); border-radius: 0.25rem; padding: 1.5rem; margin-bottom: 2rem; }
+    h2 { font-size: 1.5rem; font-weight: 600; color: #4a5568; margin: 0 0 1rem 0; }
+    .dashboard { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+    .stat-card { padding: 1rem; border-radius: 0.25rem; text-align: center; }
+    .stat-card h3 { font-size: 1.125rem; font-weight: 600; margin: 0 0 0.5rem 0; }
+    .stat-card .val { font-size: 2.25rem; font-weight: 700; }
+    .stat-blue { background: #bee3f8; color: #2a4365; }
+    .stat-green { background: #c6f6d5; color: #276749; }
+    .stat-yellow { background: #fefcbf; color: #975a16; }
+    .stat-red { background: #fed7d7; color: #9b2c2c; }
+    table { width: 100%; border-collapse: collapse; }
+    thead th { background: #edf2f7; color: #718096; text-transform: uppercase; font-size: 0.75rem; font-weight: 600; padding: 0.75rem 1.5rem; text-align: left; }
+    tbody td { padding: 0.75rem 1.5rem; border-bottom: 1px solid #edf2f7; font-size: 0.875rem; }
+    tbody tr:hover { background: #f7fafc; }
+    .clone-section { margin-bottom: 2rem; }
+    .clone-section h2 { border-bottom: 2px solid #edf2f7; padding-bottom: 0.5rem; }
+    .clone-item { padding: 1rem 0; border-bottom: 1px solid #edf2f7; }
+    .clone-item:last-child { border-bottom: none; }
+    .clone-info { color: #718096; font-size: 0.875rem; margin-bottom: 0.25rem; }
+    .toggle-btn { background: #a0aec0; color: #fff; border: none; padding: 0.125rem 0.5rem; font-size: 0.75rem; border-radius: 0.25rem; cursor: pointer; margin-left: 0.5rem; }
+    .toggle-btn:focus { outline: none; }
+    .code-block { background: #f7fafc; border: 1px solid #edf2f7; border-radius: 0.25rem; padding: 1rem; margin-top: 0.5rem; font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace; font-size: 0.875rem; color: #2d3748; white-space: pre-wrap; overflow-x: auto; display: none; }
+    .code-block.visible { display: block; }
+    .no-dupes { color: #27ae60; font-weight: 700; font-size: 1.125rem; }
+    .footer { margin-top: 3rem; padding: 2rem 0; border-top: 1px solid #e0e0e0; text-align: center; font-family: -apple-system, sans-serif; color: #666; }
+    .footer p { margin: 0.5rem 0; font-size: 0.875rem; }
+    .footer a { color: #0066cc; }
+    .footer .small { font-size: 0.75rem; color: #999; }
+    @media (max-width: 768px) { .dashboard { grid-template-columns: repeat(2, 1fr); } }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="header-inner">
+      <h1>jscpd - copy/paste report</h1>
+    </div>
+  </header>
+
+  <div class="main">
+    <div class="card">
+      <section>
+        <h2>Dashboard</h2>
+        <div class="dashboard">
+          <div class="stat-card stat-blue">
+            <h3>Total Files</h3>
+            <div class="val">280</div>
+          </div>
+          <div class="stat-card stat-green">
+            <h3>Total Lines of Code</h3>
+            <div class="val">47703</div>
+          </div>
+          <div class="stat-card stat-yellow">
+            <h3>Number of Clones</h3>
+            <div class="val">85</div>
+          </div>
+          <div class="stat-card stat-red">
+            <h3>Duplicated Lines</h3>
+            <div class="val">770 (1.61%)</div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="card">
+      <section>
+        <h2>Formats with Duplications</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Format</th>
+              <th>Files</th>
+              <th>Lines</th>
+              <th>Clones</th>
+              <th>Duplicated Lines</th>
+              <th>Duplicated Tokens</th>
+            </tr>
+          </thead>
+          <tbody>
+            
+            <tr>
+              <td><a href="#bash-clones">bash</a></td>
+              <td>1</td>
+              <td>10</td>
+              <td>0</td>
+              <td>0 (0.00%)</td>
+              <td>0 (0.00%)</td>
+            </tr>
+            
+            <tr>
+              <td><a href="#cpp-clones">cpp</a></td>
+              <td>1</td>
+              <td>145</td>
+              <td>0</td>
+              <td>0 (0.00%)</td>
+              <td>0 (0.00%)</td>
+            </tr>
+            
+            <tr>
+              <td><a href="#javascript-clones">javascript</a></td>
+              <td>12</td>
+              <td>487</td>
+              <td>0</td>
+              <td>0 (0.00%)</td>
+              <td>0 (0.00%)</td>
+            </tr>
+            
+            <tr>
+              <td><a href="#json-clones">json</a></td>
+              <td>2</td>
+              <td>77</td>
+              <td>0</td>
+              <td>0 (0.00%)</td>
+              <td>0 (0.00%)</td>
+            </tr>
+            
+            <tr>
+              <td><a href="#markdown-clones">markdown</a></td>
+              <td>33</td>
+              <td>1295</td>
+              <td>0</td>
+              <td>0 (0.00%)</td>
+              <td>0 (0.00%)</td>
+            </tr>
+            
+            <tr>
+              <td><a href="#twig-clones">twig</a></td>
+              <td>7</td>
+              <td>106</td>
+              <td>0</td>
+              <td>0 (0.00%)</td>
+              <td>0 (0.00%)</td>
+            </tr>
+            
+            <tr>
+              <td><a href="#typescript-clones">typescript</a></td>
+              <td>224</td>
+              <td>45583</td>
+              <td>85</td>
+              <td>770 (1.69%)</td>
+              <td>5741 (1.80%)</td>
+            </tr>
+            
+            <tr style="font-weight: 700;">
+              <td>Total</td>
+              <td>280</td>
+              <td>47703</td>
+              <td>85</td>
+              <td>770 (1.61%)</td>
+              <td>5741 (1.68%)</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+    </div>
+
+    
+    
+    <div class="card">
+      <section class="clone-section">
+        <a name="typescript-clones"></a>
+        <h2>typescript</h2>
+        <div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/extensions/claude-code-adapter/src/index.ts (Line 109:66 - Line 115:4),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/extensions/opencode-adapter/src/index.ts (Line 140:72 - Line 146:4)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-1')">Show code</button>
+            </div>
+            <pre id="code-typescript-1" class="code-block">  const anchor = request.scope === &#39;project&#39; ? &#39;project&#39; : &#39;home&#39;;
+  if (request.feature === &#39;asset.prompt&#39;) {
+    return projectionSuccess(targetPath(anchor, [...base, &#39;commands&#39;, `${request.assetId}.md`]));
+  }
+  if (request.feature === &#39;asset.skill&#39;) {
+    return projectionSuccess(targetPath(anchor, [...base, &#39;skills&#39;, request.assetId, &#39;SKILL.md&#39;]));
+  }</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/extensions/claude-code-adapter/src/index.ts (Line 150:41 - Line 157:9),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/extensions/opencode-adapter/src/index.ts (Line 174:39 - Line 181:9)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-2')">Show code</button>
+            </div>
+            <pre id="code-typescript-2" class="code-block">    target: requirePath(claudeCodeTarget({ feature: &#39;asset.prompt&#39;, scope: request.scope, assetId: request.id })),
+    mediaType: &#39;text/markdown&#39; as const,
+    content: entries.length === 0 ? request.body : renderMarkdown(entries, request.body),
+  });
+}
+
+/** Projects a shared Agent Skills file to Claude Code&#39;s native directory. */
+function projectClaudeCodeSkill(request: SkillProjectionRequest): ProjectionResult&#60;ProjectedFile&#62; {</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/extensions/opencode-adapter/src/index.spec.ts (Line 256:35 - Line 266:6),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/extensions/pi-adapter/src/index.spec.ts (Line 139:29 - Line 149:6)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-3')">Show code</button>
+            </div>
+            <pre id="code-typescript-3" class="code-block">      () =&#62; opencodeHarnessAdapter.reloadNotice({ changedFeatures: [&#39;asset.unknown&#39;] } as never),
+    ];
+    for (const call of calls) {
+      expect(call).not.toThrow();
+      const result = call();
+      expect(result.value).toBeUndefined();
+      expect(result.diagnostics).toMatchObject([{ code: &#39;INVALID_REQUEST&#39; }]);
+    }
+  });
+
+  it(&#39;emits byte-equivalent shared skill files for Pi and OpenCode&#39;, () =&#62; {</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/extensions/opencode-adapter/src/index.ts (Line 154:84 - Line 159:42),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/extensions/pi-adapter/src/index.ts (Line 131:78 - Line 136:42)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-4')">Show code</button>
+            </div>
+            <pre id="code-typescript-4" class="code-block">function projectOpencodePrompt(request: PromptProjectionRequest): ProjectionResult&#60;ProjectedFile&#62; {
+  const diagnostics = contentDiagnostics(&#39;asset.prompt&#39;, request.scope, request.id, request.body);
+  const metadata = request.metadata ?? {};
+  if (metadata.description !== undefined &#38;&#38; !nonblank(metadata.description))
+    diagnostics.push(invalidMetadata(&#39;prompt.description&#39;, request));
+  if (metadata.argumentHint !== undefined) diagnostics.push(unrepresentable(&#39;prompt.argument-hint&#39;, request));</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/extensions/opencode-adapter/src/index.ts (Line 188:34 - Line 194:25),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/extensions/pi-adapter/src/index.ts (Line 164:28 - Line 170:25)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-5')">Show code</button>
+            </div>
+            <pre id="code-typescript-5" class="code-block">function projectOpencodeExtension(request: ExtensionProjectionRequest): ProjectionResult&#60;ProjectedFile&#62; {
+  const diagnostics = contentDiagnostics(&#39;asset.extension&#39;, request.scope, request.id, request.source);
+  if (diagnostics.length &#62; 0) return projectionFailure(diagnostics);
+  return projectionSuccess({
+    assetId: request.id,
+    feature: &#39;asset.extension&#39; as const,
+    target: requirePath(opencodeTarget({ feature: &#39;asset.extension&#39;, scope: request.scope, assetId: request.id })),</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/extensions/opencode-adapter/src/index.ts (Line 245:38 - Line 253:16),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/extensions/pi-adapter/src/index.ts (Line 183:32 - Line 191:16)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-6')">Show code</button>
+            </div>
+            <pre id="code-typescript-6" class="code-block">  const name = OPENCODE_PACKAGE_NAMES[request.logicalId];
+  if (name === undefined || !PACKAGE_VERSION_PATTERN.test(request.version)) {
+    return projectionFailure([invalidPackage(request.scope)]);
+  }
+  return projectionSuccess({
+    logicalId: request.logicalId,
+    scope: request.scope,
+    source: { ecosystem: &#39;npm&#39; as const, name, version: request.version },
+    activation: &#39;opencode-plugin&#39; as const,</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/extensions/opencode-adapter/src/index.ts (Line 296:50 - Line 304:12),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/extensions/pi-adapter/src/index.ts (Line 206:45 - Line 214:12)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-7')">Show code</button>
+            </div>
+            <pre id="code-typescript-7" class="code-block">    declaration.activation !== &#39;opencode-plugin&#39; ||
+    declaration.source.ecosystem !== &#39;npm&#39; ||
+    declaration.source.name !== expectedName ||
+    !PACKAGE_VERSION_PATTERN.test(declaration.source.version)
+  ) {
+    return projectionFailure([invalidPackage(declaration.scope)]);
+  }
+  return projectionSuccess({
+    hostId: &#39;opencode&#39;,</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/extensions/opencode-adapter/src/index.ts (Line 328:95 - Line 336:9),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/extensions/opencode-adapter/src/index.ts (Line 343:65 - Line 351:9)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-8')">Show code</button>
+            </div>
+            <pre id="code-typescript-8" class="code-block">    ...(server.environment === undefined ? {} : { environment: sortRecord(server.environment) }),
+    ...(server.enabled === undefined ? {} : { enabled: server.enabled }),
+    ...(server.timeout === undefined ? {} : { timeout: server.timeout }),
+  };
+  return projectionSuccess(mcpPlan(scope, server.name, value));
+}
+
+/** Produces one remote MCP object operation without resolving header references. */
+function planRemoteMcp(scope: HarnessScope, server: RemoteMcpDeclaration): ProjectionResult&#60;HostConfigPlan&#62; {</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/extensions/opencode-design-docs/src/opencode-design-docs.spec.ts (Line 12:27 - Line 20:18),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/extensions/pi-design-docs/src/pi-design-docs.spec.ts (Line 12:22 - Line 20:18)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-9')">Show code</button>
+            </div>
+            <pre id="code-typescript-9" class="code-block">  type OpenCodeToolFactory,
+} from &#39;./index.js&#39;;
+
+const roots: string[] = [];
+afterEach(() =&#62; {
+  vi.restoreAllMocks();
+  while (roots.length) rmSync(roots.pop() as string, { recursive: true, force: true });
+});
+function fixture(): string {</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/extensions/opencode-design-docs/src/opencode-design-docs.spec.ts (Line 13:20 - Line 20:18),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/design-docs-mcp/src/server.spec.ts (Line 9:85 - Line 16:18)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-10')">Show code</button>
+            </div>
+            <pre id="code-typescript-10" class="code-block">} from &#39;./index.js&#39;;
+
+const roots: string[] = [];
+afterEach(() =&#62; {
+  vi.restoreAllMocks();
+  while (roots.length) rmSync(roots.pop() as string, { recursive: true, force: true });
+});
+function fixture(): string {</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/extensions/opencode-design-docs/src/opencode-design-docs.spec.ts (Line 70:70 - Line 75:10),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/extensions/pi-design-docs/src/pi-design-docs.spec.ts (Line 73:70 - Line 78:10)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-11')">Show code</button>
+            </div>
+            <pre id="code-typescript-11" class="code-block">  it(&#39;transports retryable repository evidence through OpenCode JSON&#39;, async () =&#62; {
+    const definition = DESIGN_DOCS_TOOLS.find((tool) =&#62; tool.name === &#39;document_id&#39;)!;
+    vi.spyOn(definition, &#39;run&#39;).mockRejectedValue(
+      new StaleRevisionError(&#39;stale&#39;, { expected: &#39;sha256:old&#39;, actual: &#39;sha256:new&#39; }),
+    );
+    const hooks = (await NeottiaDesignDocsPlugin({ directory: fixture() } as never)) as unknown as {</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/extensions/opencode-design-docs/src/opencode-design-docs.spec.ts (Line 70:70 - Line 75:10),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/design-docs-mcp/src/server.spec.ts (Line 76:80 - Line 81:10)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-12')">Show code</button>
+            </div>
+            <pre id="code-typescript-12" class="code-block">  it(&#39;transports retryable repository evidence through OpenCode JSON&#39;, async () =&#62; {
+    const definition = DESIGN_DOCS_TOOLS.find((tool) =&#62; tool.name === &#39;document_id&#39;)!;
+    vi.spyOn(definition, &#39;run&#39;).mockRejectedValue(
+      new StaleRevisionError(&#39;stale&#39;, { expected: &#39;sha256:old&#39;, actual: &#39;sha256:new&#39; }),
+    );
+    const hooks = (await NeottiaDesignDocsPlugin({ directory: fixture() } as never)) as unknown as {</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/extensions/opencode-issues/src/opencode-issues.spec.ts (Line 7:46 - Line 13:41),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/extensions/pi-issues/src/pi-issues.spec.ts (Line 7:71 - Line 12:41)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-13')">Show code</button>
+            </div>
+            <pre id="code-typescript-13" class="code-block">import { buildIssueTools, createIssuesPlugin } from &#39;./index.js&#39;;
+
+const roots: string[] = [];
+afterEach(() =&#62; roots.splice(0).forEach((root) =&#62; rmSync(root, { recursive: true, force: true })));
+
+function project(): string {
+  const cwd = mkdtempSync(join(tmpdir(), &#39;opencode-issues-&#39;));</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/extensions/opencode-issues/src/opencode-issues.spec.ts (Line 7:46 - Line 12:9),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/issues/src/config.spec.ts (Line 22:1 - Line 27:9)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-14')">Show code</button>
+            </div>
+            <pre id="code-typescript-14" class="code-block">import { buildIssueTools, createIssuesPlugin } from &#39;./index.js&#39;;
+
+const roots: string[] = [];
+afterEach(() =&#62; roots.splice(0).forEach((root) =&#62; rmSync(root, { recursive: true, force: true })));
+
+function project(): string {</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/extensions/opencode-memory/src/opencode-memory.spec.ts (Line 6:74 - Line 21:41),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/extensions/pi-memory/src/pi-memory.spec.ts (Line 6:73 - Line 20:41)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-15')">Show code</button>
+            </div>
+            <pre id="code-typescript-15" class="code-block">import { buildMemoryTools, NeottiaMemoryPlugin, type OpenCodeToolFactory } from &#39;./index.js&#39;;
+
+/**
+ * Unit tests: the plugin builds real OpenCode tool definitions and routes
+ * execution through the store. The real-harness E2E lives in
+ * opencode.plugin.harness.test.ts (opt-in via NEOTTIA_TEST_HARNESS).
+ */
+
+const projects: string[] = [];
+
+afterEach(() =&#62; {
+  while (projects.length) rmSync(projects.pop() as string, { recursive: true, force: true });
+});
+
+function fixture(): string {
+  const cwd = mkdtempSync(join(tmpdir(), &#39;neottia-oc-ext-&#39;));</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/extensions/opencode-memory/src/opencode-memory.spec.ts (Line 21:59 - Line 27:2),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/extensions/pi-memory/src/pi-memory.spec.ts (Line 20:59 - Line 26:2)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-16')">Show code</button>
+            </div>
+            <pre id="code-typescript-16" class="code-block">  const cwd = mkdtempSync(join(tmpdir(), &#39;neottia-oc-ext-&#39;));
+  projects.push(cwd);
+  const path = join(cwd, &#39;.neottia&#39;, &#39;config.yml&#39;);
+  mkdirSync(join(path, &#39;..&#39;), { recursive: true });
+  writeFileSync(path, &#39;version: 1\nskills:\n  memory:\n    enabled: true\n&#39;, &#39;utf8&#39;);
+  return cwd;
+}</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/extensions/opencode-searchable/src/index.ts (Line 42:25 - Line 48:18),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/searchable-mcp/src/server.ts (Line 34:8 - Line 40:16)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-17')">Show code</button>
+            </div>
+            <pre id="code-typescript-17" class="code-block">      interactive: false,
+      ...(options.snapshot ? { snapshot: options.snapshot } : {}),
+      ...(options.env ? { env: options.env } : {}),
+      ...(options.configOverrides ? { overrides: { modules: { searchable: options.configOverrides } } } : {}),
+    });
+    const config = snapshot.get(searchableConfigContribution);
+    const runtime = (options.runtimeFactory ?? createSearchableRuntime)({ cwd: host.directory, config });</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/extensions/opencode-searchable/src/opencode-searchable.spec.ts (Line 11:55 - Line 16:4),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/extensions/pi-searchable/src/pi-searchable.spec.ts (Line 15:1 - Line 20:4)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-18')">Show code</button>
+            </div>
+            <pre id="code-typescript-18" class="code-block">import { buildSearchableTools, createSearchablePlugin } from &#39;./index.js&#39;;
+
+const roots: string[] = [];
+afterEach(() =&#62; roots.splice(0).forEach((root) =&#62; rmSync(root, { recursive: true, force: true })));
+
+it(&#39;builds every shared tool and forwards OpenCode cancellation&#39;, async () =&#62; {</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/extensions/pi-design-docs/src/index.ts (Line 52:43 - Line 61:68),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/extensions/pi-searchable/src/index.ts (Line 57:43 - Line 66:68)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-19')">Show code</button>
+            </div>
+            <pre id="code-typescript-19" class="code-block">      parameters: designDocsToolParameters[definition.name],
+      async execute(_callId, params, signal, _onUpdate, invocation) {
+        const cwd = resolve(invocation.cwd ?? defaultCwd);
+        let context = contexts.get(cwd);
+        if (!context) {
+          const snapshot = resolveHostConfigSnapshot({
+            cwd,
+            interactive: true,
+            env: options.env ?? process.env,
+            ...(options.configOverrides ? { overrides: { modules: { design_docs: options.configOverrides } } } : {}),</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/extensions/pi-design-docs/src/index.ts (Line 54:39 - Line 61:68),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/extensions/pi-memory/src/index.ts (Line 62:40 - Line 69:68)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-20')">Show code</button>
+            </div>
+            <pre id="code-typescript-20" class="code-block">        const cwd = resolve(invocation.cwd ?? defaultCwd);
+        let context = contexts.get(cwd);
+        if (!context) {
+          const snapshot = resolveHostConfigSnapshot({
+            cwd,
+            interactive: true,
+            env: options.env ?? process.env,
+            ...(options.configOverrides ? { overrides: { modules: { design_docs: options.configOverrides } } } : {}),</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/extensions/pi-design-docs/src/pi-design-docs.spec.ts (Line 109:92 - Line 116:34),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/extensions/pi-design-docs/src/pi-design-docs.spec.ts (Line 181:84 - Line 188:34)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-21')">Show code</button>
+            </div>
+            <pre id="code-typescript-21" class="code-block">  it(&#39;lets the invocation that encounters stale state control a concurrent prompt&#39;, async () =&#62; {
+    const { registered, close } = registeredTools();
+    const root = fixture(&#39;prompt&#39;);
+    const signal = new AbortController().signal;
+    const invocation = { cwd: root };
+    await registered
+      .get(&#39;document_create&#39;)!
+      .execute(&#39;create&#39;, { title: &#39;Concurrent&#39;, kind: &#39;hld&#39;, body: &#39;needle&#39; }, signal, () =&#62; undefined, invocation);</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/extensions/pi-design-docs/src/pi-design-docs.spec.ts (Line 116:47 - Line 125:38),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/extensions/pi-design-docs/src/pi-design-docs.spec.ts (Line 188:47 - Line 197:38)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-22')">Show code</button>
+            </div>
+            <pre id="code-typescript-22" class="code-block">      .execute(&#39;create&#39;, { title: &#39;Concurrent&#39;, kind: &#39;hld&#39;, body: &#39;needle&#39; }, signal, () =&#62; undefined, invocation);
+    await registered
+      .get(&#39;document_search&#39;)!
+      .execute(&#39;search-1&#39;, { query: &#39;needle&#39; }, signal, () =&#62; undefined, invocation);
+    const database = new DatabaseSync(join(root, &#39;.neottia/cache/design-docs.sqlite&#39;));
+    database
+      .prepare(&#34;UPDATE neottia_repository_cache_meta SET value=? WHERE key=&#39;rebuilt_at&#39;&#34;)
+      .run(&#39;2000-01-01T00:00:00.000Z&#39;);
+    database.close();
+    const confirm = vi.fn(async () =&#62; false);</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/extensions/pi-memory/src/pi-memory.spec.ts (Line 108:59 - Line 113:44),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/extensions/pi-memory/src/pi-memory.spec.ts (Line 165:79 - Line 170:44)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-23')">Show code</button>
+            </div>
+            <pre id="code-typescript-23" class="code-block">  it(&#39;stores a memory in-process through the tool handler&#39;, async () =&#62; {
+    const cwd = fixture();
+    const { api, registered } = fakePi();
+    registerMemoryTools(api, { cwd });
+    const store = registered.find((tool) =&#62; tool.name === &#39;memory_store&#39;) as {
+      execute: (id: string, params: unknown) =&#62; Promise&#60;{ content: Array&#60;{ text: string }&#62; }&#62;;</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/cli/src/catalog.ts (Line 14:5 - Line 19:15),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/cli/src/catalog.ts (Line 20:11 - Line 25:15)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-24')">Show code</button>
+            </div>
+            <pre id="code-typescript-24" class="code-block">  pi: Object.freeze([
+    { logicalId: &#39;memory&#39;, version: &#39;0.1.1&#39; },
+    { logicalId: &#39;issues&#39;, version: &#39;0.2.0&#39; },
+    { logicalId: &#39;design-docs&#39;, version: &#39;0.2.0&#39; },
+    { logicalId: &#39;searchable&#39;, version: &#39;0.2.0&#39; },
+  ] as const),</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/cli/src/index.ts (Line 86:27 - Line 91:15),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/cli/src/index.ts (Line 161:28 - Line 166:15)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-25')">Show code</button>
+            </div>
+            <pre id="code-typescript-25" class="code-block">async function initCommand(arguments_: readonly string[], output: CliOutput, env: NodeJS.ProcessEnv): Promise&#60;number&#62; {
+  const { values } = parseArgs({
+    args: [...arguments_],
+    strict: true,
+    allowPositionals: false,
+    options: {</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/cli/src/index.ts (Line 183:66 - Line 189:5),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/cli/src/index.ts (Line 285:64 - Line 291:5)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-26')">Show code</button>
+            </div>
+            <pre id="code-typescript-26" class="code-block">  const harnesses = selectHarnesses(values.harness, project, env);
+  const override = values.scope === undefined ? undefined : parseScope(values.scope);
+  const configuredScopes = new Map(
+    resolveConfig(officialConfigRegistry, { cwd: project, env })
+      .get(harnessInstallConfigContribution)
+      .targets.map((target) =&#62; [target.id, target.scope] as const),
+  );</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/config/src/registry.ts (Line 342:14 - Line 351:9),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/config/src/resolver.ts (Line 864:49 - Line 873:9)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-27')">Show code</button>
+            </div>
+            <pre id="code-typescript-27" class="code-block">  return true;
+}
+
+/** Exact path equality avoids ambiguous dot-joined key comparisons. */
+function pathsEqual(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length &#38;&#38; left.every((segment, index) =&#62; segment === right[index]);
+}
+
+/** Stable path rendering is used only after segment validation. */
+function formatPath(path: readonly string[]): string {</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/config/src/registry.ts (Line 342:14 - Line 348:2),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/design-docs/src/config.ts (Line 274:33 - Line 280:2)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-28')">Show code</button>
+            </div>
+            <pre id="code-typescript-28" class="code-block">  return true;
+}
+
+/** Exact path equality avoids ambiguous dot-joined key comparisons. */
+function pathsEqual(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length &#38;&#38; left.every((segment, index) =&#62; segment === right[index]);
+}</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/config/src/registry.ts (Line 342:14 - Line 348:2),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/issues/src/config.ts (Line 263:26 - Line 269:2)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-29')">Show code</button>
+            </div>
+            <pre id="code-typescript-29" class="code-block">  return true;
+}
+
+/** Exact path equality avoids ambiguous dot-joined key comparisons. */
+function pathsEqual(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length &#38;&#38; left.every((segment, index) =&#62; segment === right[index]);
+}</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/config/src/registry.ts (Line 342:14 - Line 348:2),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/memory-core/src/config.ts (Line 337:97 - Line 343:2)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-30')">Show code</button>
+            </div>
+            <pre id="code-typescript-30" class="code-block">  return true;
+}
+
+/** Exact path equality avoids ambiguous dot-joined key comparisons. */
+function pathsEqual(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length &#38;&#38; left.every((segment, index) =&#62; segment === right[index]);
+}</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/design-docs-mcp/src/server.ts (Line 39:3 - Line 45:60),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/issues-mcp/src/server.ts (Line 31:42 - Line 37:60)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-31')">Show code</button>
+            </div>
+            <pre id="code-typescript-31" class="code-block">  );
+  const effectiveSnapshot = resolveHostConfigSnapshot({
+    cwd,
+    interactive: false,
+    ...(options.snapshot ? { snapshot: options.snapshot } : {}),
+    ...(options.env ? { env: options.env } : {}),
+    ...(options.configOverrides ? { overrides: { modules: { design_docs: options.configOverrides } } } : {}),</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/design-docs/src/config.spec.ts (Line 191:103 - Line 198:17),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/issues/src/config.spec.ts (Line 156:96 - Line 163:17)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-32')">Show code</button>
+            </div>
+            <pre id="code-typescript-32" class="code-block">    ).toThrowError(expect.objectContaining({ category: &#39;configuration&#39;, code: &#39;CONFIG_SCHEMA_INVALID&#39; }));
+  });
+
+  it(&#39;rejects malformed documents, duplicate shard locations, unknown keys, and unsafe roots&#39;, () =&#62; {
+    const cwd = fixture();
+    const file = writeConfig(cwd, { version: 1 });
+    writeFileSync(file, &#39;version: 1\nskills: [unclosed\n&#39;, &#39;utf8&#39;);
+    expect(() =&#62; loadDesignDocsConfig(cwd, { env: {} })).toThrowError(</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/design-docs/src/config.spec.ts (Line 224:99 - Line 233:77),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/design-docs/src/config.spec.ts (Line 257:55 - Line 266:77)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-33')">Show code</button>
+            </div>
+            <pre id="code-typescript-33" class="code-block">    const complete = generateConfigJsonSchema(createConfigRegistry([designDocsConfigContribution]));
+    const completeProperties = complete[&#39;properties&#39;] as Record&#60;string, Record&#60;string, unknown&#62;&#62;;
+    const completeRoot = (
+      completeProperties[&#39;modules&#39;][&#39;properties&#39;] as Record&#60;string, Record&#60;string, Record&#60;string, unknown&#62;&#62;&#62;
+    )[&#39;design_docs&#39;][&#39;properties&#39;][&#39;root&#39;];
+    const profileModules = (
+      (completeProperties[&#39;profiles&#39;][&#39;additionalProperties&#39;] as Record&#60;string, Record&#60;string, unknown&#62;&#62;)[&#39;properties&#39;]
+        .modules as Record&#60;string, Record&#60;string, unknown&#62;&#62;
+    )[&#39;properties&#39;] as Record&#60;string, Record&#60;string, Record&#60;string, unknown&#62;&#62;&#62;;
+    const profileRoot = profileModules[&#39;design_docs&#39;][&#39;properties&#39;][&#39;root&#39;];</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/design-docs/src/config.spec.ts (Line 360:60 - Line 369:44),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/issues/src/config.spec.ts (Line 319:52 - Line 328:44)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-34')">Show code</button>
+            </div>
+            <pre id="code-typescript-34" class="code-block">      expect.objectContaining({ code: &#39;CONFIG_ENV_INVALID&#39; }),
+    );
+  });
+
+  it(&#39;ignores unrelated roots only in the deprecated standalone wrapper&#39;, () =&#62; {
+    const cwd = fixture();
+    const projectFile = writeConfig(cwd, {
+      version: 1,
+      mcpServers: { anything: { command: &#39;x&#39; } },
+      modules: { memory: { enabled: true }, design_docs: { enabled: true } },</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/design-docs/src/config.ts (Line 247:18 - Line 253:13),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/issues/src/config.ts (Line 240:17 - Line 246:13)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-35')">Show code</button>
+            </div>
+            <pre id="code-typescript-35" class="code-block">  const messages = error.diagnostics.map((diagnostic) =&#62; {
+    const path = diagnostic.path === undefined ? &#39;&#39; : ` at ${diagnostic.path.join(&#39;.&#39;)}`;
+    const environment = diagnostic.source?.environment === undefined ? &#39;&#39; : ` (${diagnostic.source.environment})`;
+    const file = diagnostic.source?.file === undefined ? &#39;&#39; : ` in ${diagnostic.source.file}`;
+    return `${diagnostic.message}${path}${environment}${file}`;
+  });
+  return new DesignDocsError(</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/design-docs/src/config.ts (Line 258:5 - Line 263:7),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/issues/src/config.ts (Line 248:14 - Line 253:7)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-36')">Show code</button>
+            </div>
+            <pre id="code-typescript-36" class="code-block">    {
+      diagnostics: error.diagnostics.map((diagnostic) =&#62; ({
+        code: diagnostic.code,
+        ...(diagnostic.path === undefined ? {} : { path: diagnostic.path.join(&#39;.&#39;) }),
+      })),
+    },</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/design-docs/src/index-sqlite.spec.ts (Line 6:53 - Line 12:24),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/design-docs/src/security.spec.ts (Line 6:51 - Line 12:24)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-37')">Show code</button>
+            </div>
+            <pre id="code-typescript-37" class="code-block">import { designDocsConfigSchema } from &#39;./config.js&#39;;
+import { DesignDocumentStore } from &#39;./store.js&#39;;
+
+const roots: string[] = [];
+const id = &#39;doc-01ARZ3NDEKTSV4RRFFQ69G5FAV&#39;;
+afterEach(async () =&#62; Promise.all(roots.splice(0).map((root) =&#62; rm(root, { recursive: true, force: true }))));
+async function fixture(overrides: Record&#60;string, unknown&#62; = {}, warm = true) {</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/design-docs/src/recovery.spec.ts (Line 18:65 - Line 23:47),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/design-docs/src/recovery.spec.ts (Line 34:65 - Line 39:47)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-38')">Show code</button>
+            </div>
+            <pre id="code-typescript-38" class="code-block">    const root = await mkdtemp(join(tmpdir(), &#39;design-recovery-&#39;));
+    roots.push(root);
+    const store = await DesignDocumentStore.fromConfig(designDocsConfigSchema.parse({ enabled: true }), root, {
+      generateId: () =&#62; id,
+    });
+    const record = await store.create({ title: &#39;Recoverable&#39;, kind: &#39;hld&#39; });</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/design-docs/src/store.ts (Line 495:66 - Line 502:14),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/design-docs/src/store.ts (Line 533:85 - Line 540:14)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-39')">Show code</button>
+            </div>
+            <pre id="code-typescript-39" class="code-block">            const decoded = decodeHarnessctlDocument(item.content, this.config.security.limits);
+            const existing = catalog.byId
+              .get(decoded.metadata.id)
+              ?.find((entity) =&#62; entity.decoded.metadata.version === decoded.metadata.version);
+            if (existing) {
+              conflicts.push(`${decoded.metadata.id}:v${decoded.metadata.version}`);
+              continue;
+            }</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/design-docs/src/tools.spec.ts (Line 19:3 - Line 27:2),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/design-docs/src/tools.spec.ts (Line 84:3 - Line 92:2)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-40')">Show code</button>
+            </div>
+            <pre id="code-typescript-40" class="code-block">  const context: DesignDocsToolContext = {
+    cwd,
+    interactive: false,
+    configOverrides: { enabled: true, security: { limits: { max_result_bytes: maxResultBytes } } },
+    storeKey: {},
+  };
+  contexts.push(context);
+  return context;
+}</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/distribution/src/immutable.ts (Line 2:8 - Line 12:2),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/sdlc/src/compiler.ts (Line 1300:1 - Line 1310:2)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-41')">Show code</button>
+            </div>
+            <pre id="code-typescript-41" class="code-block">export function deepFreeze&#60;T&#62;(value: T): T {
+  if (Array.isArray(value)) {
+    for (const item of value) deepFreeze(item);
+    return Object.freeze(value);
+  }
+  if (value !== null &#38;&#38; typeof value === &#39;object&#39;) {
+    for (const item of Object.values(value as Record&#60;string, unknown&#62;)) deepFreeze(item);
+    return Object.freeze(value);
+  }
+  return value;
+}</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/distribution/src/inspection.ts (Line 99:29 - Line 105:22),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/distribution/src/inspection.ts (Line 119:100 - Line 124:22)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-42')">Show code</button>
+            </div>
+            <pre id="code-typescript-42" class="code-block">  rejectDuplicateUnits(units);
+  units.sort((left, right) =&#62; compareCodeUnits(receiptEntryKey(left), receiptEntryKey(right)));
+
+  return Object.freeze({
+    roots: Object.freeze({ ...roots }),
+    receiptPath: receiptFile,
+    receiptContainer,</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/distribution/src/inspection.ts (Line 224:26 - Line 237:2),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/distribution/src/transaction.ts (Line 287:22 - Line 300:2)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-43')">Show code</button>
+            </div>
+            <pre id="code-typescript-43" class="code-block">async function pathExists(path: string): Promise&#60;boolean&#62; {
+  try {
+    await lstat(path);
+    return true;
+  } catch (error) {
+    if (isMissing(error)) return false;
+    throw error;
+  }
+}
+
+/** Narrows Node&#39;s missing-path errors. */
+function isMissing(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error &#38;&#38; &#39;code&#39; in error &#38;&#38; error.code === &#39;ENOENT&#39;;
+}</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/harness-adapter/src/contracts.ts (Line 522:21 - Line 529:9),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/harness-adapter/src/validation.ts (Line 437:18 - Line 444:9)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-44')">Show code</button>
+            </div>
+            <pre id="code-typescript-44" class="code-block">function plainRecord(value: unknown): value is Record&#60;string, unknown&#62; {
+  if (value === null || typeof value !== &#39;object&#39; || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+/** Checks that an object contains no unknown own enumerable fields. */
+function hasOnlyKeys(value: Record&#60;string, unknown&#62;, allowed: readonly string[]): boolean {</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/issues-mcp/src/server.spec.ts (Line 48:63 - Line 55:4),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/searchable-mcp/src/server.spec.ts (Line 66:61 - Line 73:4)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-45')">Show code</button>
+            </div>
+            <pre id="code-typescript-45" class="code-block">  const invalid = await connected.callTool({ name: &#39;issue_get&#39;, arguments: {} });
+  expect(invalid.isError).toBe(true);
+  expect(JSON.parse(String((invalid.content as Array&#60;{ text: string }&#62;)[0]?.text))).toMatchObject({
+    code: &#39;TOOL_INPUT_INVALID&#39;,
+  });
+});
+
+it(&#39;uses the real design-document resolver by default&#39;, async () =&#62; {</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/issues-mcp/src/server.spec.ts (Line 59:79 - Line 64:79),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/issues-mcp/src/server.spec.ts (Line 85:46 - Line 90:79)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-46')">Show code</button>
+            </div>
+            <pre id="code-typescript-46" class="code-block">  const document = await documents.create({ title: &#39;MCP target&#39;, kind: &#39;hld&#39; });
+  const created = await connected.callTool({ name: &#39;issue_create&#39;, arguments: { type: &#39;task&#39;, title: &#39;Linked&#39; } });
+  const issue = created.structuredContent as { id: string; revision: string };
+  const linked = await connected.callTool({
+    name: &#39;issue_link_document&#39;,
+    arguments: { id: issue.id, expected_revision: issue.revision, document_id: document.id },</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/issues-mcp/src/server.ts (Line 64:40 - Line 72:23),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/searchable-mcp/src/server.ts (Line 63:45 - Line 71:23)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-47')">Show code</button>
+            </div>
+            <pre id="code-typescript-47" class="code-block">      outputSchema: issueToolJsonSchema(definition.name, &#39;output&#39;) as {
+        type: &#39;object&#39;;
+        properties?: Record&#60;string, object&#62;;
+        required?: string[];
+      },
+    })),
+  }));
+  server.setRequestHandler(CallToolRequestSchema, async (request, extra) =&#62; {
+    const definition = findIssueTool(request.params.name);</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/issues/src/config.spec.ts (Line 30:13 - Line 50:10),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/memory-core/src/config.spec.ts (Line 27:63 - Line 47:10)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-48')">Show code</button>
+            </div>
+            <pre id="code-typescript-48" class="code-block">  return cwd;
+}
+
+function writeConfig(cwd: string, config: unknown, file = &#39;.neottia/config.yml&#39;): string {
+  const path = join(cwd, file);
+  mkdirSync(join(path, &#39;..&#39;), { recursive: true });
+  writeFileSync(path, stringify(config, { lineWidth: 0 }), &#39;utf8&#39;);
+  return path;
+}
+
+const companionPatchSchema = z.object({ enabled: z.boolean().optional() }).strict();
+const companionContribution = defineConfigContribution({
+  id: &#39;companion&#39;,
+  path: [&#39;modules&#39;, &#39;companion&#39;],
+  filePatchSchema: companionPatchSchema,
+  runtimePatchSchema: companionPatchSchema,
+  resolvedSchema: z.object({ enabled: z.boolean() }).strict(),
+  defaults: { enabled: false },
+});
+
+describe(&#39;Issues configuration contribution&#39;, () =&#62; {</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/issues/src/config.spec.ts (Line 237:17 - Line 253:10),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/issues/src/config.spec.ts (Line 257:61 - Line 273:6)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-49')">Show code</button>
+            </div>
+            <pre id="code-typescript-49" class="code-block">        issues: {
+          enabled: true,
+          root: &#39;work/issues&#39;,
+          prefix: &#39;ticket-&#39;,
+          retrieval: { limit: 8, max_bytes: 8192 },
+          cache: { max_age_ms: 1234, stale_policy: &#39;fail&#39; },
+          lock: { wait_ms: 2345, stale_ms: 3456 },
+          security: {
+            max_file_bytes: 4096,
+            max_files: 50,
+            max_total_bytes: 65_536,
+            max_batch_paths: 25,
+            max_query_bytes: 2048,
+            max_query_rows: 100,
+            max_result_bytes: 32_768,
+          },
+        },</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/issues/src/store.ts (Line 180:7 - Line 185:16),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/issues/src/store.ts (Line 398:11 - Line 403:22)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-50')">Show code</button>
+            </div>
+            <pre id="code-typescript-50" class="code-block">      let policy = this.config.cache.stale_policy;
+      if (policy === &#39;prompt&#39;) policy = (await this.options.onStaleCache?.()) === false ? &#39;fail&#39; : &#39;rebuild&#39;;
+      const handle = await ensureIssueCache(
+        await this.cacheRoot(),
+        lease,
+        catalog,</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/issues/src/store.ts (Line 299:78 - Line 308:8),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/issues/src/store.ts (Line 322:75 - Line 331:8)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-51')">Show code</button>
+            </div>
+            <pre id="code-typescript-51" class="code-block">        [input.relationship]: [...owner.record[input.relationship], targetId],
+        updated_at: new Date().toISOString(),
+      };
+      const result = await this.publishRecord(root, lease, catalog, ownerId, next, control);
+      return hydrateIssue(result, ownerId);
+    }, control);
+  }
+
+  /** Removes a relation and requires the deterministic owner&#39;s current revision. */
+  async unrelate(</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/memory-core/src/backend/filesystem.ts (Line 180:62 - Line 190:50),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/memory-core/src/backend/postgres.ts (Line 262:5 - Line 275:50)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-52')">Show code</button>
+            </div>
+            <pre id="code-typescript-52" class="code-block">    tombstones.sort((left, right) =&#62; newestFirst(left, right));
+    const contentHash = createHash(&#39;sha256&#39;).update(digests.sort().join(&#39;\n&#39;)).digest(&#39;hex&#39;);
+    return { records, tombstones, activeIds, contentHash };
+  }
+
+  /** {@inheritdoc StorageBackend.applyBatch} */
+  public async applyBatch(
+    replacements: readonly StorageReplacement[],
+    control: MemoryOperationControl = {},
+  ): Promise&#60;void&#62; {
+    assertMemoryControl(control, &#39;memory write&#39;);</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/memory-core/src/backend/filesystem.ts (Line 356:67 - Line 373:10),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/memory-core/src/backend/postgres.ts (Line 589:26 - Line 607:10)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-53')">Show code</button>
+            </div>
+            <pre id="code-typescript-53" class="code-block">    return `${this.scope.organizationId}--${this.scope.projectId}`;
+  }
+
+  /** Builds the canonical file path for a record from its record type. */
+  public recordPath(record: MemoryRecord): string {
+    return `${RECORD_FOLDERS[record.record_type]}/${record.id}.yaml`;
+  }
+
+  /** Tombstone file path inside the canonical tree. */
+  public tombstonePath(tombstone: MemoryTombstone): string {
+    return `tombstones/${tombstone.id}.yaml`;
+  }
+
+  public encode(value: MemoryRecord | MemoryTombstone): Uint8Array {
+    return Buffer.from(stringify(value, { lineWidth: 0 }), &#39;utf8&#39;);
+  }
+
+  private trackUsage(path: string, size: number, files: number, bytes: number): { files: number; bytes: number } {</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/memory-core/src/backend/record-helpers.ts (Line 107:36 - Line 115:16),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/memory-core/src/backend/record-helpers.ts (Line 116:39 - Line 124:16)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-54')">Show code</button>
+            </div>
+            <pre id="code-typescript-54" class="code-block">  const result = memoryRecordSchema.safeParse(value);
+  if (!result.success) throw new MemoryError(`Invalid ${label}:\n${formatIssues(result.error.issues)}`);
+  assertScope(result.data, deps.scope);
+  deps.scanner(result.data);
+  return result.data;
+}
+
+/** Validates a canonical tombstone against the schema, scope, and scanner. */
+export function validateTombstone(value: unknown, deps: RecordHelperDeps, label = &#39;memory tombstone&#39;): MemoryTombstone {</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/memory-core/src/index-sqlite.spec.ts (Line 46:5 - Line 51:50),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/memory-core/src/index-sqlite.spec.ts (Line 65:5 - Line 70:50)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-55')">Show code</button>
+            </div>
+            <pre id="code-typescript-55" class="code-block">    const close = vi.fn().mockResolvedValue(undefined);
+    repositoryStore.openDisposableSqliteCache.mockResolvedValue({
+      state: &#39;ready&#39;,
+      database: {
+        prepare: vi.fn().mockResolvedValue({
+          get: vi.fn().mockResolvedValue({ value: new Date(0).toISOString() }),</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/memory-core/src/memory.spec.ts (Line 27:20 - Line 41:18),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/memory-mcp/src/server.spec.ts (Line 10:71 - Line 23:18)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-56')">Show code</button>
+            </div>
+            <pre id="code-typescript-56" class="code-block">} from &#39;./index.js&#39;;
+
+/**
+ * Adapted from the harnessctl-v2 memory test suite (v1 semantics on the new
+ * filesystem + SQLite architecture). Integration-style tests run in temp
+ * folders only; the repository and workspace folders stay immutable.
+ */
+
+const tempDirs: string[] = [];
+
+afterEach(() =&#62; {
+  while (tempDirs.length) rmSync(tempDirs.pop() as string, { recursive: true, force: true });
+});
+
+function fixture(): string {</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/memory-core/src/memory.spec.ts (Line 789:38 - Line 803:20),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/memory-mcp/src/server.spec.ts (Line 149:58 - Line 164:20)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-57')">Show code</button>
+            </div>
+            <pre id="code-typescript-57" class="code-block">    const destination = storeFor(cwd);
+
+    // Hold the repository authority directly, like a competing process would.
+    const root = await resolveManagedRoot({
+      authorityRoot: cwd,
+      managedPath: &#39;.neottia/memory&#39;,
+      limits: DEFAULT_STORE_LIMITS,
+    });
+    let release!: () =&#62; void;
+    const gate = new Promise&#60;void&#62;((resolve) =&#62; (release = resolve));
+    const holding = withRepositoryLease(root, async () =&#62; gate, { waitMs: 10_000 });
+    await new Promise((resolve) =&#62; setTimeout(resolve, 50));
+
+    const controller = new AbortController();
+    const pending = destination.import(exported, false, { signal: controller.signal });</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/memory-core/src/tool-contracts.ts (Line 171:37 - Line 176:33),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/memory-core/src/tool-contracts.ts (Line 180:33 - Line 185:33)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-58')">Show code</button>
+            </div>
+            <pre id="code-typescript-58" class="code-block">export const validationReportSchema = z
+  .object({
+    valid: z.boolean(),
+    records: z.number().int().nonnegative(),
+    tombstones: z.number().int().nonnegative(),
+    errors: z.array(z.string()),</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/release/scripts/publish-release.spec.ts (Line 67:97 - Line 86:6),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/release/scripts/publish-release.spec.ts (Line 90:99 - Line 109:6)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-59')">Show code</button>
+            </div>
+            <pre id="code-typescript-59" class="code-block">      .mockResolvedValueOnce(new Response(JSON.stringify({ error: &#39;Not found&#39; }), { status: 404 }))
+      .mockResolvedValueOnce(Response.json({ name: &#39;@neottia/core&#39;, versions: { &#39;0.1.0&#39;: { version: &#39;0.1.0&#39; } } }));
+    const delayImpl = vi.fn(async () =&#62; undefined);
+
+    await expect(
+      publishPreparedRelease({
+        manifest,
+        environment: { NODE_AUTH_TOKEN: &#39;test-token&#39; },
+        fetchImpl,
+        spawnImpl: vi.fn(() =&#62; ({ status: 0 })),
+        delayImpl,
+        maxAttempts: 2,
+        retryDelayMs: 1,
+        log: vi.fn(),
+      }),
+    ).resolves.toBe(&#39;published&#39;);
+    expect(delayImpl).toHaveBeenCalledOnce();
+  });
+
+  it(&#39;retries transient registry failures while waiting for modules&#39;, async () =&#62; {</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/repository-store/src/lease.ts (Line 886:81 - Line 896:12),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/repository-store/src/lease.ts (Line 942:99 - Line 952:12)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-60')">Show code</button>
+            </div>
+            <pre id="code-typescript-60" class="code-block">    if (moved.metadata.token !== token || !sameIdentity(expected.identity, moved.identity)) {
+      restoreQuarantinedLease(quarantine, path, releaseExpectation, {
+        kind: &#39;file&#39;,
+        identity: moved.identity,
+        token: moved.metadata.token,
+      });
+      return false;
+    }
+    rmSync(quarantine);
+    return true;
+  } catch {</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/repository-store/src/repository-store.spec.ts (Line 169:62 - Line 175:22),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/repository-store/src/repository-store.spec.ts (Line 242:68 - Line 248:22)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-61')">Show code</button>
+            </div>
+            <pre id="code-typescript-61" class="code-block">    const path = resolveManagedPath(root, &#39;records/raced.txt&#39;);
+    const absolute = join(root.managedRoot, path.relativePath);
+    await withRepositoryLease(root, async (lease) =&#62; {
+      await applyCanonicalBatch(root, lease, [{ kind: &#39;write&#39;, path, bytes: bytes(&#39;original&#39;), expected: &#39;absent&#39; }]);
+      const revision = (await readManagedFile(root, lease, path)).revision;
+      setFilesystemFaultInjectorForTests((event, target) =&#62; {
+        if (event !== &#39;before-exact-publication&#39; || target !== absolute) return;</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/repository-store/src/repository-store.spec.ts (Line 213:47 - Line 221:6),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/repository-store/src/repository-store.spec.ts (Line 232:8 - Line 240:6)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-62')">Show code</button>
+            </div>
+            <pre id="code-typescript-62" class="code-block">      setNativePublicationBackendForTests(null);
+      await expect(
+        applyCanonicalBatch(root, lease, [{ kind: &#39;write&#39;, path, bytes: bytes(&#39;changed&#39;), expected }]),
+      ).rejects.toMatchObject({ code: &#39;UNSUPPORTED_RUNTIME&#39; });
+      expect(readFileSync(join(root.managedRoot, path.relativePath), &#39;utf8&#39;)).toBe(&#39;original&#39;);
+    });
+  });
+
+  it(&#39;classifies native EINVAL without destructively evacuating canonical bytes&#39;, async () =&#62; {</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/repository-store/src/repository-store.spec.ts (Line 491:61 - Line 496:18),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/repository-store/src/repository-store.spec.ts (Line 512:63 - Line 516:95)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-63')">Show code</button>
+            </div>
+            <pre id="code-typescript-63" class="code-block">      await runCrashWorker(authority, faultEvent, occurrence);
+      await new Promise((resolveDelay) =&#62; setTimeout(resolveDelay, 5));
+      const root = await resolveManagedRoot({ authorityRoot: authority, limits: DEFAULT_STORE_LIMITS });
+      await withRepositoryLease(root, async () =&#62; undefined, { staleMs: 1 });
+      expect(readFileSync(join(authority, &#39;records/first.txt&#39;), &#39;utf8&#39;)).toBe(
+        committed ? &#39;committed-first&#39; : &#39;original-first&#39;,</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/repository-store/src/repository-store.spec.ts (Line 575:88 - Line 580:10),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/repository-store/src/repository-store.spec.ts (Line 601:80 - Line 606:10)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-64')">Show code</button>
+            </div>
+            <pre id="code-typescript-64" class="code-block">  it(&#39;removes only an expected stale release entry when a new owner blocks restoration&#39;, async () =&#62; {
+    const root = await fixture();
+    await withRepositoryLease(root, async () =&#62; undefined);
+    const control = join(root.authorityRoot, &#39;.neottia&#39;, &#39;repository-store&#39;);
+    const lockPath = join(control, &#39;authority.lease&#39;);
+    const staleToken = randomBytes(32).toString(&#39;hex&#39;);</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/repository-store/src/repository-store.spec.ts (Line 575:88 - Line 580:10),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/repository-store/src/repository-store.spec.ts (Line 624:82 - Line 629:10)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-65')">Show code</button>
+            </div>
+            <pre id="code-typescript-65" class="code-block">  it(&#39;removes only an expected stale release entry when a new owner blocks restoration&#39;, async () =&#62; {
+    const root = await fixture();
+    await withRepositoryLease(root, async () =&#62; undefined);
+    const control = join(root.authorityRoot, &#39;.neottia&#39;, &#39;repository-store&#39;);
+    const lockPath = join(control, &#39;authority.lease&#39;);
+    const staleToken = randomBytes(32).toString(&#39;hex&#39;);</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/repository-store/src/repository-store.spec.ts (Line 575:88 - Line 580:10),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/repository-store/src/repository-store.spec.ts (Line 652:79 - Line 657:10)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-66')">Show code</button>
+            </div>
+            <pre id="code-typescript-66" class="code-block">  it(&#39;removes only an expected stale release entry when a new owner blocks restoration&#39;, async () =&#62; {
+    const root = await fixture();
+    await withRepositoryLease(root, async () =&#62; undefined);
+    const control = join(root.authorityRoot, &#39;.neottia&#39;, &#39;repository-store&#39;);
+    const lockPath = join(control, &#39;authority.lease&#39;);
+    const staleToken = randomBytes(32).toString(&#39;hex&#39;);</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/repository-store/src/repository-store.spec.ts (Line 601:88 - Line 616:7),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/repository-store/src/repository-store.spec.ts (Line 624:90 - Line 639:7)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-67')">Show code</button>
+            </div>
+            <pre id="code-typescript-67" class="code-block">  it(&#39;restores a verified release identity when the destination remains absent&#39;, async () =&#62; {
+    const root = await fixture();
+    await withRepositoryLease(root, async () =&#62; undefined);
+    const control = join(root.authorityRoot, &#39;.neottia&#39;, &#39;repository-store&#39;);
+    const lockPath = join(control, &#39;authority.lease&#39;);
+    const token = randomBytes(32).toString(&#39;hex&#39;);
+    const releasePath = `${lockPath}.release-${token}`;
+    mkdirSync(releasePath);
+    const ownerPath = join(releasePath, &#39;owner.json&#39;);
+    writeOwnerMetadata(ownerPath, control, process.pid, new Date(), token);
+    const expected = {
+      kind: &#39;directory&#39; as const,
+      identity: lstatSync(releasePath),
+      ownerIdentity: lstatSync(ownerPath),
+      token,
+    };</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/repository-store/src/repository-store.spec.ts (Line 601:88 - Line 616:7),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/repository-store/src/repository-store.spec.ts (Line 652:87 - Line 667:7)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-68')">Show code</button>
+            </div>
+            <pre id="code-typescript-68" class="code-block">  it(&#39;restores a verified release identity when the destination remains absent&#39;, async () =&#62; {
+    const root = await fixture();
+    await withRepositoryLease(root, async () =&#62; undefined);
+    const control = join(root.authorityRoot, &#39;.neottia&#39;, &#39;repository-store&#39;);
+    const lockPath = join(control, &#39;authority.lease&#39;);
+    const token = randomBytes(32).toString(&#39;hex&#39;);
+    const releasePath = `${lockPath}.release-${token}`;
+    mkdirSync(releasePath);
+    const ownerPath = join(releasePath, &#39;owner.json&#39;);
+    writeOwnerMetadata(ownerPath, control, process.pid, new Date(), token);
+    const expected = {
+      kind: &#39;directory&#39; as const,
+      identity: lstatSync(releasePath),
+      ownerIdentity: lstatSync(ownerPath),
+      token,
+    };</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/repository-store/src/repository-store.spec.ts (Line 632:41 - Line 642:98),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/repository-store/src/repository-store.spec.ts (Line 660:41 - Line 670:98)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-69')">Show code</button>
+            </div>
+            <pre id="code-typescript-69" class="code-block">    const ownerPath = join(releasePath, &#39;owner.json&#39;);
+    writeOwnerMetadata(ownerPath, control, process.pid, new Date(), token);
+    const expected = {
+      kind: &#39;directory&#39; as const,
+      identity: lstatSync(releasePath),
+      ownerIdentity: lstatSync(ownerPath),
+      token,
+    };
+    renameSync(releasePath, `${releasePath}.displaced`);
+    mkdirSync(releasePath);
+    writeOwnerMetadata(join(releasePath, &#39;owner.json&#39;), control, process.pid, new Date(), token);</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/repository-store/src/repository-store.spec.ts (Line 882:70 - Line 887:39),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/repository-store/src/repository-store.spec.ts (Line 902:73 - Line 907:39)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-70')">Show code</button>
+            </div>
+            <pre id="code-typescript-70" class="code-block">  it(&#39;retries when a live claim is removed during owner verification&#39;, async () =&#62; {
+    const root = await fixture();
+    await withRepositoryLease(root, async () =&#62; undefined);
+    const control = join(root.authorityRoot, &#39;.neottia&#39;, &#39;repository-store&#39;);
+    const claim = join(control, &#39;authority.claim&#39;);
+    writeOwnerMetadata(claim, control, process.pid, new Date());</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/repository-store/src/repository-store.spec.ts (Line 914:92 - Line 919:10),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/repository-store/src/repository-store.spec.ts (Line 954:84 - Line 962:10)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-71')">Show code</button>
+            </div>
+            <pre id="code-typescript-71" class="code-block">  it(&#39;preserves a fresh live same-token claim substituted after stale-owner verification&#39;, async () =&#62; {
+    const root = await fixture();
+    await withRepositoryLease(root, async () =&#62; undefined);
+    const control = join(root.authorityRoot, &#39;.neottia&#39;, &#39;repository-store&#39;);
+    const claim = join(control, &#39;authority.claim&#39;);
+    const token = randomUUID();</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/repository-store/src/repository-store.spec.ts (Line 914:92 - Line 919:10),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/repository-store/src/repository-store.spec.ts (Line 987:74 - Line 992:10)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-72')">Show code</button>
+            </div>
+            <pre id="code-typescript-72" class="code-block">  it(&#39;preserves a fresh live same-token claim substituted after stale-owner verification&#39;, async () =&#62; {
+    const root = await fixture();
+    await withRepositoryLease(root, async () =&#62; undefined);
+    const control = join(root.authorityRoot, &#39;.neottia&#39;, &#39;repository-store&#39;);
+    const claim = join(control, &#39;authority.claim&#39;);
+    const token = randomUUID();</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/repository-store/src/repository-store.spec.ts (Line 954:90 - Line 967:10),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/repository-store/src/repository-store.spec.ts (Line 987:80 - Line 996:10)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-73')">Show code</button>
+            </div>
+            <pre id="code-typescript-73" class="code-block">  it(&#39;treats a claim released during a reclaim read as contention, not tampering&#39;, async () =&#62; {
+    // Deterministic replay of the CI race behind issue #123: the contender&#39;s
+    // bounded claim read holds an open descriptor while the live owner&#39;s
+    // unlink lands, so the descriptor observes nlink zero mid-read.
+    const root = await fixture();
+    await withRepositoryLease(root, async () =&#62; undefined);
+    const control = join(root.authorityRoot, &#39;.neottia&#39;, &#39;repository-store&#39;);
+    const claim = join(control, &#39;authority.claim&#39;);
+    const staging = join(control, `authority.claim.prepare-${randomUUID()}`);
+    writeOwnerMetadata(staging, control, process.pid, new Date());
+    linkSync(staging, claim);
+    rmSync(staging);
+
+    const worker = fileURLToPath(new URL(&#39;./lease-worker.fixture.ts&#39;, import.meta.url));</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/repository-store/src/sqlite/cache.spec.ts (Line 56:7 - Line 61:12),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/repository-store/src/sqlite/cache.spec.ts (Line 286:11 - Line 291:10)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-74')">Show code</button>
+            </div>
+            <pre id="code-typescript-74" class="code-block">      const rebuilt = await rebuildDisposableSqliteCache(root, lease, specification);
+      await rebuilt.close();
+      const opened = await openDisposableSqliteCache(root, lease, specification);
+      expect(opened.state).toBe(&#39;ready&#39;);
+      if (opened.state === &#39;ready&#39;) await opened.close();
+      await expect(</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/repository-store/src/sqlite/cache.ts (Line 61:27 - Line 67:66),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/repository-store/src/sqlite/cache.ts (Line 129:33 - Line 135:66)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-75')">Show code</button>
+            </div>
+            <pre id="code-typescript-75" class="code-block">): Promise&#60;CacheOpenResult&#62; {
+  assertLiveLease(root, lease);
+  checkControl(options);
+  assertCachePath(root, specification.path);
+  const rootState = requireRootState(root);
+  recoverCachePublications(root, lease, options);
+  const path = requirePathState(specification.path).absolutePath;</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/repository-store/src/sqlite/cache.ts (Line 339:4 - Line 345:12),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/repository-store/src/sqlite/cache.ts (Line 377:21 - Line 382:9)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-76')">Show code</button>
+            </div>
+            <pre id="code-typescript-76" class="code-block">  };
+  return {
+    exec: (sql) =&#62; guarded(() =&#62; database.exec(sql)),
+    prepare: (sql) =&#62; guarded(async () =&#62; wrapGuardedStatement(await database.prepare(sql), guarded)),
+    async close() {
+      // Closing must remain possible after an operation grows past its bound.
+      const before = captureContinuousCacheState(path, snapshot());</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/sdlc/src/compiler.spec.ts (Line 49:2 - Line 55:4),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/sdlc/src/role-instructions.spec.ts (Line 20:79 - Line 26:4)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-77')">Show code</button>
+            </div>
+            <pre id="code-typescript-77" class="code-block">];
+const REQUIRED_CURRENT_ASSIGNMENTS = Object.freeze({
+  planner: { agent: &#39;current&#39; as const },
+  implementer: { agent: &#39;current&#39; as const },
+  verifier: { agent: &#39;current&#39; as const },
+  &#39;release-coordinator&#39;: { agent: &#39;current&#39; as const },
+});</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/sdlc/src/compiler.spec.ts (Line 476:12 - Line 489:12),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/sdlc/src/compiler.spec.ts (Line 542:17 - Line 555:10)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-78')">Show code</button>
+            </div>
+            <pre id="code-typescript-78" class="code-block">      } as ConfigShardValues;
+      const piInput = createSdlcCompilerInput(snapshot(values), {
+        compilerVersion: &#39;0.1.0&#39;,
+        harnessId: &#39;pi&#39;,
+        scope: &#39;project&#39;,
+      });
+      const opencodeInput = createSdlcCompilerInput(snapshot(values), {
+        compilerVersion: &#39;0.1.0&#39;,
+        harnessId: &#39;opencode&#39;,
+        scope: &#39;project&#39;,
+      });
+      const pi = compileSdlc(piInput, piHarnessAdapter);
+      const opencode = compileSdlc(opencodeInput, opencodeHarnessAdapter);
+      const piBodies = promptAssets(pi).map(promptBody);</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/sdlc/src/compiler.spec.ts (Line 621:91 - Line 640:25),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/sdlc/src/compiler.spec.ts (Line 1132:68 - Line 1148:68)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-79')">Show code</button>
+            </div>
+            <pre id="code-typescript-79" class="code-block">  it(&#39;does not require a forge CLI when configured MCP covers every CLI-backed capability&#39;, () =&#62; {
+    const input = createSdlcCompilerInput(
+      snapshot({
+        &#39;sdlc-issues-capability&#39;: { provider: &#39;github&#39; },
+        &#39;sdlc-source-control-capability&#39;: { local: &#39;git&#39;, remote: &#39;github&#39;, workspaces: false },
+        &#39;sdlc-forge-connections&#39;: {
+          github: {
+            base_url: &#39;https://github.example.test&#39;,
+            credential_environment: &#39;GITHUB_TOKEN&#39;,
+            mcp: {
+              issues: { server: &#39;github&#39;, command: &#39;github-mcp-server&#39; },
+              remote_source_control: { server: &#39;github&#39;, command: &#39;github-mcp-server&#39; },
+            },
+          },
+        },
+      }),
+      {
+        compilerVersion: &#39;0.1.0&#39;,
+        harnessId: &#39;pi&#39;,
+        scope: &#39;project&#39;,</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/sdlc/src/compiler.spec.ts (Line 640:25 - Line 648:32),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/sdlc/src/compiler.spec.ts (Line 679:10 - Line 687:32)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-80')">Show code</button>
+            </div>
+            <pre id="code-typescript-80" class="code-block">        scope: &#39;project&#39;,
+      },
+    );
+    const commands = compileSdlc(input, piHarnessAdapter).assets.prerequisites.flatMap((prerequisite) =&#62;
+      prerequisite.check.kind === &#39;command&#39; ? [prerequisite.check.command] : [],
+    );
+
+    expect(commands).toContain(&#39;github-mcp-server&#39;);
+    expect(commands).toContain(&#39;git&#39;);</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/sdlc/src/compiler.ts (Line 1121:71 - Line 1128:6),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/sdlc/src/instructions.ts (Line 147:55 - Line 154:6)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-81')">Show code</button>
+            </div>
+            <pre id="code-typescript-81" class="code-block">  const expectedProviders: Readonly&#60;Record&#60;SdlcInstructionPack[&#39;slot&#39;], string&#62;&#62; = Object.freeze({
+    issues: context.issues.provider,
+    documents: context.documents.provider,
+    memory: context.memory.provider,
+    searchable: context.searchable.provider,
+    &#39;source-control.local&#39;: context.sourceControl.local,
+    &#39;source-control.remote&#39;: context.sourceControl.remote.enabled ? context.sourceControl.remote.provider : &#39;none&#39;,
+  });</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/sdlc/src/config.spec.ts (Line 191:11 - Line 206:10),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/sdlc/src/forge-config.spec.ts (Line 84:7 - Line 99:6)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-82')">Show code</button>
+            </div>
+            <pre id="code-typescript-82" class="code-block">          bitbucket: {
+            base_url: &#39;https://bitbucket.org/example&#39;,
+            credential_environment: &#39;BITBUCKET_TOKEN&#39;,
+            mcp: { remote_source_control: service },
+          },
+          jira: {
+            base_url: &#39;https://example.atlassian.net&#39;,
+            credential_environment: &#39;JIRA_TOKEN&#39;,
+            mcp: { issues: service },
+          },
+          confluence: {
+            base_url: &#39;https://example.atlassian.net/wiki&#39;,
+            credential_environment: &#39;CONFLUENCE_TOKEN&#39;,
+            mcp: { documents: service },
+          },
+        },</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/searchable-core/src/http.spec.ts (Line 33:7 - Line 38:11),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/searchable-core/src/http.spec.ts (Line 42:98 - Line 47:4)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-83')">Show code</button>
+            </div>
+            <pre id="code-typescript-83" class="code-block">    ]);
+    const client = new SafeHttpClient(resolver);
+    await expect(
+      client.request({ url: new URL(&#39;https://example.com&#39;), deadline: Date.now() + 1_000, maximumBytes: 1_024 }),
+    ).rejects.toMatchObject({ code: &#39;NETWORK_DESTINATION_BLOCKED&#39; });
+    expect(resolver).toHaveBeenCalledOnce();</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/searchable-core/src/migration.spec.ts (Line 100:50 - Line 105:40),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/searchable-core/src/migration.spec.ts (Line 191:26 - Line 196:40)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-84')">Show code</button>
+            </div>
+            <pre id="code-typescript-84" class="code-block">  symlinkSync(outside, join(cwd, &#39;.web_stash.db&#39;));
+  const runtime = createSearchableRuntime({ cwd, configOverrides: { enabled: true } });
+  try {
+    const report = await importLegacySearchableDatabase(runtime.store, { path: &#39;.web_stash.db&#39; });
+    expect(report).toMatchObject({ valid: false, planned: 0, imported: 0 });
+    expect(report.errors[0]).toContain(&#39;regular singly-linked file&#39;);</pre>
+          </div>
+          
+          <div class="clone-item">
+            <div class="clone-info">
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/testkit/src/runners.ts (Line 256:29 - Line 262:31),
+              /home/dragosc/Workspace/gh--dragoscirjan/neottia--workspaces/chore-deps-toolchain-upgrades/packages/testkit/src/runners.ts (Line 273:50 - Line 279:31)
+            </div>
+            <div>
+              <button class="toggle-btn" onclick="toggle('code-typescript-85')">Show code</button>
+            </div>
+            <pre id="code-typescript-85" class="code-block">  options: HarnessRunOptions,
+  attempts = 5,
+): { result: HarnessRunResult; modelId: string } {
+  const ids = freeModelFallbackIds().slice(0, attempts);
+  if (ids.length === 0) throw new Error(&#39;No free OpenRouter models available for the harness fallback.&#39;);
+  let modelId = ids[0] as string;
+  let last: HarnessRunResult = runOpencode({ ...options, modelId });</pre>
+          </div>
+          
+        </div>
+      </section>
+    </div>
+    
+    
+  </div>
+
+  <div class="footer">
+    <p>Generated by <a href="https://jscpd.dev" target="_blank">jscpd</a> v5.4.0 by <a href="https://github.com/kucherenko" target="_blank">Andrey Kucherenko</a></p>
+    <p><a href="https://www.npmjs.com/package/jscpd" target="_blank"><img src="https://img.shields.io/npm/dw/jscpd.svg?style=flat-square" alt="npm weekly downloads" style="vertical-align: middle;"></a></p>
+  </div>
+
+  <script>
+    function toggle(id) {
+      var el = document.getElementById(id);
+      if (el) { el.classList.toggle('visible'); }
+    }
+  </script>
+</body>
+</html>
