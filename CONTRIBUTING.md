@@ -1,6 +1,23 @@
-# Contributing to neottia
+# Contributing to Neottia
 
-Contributions through issues and pull requests are welcome.
+Contributions through focused issues and pull requests are welcome. This guide applies to human contributors and coding agents.
+
+Read this document before planning or performing repository architecture, design, implementation, documentation, configuration, policy, or publication changes.
+
+## Contribution workflow
+
+1. Clarify ambiguous requirements.
+2. Create or link a GitHub issue before architecture, design, implementation, or policy changes. Typo, broken-link, and internal instruction fixes do not require an issue.
+3. Keep each change focused on one issue or task.
+4. Follow the isolated-workspace gate and configuration in `AGENTS.md` before changing repository state.
+5. Use the required code index before relying on code inspection.
+6. Add tests for behavior changes and update user documentation for behavior, API, or configuration changes.
+7. Add a Changeset for user-visible changes to published modules.
+8. Read and follow [`VALIDATION.md`](VALIDATION.md) before validation, commits, pushes, or publication.
+9. Commit with [Conventional Commits](https://www.conventionalcommits.org/).
+10. Open a pull request linked to the issue when an issue is required.
+
+Do not merge or release without explicit owner instruction.
 
 ## Development setup
 
@@ -12,44 +29,74 @@ mise run deps:sync
 mise run validate
 ```
 
-Use `mise tasks` to see all project tasks.
+Use `mise tasks` for the complete task list. Mise is the task interface, and its tasks delegate package operations to pnpm.
 
-## Development workflow
+## Code inspection
 
-1. Create a branch from `main`.
-2. Add tests for behavior changes.
-3. Update documentation for API changes.
-4. Run `mise run validate`.
-5. Open a pull request.
+Use a code indexing tool when inspecting or changing code.
 
-Useful commands:
+The default indexer is the `codeindex_cgc` MCP:
 
-```bash
-mise run run
-mise run build
-mise run test
-mise run test:coverage
-mise run format
-mise run lint
-mise run docs
-```
+1. Run `mise run clean` before indexing. The indexer does not honor `.gitignore`, so generated `dist/`, `.jscpd/`, and `docs/.vitepress/dist/` output must not enter the graph.
+2. Index the repository or active worktree with `add_code_to_graph`.
+3. Use `watch_directory` while developing.
+4. Scope every query with the active `repo_path`.
+5. Evaluate whether the index answers the task reliably. Its monorepo support can be weak.
 
-## Code style
+If `codeindex_cgc` is unavailable or unsuitable, record that limitation and use a better indexer when available. `codeindex_gitnexus` is preferred for commit-anchored impact analysis. Text search can supplement an index but does not satisfy a mandatory indexing step by itself.
 
-- Use TypeScript types and TSDoc for public APIs.
+## Code and package rules
+
+- Load the generic `coding` skill before code changes. Load matching language and extension skills after it.
+- Neottia uses TypeScript for project code. Compile only generic modules or modules whose target harness cannot consume TypeScript directly.
+- Follow the [Google TypeScript Style Guide](https://google.github.io/styleguide/tsguide.html) unless repository configuration or established safe conventions are stricter.
+- Comment public contracts, invariants, security boundaries, and non-obvious decisions. Simplify code that needs commentary only because it is unnecessarily complex.
 - Use kebab-case file names, camelCase functions and variables, and PascalCase classes.
-- Colocate tests using the `.spec.ts` suffix.
-- Follow existing ESLint and Prettier configuration.
+- Use TSDoc for public TypeScript APIs.
+- Follow the existing ESLint, Prettier, TypeScript, and test configuration.
 
-## Commits
+Every Node package must:
 
-Use [Conventional Commits](https://www.conventionalcommits.org/), for example:
+- use the `@neottia/` namespace;
+- include its own MIT `LICENSE` unless an approved design requires another license;
+- be listed by the root license when required;
+- include a README that explains user-facing purpose, installation, configuration, and usage.
 
-```text
-feat: add harness adapter
-fix: handle empty configuration
-```
+## Tests
 
-## License
+- Colocate tests with the source they test.
+- Use `.spec.ts` for unit tests.
+- Use `.test.ts` for integration tests.
+- Integration tests must use temporary directories. They must not mutate the repository checkout or active worktree.
+- Test observable behavior, failure paths, and relevant compatibility boundaries. A successful compile is not behavior evidence.
 
-By contributing, you agree that your contributions are licensed under the [MIT License](LICENSE).
+## Documentation
+
+Neottia publishes user documentation from `docs/` with VitePress.
+
+- Document user behavior, configuration, operations, and limitations thoroughly enough that users do not need to inspect source code.
+- Do not put contributor procedures in the user documentation site.
+- Summarize user documentation in the root `README.md`.
+- The root README may include a development section with project structure and mise commands.
+- Load the `unslop` skill before writing or editing documentation.
+- Use sentence-case headings, direct language, tested commands, and links to canonical reference pages.
+
+## Versions and releases
+
+- Manage module versions only through Changesets with `mise run changeset`. Never edit package versions by hand.
+- Prepare global releases only with `mise run release:global -- <semver>`.
+- Never edit `packages/release/release-manifest.json`; release tasks generate it.
+- Do not publish or create a release without explicit owner instruction.
+
+## Pull requests
+
+A pull request must:
+
+- contain one focused change;
+- explain what changed and why;
+- link the relevant issue when required;
+- list checks that passed, failed, or did not run;
+- state remaining risks or follow-up work;
+- avoid claims not supported by code, documentation, or executed validation.
+
+The repository owner decides when to merge or release.
