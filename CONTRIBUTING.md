@@ -78,7 +78,7 @@ Neottia publishes user documentation from `docs/` with VitePress.
 - Do not put contributor procedures in the user documentation site.
 - Summarize user documentation in the root `README.md`.
 - The root README may include a development section with project structure and mise commands.
-- Load the `unslop` skill before writing or editing documentation.
+- Load `asd-ste100-technical` while drafting documentation, then load `unslop` for the final writing pass.
 - Use sentence-case headings, direct language, tested commands, and links to canonical reference pages.
 
 ## Versions and releases
