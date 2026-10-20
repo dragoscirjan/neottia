@@ -22,11 +22,21 @@ jobs:
       runs-on: ubuntu-latest
 
   test:
-    name: Test (${{ matrix.os }})
+    name: Test (${{ matrix.os }}, ${{ matrix.tier }})
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            tier: required
+            experimental: false
+          - os: macos-latest
+            tier: experimental
+            experimental: true
+          - os: windows-latest
+            tier: experimental
+            experimental: true
+    continue-on-error: ${{ matrix.experimental }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
