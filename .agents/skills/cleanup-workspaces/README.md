@@ -1,81 +1,57 @@
 # Cleanup workspaces
 
-`cleanup-workspaces` is a destructive companion to [`isolated-workspace`](../isolated-workspace/SKILL.md). It audits old isolated workspaces, proves that their changes are integrated, shows a removal plan, and waits for confirmation before cleanup.
+`cleanup-workspaces` is the destructive companion to [`isolated-workspace`](../isolated-workspace/SKILL.md). It plans and safely removes clean integrated workspaces and prunes stale registrations after explicit confirmation.
 
-The skill supports Git worktrees and Jujutsu workspaces.
+## Automation
 
-## Origin
+The skill includes Bun-executed TypeScript automation:
 
-The `isolated-workspace` skill protects active work by creating each change in a dedicated workspace. Its cleanup section intentionally prevents deletion without an explicit request, a clean status, and proof that work is integrated or abandoned.
+- [`scripts/cleanup.ts`](scripts/cleanup.ts) audits, plans, rechecks, and applies cleanup.
+- [`scripts/cleanup.test.ts`](scripts/cleanup.test.ts) exercises successful and protected Git and Jujutsu states.
+- Shared repository and path helpers come from [`isolated-workspace/scripts/lib.ts`](../isolated-workspace/scripts/lib.ts).
 
-[Issue 6](https://github.com/dragoscirjan/ai/issues/6) adds the missing operational workflow. The new skill explains how an agent can find eligible workspaces, verify them, ask for confirmation, and remove them safely.
+`isolated-workspace` is a required sibling dependency. Consumers must resolve it by its advertised skill name and path; the cleanup skill never installs it automatically.
 
-Cleanup remains separate from workspace creation because cleanup is destructive. This separation gives cleanup an explicit command and keeps `isolated-workspace` focused on protecting work before mutation.
+The caller must select the VCS explicitly:
+
+```sh
+bun scripts/cleanup.ts --vcs git --base main
+bun scripts/cleanup.ts --vcs jj --base 'trunk()'
+```
+
+The script never infers Git versus Jujutsu. It detects the primary local repository and derives the sibling `<repository>--workspaces` directory.
+
+The default mode emits a plan with a `planId`. Removal requires a later run with both mutation gates and that exact plan ID:
+
+```sh
+bun scripts/cleanup.ts --vcs git --base main \
+  --apply --confirm --plan-id PLAN_ID
+```
 
 ## Safety model
 
-Invoking the skill authorizes an audit. It does not authorize deletion.
+Git candidates require a clean status, matching registration and branch tip, no active operation, and exact local ancestry to the selected base. Removal uses `git worktree remove` and `git branch -d` without force.
 
-The workflow has three phases:
+Git stale pruning runs only when every prunable registration is in scope. This prevents repository-wide `git worktree prune --expire now` from silently affecting another workspace root.
 
-1. Audit registered workspaces and collect evidence.
-2. Show eligible and skipped workspaces with exact commands.
-3. Ask for confirmation, repeat the safety checks, and remove only the confirmed targets.
+Jujutsu 0.38 or newer is required. Candidates require an exact integrated working-copy commit or an empty child whose parents are integrated. Cleanup uses `jj workspace forget` and `jj bookmark forget`, then removes only the revalidated workspace directory. An unresolved workspace root is skipped rather than inferred stale. Cleanup never abandons commits or propagates bookmark deletion.
 
-The skill does not rely on a branch name, directory age, closed pull request, or user statement as proof of integration. It requires local ancestry or a trusted merged-change record tied to the exact candidate tip.
+Primary, active, dirty, locked, conflicted, unmerged, out-of-scope, and ambiguous workspaces remain protected. Apply mode repeats the audit and rechecks each candidate immediately before removal.
 
-The skill never force-removes workspaces or refs. It protects:
+## Tests
 
-- the primary checkout
-- the active workspace and process directory
-- dirty, conflicted, locked, stale, missing, or ambiguous workspaces
-- workspaces outside the configured root
-- branches and bookmarks outside the configured prefix
-- changes that lack exact integration evidence
+Run the cleanup tests from the repository root:
 
-A changed audit invalidates the owner's confirmation. The agent must audit again.
-
-## Git behavior
-
-The Git procedure uses the registered worktree list, canonical paths, repository identity, branch refs, clean status, operation state, and exact commit IDs.
-
-Local integration is proven with `git merge-base --is-ancestor`. Git removes an eligible workspace with `git worktree remove` and attempts local branch deletion with `git branch -d`.
-
-The skill forbids `git worktree remove --force`, `git branch -D`, `git clean -f`, and manual deletion of a registered worktree.
-
-See the official [`git-worktree` documentation](https://git-scm.com/docs/git-worktree) for command behavior.
-
-## Jujutsu behavior
-
-The Jujutsu procedure uses registered workspace names and roots, working-copy revisions, expected bookmarks, conflicts, diffs, and revset ancestry.
-
-An eligible working copy must be the exact integrated revision or an empty child whose parents are integrated. Jujutsu first detaches the workspace with `jj workspace forget`.
-
-Jujutsu does not delete the workspace files. After the workspace is forgotten and the path is revalidated, the workflow removes the confirmed directory without a force flag.
-
-The skill uses `jj bookmark forget` for an eligible local bookmark. It forbids `jj bookmark delete` because that deletion can propagate to a remote. It also forbids `jj abandon` during workspace cleanup.
-
-See the official [Jujutsu workspace documentation](https://docs.jj-vcs.dev/latest/working-copy/#workspaces) and [`jj workspace forget` reference](https://docs.jj-vcs.dev/latest/cli-reference/#jj-workspace-forget).
-
-## Invocation
-
-Run an audit for every configured workspace:
-
-```text
-/skill:cleanup-workspaces Audit old merged workspaces.
+```sh
+bun test ./.agents/skills/cleanup-workspaces/scripts/cleanup.test.ts
 ```
 
-Restrict the audit to a named workspace:
+Run the complete workspace automation suite:
 
-```text
-/skill:cleanup-workspaces Audit issue-42 for cleanup.
+```sh
+bun test \
+  ./.agents/skills/isolated-workspace/scripts/create.test.ts \
+  ./.agents/skills/cleanup-workspaces/scripts/cleanup.test.ts
 ```
 
-Neither command authorizes removal. The agent must show the plan and ask for confirmation.
-
-## Files
-
-- [`SKILL.md`](SKILL.md) contains the agent workflow and safety rules.
-- `README.md` explains the design and its relationship to `isolated-workspace`.
-
-Keep the directory name and the `name` field in `SKILL.md` set to `cleanup-workspaces` for portable Agent Skills discovery.
+See [`SKILL.md`](SKILL.md) for the complete agent workflow, safety stops, and exit codes.

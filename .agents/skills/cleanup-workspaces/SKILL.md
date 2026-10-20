@@ -1,231 +1,152 @@
 ---
 name: cleanup-workspaces
-description: Audit and safely remove old Git worktrees or Jujutsu workspaces after their changes are integrated. Use only when the owner explicitly asks to clean merged, finished, or abandoned isolated workspaces.
+description: Plan and safely remove clean integrated Git worktrees or Jujutsu workspaces and prune stale registrations. Use only when the owner explicitly asks to clean finished isolated workspaces. Requires explicit VCS selection and confirmed apply mode.
 disable-model-invocation: true
-compatibility: Requires Git with worktree support or Jujutsu with workspace support.
+compatibility: Requires Bun and either Git with worktree support or Jujutsu 0.38 or newer with workspace support.
 metadata:
   author: dragoscirjan
-  version: "1.0"
+  version: "2.0"
   opencode/slash: "true"
 ---
 
 # Cleanup workspaces
 
-Find isolated workspaces that are safe to remove. Show a cleanup plan. Remove only the targets that the owner confirms.
+Audit isolated workspaces with deterministic TypeScript automation. Show the complete plan before removal. Loading or invoking this skill authorizes an audit only; it does not authorize mutation.
 
-This skill is destructive. Loading or invoking the skill authorizes an audit only. It does not authorize removal.
+Run cleanup from the primary checkout or another workspace that will survive. Read the nearest `AGENTS.md` and the `isolated-workspace` skill first.
 
-## Read the workspace policy
+This skill depends on `isolated-workspace` and imports its advertised `scripts/lib.ts` helper through the sibling skill path. If that skill or helper is unavailable, stop. Do not install a missing dependency without owner approval and do not recreate it from memory.
 
-Read the nearest applicable `AGENTS.md` and the repository's `isolated-workspace` skill before the audit. Require these values:
+## Select the VCS and base
 
-- version-control system: `git` or `jj`
-- base revision
-- workspace root
-- branch or bookmark prefix
+The script requires `--vcs git` or `--vcs jj`. It never infers the VCS, including in a colocated repository. Use only that tool for the complete audit and apply operation.
 
-Do not guess a missing value. Ask the owner to configure it.
+Pass the project-configured base through `--base`. When omitted, the script uses the Git remote default branch, then the current Git branch, or `trunk()` for Jujutsu.
 
-Use only the configured version-control system. Do not mix Git and Jujutsu procedures in a colocated repository.
+Bun runs the helper but is not added to the target repository. If Bun or the selected VCS is unavailable, stop. Do not install or reconfigure tools without owner approval.
 
-Resolve `derive-from-memory-or-origin` with the repository-identity procedure in `isolated-workspace`. Resolve a relative workspace root from the repository root. Canonicalize every candidate path before comparing it with the workspace root.
+## Produce the plan
 
-## Start with an audit
-
-Treat requests such as "clean old workspaces" or `/skill:cleanup-workspaces` as requests to inspect and plan.
-
-If the owner names one or more workspaces, restrict the audit to those names. Do not add other candidates without asking.
-
-Run the audit from a workspace that will survive cleanup. Never remove:
-
-- the primary checkout
-- the current process directory or any of its parents
-- the workspace that contains the active agent session
-- a locked workspace
-- a workspace outside the configured workspace root
-- a workspace whose branch or bookmark does not match the configured prefix
-- a workspace that belongs to another repository, issue, or task
-- a workspace with unresolved conflicts or an operation in progress
-- a workspace with changes that are not covered by the integration evidence
-- a workspace whose state, ownership, path, or integration status is uncertain
-
-Do not fetch, pull, rebase, update bookmarks, or change the base revision during the audit. If the local base or remote-tracking data may be stale, report that limit and stop. Let the owner update repository state before a new audit.
-
-An owner's statement that work was merged is a cleanup request, not sufficient merge evidence.
-
-## Require integration evidence
-
-Accept a candidate only when one of these checks proves that the exact candidate tip is integrated:
-
-1. The candidate tip is an ancestor of the configured base revision in the local commit graph.
-2. A trusted hosting service reports a merged change for the same repository and ref, and the service's recorded head commit equals the candidate tip.
-
-For a squash or rebase merge, local ancestry can fail. Use hosting evidence only when it identifies the exact head commit. Do not infer integration from a closed change, a deleted remote ref, a similar commit message, or a clean directory.
-
-Record the base revision and its resolved commit ID in the plan. Record the evidence for each candidate.
-
-## Audit Git worktrees
-
-Use this procedure only when the configured version-control system is `git`.
-
-1. Read registered worktrees with machine-readable output:
-
-   ```sh
-   git worktree list --porcelain -z
-   ```
-
-2. Keep only linked worktrees whose canonical paths are inside the configured workspace root.
-3. Skip bare, detached, locked, prunable, missing, or inaccessible entries.
-4. Require the recorded branch to start with `refs/heads/<configured-prefix>/`.
-5. Confirm that the worktree uses the same Git common directory as the repository.
-6. Confirm that the candidate is not the primary checkout. In the primary checkout, the absolute Git directory equals the common Git directory. A linked worktree has its own Git directory below the common directory's `worktrees` area.
-7. Inspect the candidate without changing it:
-
-   ```sh
-   git -C "$workspace_path" status --porcelain=v1 --untracked-files=all
-   git -C "$workspace_path" symbolic-ref -q HEAD
-   git -C "$workspace_path" rev-parse HEAD
-   git rev-parse "$branch_name"
-   ```
-
-   Require empty status output. Require the symbolic ref to match the recorded branch. Require the worktree `HEAD`, branch tip, and audited tip to be the same commit.
-
-8. Check for merge, rebase, cherry-pick, revert, or bisect state through the candidate's Git paths. Skip the candidate if any operation is active.
-9. Preview ignored files that workspace removal may delete:
-
-   ```sh
-   git -C "$workspace_path" clean -ndX
-   ```
-
-   Include the preview in the plan. Do not run `git clean` without `-n`.
-
-10. Prove local integration when possible:
-
-    ```sh
-    git merge-base --is-ancestor "$tip_commit" "$base_revision"
-    ```
-
-    Exit status `0` proves local ancestry. Any other status requires exact hosting evidence or disqualifies the candidate.
-
-Do not use `--force`, `git branch -D`, `git clean -f`, or manual deletion for a registered Git worktree.
-
-## Audit Jujutsu workspaces
-
-Use this procedure only when the configured version-control system is `jj`.
-
-1. Read registered workspaces from a workspace that will survive cleanup:
-
-   ```sh
-   jj workspace list
-   ```
-
-2. Resolve each candidate root:
-
-   ```sh
-   jj workspace root --name "$workspace_name"
-   ```
-
-3. Keep only workspaces whose canonical roots are inside the configured workspace root. Skip missing, stale, inaccessible, or unresolved roots.
-4. Skip the current workspace and the repository's primary workspace.
-5. Derive the expected bookmark as `<configured-prefix>/<workspace-name>`. If a different bookmark represents the change, require explicit project evidence for that mapping.
-6. Snapshot and inspect the candidate:
-
-   ```sh
-   jj -R "$workspace_path" status
-   jj -R "$workspace_path" diff --summary -r @
-   ```
-
-   Skip conflicts and concurrent-operation warnings. Record the candidate working-copy commit after `jj status` snapshots the files.
-
-7. Accept one of these safe working-copy shapes:
-
-   - The working-copy commit is the exact integrated tip.
-   - The working-copy commit is empty and every parent is integrated.
-
-   A non-empty working-copy commit that differs from the integrated tip is not safe to remove.
-
-8. Use revsets to prove ancestry. The following query must select the exact candidate tip before local ancestry counts as evidence:
-
-   ```sh
-   jj log -r "$tip_revision & ::$base_revision" --count
-   ```
-
-   Require a count of `1`. Require the base and candidate expressions to resolve without ambiguity or conflict.
-
-9. If the expected bookmark exists, resolve its target and require it to match the audited tip or the integrated parent of an empty working-copy commit. If no bookmark exists, the working-copy revision itself must provide the integration evidence.
-10. Do not use `jj abandon`. An integrated commit does not need to be abandoned during workspace cleanup.
-
-`jj workspace forget` does not delete files from disk. The cleanup plan must state that Jujutsu detaches the workspace first and removes the confirmed directory separately.
-
-Use `jj bookmark forget`, not `jj bookmark delete`, when removing an eligible local bookmark. `bookmark delete` can propagate deletion to a remote on the next push.
-
-## Present the cleanup plan
-
-Show one row for every candidate:
-
-- workspace name
-- canonical path
-- branch or bookmark
-- exact tip commit
-- configured base and resolved commit
-- clean-state result
-- integration evidence
-- ignored or untracked files that directory removal will delete
-- exact removal commands
-
-Show skipped workspaces separately with the reason for each skip.
-
-Do not present an uncertain workspace as eligible.
-
-Ask the owner to confirm the complete eligible set. A valid confirmation must occur after the plan is shown. If the set or any audited state changes, discard the confirmation and audit again.
-
-## Remove confirmed Git worktrees
-
-Immediately before each removal, repeat the path, scope, branch, clean-state, operation-state, tip, and integration checks. Stop if any result changed.
-
-Run these commands without force:
+Resolve this skill's directory, then run:
 
 ```sh
-git worktree remove "$workspace_path"
-git branch -d "$branch_name"
+bun <skill-directory>/scripts/cleanup.ts --vcs git --base main
 ```
 
-If `git worktree remove` fails, stop for that candidate and preserve the branch. If `git branch -d` fails, keep the branch and report the failure. Never retry with `--force` or `-D`.
+Use `--vcs jj` for Jujutsu. The default is a structured JSON plan. `--dry-run` is an optional explicit alias for plan mode.
 
-Verify that the path is absent from `git worktree list --porcelain` and that no confirmed user files remain unexpectedly.
+The script detects the primary local repository and derives its sibling `<repository>--workspaces` directory. Hosted-repository identity is not required.
 
-## Remove confirmed Jujutsu workspaces
+The plan reports:
 
-Immediately before each removal, repeat the path, scope, current-workspace, conflict, working-copy, tip, bookmark, and integration checks. Stop if any result changed.
+- primary repository and workspace root
+- base expression and exact resolved commit
+- every eligible workspace, exact tip, integration evidence, and removal command
+- every stale registration that can be pruned safely
+- every skipped workspace and its reason
+- ignored Git files that worktree removal can delete
+- limits that block otherwise possible cleanup
+- the `planId` that binds apply mode to this exact candidate and skipped set
 
-From a surviving workspace, run:
+Do not add force flags or manually widen the eligible set.
+
+## Protected state
+
+The automation never selects:
+
+- the primary checkout or default Jujutsu workspace
+- the current process directory or a workspace that contains it
+- a workspace outside the derived workspace root
+- a locked, detached, conflicted, inaccessible, or ambiguous workspace
+- a Git workspace with an active merge, rebase, cherry-pick, revert, or bisect
+- a workspace with detected file changes
+- a non-empty candidate tip that is not an ancestor of the selected base
+- a workspace whose registered path, repository, ref, or exact tip does not match
+
+It does not fetch, pull, rebase, move bookmarks, update the base, infer squash merges, or consult a hosting service. If local ancestry does not prove integration, the workspace remains skipped.
+
+## Git eligibility and stale registrations
+
+A registered Git worktree is eligible only when:
+
+1. its canonical path is inside the derived workspace root
+2. it is not primary, active, locked, detached, or missing
+3. it uses the same Git common directory
+4. `git status --porcelain=v1 --untracked-files=all` is empty
+5. no Git operation is active
+6. the registered `HEAD`, checked-out branch, and branch tip match
+7. `git merge-base --is-ancestor <tip> <base>` succeeds
+
+The plan includes `git clean -ndX` output as a warning only. The script never runs `git clean -f`.
+
+Missing registered worktrees are stale. Git pruning is repository-wide, so the script runs `git worktree prune --expire now --verbose` only when every currently prunable registration is inside the derived workspace root. If any prunable registration is out of scope, all automatic Git pruning is disabled and the limit is reported.
+
+After pruning, a stale branch is deleted only when its recorded tip is unchanged and integrated.
+
+## Jujutsu eligibility and stale registrations
+
+A registered Jujutsu workspace is eligible only when:
+
+1. its canonical path is inside the derived workspace root
+2. it is not the default or active workspace
+3. a working-copy snapshot succeeds without conflicts
+4. the exact working-copy commit is integrated, or it is empty and every parent is integrated
+5. any matching local bookmark is unambiguous and targets the audited tip or integrated parent
+
+The ancestry query must select exactly the candidate commit through `<tip> & ::<base>`.
+
+`jj status` refreshes Jujutsu's working-copy snapshot during audit. This can update repository metadata but does not edit workspace files or refs. If the snapshot changes the audited commit, the current run skips that workspace and requires another audit.
+
+Treat a Jujutsu registration as stale only when `jj workspace root --name` resolves its registered root and that path is missing. If Jujutsu cannot resolve the root, classify the workspace as inaccessible and skip it. Never infer staleness from the derived path alone. Forgetting a proven stale registration preserves its bookmark and commit unless the normal eligible-workspace checks independently authorize bookmark cleanup.
+
+## Confirm and apply
+
+Show the complete plan to the owner. Confirmation must refer to that plan and occur after it is shown.
+
+Then rerun the same command with both mutation gates:
 
 ```sh
-jj workspace forget "$workspace_name"
+bun <skill-directory>/scripts/cleanup.ts \
+  --vcs git \
+  --base main \
+  --apply \
+  --confirm \
+  --plan-id PLAN_ID
 ```
 
-If an eligible local bookmark remains, remove only the local bookmark relationship:
+Replace `PLAN_ID` with the value emitted by the approved plan-mode run. Apply mode requires `--apply`, `--confirm`, and the matching `--plan-id`. It audits twice before mutation and compares the VCS, base, candidate and skipped sets, canonical paths, refs, tips, ignored-file previews, limits, and operations. It also re-audits each eligible workspace immediately before removal. Any changed state stops the operation or candidate.
+
+Git removal uses only:
 
 ```sh
-jj bookmark forget "$bookmark_name"
+git worktree remove <workspace-path>
+git branch -d <branch>
 ```
 
-Verify that the workspace name is absent from `jj workspace list`. Then recheck that the canonical directory is the exact confirmed path inside the configured workspace root. Remove that directory without a force flag:
+Jujutsu removal uses `jj workspace forget`, then `jj bookmark forget` for an eligible local bookmark, then removes the exact confirmed directory without force.
 
-```sh
-rm -r -- "$workspace_path"
-```
+Never retry with `git worktree remove --force`, `git branch -D`, `git clean -f`, `jj abandon`, `jj bookmark delete`, or `rm -rf`.
 
-If any Jujutsu command or filesystem removal fails, stop and report the partial result. Do not use `rm -rf`, `jj abandon`, or `jj bookmark delete` as a retry.
+## Report results
 
-## Report the result
+Report:
 
-List:
-
-- removed workspaces
-- deleted Git branches or forgotten Jujutsu bookmarks
-- retained branches, bookmarks, directories, or metadata
+- removed workspaces and stale registrations
+- deleted Git branches and forgotten Jujutsu bookmarks
+- retained refs or directories
 - skipped workspaces and reasons
-- failed commands and the remaining safe recovery step
+- failed commands and partial results
+- limits or checks that could not run
 
-Do not claim cleanup succeeded until the VCS registry and filesystem checks pass.
+JSON is the default output. Use `--format text` for a concise report. A partial failure exits nonzero.
+
+Exit codes are:
+
+- `0`: success
+- `2`: invalid arguments or missing confirmation
+- `3`: state or safety conflict
+- `4`: missing environment prerequisite
+- `5`: VCS command or partial cleanup failure
+- `6`: filesystem or unexpected failure
+
+Cleanup does not authorize merge or release.

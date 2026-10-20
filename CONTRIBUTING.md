@@ -45,6 +45,14 @@ The default indexer is the `codeindex_cgc` MCP:
 
 If `codeindex_cgc` is unavailable or unsuitable, record that limitation and use a better indexer when available. `codeindex_gitnexus` is preferred for commit-anchored impact analysis. Text search can supplement an index but does not satisfy a mandatory indexing step by itself.
 
+## Human-approved instruction adaptation
+
+When repository instructions no longer fit an observed workflow, follow the `instruction-maintenance` skill. An agent may inspect the instruction graph and present an exact proposal without prior approval. It must not change instructions until a human explicitly approves that proposal.
+
+Approval is limited to the stated files and rule changes. Changed evidence, scope, dependencies, handoffs, or protected rules require a revised proposal and new approval. After approval, follow the normal issue, isolated-workspace, validation, commit, and pull-request gates.
+
+This adaptation workflow covers instruction routes, deferred policy documents, dependency or handoff statements, and skill routing metadata. It does not authorize changes to detailed skill behavior.
+
 ## Code and package rules
 
 - Load the generic `coding` skill before code changes. Load matching language and extension skills after it.
