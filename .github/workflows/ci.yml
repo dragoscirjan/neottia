@@ -16,10 +16,14 @@ concurrency:
 
 jobs:
   quality:
-    name: Validate
+    name: Validate (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
     uses: ./.github/workflows/ci.quality.yml
     with:
-      runs-on: ubuntu-latest
+      runs-on: ${{ matrix.os }}
 
   release:
     needs: quality
