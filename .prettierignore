@@ -1,4 +1,7 @@
 # Generated files, external metadata, and local state
+.agents/skills/grill-me/
+.agents/skills/grilling/
+.agents/skills/unslop/
 *.lock
 *.log
 *.gyp
