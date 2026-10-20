@@ -1,10 +1,10 @@
 ---
 name: isolated-workspace
-description: Create or reuse one isolated change workspace before mutating a version-controlled repository. Use for any architecture, design, implementation, coding, documentation, configuration, or other task that changes files. Supports Git worktrees and Jujutsu workspaces and prevents work in the primary checkout.
-compatibility: Requires Git with worktree support or Jujutsu with workspace support.
+description: Plan, create, or reuse one isolated Git worktree or Jujutsu workspace before repository mutation. Use before architecture, code, documentation, configuration, or policy changes. Requires an explicit VCS and branch or bookmark name while detecting repository and workspace paths automatically.
+compatibility: Requires Bun and either Git with worktree support or Jujutsu 0.38 or newer with workspace support.
 metadata:
   author: dragoscirjan
-  version: "1.1"
+  version: "2.0"
   opencode/slash: "true"
 ---
 
@@ -12,169 +12,124 @@ metadata:
 
 Establish a dedicated workspace before the first repository mutation. Do not edit, generate, move, or delete repository files until this gate passes.
 
+Use the bundled TypeScript automation. Do not recreate its path derivation or VCS procedures manually.
+
 ## Read project configuration
 
-Read the nearest applicable `AGENTS.md` and require these values from its **Isolated workspace** section:
+Read the nearest applicable `AGENTS.md`. Obtain:
 
-- version-control system: `git` or `jj`
-- base revision
-- workspace root: an explicit path or `derive-from-memory-or-origin`
-- branch or bookmark prefix
+- the VCS selected by the project or owner
+- the base revision, when the project configures one
+- the full branch or bookmark name for the tracked change
 
-Do not guess missing values. Stop and ask the owner to configure them.
+The script must receive `--vcs git` or `--vcs jj`. It never infers the VCS, including in a colocated repository. Do not mix Git and Jujutsu commands.
 
-Use only the configured version-control system. A colocated repository may contain both `.git` and `.jj`; do not switch tools or mix their workspace workflows.
+Pass the full branch or bookmark name through `--branch`. Apply the configured prefix before invoking the script. For example, use `--branch change/issue-42`, not only `issue-42`.
+
+Pass a configured base through `--base`. When it is omitted, the script uses the Git remote default branch, then the current Git branch, or `trunk()` for Jujutsu.
+
+Bun runs the helper but is not added to the target repository. If Bun or the selected VCS is unavailable, stop. Do not install or reconfigure tools without owner approval.
+
+## Plan the workspace
+
+Resolve this skill's directory, then run:
+
+```sh
+bun <skill-directory>/scripts/create.ts \
+  --vcs git \
+  --branch change/issue-42 \
+  --base main
+```
+
+Use `--vcs jj` for Jujutsu. The default is a JSON plan. `--dry-run` is an optional explicit alias for plan mode.
+
+The script detects the repository that contains the current directory. It identifies the primary Git worktree or the Jujutsu `default` workspace, then derives:
+
+```text
+workspace root = <primary repository parent>/<primary repository name>--workspaces
+workspace path = <workspace root>/<final branch component>
+workspace name = <final branch component>
+```
+
+For `change/issue-42` in `/work/project`, the derived path is `/work/project--workspaces/issue-42`.
+
+The script rejects unsafe names, path escapes, symlinked workspace roots, unregistered destination collisions, conflicting workspace names, and branches attached elsewhere. It does not use hosted-repository identity or a remote URL to derive local paths.
+
+Review the plan. Confirm that it reports the intended:
+
+- VCS
+- primary repository
+- base revision and resolved commit
+- full branch or bookmark
+- workspace name and absolute path
+- create, attach, repair, or reuse action
+- exact VCS commands
+- the `planId` that binds apply mode to this exact plan
 
 ## Protect existing work
 
 - Never mutate the primary checkout.
-- Never stash, reset, clean, move, or delete pre-existing user changes.
+- Never stash, reset, clean, move, or delete pre-existing changes.
 - Keep one active writer per workspace.
-- Do not create a nested workspace when the current directory is already a dedicated workspace for the same tracked change.
-- Reuse an existing workspace only after verifying that it belongs to the same change and has no unrelated modifications.
-- If a branch, bookmark, workspace name, or destination path collides with unrelated work, stop and ask the owner for a different change identifier.
+- Do not create a nested workspace.
+- Treat a branch, bookmark, workspace-name, or path collision as a stop.
+- Reuse only an exact registered path and branch or bookmark match.
+- Before continuing in a reused workspace, inspect its status and confirm that existing changes belong to the current task. The script cannot determine task ownership.
 
-## Choose the change identity
+## Apply the approved plan
 
-Derive a short filesystem-safe `change_id` from the tracked issue or task. Use lowercase letters, numbers, and hyphens.
-
-Assign the configured values. When the workspace root is `derive-from-memory-or-origin`, resolve the repository name in this order:
-
-1. Query any available project-scoped memory or context MCP for the current repository identity.
-2. Accept a result only when it is unambiguous and scoped to the current project. Ignore generic, unrelated, or stale entries.
-3. On a miss, run `git config get remote.origin.url` once. If command execution requires approval or is blocked, ask the owner for approval; do not retry repeatedly or guess.
-4. Derive the repository name from the remote URL.
-5. Store the derived repository name and its `git-config` provenance in the available project-scoped memory or context MCP so later runs can avoid the Git command.
-
-Store only safe identity data. Never persist credentials, token-bearing URLs, embedded user information, or personal filesystem paths. Store a sanitized `host/owner/repository` identity only when it contains no secrets. If no memory or context MCP is available, continue without creating a repository cache file.
-
-Use the Git fallback only when memory/context did not resolve `repository_name`:
+After the human approves the exact plan, rerun the same command with both mutation gates:
 
 ```sh
-remote_url="$(git config get remote.origin.url)" || {
-  echo "remote.origin.url is required to derive the workspace root" >&2
-  exit 1
-}
-repository_name="${remote_url##*/}"
-repository_name="${repository_name%.git}"
-if [ -z "$repository_name" ]; then
-  echo "could not derive the repository name from remote.origin.url" >&2
-  exit 1
-fi
+bun <skill-directory>/scripts/create.ts \
+  --vcs git \
+  --branch change/issue-42 \
+  --base main \
+  --apply \
+  --confirm \
+  --plan-id PLAN_ID
 ```
 
-After `repository_name` is resolved from either source, construct the workspace values:
+Replace `PLAN_ID` with the value emitted by the approved plan-mode run. Apply mode requires `--apply`, `--confirm`, and the matching `--plan-id`. It rebuilds the plan before mutation and stops if the approved plan ID, action, path, or resolved base changed.
 
-```sh
-base_revision="value from AGENTS.md"
-workspace_root_setting="value from AGENTS.md"
-branch_prefix="value from AGENTS.md"
+For Git, it either:
 
-if [ "$workspace_root_setting" = "derive-from-memory-or-origin" ]; then
-  workspace_root="../${repository_name}--workspaces"
-else
-  workspace_root="$workspace_root_setting"
-fi
+- creates the branch from the base and adds its worktree, or
+- attaches an existing branch only when it is not attached elsewhere.
 
-branch_name="$branch_prefix/$change_id"
-workspace_path="$workspace_root/$change_id"
-```
+For Jujutsu, it:
 
-For a pure Jujutsu repository without a stored identity or Git configuration, require an explicit workspace root instead of `derive-from-memory-or-origin`.
+1. adds a named workspace from the base
+2. describes its working-copy change with the full bookmark name
+3. creates the full bookmark at `@`
 
-Resolve a relative workspace root from the repository root. Confirm that the resulting workspace path is outside the primary checkout, then create the configured parent directory if needed:
-
-```sh
-mkdir -p "$workspace_root"
-```
-
-Do not create the directory until its resolved location has passed the outside-checkout check.
-
-## Reuse a compliant workspace
-
-Before creating anything, inspect registered workspaces and repository status.
-
-A workspace is reusable only when all are true:
-
-1. It is registered with the configured version-control system.
-2. Its path equals the configured workspace path.
-3. It belongs to the intended branch, bookmark, issue, or change.
-4. Existing modifications belong to the current task.
-
-When these conditions hold, continue there. Otherwise, do not repurpose it.
-
-## Create a Git worktree
-
-Use this procedure only when the configured version-control system is `git`.
-
-From the repository root, inspect state without changing it:
-
-```sh
-git status --short --branch
-git worktree list --porcelain
-```
-
-For a new branch and workspace:
-
-```sh
-git worktree add "$workspace_path" -b "$branch_name" "$base_revision"
-git -C "$workspace_path" status --short --branch
-```
-
-If the branch already exists and is not attached elsewhere, omit `-b` and attach it deliberately:
-
-```sh
-git worktree add "$workspace_path" "$branch_name"
-git -C "$workspace_path" status --short --branch
-```
-
-Do not run either creation command when the destination exists or the branch is attached to another worktree.
-
-## Create a Jujutsu workspace
-
-Use this procedure only when the configured version-control system is `jj`.
-
-From the repository root, inspect state without changing it:
-
-```sh
-jj status
-jj workspace list
-```
-
-Create a new workspace and working-copy change:
-
-```sh
-jj workspace add --name "$change_id" -r "$base_revision" "$workspace_path"
-(
-  cd "$workspace_path"
-  jj describe -m "$change_id"
-  jj status
-)
-```
-
-Do not create a Git branch for a Jujutsu workspace. When publication requires a named bookmark, create it from the completed change:
-
-```sh
-(
-  cd "$workspace_path"
-  jj bookmark create "$branch_name" -r @
-)
-```
-
-Do not overwrite an existing bookmark.
+A later run is idempotent when the registration, path, and branch or bookmark still match. It can repair a missing Jujutsu bookmark only when the exact registered workspace's description equals the requested full bookmark name. It never overwrites a bookmark.
 
 ## Verify the gate
 
-Before editing files, verify and report:
+Require successful apply output or an exact reusable workspace. Then verify and report:
 
-- selected version-control system
+- selected VCS
 - absolute workspace path
-- base revision
-- branch or bookmark name
-- status of the dedicated workspace
+- resolved base
+- branch or bookmark
+- current status
 
-Perform every subsequent read, write, command, validation, commit, and publication step from that workspace. When tools do not preserve `cd`, pass the workspace explicitly through an absolute path or command working directory.
+Run every subsequent read, write, command, validation, commit, and publication step from the isolated workspace. When tools do not preserve `cd`, pass the absolute workspace path as their working directory.
 
-## Cleanup
+## Output and failures
 
-Do not remove a workspace, branch, bookmark, or working-copy change unless the change is integrated or abandoned and the owner explicitly requests cleanup. Verify a clean status before cleanup and preserve any unmerged work.
+JSON is the default output. Use `--format text` for a concise human-readable report. Diagnostics are bounded and redact common credential-bearing values.
+
+Exit codes are:
+
+- `0`: success
+- `2`: invalid arguments or missing confirmation
+- `3`: state, identity, or path conflict
+- `4`: missing environment prerequisite
+- `5`: VCS command failure
+- `6`: filesystem or unexpected failure
+
+## Cleanup handoff
+
+Do not remove the workspace here. When the owner asks to clean completed workspaces, load and follow the `cleanup-workspaces` skill. Creation does not authorize cleanup, merge, or release.
