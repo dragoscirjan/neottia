@@ -36,7 +36,6 @@ jobs:
           - os: windows-latest
             tier: experimental
             experimental: true
-    continue-on-error: ${{ matrix.experimental }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
@@ -47,7 +46,13 @@ jobs:
           install: true
           cache: true
       - run: mise run deps:sync:pnpm
-      - run: mise run test
+      - name: Run tests
+        id: tests
+        continue-on-error: ${{ matrix.experimental }}
+        run: mise run test
+      - name: Report experimental failure
+        if: ${{ always() && matrix.experimental && steps.tests.outcome == 'failure' }}
+        run: echo "::warning::${{ matrix.os }} remains experimental because its test suite failed."
 
   release:
     needs: [quality, test]
