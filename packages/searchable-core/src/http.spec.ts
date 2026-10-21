@@ -109,20 +109,20 @@ describe('public network policy', () => {
     const client = new SafeHttpClient();
     const controller = new AbortController();
     try {
-      const streamed = await client.stream({
-        url,
-        signal: controller.signal,
-        deadline: Date.now() + (mode === 'deadline' ? 30 : 1_000),
-        maximumBytes: 1_024,
-        destination: 'trusted-local',
-      });
-      const consumed = (async () => {
+      const consumed = async (): Promise<void> => {
+        const streamed = await client.stream({
+          url,
+          signal: controller.signal,
+          deadline: Date.now() + (mode === 'deadline' ? 30 : 1_000),
+          maximumBytes: 1_024,
+          destination: 'trusted-local',
+        });
         for await (const chunk of streamed.chunks) {
           void chunk;
           if (mode === 'cancellation') controller.abort();
         }
-      })();
-      await expect(consumed).rejects.toMatchObject({
+      };
+      await expect(consumed()).rejects.toMatchObject({
         code: mode === 'deadline' ? 'DEADLINE_EXCEEDED' : 'OPERATION_CANCELLED',
       });
     } finally {

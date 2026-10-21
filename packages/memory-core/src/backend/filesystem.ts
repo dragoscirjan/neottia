@@ -443,7 +443,13 @@ function canonicalMemoryRoot(root: string): string {
   while (true) {
     try {
       const stat = lstatSync(current);
-      if (stat.isSymbolicLink() || !stat.isDirectory()) throw new MemoryError(`Unsafe memory root: ${root}`);
+      if (stat.isSymbolicLink()) {
+        if (missing.length === 0) throw new MemoryError(`Unsafe memory root: ${root}`);
+        const canonical = realpathSync.native(current);
+        if (!lstatSync(canonical).isDirectory()) throw new MemoryError(`Unsafe memory root: ${root}`);
+        return join(canonical, ...missing);
+      }
+      if (!stat.isDirectory()) throw new MemoryError(`Unsafe memory root: ${root}`);
       return join(realpathSync.native(current), ...missing);
     } catch (error: unknown) {
       if (!isCode(error, 'ENOENT')) throw error;
