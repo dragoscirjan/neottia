@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -282,7 +282,7 @@ describe('empty-project CLI adoption journey (issue #161)', () => {
     }
     const hostWrites = plan.mutations.filter((mutation) => mutation.role === 'host-config');
     expect(hostWrites).toHaveLength(1);
-    expect(hostWrites[0]!.path).toBe(join(roots.project, '.pi', 'settings.json'));
+    expect(hostWrites[0]!.path).toBe(join(await realpath(roots.project), '.pi', 'settings.json'));
     for (const expected of expectedPiPackages()) {
       expect(hostWrites[0]!.content).toContain(expected);
     }

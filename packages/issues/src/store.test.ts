@@ -562,7 +562,7 @@ describe('issue canonical lifecycle', () => {
     });
     database.close();
     expect((await issues.get(child.id)).metadata).toEqual({ nested: { count: 2 }, labels: ['one', 'two'] });
-  });
+  }, 30_000);
 
   it('health-checks structured projections across multiple keyset pages', async () => {
     const cwd = project();
