@@ -26,11 +26,11 @@ import {
   syncFileDescriptor,
 } from './filesystem.js';
 import {
-  assertNativePublicationPath,
-  nativeRenameNoReplace,
-  requireNativePublicationBackend,
-  type NativePublicationBackend,
-} from './native-publication.js';
+  assertPlatformFilesystem,
+  platformRenameNoReplace,
+  requireRepositoryPlatformBackend,
+  type RepositoryPlatformBackend,
+} from './platform-backend.js';
 
 /** Identity and revision captured by the final pre-publication read. */
 export interface ExpectedRegularFile {
@@ -56,8 +56,8 @@ export function publishExactRegularFile(
   const temporary = join(parent, `.${basename(path)}.${token}.repository-store.tmp`);
   const evacuated = join(parent, `.${basename(path)}.${token}.repository-store.evacuated`);
   // Backend loading and platform checks happen before staging or destination mutation.
-  const nativeBackend = expected === undefined ? undefined : requireNativePublicationBackend();
-  if (nativeBackend !== undefined) assertNativePublicationPath(nativeBackend, parent);
+  const platformBackend = expected === undefined ? undefined : requireRepositoryPlatformBackend();
+  if (platformBackend !== undefined) assertPlatformFilesystem(platformBackend, parent);
   let descriptor: number | undefined;
   let temporaryIdentity: Stats | undefined;
   let evacuatedIdentity: Stats | undefined;
@@ -84,7 +84,7 @@ export function publishExactRegularFile(
     if (expected !== undefined) {
       emitFilesystemFault(bytes === null ? 'before-exact-removal' : 'before-exact-publication', path);
       emitFilesystemFault('before-exact-evacuation', evacuated);
-      moveNoReplace(nativeBackend as NativePublicationBackend, path, evacuated, 'evacuate destination');
+      moveNoReplace(platformBackend as RepositoryPlatformBackend, path, evacuated, 'evacuate destination');
       emitFilesystemFault('destination-evacuated', path);
       evacuatedIdentity = lstatSync(evacuated);
       assertSafeRegular(evacuatedIdentity, evacuated);
@@ -93,7 +93,7 @@ export function publishExactRegularFile(
         !sameIdentity(expected.identity, evacuatedIdentity) ||
         computeByteRevision(evacuatedBytes) !== expected.revision
       ) {
-        restoreEvacuated(nativeBackend as NativePublicationBackend, evacuated, path, parent);
+        restoreEvacuated(platformBackend as RepositoryPlatformBackend, evacuated, path, parent);
         evacuatedIdentity = undefined;
         throw new PathSafetyError(`Destination changed during publication: ${path}`, 'IDENTITY_CHANGED', {
           path,
@@ -111,7 +111,7 @@ export function publishExactRegularFile(
       } catch (error: unknown) {
         if (hasCode(error, 'EEXIST')) {
           if (evacuatedIdentity !== undefined)
-            restoreEvacuated(nativeBackend as NativePublicationBackend, evacuated, path, parent);
+            restoreEvacuated(platformBackend as RepositoryPlatformBackend, evacuated, path, parent);
           evacuatedIdentity = undefined;
           throw new PathSafetyError(`Destination appeared during publication: ${path}`, 'IDENTITY_CHANGED');
         }
@@ -178,7 +178,7 @@ export function recoverExactPublication(
     if (!hasCode(error, 'ENOENT')) throw error;
   }
   if (current === undefined) {
-    restoreEvacuated(requireNativePublicationBackend(), evacuated, path, parent);
+    restoreEvacuated(requireRepositoryPlatformBackend(), evacuated, path, parent);
     return;
   }
   if (sameIdentity(evidence, current)) {
@@ -238,9 +238,9 @@ function recoverTemporaryPublication(
   publishExactRegularFile(temporary, null, { identity: temporaryIdentity, revision, maxBytes }, `${token}-temporary`);
 }
 
-function restoreEvacuated(backend: NativePublicationBackend, evacuated: string, path: string, parent: string): void {
+function restoreEvacuated(backend: RepositoryPlatformBackend, evacuated: string, path: string, parent: string): void {
   try {
-    nativeRenameNoReplace(backend, evacuated, path);
+    platformRenameNoReplace(backend, evacuated, path);
   } catch (error: unknown) {
     if (hasCode(error, 'EEXIST'))
       throw new RecoveryError(
@@ -254,13 +254,13 @@ function restoreEvacuated(backend: NativePublicationBackend, evacuated: string, 
 }
 
 function moveNoReplace(
-  backend: NativePublicationBackend,
+  backend: RepositoryPlatformBackend,
   source: string,
   destination: string,
   operation: string,
 ): void {
   try {
-    nativeRenameNoReplace(backend, source, destination);
+    platformRenameNoReplace(backend, source, destination);
   } catch (error: unknown) {
     if (hasCode(error, 'EEXIST'))
       throw new RecoveryError(`Cannot ${operation}; private destination already exists.`, 'RECOVERY_AMBIGUOUS', {
