@@ -126,12 +126,14 @@ describe('repository canonical store', () => {
     expect(validateRelativePath('unicode/文件.yml')).toBe('unicode/文件.yml');
   });
 
-  it('certifies only the supported Linux architectures', () => {
+  it('certifies only the supported platform and architecture tuples', () => {
     expect(isCertifiedRepositoryPlatform('linux', 'x64')).toBe(true);
     expect(isCertifiedRepositoryPlatform('linux', 'arm64')).toBe(true);
+    expect(isCertifiedRepositoryPlatform('darwin', 'x64')).toBe(true);
+    expect(isCertifiedRepositoryPlatform('darwin', 'arm64')).toBe(true);
     expect(isCertifiedRepositoryPlatform('linux', 'ppc64')).toBe(false);
     expect(isCertifiedRepositoryPlatform('linux', 's390x')).toBe(false);
-    expect(isCertifiedRepositoryPlatform('darwin', 'arm64')).toBe(false);
+    expect(isCertifiedRepositoryPlatform('darwin', 'ia32')).toBe(false);
     expect(isCertifiedRepositoryPlatform('win32', 'x64')).toBe(false);
   });
 
@@ -238,6 +240,7 @@ describe('repository canonical store', () => {
         platform: process.platform,
         filesystemRequirement: 'the test filesystem',
         filesystem: { supportsLocalPath: () => true },
+        durability: { syncDescriptor() {} },
         publication: {
           renameNoReplace() {
             throw Object.assign(new Error('unsupported rename flags'), { code: 'EINVAL' });
@@ -595,6 +598,7 @@ describe('repository authority lease', () => {
       platform: process.platform,
       filesystemRequirement: 'the test filesystem',
       filesystem: { supportsLocalPath: () => false },
+      durability: { syncDescriptor() {} },
       publication: {
         renameNoReplace() {
           publicationCalled = true;

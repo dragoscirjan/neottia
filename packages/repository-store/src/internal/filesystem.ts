@@ -2,7 +2,6 @@ import {
   closeSync,
   constants as fsConstants,
   fstatSync,
-  fsyncSync,
   lstatSync,
   mkdirSync,
   openSync,
@@ -10,8 +9,9 @@ import {
   type Stats,
 } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
-import { DurabilityError, PathSafetyError, ResourceLimitError } from '../errors.js';
+import { DurabilityError, PathSafetyError, ResourceLimitError, UnsupportedRuntimeError } from '../errors.js';
 import { emitFilesystemFault } from './fault-injection.js';
+import { requireRepositoryPlatformBackend } from './platform-backend.js';
 
 /** Stable identity for one existing directory component. */
 export interface DirectoryIdentity {
@@ -171,8 +171,9 @@ function assertRegularWithLinks(stat: Stats, path: string, allowedLinkCounts: re
 export function syncFileDescriptor(descriptor: number, path: string): void {
   try {
     emitFilesystemFault('file-fsync', path);
-    fsyncSync(descriptor);
+    requireRepositoryPlatformBackend().durability.syncDescriptor(descriptor);
   } catch (error: unknown) {
+    if (error instanceof UnsupportedRuntimeError) throw error;
     throw new DurabilityError(`Failed to synchronize file: ${path}`, {
       cause: error,
       evidence: { operation: 'file-fsync', path },
@@ -206,8 +207,9 @@ export function syncDirectory(path: string): void {
     if (!stat.isDirectory()) throw unsafe(`Unsafe directory: ${path}`);
     try {
       emitFilesystemFault('directory-fsync', path);
-      fsyncSync(descriptor);
+      requireRepositoryPlatformBackend().durability.syncDescriptor(descriptor);
     } catch (error: unknown) {
+      if (error instanceof UnsupportedRuntimeError) throw error;
       throw new DurabilityError(`Failed to synchronize directory: ${path}`, {
         cause: error,
         evidence: { operation: 'directory-fsync', path },

@@ -12,6 +12,11 @@ export interface LocalFilesystemBackend {
   supportsLocalPath(path: string): boolean;
 }
 
+/** Native descriptor flush with the durability barrier required by the platform. */
+export interface DurabilityBackend {
+  syncDescriptor(descriptor: number): void;
+}
+
 /** Platform guarantees required by Repository Store leased operations. */
 export interface RepositoryPlatformBackend {
   readonly id: string;
@@ -19,6 +24,7 @@ export interface RepositoryPlatformBackend {
   readonly filesystemRequirement: string;
   readonly publication: ExactPublicationBackend;
   readonly filesystem: LocalFilesystemBackend;
+  readonly durability: DurabilityBackend;
 }
 
 interface PlatformBackendDefinition {
@@ -32,6 +38,7 @@ interface NativePlatformModule {
   readonly platform: string;
   renameNoReplace(source: string, destination: string): void;
   supportsLocalPath(path: string): boolean;
+  syncDescriptor(descriptor: number): void;
 }
 
 const backendDefinitions: Partial<Record<NodeJS.Platform, PlatformBackendDefinition>> = {
@@ -40,6 +47,12 @@ const backendDefinitions: Partial<Record<NodeJS.Platform, PlatformBackendDefinit
     platform: 'linux',
     architectures: ['x64', 'arm64'],
     filesystemRequirement: 'a certified Linux local filesystem',
+  },
+  darwin: {
+    id: 'macos-node-api',
+    platform: 'darwin',
+    architectures: ['x64', 'arm64'],
+    filesystemRequirement: 'a local APFS filesystem with certified publication and durability capabilities',
   },
 };
 
@@ -68,6 +81,7 @@ export function requireRepositoryPlatformBackend(): RepositoryPlatformBackend {
       ...definition,
       publication: Object.freeze({ renameNoReplace: nativeModule.renameNoReplace.bind(nativeModule) }),
       filesystem: Object.freeze({ supportsLocalPath: nativeModule.supportsLocalPath.bind(nativeModule) }),
+      durability: Object.freeze({ syncDescriptor: nativeModule.syncDescriptor.bind(nativeModule) }),
     });
     return loadedBackend;
   } catch (error: unknown) {
@@ -124,7 +138,8 @@ function loadNativeModule(): NativePlatformModule {
   if (
     typeof candidate.platform !== 'string' ||
     typeof candidate.renameNoReplace !== 'function' ||
-    typeof candidate.supportsLocalPath !== 'function'
+    typeof candidate.supportsLocalPath !== 'function' ||
+    typeof candidate.syncDescriptor !== 'function'
   )
     throw new Error('Native addon does not expose the complete platform backend contract.');
   return candidate as NativePlatformModule;

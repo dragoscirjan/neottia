@@ -8,7 +8,16 @@
 pnpm add @neottia/repository-store
 ```
 
-It requires Node.js 22.16 or newer or Bun 1.3.13 or newer, Linux x64 or arm64, C++17, Python, Make, Linux headers, `renameat2(RENAME_NOREPLACE)`, a recognized local ext4, XFS, Btrfs, tmpfs, or overlay filesystem, and same-volume regular-file hard links. Unsupported runtimes and network filesystems fail with `UnsupportedRuntimeError` before leased work.
+Repository Store requires Node.js 22.16 or newer or Bun 1.3.13 or newer. Source installation requires a C++17 compiler, Python, Make, and the platform development headers used by Node-API.
+
+The following platform combinations are supported:
+
+| Operating system | Architectures | Filesystems                               | Native guarantees                                                                                         |
+| ---------------- | ------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Linux            | x64, arm64    | Local ext4, XFS, Btrfs, tmpfs, or overlay | `renameat2(RENAME_NOREPLACE)`, `fsync`, same-volume regular-file hard links                               |
+| macOS 15 and 26  | x64, arm64    | Local APFS                                | `renamex_np(RENAME_EXCL)`, `F_FULLFSYNC`, persistent object identity, same-volume regular-file hard links |
+
+Repository authority acquisition checks the native addon, filesystem capabilities, and durability support before it creates claim or lease artifacts. Windows, FreeBSD, other filesystems, unavailable native operations, and shared or network filesystems fail with `UnsupportedRuntimeError` before leased work.
 
 ## Paths, reads, and revisions
 

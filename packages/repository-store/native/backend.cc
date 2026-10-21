@@ -1,6 +1,7 @@
 #include <node_api.h>
 
 #include <cerrno>
+#include <cstdint>
 #include <cstring>
 #include <string>
 #include <utility>
@@ -27,6 +28,8 @@ const char* ErrnoCode(int value) {
       return "EPERM";
     case EACCES:
       return "EACCES";
+    case EBADF:
+      return "EBADF";
     default:
       return "EIO";
   }
@@ -98,6 +101,25 @@ napi_value SupportsLocalPath(napi_env env, napi_callback_info info) {
   return result;
 }
 
+napi_value SyncDescriptor(napi_env env, napi_callback_info info) {
+  size_t argc = 1;
+  napi_value argv[1];
+  napi_get_cb_info(env, info, &argc, argv, nullptr, nullptr);
+  std::int32_t descriptor = -1;
+  if (argc != 1 || napi_get_value_int32(env, argv[0], &descriptor) != napi_ok || descriptor < 0) {
+    napi_throw_type_error(env, nullptr, "syncDescriptor requires one non-negative file descriptor");
+    return nullptr;
+  }
+  const int error = neottia::repository_store::SyncDescriptor(descriptor);
+  if (error != 0) {
+    ThrowErrno(env, error);
+    return nullptr;
+  }
+  napi_value undefined;
+  napi_get_undefined(env, &undefined);
+  return undefined;
+}
+
 napi_value Initialize(napi_env env, napi_value exports) {
   napi_value platform;
   napi_create_string_utf8(env, neottia::repository_store::Platform(), NAPI_AUTO_LENGTH, &platform);
@@ -108,6 +130,9 @@ napi_value Initialize(napi_env env, napi_value exports) {
   napi_value supports_function;
   napi_create_function(env, "supportsLocalPath", NAPI_AUTO_LENGTH, SupportsLocalPath, nullptr, &supports_function);
   napi_set_named_property(env, exports, "supportsLocalPath", supports_function);
+  napi_value sync_function;
+  napi_create_function(env, "syncDescriptor", NAPI_AUTO_LENGTH, SyncDescriptor, nullptr, &sync_function);
+  napi_set_named_property(env, exports, "syncDescriptor", sync_function);
   return exports;
 }
 
