@@ -21,8 +21,41 @@ jobs:
     with:
       runs-on: ubuntu-latest
 
+  test:
+    name: Test (${{ matrix.os }}, ${{ matrix.tier }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            tier: required
+            experimental: false
+          - os: macos-latest
+            tier: experimental
+            experimental: true
+          - os: windows-latest
+            tier: experimental
+            experimental: true
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@v5
+        with:
+          install: true
+          cache: true
+      - run: mise run deps:sync:pnpm
+      - name: Run tests
+        id: tests
+        continue-on-error: ${{ matrix.experimental }}
+        run: mise run test
+      - name: Report experimental failure
+        if: ${{ always() && matrix.experimental && steps.tests.outcome == 'failure' }}
+        run: echo "::warning::${{ matrix.os }} remains experimental because its test suite failed."
+
   release:
-    needs: quality
+    needs: [quality, test]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       # The release workflow dispatches validation for token-created version PRs.
