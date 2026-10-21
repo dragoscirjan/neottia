@@ -5,6 +5,7 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   renameSync,
   statSync,
   rmSync,
@@ -606,8 +607,9 @@ function replaceWithSentinel(path: string): void {
 }
 
 async function newCacheFixture(prefix: string, digest = 'digest') {
-  const authority = mkdtempSync(join(tmpdir(), prefix));
-  temporaryDirectories.push(authority);
+  const requestedAuthority = mkdtempSync(join(tmpdir(), prefix));
+  temporaryDirectories.push(requestedAuthority);
+  const authority = realpathSync.native(requestedAuthority);
   const root = await resolveManagedRoot({ authorityRoot: authority, limits: DEFAULT_STORE_LIMITS });
   const path = resolveManagedPath(root, 'cache.db');
   return { authority, root, path, specification: cacheSpecification(path, digest) };

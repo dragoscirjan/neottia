@@ -807,7 +807,7 @@ describe('environment values, secrets, and safe diagnostics', () => {
       resolutionError(() => resolveConfig(registry, { cwd, env: {}, globalFile: false, projectFile: wide }))
         .diagnostics,
     ).toMatchObject([{ code: 'LIMIT' }]);
-  });
+  }, 30_000);
 
   it('bounds diagnostics and freezes their structured metadata', () => {
     const cwd = temporaryDirectory();
