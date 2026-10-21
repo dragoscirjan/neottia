@@ -40,10 +40,10 @@ import {
   type RepositoryLease,
 } from './internal/model.js';
 import {
-  assertNativePublicationPath,
-  nativeRenameNoReplace,
-  requireNativePublicationBackend,
-} from './internal/native-publication.js';
+  assertPlatformFilesystem,
+  platformRenameNoReplace,
+  requireRepositoryPlatformBackend,
+} from './internal/platform-backend.js';
 
 /** Abort and absolute wall-clock deadline controls accepted by async operations. */
 export interface OperationControl {
@@ -120,8 +120,8 @@ export async function withRepositoryLease<T>(
     ensurePrivateDirectory(controlRoot);
     // Every successful acquisition must later remove its claim and lease.
     // Prove that exact native cleanup is available before creating either.
-    const cleanupBackend = requireNativePublicationBackend();
-    assertNativePublicationPath(cleanupBackend, controlRoot);
+    const cleanupBackend = requireRepositoryPlatformBackend();
+    assertPlatformFilesystem(cleanupBackend, controlRoot);
     const hostId = ensureHostId(controlRoot);
     lockPath = join(controlRoot, 'authority.lease');
     const claimPath = join(controlRoot, 'authority.claim');
@@ -758,7 +758,7 @@ export function restoreQuarantinedLease(
   let preserveUnverified = false;
   let restorationExpectation: ReleaseExpectation | undefined;
   try {
-    nativeRenameNoReplace(requireNativePublicationBackend(), quarantine, verification);
+    platformRenameNoReplace(requireRepositoryPlatformBackend(), quarantine, verification);
     staged = true;
     restorationExpectation = releaseArtifactMatches(verification, expected)
       ? expected
@@ -770,7 +770,7 @@ export function restoreQuarantinedLease(
       return;
     }
     try {
-      nativeRenameNoReplace(requireNativePublicationBackend(), verification, lockPath);
+      platformRenameNoReplace(requireRepositoryPlatformBackend(), verification, lockPath);
       staged = false;
     } catch (error: unknown) {
       if (!hasCode(error, 'EEXIST')) throw error;
@@ -791,7 +791,7 @@ export function restoreQuarantinedLease(
           releaseArtifactMatches(verification, expected) ||
           (movedFromLock !== undefined && releaseArtifactMatches(verification, movedFromLock))
         )
-          nativeRenameNoReplace(requireNativePublicationBackend(), verification, quarantine);
+          platformRenameNoReplace(requireRepositoryPlatformBackend(), verification, quarantine);
       } catch {
         // Preserve both identities if the original quarantine path reappeared.
       }
@@ -835,7 +835,7 @@ function cleanupVerifiedReleaseArtifact(path: string, expected: ReleaseExpectati
   try {
     const match = /\.release-([0-9a-f-]{32,64})$/u.exec(basename(releasePath));
     if (match?.[1] !== expected.token) return;
-    nativeRenameNoReplace(requireNativePublicationBackend(), path, cleanup);
+    platformRenameNoReplace(requireRepositoryPlatformBackend(), path, cleanup);
     moved = true;
     const identity = lstatSync(cleanup);
     if (!sameIdentity(identity, expected.identity) || identity.isSymbolicLink()) return;
@@ -867,7 +867,7 @@ function cleanupVerifiedReleaseArtifact(path: string, expected: ReleaseExpectati
   } finally {
     if (moved && !removed) {
       try {
-        nativeRenameNoReplace(requireNativePublicationBackend(), cleanup, path);
+        platformRenameNoReplace(requireRepositoryPlatformBackend(), cleanup, path);
       } catch {
         // Preserve both identities if the original quarantine path reappeared.
       }
@@ -1054,9 +1054,9 @@ function acquisitionTimeout(hasExplicitDeadline: boolean): LeaseContentionError 
 function quarantineNoReplace(source: string, destination: string): boolean {
   emitFilesystemFault('before-lease-artifact-quarantine', source);
   try {
-    const backend = requireNativePublicationBackend();
-    assertNativePublicationPath(backend, dirname(source));
-    nativeRenameNoReplace(backend, source, destination);
+    const backend = requireRepositoryPlatformBackend();
+    assertPlatformFilesystem(backend, dirname(source));
+    platformRenameNoReplace(backend, source, destination);
     return true;
   } catch (error: unknown) {
     if (hasCode(error, 'EEXIST') || hasCode(error, 'ENOENT')) return false;

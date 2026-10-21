@@ -41,7 +41,7 @@ import {
   type TransactionFaultEvent,
 } from './internal/fault-injection.js';
 import { getRootState } from './internal/model.js';
-import { setNativePublicationBackendForTests } from './internal/native-publication.js';
+import { setRepositoryPlatformBackendForTests } from './internal/platform-backend.js';
 import { restoreQuarantinedLease } from './lease.js';
 import {
   createTransactionDirectory,
@@ -79,7 +79,7 @@ const CRASH_CASES = [
 
 afterEach(() => {
   setFilesystemFaultInjectorForTests(undefined);
-  setNativePublicationBackendForTests(undefined);
+  setRepositoryPlatformBackendForTests(undefined);
   while (tempDirectories.length > 0) rmSync(tempDirectories.pop() as string, { recursive: true, force: true });
 });
 
@@ -210,7 +210,7 @@ describe('repository canonical store', () => {
     await withRepositoryLease(root, async (lease) => {
       await applyCanonicalBatch(root, lease, [{ kind: 'write', path, bytes: bytes('original'), expected: 'absent' }]);
       const expected = (await readManagedFile(root, lease, path)).revision;
-      setNativePublicationBackendForTests(null);
+      setRepositoryPlatformBackendForTests(null);
       await expect(
         applyCanonicalBatch(root, lease, [{ kind: 'write', path, bytes: bytes('changed'), expected }]),
       ).rejects.toMatchObject({ code: 'UNSUPPORTED_RUNTIME' });
@@ -224,10 +224,15 @@ describe('repository canonical store', () => {
     await withRepositoryLease(root, async (lease) => {
       await applyCanonicalBatch(root, lease, [{ kind: 'write', path, bytes: bytes('original'), expected: 'absent' }]);
       const expected = (await readManagedFile(root, lease, path)).revision;
-      setNativePublicationBackendForTests({
-        supportsLocalPath: () => true,
-        renameNoReplace() {
-          throw Object.assign(new Error('unsupported rename flags'), { code: 'EINVAL' });
+      setRepositoryPlatformBackendForTests({
+        id: 'test-einval',
+        platform: process.platform,
+        filesystemRequirement: 'the test filesystem',
+        filesystem: { supportsLocalPath: () => true },
+        publication: {
+          renameNoReplace() {
+            throw Object.assign(new Error('unsupported rename flags'), { code: 'EINVAL' });
+          },
         },
       });
       await expect(
@@ -563,11 +568,36 @@ describe('repository authority lease', () => {
   it('fails native-unavailable acquisition before creating claim or lease artifacts', async () => {
     const root = await fixture();
     const control = join(root.authorityRoot, '.neottia', 'repository-store');
-    setNativePublicationBackendForTests(null);
+    setRepositoryPlatformBackendForTests(null);
     await expect(withRepositoryLease(root, async () => undefined)).rejects.toMatchObject({
       category: 'config',
       code: 'UNSUPPORTED_RUNTIME',
     });
+    expect(existsSync(join(control, 'authority.claim'))).toBe(false);
+    expect(existsSync(join(control, 'authority.lease'))).toBe(false);
+  });
+
+  it('fails uncertified filesystem preflight before publication or authority artifacts', async () => {
+    const root = await fixture();
+    const control = join(root.authorityRoot, '.neottia', 'repository-store');
+    let publicationCalled = false;
+    setRepositoryPlatformBackendForTests({
+      id: 'test-unsupported-filesystem',
+      platform: process.platform,
+      filesystemRequirement: 'the test filesystem',
+      filesystem: { supportsLocalPath: () => false },
+      publication: {
+        renameNoReplace() {
+          publicationCalled = true;
+        },
+      },
+    });
+
+    await expect(withRepositoryLease(root, async () => undefined)).rejects.toMatchObject({
+      category: 'config',
+      code: 'UNSUPPORTED_RUNTIME',
+    });
+    expect(publicationCalled).toBe(false);
     expect(existsSync(join(control, 'authority.claim'))).toBe(false);
     expect(existsSync(join(control, 'authority.lease'))).toBe(false);
   });
