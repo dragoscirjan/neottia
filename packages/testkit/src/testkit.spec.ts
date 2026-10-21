@@ -1,4 +1,4 @@
-import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DesignDocumentStore, loadDesignDocsConfig } from '@neottia/design-docs';
 import { loadIssueConfig } from '@neottia/issues';
@@ -189,6 +189,7 @@ describe('deterministic harness runner contract', () => {
     process.env.NEOTTIA_TEST_OPENCODE_BIN = executable;
     process.env.NEOTTIA_TEST_PI_BIN = executable;
     process.env.NEOTTIA_HARNESS_CAPTURE = capture;
+    const canonicalCwd = realpathSync.native(project.cwd);
 
     try {
       expect(piBin()).toBe(executable);
@@ -216,7 +217,7 @@ describe('deterministic harness runner contract', () => {
           'contract/model',
           'deterministic pi contract',
         ],
-        cwd: project.cwd,
+        cwd: canonicalCwd,
         env: {
           HOME: project.cwd,
           XDG_DATA_HOME: project.xdgDataDir,
@@ -236,7 +237,7 @@ describe('deterministic harness runner contract', () => {
       assertHarnessConclusive(opencode);
       expect(JSON.parse(readFileSync(capture, 'utf8'))).toMatchObject({
         args: ['run', '--model', 'openrouter/contract/model', 'deterministic opencode contract'],
-        cwd: project.cwd,
+        cwd: canonicalCwd,
         env: {
           HOME: project.cwd,
           XDG_DATA_HOME: project.xdgDataDir,

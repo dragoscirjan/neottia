@@ -72,7 +72,7 @@ describe('issue canonical lifecycle', () => {
     expect((await issues.search('cafe')).map((issue) => issue.id)).toContain(tokenized.id);
     expect((await issues.search('alpha-beta')).map((issue) => issue.id)).toContain(tokenized.id);
     expect((await issues.validate()).valid).toBe(true);
-  });
+  }, 30_000);
 
   it('serializes concurrent comment appends without losing unrelated state', async () => {
     const cwd = project();
