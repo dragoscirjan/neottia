@@ -111,6 +111,8 @@ it('discovers shared contracts and executes canonical storage from the packed CL
     name: 'web_stash',
     arguments: { url: 'https://example.com/packed', title: 'Packed', content: 'packaged marker content' },
   });
+  if (stashed.structuredContent === undefined)
+    throw new Error(`Packed web_stash omitted structured content: ${JSON.stringify(stashed)}`);
   expect(stashed.structuredContent).toEqual({ stashed: true, url: 'https://example.com/packed' });
   const grep = await connected.callTool({ name: 'web_grep', arguments: { query: 'marker' } });
   expect(grep.structuredContent).toMatchObject({ results: [{ title: 'Packed' }] });

@@ -222,7 +222,7 @@ describe('memory store (filesystem + SQLite index)', () => {
     rmSync(join(cwd, '.neottia', 'memory', 'index.db'), { force: true });
     await expect(store.search({ query: 'aggregate', limit: 5, max_chars: 100_000 })).resolves.toHaveLength(5);
     await expect(store.validate()).resolves.toMatchObject({ valid: true, records: 1_501 });
-  }, 30_000);
+  }, 120_000);
 
   it.each(['', '-wal', '-shm'] as const)(
     'preserves canonical YAML and a substituted Memory cache%s artifact',

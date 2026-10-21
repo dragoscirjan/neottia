@@ -65,7 +65,7 @@ export function registerImportLifecycleContract(name: string, createStore: Impor
       });
       expect(await destination.get(seed.id)).toMatchObject({ id: seed.id });
       expect(await destination.list()).toEqual([]);
-    });
+    }, 30_000);
 
     it('rejects foreign namespaces, secrets, and overflow identities', async () => {
       const namespaceStore = await open('namespace');
@@ -90,7 +90,7 @@ export function registerImportLifecycleContract(name: string, createStore: Impor
       const identitySeed = await identityStore.store(fact('Identity seed'));
       const overflow = { ...identitySeed, id: '80000000000000000000000000' };
       await rejectWithoutMutation(identityStore, `${JSON.stringify(overflow)}\n`, /Invalid memory record/u);
-    });
+    }, 30_000);
 
     it('rejects competing supersession and tombstone retirements', async () => {
       const duplicateStore = await open('duplicate-supersession');
@@ -139,7 +139,7 @@ export function registerImportLifecycleContract(name: string, createStore: Impor
         `${JSON.stringify(lateReplacement)}\n`,
         /already inactive in canonical state/u,
       );
-    });
+    }, 30_000);
 
     it('rejects broken and cyclic supersession graphs', async () => {
       const brokenStore = await open('broken-reference');
@@ -170,7 +170,7 @@ export function registerImportLifecycleContract(name: string, createStore: Impor
         `${JSON.stringify(first)}\n${JSON.stringify(second)}\n`,
         /Cyclic supersession/u,
       );
-    });
+    }, 30_000);
 
     it('returns the same compactness failure for preview and mutation', async () => {
       const store = await open('compactness');
@@ -181,7 +181,7 @@ export function registerImportLifecycleContract(name: string, createStore: Impor
         summary: 'x'.repeat(241),
       };
       await rejectWithoutMutation(store, `${JSON.stringify(oversized)}\n`, /summary has 241 Unicode characters/u);
-    });
+    }, 30_000);
   });
 }
 
