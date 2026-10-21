@@ -8,6 +8,7 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   renameSync,
   rmSync,
   symlinkSync,
@@ -124,6 +125,20 @@ describe('repository canonical store', () => {
     }
     expect(validateRelativePath('dir/record.name')).toBe('dir/record.name');
     expect(validateRelativePath('unicode/文件.yml')).toBe('unicode/文件.yml');
+  });
+
+  it('binds authority operations to the canonical physical path', async () => {
+    const requested = mkdtempSync(join(tmpdir(), 'neottia-canonical-authority-'));
+    tempDirectories.push(requested);
+    const canonical = realpathSync.native(requested);
+    const root = await resolveManagedRoot({ authorityRoot: requested, limits: DEFAULT_STORE_LIMITS });
+    const path = resolveManagedPath(root, 'records/item.txt');
+
+    await withRepositoryLease(root, async (lease) => {
+      await applyCanonicalBatch(root, lease, [{ kind: 'write', path, bytes: bytes('canonical'), expected: 'absent' }]);
+    });
+
+    expect(readFileSync(join(canonical, 'records/item.txt'), 'utf8')).toBe('canonical');
   });
 
   it('certifies only the supported platform and architecture tuples', () => {
