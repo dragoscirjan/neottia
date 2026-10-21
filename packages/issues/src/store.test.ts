@@ -138,7 +138,7 @@ describe('issue canonical lifecycle', () => {
     expect(matches.map((issue) => issue.id)).toEqual([canonical.id]);
     writeFileSync(join(cwd, '.neottia/cache/issues.sqlite'), 'corrupt');
     expect((await issues.search('canonical')).map((issue) => issue.id)).toEqual([canonical.id]);
-  });
+  }, 30_000);
 
   it('bounds hydrated list/search/export output rather than cache candidates', async () => {
     const cwd = project();

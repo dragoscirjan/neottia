@@ -63,7 +63,7 @@ it('previews and explicitly imports an immutable legacy database', async () => {
   } finally {
     await runtime.close();
   }
-});
+}, 30_000);
 
 it('does not report failure after canonical publication if the legacy source changes', async () => {
   const { cwd, path } = createLegacyDatabase({

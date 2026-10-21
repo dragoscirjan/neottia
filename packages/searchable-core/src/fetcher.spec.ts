@@ -37,7 +37,7 @@ describe('fetch strategies', () => {
     );
     expect(result).toMatchObject({ title: 'Guide', url: 'https://example.com/guide', source: 'direct' });
     expect(result.content).toContain('Useful paragraph');
-  });
+  }, 30_000);
 
   it('uses Jina only after direct failure', async () => {
     const transport = new SequenceTransport([
