@@ -24,6 +24,7 @@ export interface RepositoryPlatformBackend {
 interface PlatformBackendDefinition {
   readonly id: string;
   readonly platform: NodeJS.Platform;
+  readonly architectures: readonly string[];
   readonly filesystemRequirement: string;
 }
 
@@ -37,6 +38,7 @@ const backendDefinitions: Partial<Record<NodeJS.Platform, PlatformBackendDefinit
   linux: {
     id: 'linux-node-api',
     platform: 'linux',
+    architectures: ['x64', 'arm64'],
     filesystemRequirement: 'a certified Linux local filesystem',
   },
 };
@@ -51,7 +53,7 @@ export function requireRepositoryPlatformBackend(): RepositoryPlatformBackend {
     if (injectedBackend !== null) return injectedBackend;
     throw unsupported('Repository platform backend is disabled for this operation.');
   }
-  const definition = backendDefinitions[process.platform];
+  const definition = selectBackendDefinition(process.platform, process.arch);
   if (definition === undefined)
     throw unsupported(`Repository filesystem operations are unsupported on ${process.platform}.`);
   if (loadedBackend !== undefined) return loadedBackend;
@@ -98,6 +100,19 @@ export function assertPlatformFilesystem(backend: RepositoryPlatformBackend, pat
 /** Installs an internal test backend; null deterministically models unavailability. */
 export function setRepositoryPlatformBackendForTests(backend: RepositoryPlatformBackend | null | undefined): void {
   injectedBackend = backend;
+}
+
+/** Reports whether a platform and architecture tuple has a certified backend. */
+export function isCertifiedRepositoryPlatform(platform: NodeJS.Platform, architecture: string): boolean {
+  return selectBackendDefinition(platform, architecture) !== undefined;
+}
+
+function selectBackendDefinition(
+  platform: NodeJS.Platform,
+  architecture: string,
+): PlatformBackendDefinition | undefined {
+  const definition = backendDefinitions[platform];
+  return definition?.architectures.includes(architecture) === true ? definition : undefined;
 }
 
 function loadNativeModule(): NativePlatformModule {

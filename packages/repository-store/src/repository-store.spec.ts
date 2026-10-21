@@ -41,7 +41,7 @@ import {
   type TransactionFaultEvent,
 } from './internal/fault-injection.js';
 import { getRootState } from './internal/model.js';
-import { setRepositoryPlatformBackendForTests } from './internal/platform-backend.js';
+import { isCertifiedRepositoryPlatform, setRepositoryPlatformBackendForTests } from './internal/platform-backend.js';
 import { restoreQuarantinedLease } from './lease.js';
 import {
   createTransactionDirectory,
@@ -124,6 +124,15 @@ describe('repository canonical store', () => {
     }
     expect(validateRelativePath('dir/record.name')).toBe('dir/record.name');
     expect(validateRelativePath('unicode/文件.yml')).toBe('unicode/文件.yml');
+  });
+
+  it('certifies only the supported Linux architectures', () => {
+    expect(isCertifiedRepositoryPlatform('linux', 'x64')).toBe(true);
+    expect(isCertifiedRepositoryPlatform('linux', 'arm64')).toBe(true);
+    expect(isCertifiedRepositoryPlatform('linux', 'ppc64')).toBe(false);
+    expect(isCertifiedRepositoryPlatform('linux', 's390x')).toBe(false);
+    expect(isCertifiedRepositoryPlatform('darwin', 'arm64')).toBe(false);
+    expect(isCertifiedRepositoryPlatform('win32', 'x64')).toBe(false);
   });
 
   it('applies exact write, replacement, move, and removal operations', async () => {
