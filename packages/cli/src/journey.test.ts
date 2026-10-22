@@ -282,7 +282,9 @@ describe('empty-project CLI adoption journey (issue #161)', () => {
     }
     const hostWrites = plan.mutations.filter((mutation) => mutation.role === 'host-config');
     expect(hostWrites).toHaveLength(1);
-    expect(hostWrites[0]!.path).toBe(join(await realpath(roots.project), '.pi', 'settings.json'));
+    const hostPath = hostWrites[0]!.path;
+    expect(hostPath.endsWith(join('.pi', 'settings.json'))).toBe(true);
+    expect(await realpath(dirname(dirname(hostPath)))).toBe(await realpath(roots.project));
     for (const expected of expectedPiPackages()) {
       expect(hostWrites[0]!.content).toContain(expected);
     }
