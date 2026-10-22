@@ -1,4 +1,5 @@
 import { realpathSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   DEFAULT_STORE_LIMITS,
   rebuildDisposableSqliteCache,
@@ -36,7 +37,7 @@ await withRepositoryLease(root, async (lease) => {
   await cache.close();
 });
 
-const activePath = `${authority}/cache.db`;
+const activePath = join(authority, 'cache.db');
 setFilesystemFaultInjectorForTests((event, target) => {
   if (event === requestedEvent && target === activePath) process.kill(process.pid, 'SIGKILL');
 });

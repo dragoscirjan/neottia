@@ -450,24 +450,27 @@ describe('disposable SQLite cache', () => {
     });
   });
 
-  it.each(['', '-wal', '-shm'])('preserves an active %s replacement detected before activation', async (suffix) => {
-    const { authority, root, path, specification } = await newCacheFixture('neottia-cache-activation-');
-    await withRepositoryLease(root, async (lease) => {
-      const active = await rebuildDisposableSqliteCache(root, lease, specification);
-      const replacement = cacheSpecification(path, 'replacement-digest');
-      const populate = replacement.populate;
-      replacement.populate = async (database) => {
-        await populate(database);
-        replaceWithSentinel(join(authority, `cache.db${suffix}`));
-      };
-      await expect(rebuildDisposableSqliteCache(root, lease, replacement)).rejects.toMatchObject({
-        code: 'IDENTITY_CHANGED',
+  it.skipIf(process.platform === 'win32').each(['', '-wal', '-shm'])(
+    'preserves an active %s replacement detected before activation',
+    async (suffix) => {
+      const { authority, root, path, specification } = await newCacheFixture('neottia-cache-activation-');
+      await withRepositoryLease(root, async (lease) => {
+        const active = await rebuildDisposableSqliteCache(root, lease, specification);
+        const replacement = cacheSpecification(path, 'replacement-digest');
+        const populate = replacement.populate;
+        replacement.populate = async (database) => {
+          await populate(database);
+          replaceWithSentinel(join(authority, `cache.db${suffix}`));
+        };
+        await expect(rebuildDisposableSqliteCache(root, lease, replacement)).rejects.toMatchObject({
+          code: 'IDENTITY_CHANGED',
+        });
+        expect(readFileSync(join(authority, `cache.db${suffix}`), 'utf8')).toBe('replacement');
+        await expect(active.close()).rejects.toMatchObject({ code: 'IDENTITY_CHANGED' });
+        expect(readFileSync(join(authority, `cache.db${suffix}`), 'utf8')).toBe('replacement');
       });
-      expect(readFileSync(join(authority, `cache.db${suffix}`), 'utf8')).toBe('replacement');
-      await expect(active.close()).rejects.toMatchObject({ code: 'IDENTITY_CHANGED' });
-      expect(readFileSync(join(authority, `cache.db${suffix}`), 'utf8')).toBe('replacement');
-    });
-  });
+    },
+  );
 
   it('preserves a replacement injected at the final activation mutation', async () => {
     const { authority, root, path, specification } = await newCacheFixture('neottia-cache-final-activation-');

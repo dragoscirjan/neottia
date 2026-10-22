@@ -86,17 +86,18 @@ export function publishExactRegularFile(
       emitFilesystemFault('before-exact-evacuation', evacuated);
       moveNoReplace(platformBackend as RepositoryPlatformBackend, path, evacuated, 'evacuate destination');
       emitFilesystemFault('destination-evacuated', path);
-      evacuatedIdentity = lstatSync(evacuated);
-      assertSafeRegular(evacuatedIdentity, evacuated);
+      const observedIdentity = lstatSync(evacuated);
+      evacuatedIdentity = observedIdentity;
+      assertSafeRegular(observedIdentity, evacuated);
       const evacuatedBytes = readRegularFile(evacuated, expected.maxBytes);
       const evacuatedRevision = computeByteRevision(evacuatedBytes);
-      if (!sameIdentity(expected.identity, evacuatedIdentity) || evacuatedRevision !== expected.revision) {
+      if (!sameIdentity(expected.identity, observedIdentity) || evacuatedRevision !== expected.revision) {
         restoreEvacuated(platformBackend as RepositoryPlatformBackend, evacuated, path, parent);
         evacuatedIdentity = undefined;
         throw new PathSafetyError(`Destination changed during publication: ${path}`, 'IDENTITY_CHANGED', {
           path,
           expectedIdentity: identityEvidence(expected.identity),
-          observedIdentity: identityEvidence(evacuatedIdentity),
+          observedIdentity: identityEvidence(observedIdentity),
           expectedRevision: expected.revision,
           observedRevision: evacuatedRevision,
         });
