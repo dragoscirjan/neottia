@@ -1,5 +1,15 @@
 import assert from 'node:assert/strict';
-import { closeSync, fsyncSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  closeSync,
+  fstatSync,
+  fsyncSync,
+  lstatSync,
+  mkdtempSync,
+  openSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -19,15 +29,25 @@ try {
   const destination = join(root, 'destination.txt');
   writeFileSync(source, 'source');
   const descriptor = openSync(source, 'r+');
+  let identityBefore;
   try {
     console.log('windows native smoke: flush');
     fsyncSync(descriptor);
+    identityBefore = fstatSync(descriptor);
   } finally {
     closeSync(descriptor);
   }
 
   console.log('windows native smoke: rename');
   backend.renameNoReplace(source, destination);
+  const identityAfter = lstatSync(destination);
+  console.log(
+    'windows native smoke: identity',
+    JSON.stringify({
+      after: pickIdentity(identityAfter),
+      before: pickIdentity(identityBefore),
+    }),
+  );
   assert.equal(readFileSync(destination, 'utf8'), 'source');
 
   writeFileSync(source, 'collision');
@@ -37,4 +57,8 @@ try {
   assert.equal(readFileSync(source, 'utf8'), 'collision');
 } finally {
   rmSync(root, { recursive: true, force: true });
+}
+
+function pickIdentity(stat) {
+  return { birthtimeMs: stat.birthtimeMs, ctimeMs: stat.ctimeMs, dev: stat.dev, ino: stat.ino };
 }
