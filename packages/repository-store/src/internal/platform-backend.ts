@@ -23,6 +23,7 @@ export interface RepositoryPlatformBackend {
   readonly id: string;
   readonly platform: NodeJS.Platform;
   readonly filesystemRequirement: string;
+  readonly leaseArtifact: 'directory' | 'file';
   readonly publication: ExactPublicationBackend;
   readonly filesystem: LocalFilesystemBackend;
   readonly durability: DurabilityBackend;
@@ -33,6 +34,7 @@ interface PlatformBackendDefinition {
   readonly platform: NodeJS.Platform;
   readonly architectures: readonly string[];
   readonly filesystemRequirement: string;
+  readonly leaseArtifact: 'directory' | 'file';
 }
 
 interface NativePlatformModule {
@@ -48,18 +50,28 @@ const backendDefinitions: Partial<Record<NodeJS.Platform, PlatformBackendDefinit
     platform: 'linux',
     architectures: ['x64', 'arm64'],
     filesystemRequirement: 'a certified Linux local filesystem',
+    leaseArtifact: 'directory',
   },
   darwin: {
     id: 'macos-node-api',
     platform: 'darwin',
     architectures: ['x64', 'arm64'],
     filesystemRequirement: 'a local APFS filesystem with certified publication and durability capabilities',
+    leaseArtifact: 'directory',
   },
   win32: {
     id: 'windows-node-api',
     platform: 'win32',
     architectures: ['x64'],
     filesystemRequirement: 'a local NTFS filesystem with stable identity and hard-link capabilities',
+    leaseArtifact: 'directory',
+  },
+  freebsd: {
+    id: 'freebsd-node-api',
+    platform: 'freebsd',
+    architectures: ['x64'],
+    filesystemRequirement: 'a local UFS2 filesystem with regular-file hard links and directory fsync',
+    leaseArtifact: 'file',
   },
 };
 

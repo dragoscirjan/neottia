@@ -135,7 +135,7 @@ Pi and OpenCode each have native Memory, Issues, Design Docs, and Searchable ext
 
 ## Supporting packages
 
-`@neottia/repository-store` provides filesystem authority, exact revisions, durable batches, leases, recovery, and disposable SQLite adapters on certified Linux filesystems, macOS/APFS, and native Windows/NTFS targets. `@neottia/core` remains a template-level greeting utility. `@neottia/release` publishes a versioned bill of materials, while private `@neottia/testkit` supplies temporary adapter conformance environments and other repository test helpers.
+`@neottia/repository-store` provides filesystem authority, exact revisions, durable batches, leases, recovery, and disposable SQLite adapters on certified Linux filesystems, macOS/APFS, native Windows/NTFS, and FreeBSD 14.x/UFS2 targets. FreeBSD support is Node.js-only and x64-only. `@neottia/core` remains a template-level greeting utility. `@neottia/release` publishes a versioned bill of materials, while private `@neottia/testkit` supplies temporary adapter conformance environments and other repository test helpers.
 
 ## Documentation
 

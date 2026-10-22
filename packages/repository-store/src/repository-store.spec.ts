@@ -147,10 +147,12 @@ describe('repository canonical store', () => {
     expect(isCertifiedRepositoryPlatform('darwin', 'x64')).toBe(true);
     expect(isCertifiedRepositoryPlatform('darwin', 'arm64')).toBe(true);
     expect(isCertifiedRepositoryPlatform('win32', 'x64')).toBe(true);
+    expect(isCertifiedRepositoryPlatform('freebsd', 'x64')).toBe(true);
     expect(isCertifiedRepositoryPlatform('linux', 'ppc64')).toBe(false);
     expect(isCertifiedRepositoryPlatform('linux', 's390x')).toBe(false);
     expect(isCertifiedRepositoryPlatform('darwin', 'ia32')).toBe(false);
     expect(isCertifiedRepositoryPlatform('win32', 'arm64')).toBe(false);
+    expect(isCertifiedRepositoryPlatform('freebsd', 'arm64')).toBe(false);
   });
 
   it('applies exact write, replacement, move, and removal operations', async () => {
@@ -255,6 +257,7 @@ describe('repository canonical store', () => {
         id: 'test-einval',
         platform: process.platform,
         filesystemRequirement: 'the test filesystem',
+        leaseArtifact: 'directory',
         filesystem: { supportsLocalPath: () => true },
         durability: { syncDescriptor() {} },
         publication: {
@@ -608,6 +611,56 @@ describe('repository authority lease', () => {
     expect(existsSync(join(control, 'authority.lease'))).toBe(false);
   });
 
+  it('uses a regular-file authority lease when directory no-replace moves are unavailable', async () => {
+    const root = await fixture();
+    const control = join(root.authorityRoot, '.neottia', 'repository-store');
+    setRepositoryPlatformBackendForTests({
+      id: 'test-freebsd-file-lease',
+      platform: 'freebsd',
+      filesystemRequirement: 'the test UFS2 filesystem',
+      leaseArtifact: 'file',
+      filesystem: { supportsLocalPath: () => true },
+      durability: { syncDescriptor() {} },
+      publication: {
+        renameNoReplace(source, destination) {
+          const sourceIdentity = lstatSync(source);
+          if (!sourceIdentity.isFile())
+            throw Object.assign(new Error('directory publication is unsupported'), { code: 'ENOTSUP' });
+          linkSync(source, destination);
+          rmSync(source);
+        },
+      },
+    });
+    const path = resolveManagedPath(root, 'records/freebsd.txt');
+    await withRepositoryLease(root, async (lease) => {
+      expect(lstatSync(join(control, 'authority.lease')).isFile()).toBe(true);
+      expect(existsSync(join(control, 'authority.claim'))).toBe(false);
+      await applyCanonicalBatch(root, lease, [{ kind: 'write', path, bytes: bytes('first'), expected: 'absent' }]);
+      const revision = (await readManagedFile(root, lease, path)).revision;
+      await applyCanonicalBatch(root, lease, [{ kind: 'write', path, bytes: bytes('second'), expected: revision }]);
+    });
+    expect(readFileSync(join(root.managedRoot, path.relativePath), 'utf8')).toBe('second');
+    expect(readdirSync(control).filter((entry) => entry.startsWith('authority.'))).toEqual([]);
+
+    const hostId = join(control, 'host-id');
+    const hostPeer = join(control, `.host-id-${'a'.repeat(32)}.tmp`);
+    linkSync(hostId, hostPeer);
+    await expect(withRepositoryLease(root, async () => 'host-id-recovered')).resolves.toBe('host-id-recovered');
+    expect(existsSync(hostPeer)).toBe(false);
+
+    const token = randomBytes(32).toString('hex');
+    const lock = join(control, 'authority.lease');
+    const interruptedRelease = `${lock}.release-${token}`;
+    writeOwnerMetadata(lock, control, 16_777_215, new Date(0), token);
+    linkSync(lock, interruptedRelease);
+    utimesSync(lock, new Date(0), new Date(0));
+    await expect(withRepositoryLease(root, async () => 'lease-recovered', { staleMs: 1 })).resolves.toBe(
+      'lease-recovered',
+    );
+    expect(existsSync(interruptedRelease)).toBe(false);
+    expect(readdirSync(control).filter((entry) => entry.startsWith('authority.'))).toEqual([]);
+  });
+
   it('fails uncertified filesystem preflight before publication or authority artifacts', async () => {
     const root = await fixture();
     const control = join(root.authorityRoot, '.neottia', 'repository-store');
@@ -616,6 +669,7 @@ describe('repository authority lease', () => {
       id: 'test-unsupported-filesystem',
       platform: process.platform,
       filesystemRequirement: 'the test filesystem',
+      leaseArtifact: 'directory',
       filesystem: { supportsLocalPath: () => false },
       durability: { syncDescriptor() {} },
       publication: {
@@ -634,109 +688,121 @@ describe('repository authority lease', () => {
     expect(existsSync(join(control, 'authority.lease'))).toBe(false);
   });
 
-  it('removes only an expected stale release entry when a new owner blocks restoration', async () => {
-    const root = await fixture();
-    await withRepositoryLease(root, async () => undefined);
-    const control = join(root.authorityRoot, '.neottia', 'repository-store');
-    const lockPath = join(control, 'authority.lease');
-    const staleToken = randomBytes(32).toString('hex');
-    const releasePath = `${lockPath}.release-${staleToken}`;
-    mkdirSync(releasePath);
-    const staleOwnerPath = join(releasePath, 'owner.json');
-    writeOwnerMetadata(staleOwnerPath, control, process.pid, new Date(), staleToken);
-    const expected = {
-      kind: 'directory' as const,
-      identity: lstatSync(releasePath),
-      ownerIdentity: lstatSync(staleOwnerPath),
-      token: staleToken,
-    };
-    const currentToken = randomBytes(32).toString('hex');
-    mkdirSync(lockPath);
-    writeOwnerMetadata(join(lockPath, 'owner.json'), control, process.pid, new Date(), currentToken);
+  it.skipIf(process.platform === 'freebsd')(
+    'removes only an expected stale release entry when a new owner blocks restoration',
+    async () => {
+      const root = await fixture();
+      await withRepositoryLease(root, async () => undefined);
+      const control = join(root.authorityRoot, '.neottia', 'repository-store');
+      const lockPath = join(control, 'authority.lease');
+      const staleToken = randomBytes(32).toString('hex');
+      const releasePath = `${lockPath}.release-${staleToken}`;
+      mkdirSync(releasePath);
+      const staleOwnerPath = join(releasePath, 'owner.json');
+      writeOwnerMetadata(staleOwnerPath, control, process.pid, new Date(), staleToken);
+      const expected = {
+        kind: 'directory' as const,
+        identity: lstatSync(releasePath),
+        ownerIdentity: lstatSync(staleOwnerPath),
+        token: staleToken,
+      };
+      const currentToken = randomBytes(32).toString('hex');
+      mkdirSync(lockPath);
+      writeOwnerMetadata(join(lockPath, 'owner.json'), control, process.pid, new Date(), currentToken);
 
-    restoreQuarantinedLease(releasePath, lockPath, expected);
+      restoreQuarantinedLease(releasePath, lockPath, expected);
 
-    expect(existsSync(releasePath)).toBe(false);
-    expect(JSON.parse(readFileSync(join(lockPath, 'owner.json'), 'utf8')).token).toBe(currentToken);
-  });
+      expect(existsSync(releasePath)).toBe(false);
+      expect(JSON.parse(readFileSync(join(lockPath, 'owner.json'), 'utf8')).token).toBe(currentToken);
+    },
+  );
 
-  it('restores a verified release identity when the destination remains absent', async () => {
-    const root = await fixture();
-    await withRepositoryLease(root, async () => undefined);
-    const control = join(root.authorityRoot, '.neottia', 'repository-store');
-    const lockPath = join(control, 'authority.lease');
-    const token = randomBytes(32).toString('hex');
-    const releasePath = `${lockPath}.release-${token}`;
-    mkdirSync(releasePath);
-    const ownerPath = join(releasePath, 'owner.json');
-    writeOwnerMetadata(ownerPath, control, process.pid, new Date(), token);
-    const expected = {
-      kind: 'directory' as const,
-      identity: lstatSync(releasePath),
-      ownerIdentity: lstatSync(ownerPath),
-      token,
-    };
+  it.skipIf(process.platform === 'freebsd')(
+    'restores a verified release identity when the destination remains absent',
+    async () => {
+      const root = await fixture();
+      await withRepositoryLease(root, async () => undefined);
+      const control = join(root.authorityRoot, '.neottia', 'repository-store');
+      const lockPath = join(control, 'authority.lease');
+      const token = randomBytes(32).toString('hex');
+      const releasePath = `${lockPath}.release-${token}`;
+      mkdirSync(releasePath);
+      const ownerPath = join(releasePath, 'owner.json');
+      writeOwnerMetadata(ownerPath, control, process.pid, new Date(), token);
+      const expected = {
+        kind: 'directory' as const,
+        identity: lstatSync(releasePath),
+        ownerIdentity: lstatSync(ownerPath),
+        token,
+      };
 
-    restoreQuarantinedLease(releasePath, lockPath, expected);
+      restoreQuarantinedLease(releasePath, lockPath, expected);
 
-    expect(existsSync(releasePath)).toBe(false);
-    expect(JSON.parse(readFileSync(join(lockPath, 'owner.json'), 'utf8')).token).toBe(token);
-  });
+      expect(existsSync(releasePath)).toBe(false);
+      expect(JSON.parse(readFileSync(join(lockPath, 'owner.json'), 'utf8')).token).toBe(token);
+    },
+  );
 
-  it('preserves a same-token release replacement whose identity was not expected', async () => {
-    const root = await fixture();
-    await withRepositoryLease(root, async () => undefined);
-    const control = join(root.authorityRoot, '.neottia', 'repository-store');
-    const lockPath = join(control, 'authority.lease');
-    const token = randomBytes(32).toString('hex');
-    const releasePath = `${lockPath}.release-${token}`;
-    mkdirSync(releasePath);
-    const ownerPath = join(releasePath, 'owner.json');
-    writeOwnerMetadata(ownerPath, control, process.pid, new Date(), token);
-    const expected = {
-      kind: 'directory' as const,
-      identity: lstatSync(releasePath),
-      ownerIdentity: lstatSync(ownerPath),
-      token,
-    };
-    renameSync(releasePath, `${releasePath}.displaced`);
-    mkdirSync(releasePath);
-    writeOwnerMetadata(join(releasePath, 'owner.json'), control, process.pid, new Date(), token);
-    mkdirSync(lockPath);
-    writeOwnerMetadata(join(lockPath, 'owner.json'), control, process.pid, new Date());
+  it.skipIf(process.platform === 'freebsd')(
+    'preserves a same-token release replacement whose identity was not expected',
+    async () => {
+      const root = await fixture();
+      await withRepositoryLease(root, async () => undefined);
+      const control = join(root.authorityRoot, '.neottia', 'repository-store');
+      const lockPath = join(control, 'authority.lease');
+      const token = randomBytes(32).toString('hex');
+      const releasePath = `${lockPath}.release-${token}`;
+      mkdirSync(releasePath);
+      const ownerPath = join(releasePath, 'owner.json');
+      writeOwnerMetadata(ownerPath, control, process.pid, new Date(), token);
+      const expected = {
+        kind: 'directory' as const,
+        identity: lstatSync(releasePath),
+        ownerIdentity: lstatSync(ownerPath),
+        token,
+      };
+      renameSync(releasePath, `${releasePath}.displaced`);
+      mkdirSync(releasePath);
+      writeOwnerMetadata(join(releasePath, 'owner.json'), control, process.pid, new Date(), token);
+      mkdirSync(lockPath);
+      writeOwnerMetadata(join(lockPath, 'owner.json'), control, process.pid, new Date());
 
-    restoreQuarantinedLease(releasePath, lockPath, expected);
+      restoreQuarantinedLease(releasePath, lockPath, expected);
 
-    expect(existsSync(releasePath)).toBe(true);
-    expect(JSON.parse(readFileSync(join(releasePath, 'owner.json'), 'utf8')).token).toBe(token);
-  });
+      expect(existsSync(releasePath)).toBe(true);
+      expect(JSON.parse(readFileSync(join(releasePath, 'owner.json'), 'utf8')).token).toBe(token);
+    },
+  );
 
-  it('does not restore a substituted release identity to an absent lease path', async () => {
-    const root = await fixture();
-    await withRepositoryLease(root, async () => undefined);
-    const control = join(root.authorityRoot, '.neottia', 'repository-store');
-    const lockPath = join(control, 'authority.lease');
-    const token = randomBytes(32).toString('hex');
-    const releasePath = `${lockPath}.release-${token}`;
-    mkdirSync(releasePath);
-    const ownerPath = join(releasePath, 'owner.json');
-    writeOwnerMetadata(ownerPath, control, process.pid, new Date(), token);
-    const expected = {
-      kind: 'directory' as const,
-      identity: lstatSync(releasePath),
-      ownerIdentity: lstatSync(ownerPath),
-      token,
-    };
-    renameSync(releasePath, `${releasePath}.displaced`);
-    mkdirSync(releasePath);
-    writeOwnerMetadata(join(releasePath, 'owner.json'), control, process.pid, new Date(), token);
+  it.skipIf(process.platform === 'freebsd')(
+    'does not restore a substituted release identity to an absent lease path',
+    async () => {
+      const root = await fixture();
+      await withRepositoryLease(root, async () => undefined);
+      const control = join(root.authorityRoot, '.neottia', 'repository-store');
+      const lockPath = join(control, 'authority.lease');
+      const token = randomBytes(32).toString('hex');
+      const releasePath = `${lockPath}.release-${token}`;
+      mkdirSync(releasePath);
+      const ownerPath = join(releasePath, 'owner.json');
+      writeOwnerMetadata(ownerPath, control, process.pid, new Date(), token);
+      const expected = {
+        kind: 'directory' as const,
+        identity: lstatSync(releasePath),
+        ownerIdentity: lstatSync(ownerPath),
+        token,
+      };
+      renameSync(releasePath, `${releasePath}.displaced`);
+      mkdirSync(releasePath);
+      writeOwnerMetadata(join(releasePath, 'owner.json'), control, process.pid, new Date(), token);
 
-    restoreQuarantinedLease(releasePath, lockPath, expected);
+      restoreQuarantinedLease(releasePath, lockPath, expected);
 
-    expect(existsSync(lockPath)).toBe(false);
-    expect(existsSync(releasePath)).toBe(true);
-    expect(JSON.parse(readFileSync(join(releasePath, 'owner.json'), 'utf8')).token).toBe(token);
-  });
+      expect(existsSync(lockPath)).toBe(false);
+      expect(existsSync(releasePath)).toBe(true);
+      expect(JSON.parse(readFileSync(join(releasePath, 'owner.json'), 'utf8')).token).toBe(token);
+    },
+  );
 
   it.each(LEASE_FAULT_EVENTS)('recovers a compiled-package lease crash at %s', async (faultEvent) => {
     const authority = mkdtempSync(join(tmpdir(), 'neottia-lease-crash-'));
@@ -849,7 +915,7 @@ describe('repository authority lease', () => {
     },
   );
 
-  it.each(['owner.json', 'authority.claim'] as const)(
+  it.skipIf(process.platform === 'freebsd').each(['owner.json', 'authority.claim'] as const)(
     'bounds direct %s lease metadata before decoding',
     async (artifact) => {
       const root = await fixture();
@@ -865,7 +931,7 @@ describe('repository authority lease', () => {
     },
   );
 
-  it.each([
+  it.skipIf(process.platform === 'freebsd').each([
     ['owner.json', 'symlink'],
     ['owner.json', 'hardlink'],
     ['authority.claim', 'symlink'],
@@ -899,44 +965,50 @@ describe('repository authority lease', () => {
     ).rejects.toBeInstanceOf(LeaseContentionError);
   });
 
-  it.each(['directory', 'owner'] as const)('does not release a same-token %s replacement', async (replacement) => {
-    const root = await fixture();
-    const control = join(root.authorityRoot, '.neottia', 'repository-store');
-    const lock = join(control, 'authority.lease');
-    await withRepositoryLease(root, async () => {
-      const owner = readFileSync(join(lock, 'owner.json'));
-      if (replacement === 'directory') {
-        renameSync(lock, `${lock}.operator`);
-        mkdirSync(lock);
-      } else {
-        rmSync(join(lock, 'owner.json'));
-      }
-      writeFileSync(join(lock, 'owner.json'), owner);
-    });
-    expect(existsSync(lock)).toBe(true);
-    expect(readFileSync(join(lock, 'owner.json'))).toBeTruthy();
-  });
+  it.skipIf(process.platform === 'freebsd').each(['directory', 'owner'] as const)(
+    'does not release a same-token %s replacement',
+    async (replacement) => {
+      const root = await fixture();
+      const control = join(root.authorityRoot, '.neottia', 'repository-store');
+      const lock = join(control, 'authority.lease');
+      await withRepositoryLease(root, async () => {
+        const owner = readFileSync(join(lock, 'owner.json'));
+        if (replacement === 'directory') {
+          renameSync(lock, `${lock}.operator`);
+          mkdirSync(lock);
+        } else {
+          rmSync(join(lock, 'owner.json'));
+        }
+        writeFileSync(join(lock, 'owner.json'), owner);
+      });
+      expect(existsSync(lock)).toBe(true);
+      expect(readFileSync(join(lock, 'owner.json'))).toBeTruthy();
+    },
+  );
 
-  it('preserves a same-token claim substituted immediately before quarantine', async () => {
-    const root = await fixture();
-    const control = join(root.authorityRoot, '.neottia', 'repository-store');
-    const claim = join(control, 'authority.claim');
-    let substituted = false;
-    setFilesystemFaultInjectorForTests((event, target) => {
-      if (event !== 'before-lease-artifact-quarantine' || target !== claim || substituted) return;
-      substituted = true;
-      const owner = readFileSync(claim);
-      renameSync(claim, `${claim}.operator`);
-      writeFileSync(claim, owner);
-    });
-    await expect(withRepositoryLease(root, async () => undefined)).rejects.toMatchObject({
-      code: 'LEASE_OWNER_UNKNOWN',
-    });
-    expect(readFileSync(claim, 'utf8')).toContain('"token"');
-    expect(readFileSync(`${claim}.operator`, 'utf8')).toContain('"token"');
-  });
+  it.skipIf(process.platform === 'freebsd')(
+    'preserves a same-token claim substituted immediately before quarantine',
+    async () => {
+      const root = await fixture();
+      const control = join(root.authorityRoot, '.neottia', 'repository-store');
+      const claim = join(control, 'authority.claim');
+      let substituted = false;
+      setFilesystemFaultInjectorForTests((event, target) => {
+        if (event !== 'before-lease-artifact-quarantine' || target !== claim || substituted) return;
+        substituted = true;
+        const owner = readFileSync(claim);
+        renameSync(claim, `${claim}.operator`);
+        writeFileSync(claim, owner);
+      });
+      await expect(withRepositoryLease(root, async () => undefined)).rejects.toMatchObject({
+        code: 'LEASE_OWNER_UNKNOWN',
+      });
+      expect(readFileSync(claim, 'utf8')).toContain('"token"');
+      expect(readFileSync(`${claim}.operator`, 'utf8')).toContain('"token"');
+    },
+  );
 
-  it('reclaims only a stale, conclusively dead same-host owner', async () => {
+  it.skipIf(process.platform === 'freebsd')('reclaims only a stale, conclusively dead same-host owner', async () => {
     const root = await fixture();
     await withRepositoryLease(root, async () => undefined);
     const control = join(root.authorityRoot, '.neottia', 'repository-store');
@@ -946,142 +1018,160 @@ describe('repository authority lease', () => {
     await expect(withRepositoryLease(root, async () => 'recovered', { staleMs: 1 })).resolves.toBe('recovered');
   });
 
-  it('retries when a live claim is removed during owner verification', async () => {
-    const root = await fixture();
-    await withRepositoryLease(root, async () => undefined);
-    const control = join(root.authorityRoot, '.neottia', 'repository-store');
-    const claim = join(control, 'authority.claim');
-    writeOwnerMetadata(claim, control, process.pid, new Date());
-    let removed = false;
-    setFilesystemFaultInjectorForTests((event, target) => {
-      if (removed || event !== 'bounded-read-opened' || target !== claim) return;
-      removed = true;
+  it.skipIf(process.platform === 'freebsd')(
+    'retries when a live claim is removed during owner verification',
+    async () => {
+      const root = await fixture();
+      await withRepositoryLease(root, async () => undefined);
+      const control = join(root.authorityRoot, '.neottia', 'repository-store');
+      const claim = join(control, 'authority.claim');
+      writeOwnerMetadata(claim, control, process.pid, new Date());
+      let removed = false;
+      setFilesystemFaultInjectorForTests((event, target) => {
+        if (removed || event !== 'bounded-read-opened' || target !== claim) return;
+        removed = true;
+        rmSync(claim);
+      });
+
+      await expect(withRepositoryLease(root, async () => 'acquired', { pollMs: 1, waitMs: 1_000 })).resolves.toBe(
+        'acquired',
+      );
+      expect(removed).toBe(true);
+      expect(existsSync(claim)).toBe(false);
+    },
+  );
+
+  it.skipIf(process.platform === 'freebsd')(
+    'reclaims a stale claim whose same-host owner is conclusively dead',
+    async () => {
+      const root = await fixture();
+      await withRepositoryLease(root, async () => undefined);
+      const control = join(root.authorityRoot, '.neottia', 'repository-store');
+      const claim = join(control, 'authority.claim');
+      writeOwnerMetadata(claim, control, 16_777_215, new Date(0));
+      utimesSync(claim, new Date(0), new Date(0));
+
+      await expect(withRepositoryLease(root, async () => 'recovered', { staleMs: 1 })).resolves.toBe('recovered');
+      expect(existsSync(claim)).toBe(false);
+    },
+  );
+
+  it.skipIf(process.platform === 'freebsd')(
+    'preserves a fresh live same-token claim substituted after stale-owner verification',
+    async () => {
+      const root = await fixture();
+      await withRepositoryLease(root, async () => undefined);
+      const control = join(root.authorityRoot, '.neottia', 'repository-store');
+      const claim = join(control, 'authority.claim');
+      const token = randomUUID();
+      writeOwnerMetadata(claim, control, 16_777_215, new Date(0), token);
+      utimesSync(claim, new Date(0), new Date(0));
+      let replacementBytes: Buffer | undefined;
+      setFilesystemFaultInjectorForTests((event, target) => {
+        if (event !== 'after-stale-claim-owner-verified' || target !== claim || replacementBytes !== undefined) return;
+        renameSync(claim, `${claim}.stale-owner`);
+        writeOwnerMetadata(claim, control, process.pid, new Date(), token);
+        replacementBytes = readFileSync(claim);
+      });
+
+      await expect(
+        withRepositoryLease(root, async () => undefined, { staleMs: 1, pollMs: 1, waitMs: 25 }),
+      ).rejects.toMatchObject({ code: 'LEASE_BUSY' });
+      expect(readFileSync(claim)).toEqual(replacementBytes);
+      expect(existsSync(`${claim}.stale-owner`)).toBe(true);
+    },
+  );
+
+  it.skipIf(process.platform === 'freebsd')(
+    'completes an interrupted atomic claim publication before reclaiming it',
+    async () => {
+      const root = await fixture();
+      await withRepositoryLease(root, async () => undefined);
+      const control = join(root.authorityRoot, '.neottia', 'repository-store');
+      const token = randomUUID();
+      const staging = join(control, `authority.claim.prepare-${token}`);
+      const claim = join(control, 'authority.claim');
+      writeOwnerMetadata(staging, control, 16_777_215, new Date(0), token);
+      linkSync(staging, claim);
+      utimesSync(staging, new Date(0), new Date(0));
+      utimesSync(claim, new Date(0), new Date(0));
+
+      await expect(withRepositoryLease(root, async () => 'recovered', { staleMs: 1 })).resolves.toBe('recovered');
+      expect(existsSync(staging)).toBe(false);
+      expect(existsSync(claim)).toBe(false);
+    },
+  );
+
+  it.skipIf(process.platform === 'freebsd')(
+    'treats a claim released during a reclaim read as contention, not tampering',
+    async () => {
+      // Deterministic replay of the CI race behind issue #123: the contender's
+      // bounded claim read holds an open descriptor while the live owner's
+      // unlink lands, so the descriptor observes nlink zero mid-read.
+      const root = await fixture();
+      await withRepositoryLease(root, async () => undefined);
+      const control = join(root.authorityRoot, '.neottia', 'repository-store');
+      const claim = join(control, 'authority.claim');
+      const staging = join(control, `authority.claim.prepare-${randomUUID()}`);
+      writeOwnerMetadata(staging, control, process.pid, new Date());
+      linkSync(staging, claim);
+      rmSync(staging);
+
+      const worker = fileURLToPath(new URL('./lease-worker.fixture.ts', import.meta.url));
+      const openedMarker = join(root.authorityRoot, 'race-opened-released');
+      const resumeMarker = join(root.authorityRoot, 'race-resume-released');
+      const pending = runWorkerProcess(
+        worker,
+        [root.authorityRoot, 'released', '1', 'released'],
+        'claim release race worker',
+        (code) => code === 0,
+      );
+      await waitForCondition(() => existsSync(openedMarker));
       rmSync(claim);
-    });
+      writeFileSync(resumeMarker, 'go');
+      await pending;
 
-    await expect(withRepositoryLease(root, async () => 'acquired', { pollMs: 1, waitMs: 1_000 })).resolves.toBe(
-      'acquired',
-    );
-    expect(removed).toBe(true);
-    expect(existsSync(claim)).toBe(false);
-  });
+      // The contender reclaimed the released slot and completed a full lease.
+      expect(existsSync(claim)).toBe(false);
+      expect(readdirSync(control).filter((name) => name.startsWith('authority.'))).toEqual([]);
+      await expect(withRepositoryLease(root, async () => 'steady')).resolves.toBe('steady');
+    },
+  );
 
-  it('reclaims a stale claim whose same-host owner is conclusively dead', async () => {
-    const root = await fixture();
-    await withRepositoryLease(root, async () => undefined);
-    const control = join(root.authorityRoot, '.neottia', 'repository-store');
-    const claim = join(control, 'authority.claim');
-    writeOwnerMetadata(claim, control, 16_777_215, new Date(0));
-    utimesSync(claim, new Date(0), new Date(0));
+  it.skipIf(process.platform === 'freebsd')(
+    'fails closed when the claim is substituted during a reclaim read',
+    async () => {
+      const root = await fixture();
+      await withRepositoryLease(root, async () => undefined);
+      const control = join(root.authorityRoot, '.neottia', 'repository-store');
+      const claim = join(control, 'authority.claim');
+      const staging = join(control, `authority.claim.prepare-${randomUUID()}`);
+      writeOwnerMetadata(staging, control, process.pid, new Date());
+      linkSync(staging, claim);
+      rmSync(staging);
+      const target = join(root.authorityRoot, 'operator-owned.yaml');
+      writeFileSync(target, 'operator');
 
-    await expect(withRepositoryLease(root, async () => 'recovered', { staleMs: 1 })).resolves.toBe('recovered');
-    expect(existsSync(claim)).toBe(false);
-  });
+      const worker = fileURLToPath(new URL('./lease-worker.fixture.ts', import.meta.url));
+      const openedMarker = join(root.authorityRoot, 'race-opened-substituted');
+      const resumeMarker = join(root.authorityRoot, 'race-resume-substituted');
+      const pending = runWorkerProcess(
+        worker,
+        [root.authorityRoot, 'substituted', '1', 'substituted'],
+        'claim substitution race worker',
+        (code) => code === 0,
+      );
+      await waitForCondition(() => existsSync(openedMarker));
+      rmSync(claim);
+      symlinkSync(target, claim);
+      writeFileSync(resumeMarker, 'go');
+      await expect(pending).rejects.toThrow(/unsafe hard-link/i);
 
-  it('preserves a fresh live same-token claim substituted after stale-owner verification', async () => {
-    const root = await fixture();
-    await withRepositoryLease(root, async () => undefined);
-    const control = join(root.authorityRoot, '.neottia', 'repository-store');
-    const claim = join(control, 'authority.claim');
-    const token = randomUUID();
-    writeOwnerMetadata(claim, control, 16_777_215, new Date(0), token);
-    utimesSync(claim, new Date(0), new Date(0));
-    let replacementBytes: Buffer | undefined;
-    setFilesystemFaultInjectorForTests((event, target) => {
-      if (event !== 'after-stale-claim-owner-verified' || target !== claim || replacementBytes !== undefined) return;
-      renameSync(claim, `${claim}.stale-owner`);
-      writeOwnerMetadata(claim, control, process.pid, new Date(), token);
-      replacementBytes = readFileSync(claim);
-    });
-
-    await expect(
-      withRepositoryLease(root, async () => undefined, { staleMs: 1, pollMs: 1, waitMs: 25 }),
-    ).rejects.toMatchObject({ code: 'LEASE_BUSY' });
-    expect(readFileSync(claim)).toEqual(replacementBytes);
-    expect(existsSync(`${claim}.stale-owner`)).toBe(true);
-  });
-
-  it('completes an interrupted atomic claim publication before reclaiming it', async () => {
-    const root = await fixture();
-    await withRepositoryLease(root, async () => undefined);
-    const control = join(root.authorityRoot, '.neottia', 'repository-store');
-    const token = randomUUID();
-    const staging = join(control, `authority.claim.prepare-${token}`);
-    const claim = join(control, 'authority.claim');
-    writeOwnerMetadata(staging, control, 16_777_215, new Date(0), token);
-    linkSync(staging, claim);
-    utimesSync(staging, new Date(0), new Date(0));
-    utimesSync(claim, new Date(0), new Date(0));
-
-    await expect(withRepositoryLease(root, async () => 'recovered', { staleMs: 1 })).resolves.toBe('recovered');
-    expect(existsSync(staging)).toBe(false);
-    expect(existsSync(claim)).toBe(false);
-  });
-
-  it('treats a claim released during a reclaim read as contention, not tampering', async () => {
-    // Deterministic replay of the CI race behind issue #123: the contender's
-    // bounded claim read holds an open descriptor while the live owner's
-    // unlink lands, so the descriptor observes nlink zero mid-read.
-    const root = await fixture();
-    await withRepositoryLease(root, async () => undefined);
-    const control = join(root.authorityRoot, '.neottia', 'repository-store');
-    const claim = join(control, 'authority.claim');
-    const staging = join(control, `authority.claim.prepare-${randomUUID()}`);
-    writeOwnerMetadata(staging, control, process.pid, new Date());
-    linkSync(staging, claim);
-    rmSync(staging);
-
-    const worker = fileURLToPath(new URL('./lease-worker.fixture.ts', import.meta.url));
-    const openedMarker = join(root.authorityRoot, 'race-opened-released');
-    const resumeMarker = join(root.authorityRoot, 'race-resume-released');
-    const pending = runWorkerProcess(
-      worker,
-      [root.authorityRoot, 'released', '1', 'released'],
-      'claim release race worker',
-      (code) => code === 0,
-    );
-    await waitForCondition(() => existsSync(openedMarker));
-    rmSync(claim);
-    writeFileSync(resumeMarker, 'go');
-    await pending;
-
-    // The contender reclaimed the released slot and completed a full lease.
-    expect(existsSync(claim)).toBe(false);
-    expect(readdirSync(control).filter((name) => name.startsWith('authority.'))).toEqual([]);
-    await expect(withRepositoryLease(root, async () => 'steady')).resolves.toBe('steady');
-  });
-
-  it('fails closed when the claim is substituted during a reclaim read', async () => {
-    const root = await fixture();
-    await withRepositoryLease(root, async () => undefined);
-    const control = join(root.authorityRoot, '.neottia', 'repository-store');
-    const claim = join(control, 'authority.claim');
-    const staging = join(control, `authority.claim.prepare-${randomUUID()}`);
-    writeOwnerMetadata(staging, control, process.pid, new Date());
-    linkSync(staging, claim);
-    rmSync(staging);
-    const target = join(root.authorityRoot, 'operator-owned.yaml');
-    writeFileSync(target, 'operator');
-
-    const worker = fileURLToPath(new URL('./lease-worker.fixture.ts', import.meta.url));
-    const openedMarker = join(root.authorityRoot, 'race-opened-substituted');
-    const resumeMarker = join(root.authorityRoot, 'race-resume-substituted');
-    const pending = runWorkerProcess(
-      worker,
-      [root.authorityRoot, 'substituted', '1', 'substituted'],
-      'claim substitution race worker',
-      (code) => code === 0,
-    );
-    await waitForCondition(() => existsSync(openedMarker));
-    rmSync(claim);
-    symlinkSync(target, claim);
-    writeFileSync(resumeMarker, 'go');
-    await expect(pending).rejects.toThrow(/unsafe hard-link/i);
-
-    // The substituted artifact and its target remain untouched.
-    expect(lstatSync(claim).isSymbolicLink()).toBe(true);
-    expect(readFileSync(target, 'utf8')).toBe('operator');
-  });
+      // The substituted artifact and its target remain untouched.
+      expect(lstatSync(claim).isSymbolicLink()).toBe(true);
+      expect(readFileSync(target, 'utf8')).toBe('operator');
+    },
+  );
 
   it('interrupts a contention wait promptly when its signal aborts', async () => {
     const root = await fixture();
