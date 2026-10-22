@@ -24,7 +24,7 @@ beforeAll(() => {
     .filter((name) => name.endsWith('.tgz'))
     .map((name) => join(root, name))[0];
   if (!tarball) throw new Error('pnpm pack did not produce an Issues MCP tarball.');
-  const entries = execFileSync('tar', ['-tzf', tarball], { encoding: 'utf8' }).split('\n');
+  const entries = execFileSync('tar', ['-tzf', tarball], { encoding: 'utf8' }).split(/\r?\n/u);
   if (!entries.includes('package/dist/cli.js')) throw new Error('Packed Issues MCP omits dist/cli.js.');
   if (!entries.includes('package/package.json')) throw new Error('Packed Issues MCP omits package.json.');
   const extracted = join(root, 'extracted');

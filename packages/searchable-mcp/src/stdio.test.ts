@@ -33,10 +33,10 @@ beforeAll(() => {
   };
   const mcpTarball = tarballs.get('@neottia/searchable-mcp');
   if (!mcpTarball) throw new Error('pnpm pack did not produce a Searchable MCP tarball.');
-  const entries = execFileSync('tar', ['-tzf', mcpTarball], { encoding: 'utf8' }).split('\n');
+  const entries = execFileSync('tar', ['-tzf', mcpTarball], { encoding: 'utf8' }).split(/\r?\n/u);
   if (!entries.includes('package/dist/cli.js')) throw new Error('Packed Searchable MCP omits dist/cli.js.');
   for (const name of ['pi-searchable', 'opencode-searchable'] as const) {
-    const adapterEntries = execFileSync('tar', ['-tzf', adapterTarballs[name]], { encoding: 'utf8' }).split('\n');
+    const adapterEntries = execFileSync('tar', ['-tzf', adapterTarballs[name]], { encoding: 'utf8' }).split(/\r?\n/u);
     if (!adapterEntries.includes('package/src/index.ts'))
       throw new Error(`Packed ${name} omits its TypeScript entry point.`);
   }
@@ -162,7 +162,7 @@ function pack(relativePath: string): string {
     cwd: join(repoRoot(), relativePath),
     encoding: 'utf8',
   }).trim();
-  return resolve(packageRoot, output.split('\n').at(-1) as string);
+  return resolve(packageRoot, output.split(/\r?\n/u).at(-1) as string);
 }
 
 function extract(tarball: string, destination: string): string {
