@@ -1,7 +1,7 @@
 import { execFileSync, spawn } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { delimiter, join, resolve } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { SEARCHABLE_TOOLS, searchableToolJsonSchema } from '@neottia/searchable-core';
@@ -68,7 +68,7 @@ beforeAll(() => {
     stdio: 'inherit',
     env: {
       ...process.env,
-      PATH: `${join(repoRoot(), 'packages', 'repository-store', 'node_modules', '.bin')}:${process.env.PATH ?? ''}`,
+      PATH: `${join(repoRoot(), 'packages', 'repository-store', 'node_modules', '.bin')}${delimiter}${process.env.PATH ?? ''}`,
     },
   });
   packedEntry = join(packedPackage, 'dist', 'cli.js');
