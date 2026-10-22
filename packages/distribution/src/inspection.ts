@@ -1,4 +1,5 @@
 import { lstat, readFile } from 'node:fs/promises';
+import { isAbsolute } from 'node:path';
 
 import type { HostConfigLocator, TargetPath } from '@neottia/harness-adapter';
 
@@ -214,7 +215,7 @@ function rejectDuplicateUnits(units: readonly InspectedUnit[]): void {
 /** Validates roots once before any filesystem access. */
 function validateRoots(roots: InstallRoots): void {
   for (const [name, root] of Object.entries(roots)) {
-    if (typeof root !== 'string' || root.length === 0 || !root.startsWith('/')) {
+    if (typeof root !== 'string' || root.length === 0 || !isAbsolute(root)) {
       throw new TypeError(`The ${name} root must be absolute.`);
     }
   }
