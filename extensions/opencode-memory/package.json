@@ -1,6 +1,6 @@
 {
   "name": "@neottia/opencode-memory",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "OpenCode plugin: in-process memory tools from @neottia/memory-core",
   "author": "Dragos Cirjan",
   "license": "MIT",

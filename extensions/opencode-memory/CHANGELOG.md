@@ -1,5 +1,12 @@
 # @neottia/opencode-memory
 
+## 0.2.3
+
+### Patch Changes
+
+- Updated dependencies [[`ffe774e`](https://github.com/dragoscirjan/neottia/commit/ffe774ed19e63ad542cc59f5687ba88b3facc3c5)]:
+  - @neottia/memory-core@0.3.1
+
 ## 0.2.2
 
 ### Patch Changes

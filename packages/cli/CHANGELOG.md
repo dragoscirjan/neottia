@@ -1,5 +1,14 @@
 # @neottia/cli
 
+## 0.7.1
+
+### Patch Changes
+
+- [#206](https://github.com/dragoscirjan/neottia/pull/206) [`ffe774e`](https://github.com/dragoscirjan/neottia/commit/ffe774ed19e63ad542cc59f5687ba88b3facc3c5) Thanks [@dragoscirjan](https://github.com/dragoscirjan)! - Preserve receipt symlink rejection across physical path aliases and reject relative Memory roots with symlinked ancestors before creating repository authority artifacts.
+- Updated dependencies [[`ffe774e`](https://github.com/dragoscirjan/neottia/commit/ffe774ed19e63ad542cc59f5687ba88b3facc3c5)]:
+  - @neottia/memory-core@0.3.1
+  - @neottia/searchable-core@0.2.1
+
 ## 0.7.0
 
 ### Minor Changes

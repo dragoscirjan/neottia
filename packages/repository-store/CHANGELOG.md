@@ -1,5 +1,13 @@
 # @neottia/repository-store
 
+## 0.2.1
+
+### Patch Changes
+
+- [#206](https://github.com/dragoscirjan/neottia/pull/206) [`3dc447d`](https://github.com/dragoscirjan/neottia/commit/3dc447d3a3134fe5cc3f1185e6099ecc8275693d) Thanks [@dragoscirjan](https://github.com/dragoscirjan)! - Add native Repository Store support for macOS 15 and 26 on x64 and arm64 local APFS volumes.
+
+- [#209](https://github.com/dragoscirjan/neottia/pull/209) [`bc9f2fc`](https://github.com/dragoscirjan/neottia/commit/bc9f2fcd20854588e4a940b74e301db36e31a6a9) Thanks [@dragoscirjan](https://github.com/dragoscirjan)! - Add the native Windows x64 backend for atomic no-replace publication and durable file synchronization on local NTFS volumes.
+
 ## 0.2.0
 
 ### Minor Changes

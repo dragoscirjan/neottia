@@ -852,7 +852,7 @@ importers:
         specifier: workspace:0.2.0
         version: link:../../extensions/claude-code-adapter
       '@neottia/cli':
-        specifier: workspace:0.7.0
+        specifier: workspace:0.7.1
         version: link:../cli
       '@neottia/config':
         specifier: workspace:0.2.0
@@ -885,10 +885,10 @@ importers:
         specifier: workspace:0.2.2
         version: link:../issues-mcp
       '@neottia/memory-core':
-        specifier: workspace:0.3.0
+        specifier: workspace:0.3.1
         version: link:../memory-core
       '@neottia/memory-mcp':
-        specifier: workspace:0.3.2
+        specifier: workspace:0.3.3
         version: link:../memory-mcp
       '@neottia/opencode-adapter':
         specifier: workspace:0.2.0
@@ -900,10 +900,10 @@ importers:
         specifier: workspace:0.2.2
         version: link:../../extensions/opencode-issues
       '@neottia/opencode-memory':
-        specifier: workspace:0.2.2
+        specifier: workspace:0.2.3
         version: link:../../extensions/opencode-memory
       '@neottia/opencode-searchable':
-        specifier: workspace:0.2.2
+        specifier: workspace:0.2.3
         version: link:../../extensions/opencode-searchable
       '@neottia/pi-adapter':
         specifier: workspace:0.2.0
@@ -915,22 +915,22 @@ importers:
         specifier: workspace:0.2.2
         version: link:../../extensions/pi-issues
       '@neottia/pi-memory':
-        specifier: workspace:0.2.2
+        specifier: workspace:0.2.3
         version: link:../../extensions/pi-memory
       '@neottia/pi-searchable':
-        specifier: workspace:0.2.2
+        specifier: workspace:0.2.3
         version: link:../../extensions/pi-searchable
       '@neottia/repository-store':
-        specifier: workspace:0.2.0
+        specifier: workspace:0.2.1
         version: link:../repository-store
       '@neottia/sdlc':
         specifier: workspace:0.5.0
         version: link:../sdlc
       '@neottia/searchable-core':
-        specifier: workspace:0.2.0
+        specifier: workspace:0.2.1
         version: link:../searchable-core
       '@neottia/searchable-mcp':
-        specifier: workspace:0.2.2
+        specifier: workspace:0.2.3
         version: link:../searchable-mcp
 
   packages/repository-store:
@@ -5676,7 +5676,7 @@ snapshots:
       eslint-plugin-jsonc: 2.21.1(@eslint/json@0.13.2)(eslint@9.39.5)
       eslint-plugin-markdown: 5.1.0(eslint@9.39.5)
       eslint-plugin-node-import: 1.2.0(eslint@9.39.5)
-      eslint-plugin-prettier: 5.5.6(eslint-config-prettier@10.1.8(eslint@10.11.0))(eslint@9.39.5)(prettier@3.9.9)
+      eslint-plugin-prettier: 5.5.6(eslint-config-prettier@10.1.8(eslint@9.39.5))(eslint@9.39.5)(prettier@3.9.9)
       eslint-plugin-toml: 0.12.0(eslint@9.39.5)
       eslint-plugin-yml: 1.19.1(eslint@9.39.5)
       globals: 16.5.0
@@ -5827,7 +5827,7 @@ snapshots:
       - supports-color
     optional: true
 
-  '@typescript-eslint/eslint-plugin@8.69.0(@typescript-eslint/parser@8.69.0(eslint@10.11.0)(typescript@5.9.3))(eslint@9.39.5)(typescript@5.9.3)':
+  '@typescript-eslint/eslint-plugin@8.69.0(@typescript-eslint/parser@8.69.0(eslint@9.39.5)(typescript@5.9.3))(eslint@9.39.5)(typescript@5.9.3)':
     dependencies:
       '@eslint-community/regexpp': 4.12.2
       '@typescript-eslint/parser': 8.69.0(eslint@9.39.5)(typescript@5.9.3)
@@ -6749,7 +6749,7 @@ snapshots:
       eslint: 9.39.5
       globals: 17.12.0
 
-  eslint-plugin-prettier@5.5.6(eslint-config-prettier@10.1.8(eslint@10.11.0))(eslint@9.39.5)(prettier@3.9.9):
+  eslint-plugin-prettier@5.5.6(eslint-config-prettier@10.1.8(eslint@9.39.5))(eslint@9.39.5)(prettier@3.9.9):
     dependencies:
       eslint: 9.39.5
       prettier: 3.9.9
@@ -8566,7 +8566,7 @@ snapshots:
 
   typescript-eslint@8.69.0(eslint@9.39.5)(typescript@5.9.3):
     dependencies:
-      '@typescript-eslint/eslint-plugin': 8.69.0(@typescript-eslint/parser@8.69.0(eslint@10.11.0)(typescript@5.9.3))(eslint@9.39.5)(typescript@5.9.3)
+      '@typescript-eslint/eslint-plugin': 8.69.0(@typescript-eslint/parser@8.69.0(eslint@9.39.5)(typescript@5.9.3))(eslint@9.39.5)(typescript@5.9.3)
       '@typescript-eslint/parser': 8.69.0(eslint@9.39.5)(typescript@5.9.3)
       '@typescript-eslint/typescript-estree': 8.69.0(typescript@5.9.3)
       '@typescript-eslint/utils': 8.69.0(eslint@9.39.5)(typescript@5.9.3)

@@ -1,5 +1,13 @@
 # @neottia/memory-core
 
+## 0.3.1
+
+### Patch Changes
+
+- [#206](https://github.com/dragoscirjan/neottia/pull/206) [`ffe774e`](https://github.com/dragoscirjan/neottia/commit/ffe774ed19e63ad542cc59f5687ba88b3facc3c5) Thanks [@dragoscirjan](https://github.com/dragoscirjan)! - Preserve receipt symlink rejection across physical path aliases and reject relative Memory roots with symlinked ancestors before creating repository authority artifacts.
+- Updated dependencies [[`3dc447d`](https://github.com/dragoscirjan/neottia/commit/3dc447d3a3134fe5cc3f1185e6099ecc8275693d), [`bc9f2fc`](https://github.com/dragoscirjan/neottia/commit/bc9f2fcd20854588e4a940b74e301db36e31a6a9)]:
+  - @neottia/repository-store@0.2.1
+
 ## 0.3.0
 
 ### Minor Changes
