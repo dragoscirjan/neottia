@@ -63,6 +63,10 @@ This adaptation workflow covers instruction routes, deferred policy documents, d
 - Use TSDoc for public TypeScript APIs.
 - Follow the existing ESLint, Prettier, TypeScript, and test configuration.
 
+#### Repository Store native backends
+
+Repository Store native platform backends must use C++17 and the stable C Node-API (`node_api.h`) for both Node.js and Bun. Keep operating-system code behind internal capability interfaces. Do not introduce Rust, V8, libuv, Node.js C++ APIs, or separate runtime-specific native implementations without a separately approved architecture issue. Require benchmark evidence for performance claims; filesystem semantics and safety invariants take priority over language-level micro-optimizations.
+
 Every Node package must:
 
 - use the `@neottia/` namespace;
