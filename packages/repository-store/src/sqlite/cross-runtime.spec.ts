@@ -53,7 +53,10 @@ async function runRuntime(
     });
     child.once('error', rejectRun);
     child.once('exit', (code, signal) => {
-      if ((expectedSignal === undefined && code === 0) || signal === expectedSignal) resolveRun();
+      const expectedWindowsTermination =
+        process.platform === 'win32' && expectedSignal !== undefined && code === 1 && signal === null;
+      if ((expectedSignal === undefined && code === 0) || signal === expectedSignal || expectedWindowsTermination)
+        resolveRun();
       else rejectRun(new Error(`${runtime} ${mode} exited ${code}/${signal}: ${standardError}`));
     });
   });

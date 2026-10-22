@@ -99,6 +99,7 @@ profiles:
 `,
   );
   const env = {
+    APPDATA: globalRoot,
     XDG_CONFIG_HOME: globalRoot,
     NEOTTIA_PROFILE: 'selected',
     NEOTTIA_SEARCHABLE_SEARCH_LIMIT: '8',

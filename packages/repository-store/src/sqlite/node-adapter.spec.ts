@@ -55,6 +55,23 @@ describe('bounded SQLite cursors', () => {
     await database.close();
   });
 
+  it('finalizes Bun statements before closing the database', async () => {
+    const order: string[] = [];
+    const database = wrapDatabase('bun', {
+      exec: () => undefined,
+      prepare: () => ({
+        finalize: () => order.push('statement'),
+        run: () => ({}),
+        get: () => undefined,
+        all: () => [],
+      }),
+      close: () => order.push('database'),
+    });
+    await database.prepare('SELECT 1');
+    await database.close();
+    expect(order).toEqual(['statement', 'database']);
+  });
+
   it('stops iterating as soon as the row bound is exceeded', async () => {
     let yielded = 0;
     const statement = {

@@ -1,4 +1,4 @@
-import { lstatSync, readdirSync, renameSync } from 'node:fs';
+import { readdirSync, renameSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { RecoveryError } from '../errors.js';
 import { readManagedFileIfExists } from '../files.js';
@@ -13,7 +13,7 @@ import {
 } from './journal.js';
 import type { JournalManifest, RecoveryReport } from './types.js';
 import { emitTransactionFault } from '../internal/fault-injection.js';
-import { assertSafeRegular, syncDirectory } from '../internal/filesystem.js';
+import { assertSafeRegular, lstatSync, syncDirectory } from '../internal/filesystem.js';
 import { getPathState, getRootState, type ManagedRoot, type RepositoryLease } from '../internal/model.js';
 import { recoverExactPublication } from '../internal/publication.js';
 import { assertLiveLease, checkControl, type OperationControl } from '../lease.js';

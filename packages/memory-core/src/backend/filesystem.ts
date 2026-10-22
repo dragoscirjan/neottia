@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash } from 'node:crypto';
-import { lstatSync } from 'node:fs';
+import { lstatSync, realpathSync } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import {
   DEFAULT_STORE_LIMITS,
@@ -79,7 +79,11 @@ export class FilesystemBackend extends MemoryRecordSupport implements StorageBac
 
   public constructor(options: FilesystemBackendOptions) {
     super();
-    this.root = resolve(options.cwd, options.config.root);
+    const canonicalCwd = canonicalMemoryRoot(resolve(options.cwd));
+    const absoluteConfiguredRoot = isAbsolute(options.config.root);
+    const configuredRoot = resolve(canonicalCwd, options.config.root);
+    if (!absoluteConfiguredRoot) assertSafeMemoryRoot(configuredRoot);
+    this.root = canonicalMemoryRoot(configuredRoot);
     assertSafeMemoryRoot(this.root);
     this.cacheMaxAgeMs = options.config.cache.max_age_ms;
     this.stalePolicy = options.config.cache.stale_policy;
@@ -89,9 +93,8 @@ export class FilesystemBackend extends MemoryRecordSupport implements StorageBac
       maxFiles: options.config.security.limits.max_files,
       maxTotalBytes: options.config.security.limits.max_total_bytes,
     };
-    const absoluteConfiguredRoot = isAbsolute(options.config.root);
     this.repositoryRootOptions = {
-      authorityRoot: absoluteConfiguredRoot ? this.root : resolve(options.cwd),
+      authorityRoot: absoluteConfiguredRoot ? this.root : canonicalCwd,
       ...(absoluteConfiguredRoot ? {} : { managedPath: options.config.root.split(sep).join('/') }),
       limits: {
         ...DEFAULT_STORE_LIMITS,
@@ -435,6 +438,30 @@ export type MemoryRecordInput = Omit<
   details?: string | null;
   tags?: string[];
 };
+
+function canonicalMemoryRoot(root: string): string {
+  const missing: string[] = [];
+  let current = resolve(root);
+  while (true) {
+    try {
+      const stat = lstatSync(current);
+      if (stat.isSymbolicLink()) {
+        if (missing.length === 0) throw new MemoryError(`Unsafe memory root: ${root}`);
+        const canonical = realpathSync.native(current);
+        if (!lstatSync(canonical).isDirectory()) throw new MemoryError(`Unsafe memory root: ${root}`);
+        return join(canonical, ...missing);
+      }
+      if (!stat.isDirectory()) throw new MemoryError(`Unsafe memory root: ${root}`);
+      return join(realpathSync.native(current), ...missing);
+    } catch (error: unknown) {
+      if (!isCode(error, 'ENOENT')) throw error;
+      const parent = dirname(current);
+      if (parent === current) throw new MemoryError(`Cannot resolve memory root: ${root}`);
+      missing.unshift(basename(current));
+      current = parent;
+    }
+  }
+}
 
 function assertSafeMemoryRoot(root: string): void {
   const components: string[] = [];

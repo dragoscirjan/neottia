@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { lstatSync, readdirSync, renameSync, rmSync, rmdirSync } from 'node:fs';
+import { readdirSync, renameSync, rmSync, rmdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { PathSafetyError, RecoveryError, ResourceLimitError, StaleRevisionError } from '../errors.js';
 import { assertPathAuthority, readManagedFileIfExists } from '../files.js';
@@ -13,7 +13,7 @@ import {
 import { recoverActiveDirectory } from './recovery.js';
 import type { ApplyCanonicalBatchOptions, CanonicalOperation, JournalEntry, JournalManifest } from './types.js';
 import { emitTransactionFault } from '../internal/fault-injection.js';
-import { assertSafeRegular, hasCode, syncDirectory } from '../internal/filesystem.js';
+import { assertSafeRegular, hasCode, lstatSync, syncDirectory } from '../internal/filesystem.js';
 import {
   requirePathState,
   requireRootState,

@@ -23,4 +23,6 @@ int SupportsLocalPath(const char*, bool* supported) {
   return 0;
 }
 
+int SyncDescriptor(int) { return ENOSYS; }
+
 }  // namespace neottia::repository_store

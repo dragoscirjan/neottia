@@ -8,6 +8,7 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   renameSync,
   rmSync,
   symlinkSync,
@@ -126,13 +127,30 @@ describe('repository canonical store', () => {
     expect(validateRelativePath('unicode/文件.yml')).toBe('unicode/文件.yml');
   });
 
-  it('certifies only the supported Linux architectures', () => {
+  it('binds authority operations to the canonical physical path', async () => {
+    const requested = mkdtempSync(join(tmpdir(), 'neottia-canonical-authority-'));
+    tempDirectories.push(requested);
+    const canonical = realpathSync.native(requested);
+    const root = await resolveManagedRoot({ authorityRoot: requested, limits: DEFAULT_STORE_LIMITS });
+    const path = resolveManagedPath(root, 'records/item.txt');
+
+    await withRepositoryLease(root, async (lease) => {
+      await applyCanonicalBatch(root, lease, [{ kind: 'write', path, bytes: bytes('canonical'), expected: 'absent' }]);
+    });
+
+    expect(readFileSync(join(canonical, 'records/item.txt'), 'utf8')).toBe('canonical');
+  });
+
+  it('certifies only the supported platform and architecture tuples', () => {
     expect(isCertifiedRepositoryPlatform('linux', 'x64')).toBe(true);
     expect(isCertifiedRepositoryPlatform('linux', 'arm64')).toBe(true);
+    expect(isCertifiedRepositoryPlatform('darwin', 'x64')).toBe(true);
+    expect(isCertifiedRepositoryPlatform('darwin', 'arm64')).toBe(true);
+    expect(isCertifiedRepositoryPlatform('win32', 'x64')).toBe(true);
     expect(isCertifiedRepositoryPlatform('linux', 'ppc64')).toBe(false);
     expect(isCertifiedRepositoryPlatform('linux', 's390x')).toBe(false);
-    expect(isCertifiedRepositoryPlatform('darwin', 'arm64')).toBe(false);
-    expect(isCertifiedRepositoryPlatform('win32', 'x64')).toBe(false);
+    expect(isCertifiedRepositoryPlatform('darwin', 'ia32')).toBe(false);
+    expect(isCertifiedRepositoryPlatform('win32', 'arm64')).toBe(false);
   });
 
   it('applies exact write, replacement, move, and removal operations', async () => {
@@ -238,6 +256,7 @@ describe('repository canonical store', () => {
         platform: process.platform,
         filesystemRequirement: 'the test filesystem',
         filesystem: { supportsLocalPath: () => true },
+        durability: { syncDescriptor() {} },
         publication: {
           renameNoReplace() {
             throw Object.assign(new Error('unsupported rename flags'), { code: 'EINVAL' });
@@ -331,6 +350,7 @@ describe('repository canonical store', () => {
     ['journal manifest', 'file-fsync', (target: string) => target.endsWith('manifest.json')],
     ['canonical directory', 'directory-fsync', () => true],
   ] as const)('returns exact durability evidence for %s fsync failures', async (_name, eventName, matches) => {
+    if (process.platform === 'win32' && eventName === 'directory-fsync') return;
     const root = await fixture();
     const path = resolveManagedPath(root, `records/durable-${eventName}.txt`);
     const cause = new Error(`injected ${eventName} failure`);
@@ -503,6 +523,7 @@ describe('repository canonical store', () => {
       const authority = mkdtempSync(join(tmpdir(), 'neottia-transaction-crash-'));
       tempDirectories.push(authority);
       await runCrashWorker(authority, faultEvent, occurrence);
+      expect(readFileSync(join(authority, '.transaction-crash-trigger'), 'utf8')).toBe(`${faultEvent}:${occurrence}`);
       await new Promise((resolveDelay) => setTimeout(resolveDelay, 5));
       const root = await resolveManagedRoot({ authorityRoot: authority, limits: DEFAULT_STORE_LIMITS });
       await withRepositoryLease(root, async () => undefined, { staleMs: 1 });
@@ -524,6 +545,7 @@ describe('repository canonical store', () => {
       const authority = mkdtempSync(join(tmpdir(), `neottia-publication-crash-${event}-`));
       tempDirectories.push(authority);
       await runCrashWorker(authority, `filesystem:${event}`, 1);
+      expect(readFileSync(join(authority, '.transaction-crash-trigger'), 'utf8')).toBe(`filesystem:${event}:1`);
       await new Promise((resolveDelay) => setTimeout(resolveDelay, 5));
       const root = await resolveManagedRoot({ authorityRoot: authority, limits: DEFAULT_STORE_LIMITS });
       await withRepositoryLease(root, async () => undefined, { staleMs: 1 });
@@ -595,6 +617,7 @@ describe('repository authority lease', () => {
       platform: process.platform,
       filesystemRequirement: 'the test filesystem',
       filesystem: { supportsLocalPath: () => false },
+      durability: { syncDescriptor() {} },
       publication: {
         renameNoReplace() {
           publicationCalled = true;
@@ -719,6 +742,7 @@ describe('repository authority lease', () => {
     const authority = mkdtempSync(join(tmpdir(), 'neottia-lease-crash-'));
     tempDirectories.push(authority);
     await runLeaseCrashWorker(authority, faultEvent);
+    expect(readFileSync(join(authority, '.lease-crash-trigger'), 'utf8')).toBe(faultEvent);
     await new Promise((resolveDelay) => setTimeout(resolveDelay, 5));
     const root = await resolveManagedRoot({ authorityRoot: authority, limits: DEFAULT_STORE_LIMITS });
     await expect(withRepositoryLease(root, async () => 'recovered', { staleMs: 1 })).resolves.toBe('recovered');
@@ -729,8 +753,9 @@ describe('repository authority lease', () => {
   it('serializes repeated real worker-process acquisitions under one repository authority', async () => {
     const authority = mkdtempSync(join(tmpdir(), 'neottia-repository-workers-'));
     tempDirectories.push(authority);
-    const workerIds = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight'];
-    const iterations = 12;
+    const workerIds =
+      process.platform === 'win32' ? ['one', 'two'] : ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight'];
+    const iterations = process.platform === 'win32' ? 2 : 12;
     await Promise.all(workerIds.map((id) => runLeaseWorker(authority, id, iterations)));
     const lines = readFileSync(join(authority, 'lease-trace.txt'), 'utf8').trim().split('\n');
     expect(lines).toHaveLength(workerIds.length * iterations * 2);
@@ -740,36 +765,39 @@ describe('repository authority lease', () => {
     }
   }, 120_000);
 
-  it('fails closed when the lease control root is rebound during owner verification', async () => {
-    const root = await fixture();
-    await withRepositoryLease(root, async () => undefined);
-    const control = join(root.authorityRoot, '.neottia', 'repository-store');
-    const lock = writeTestOwner(control, process.pid, new Date());
-    const ownerPath = join(lock, 'owner.json');
-    const displacedControl = `${control}.operator`;
-    const replacementTarget = join(root.authorityRoot, 'replacement-lease-target');
-    mkdirSync(replacementTarget);
-    writeFileSync(join(replacementTarget, 'marker'), 'operator-owned');
-    let callbackEntered = false;
-    let rebound = false;
-    setFilesystemFaultInjectorForTests((event, target) => {
-      if (rebound || event !== 'bounded-read-opened' || target !== ownerPath) return;
-      rebound = true;
-      renameSync(control, displacedControl);
-      mkdirSync(control);
-      symlinkSync(replacementTarget, join(control, 'authority.lease'), 'dir');
-    });
+  it.skipIf(process.platform === 'win32')(
+    'fails closed when the lease control root is rebound during owner verification',
+    async () => {
+      const root = await fixture();
+      await withRepositoryLease(root, async () => undefined);
+      const control = join(root.authorityRoot, '.neottia', 'repository-store');
+      const lock = writeTestOwner(control, process.pid, new Date());
+      const ownerPath = join(lock, 'owner.json');
+      const displacedControl = `${control}.operator`;
+      const replacementTarget = join(root.authorityRoot, 'replacement-lease-target');
+      mkdirSync(replacementTarget);
+      writeFileSync(join(replacementTarget, 'marker'), 'operator-owned');
+      let callbackEntered = false;
+      let rebound = false;
+      setFilesystemFaultInjectorForTests((event, target) => {
+        if (rebound || event !== 'bounded-read-opened' || target !== ownerPath) return;
+        rebound = true;
+        renameSync(control, displacedControl);
+        mkdirSync(control);
+        symlinkSync(replacementTarget, join(control, 'authority.lease'), 'dir');
+      });
 
-    await expect(
-      withRepositoryLease(root, async () => {
-        callbackEntered = true;
-      }),
-    ).rejects.toMatchObject({ category: 'path_safety', code: 'IDENTITY_CHANGED' });
-    expect(callbackEntered).toBe(false);
-    expect(rebound).toBe(true);
-    expect(lstatSync(join(control, 'authority.lease')).isSymbolicLink()).toBe(true);
-    expect(readFileSync(join(replacementTarget, 'marker'), 'utf8')).toBe('operator-owned');
-  });
+      await expect(
+        withRepositoryLease(root, async () => {
+          callbackEntered = true;
+        }),
+      ).rejects.toMatchObject({ category: 'path_safety', code: 'IDENTITY_CHANGED' });
+      expect(callbackEntered).toBe(false);
+      expect(rebound).toBe(true);
+      expect(lstatSync(join(control, 'authority.lease')).isSymbolicLink()).toBe(true);
+      expect(readFileSync(join(replacementTarget, 'marker'), 'utf8')).toBe('operator-owned');
+    },
+  );
 
   it('serializes independent same-process callers while retaining true nesting errors', async () => {
     const root = await fixture();
@@ -1172,7 +1200,7 @@ function runCrashWorker(authority: string, faultEvent: string, occurrence: numbe
     worker,
     [authority, faultEvent, String(occurrence)],
     'compiled-package crash worker',
-    (code, signal) => code === null && signal === 'SIGKILL',
+    isForcedTermination,
     false,
   );
 }
@@ -1183,9 +1211,13 @@ function runLeaseCrashWorker(authority: string, faultEvent: LeaseFaultEvent): Pr
     worker,
     [authority, faultEvent],
     'compiled-package lease crash worker',
-    (code, signal) => code === null && signal === 'SIGKILL',
+    isForcedTermination,
     false,
   );
+}
+
+function isForcedTermination(code: number | null, signal: NodeJS.Signals | null): boolean {
+  return process.platform === 'win32' ? code === 1 && signal === null : code === null && signal === 'SIGKILL';
 }
 
 function runLeaseWorker(authority: string, id: string, iterations: number): Promise<void> {

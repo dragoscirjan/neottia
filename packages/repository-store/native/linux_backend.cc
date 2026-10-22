@@ -6,6 +6,7 @@
 #include <linux/magic.h>
 #include <stdio.h>
 #include <sys/vfs.h>
+#include <unistd.h>
 
 namespace neottia::repository_store {
 
@@ -31,6 +32,14 @@ int SupportsLocalPath(const char* path, bool* supported) {
       *supported = false;
   }
   return 0;
+}
+
+int SyncDescriptor(int descriptor) {
+  int result;
+  do {
+    result = fsync(descriptor);
+  } while (result != 0 && errno == EINTR);
+  return result == 0 ? 0 : errno;
 }
 
 }  // namespace neottia::repository_store

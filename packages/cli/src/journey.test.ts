@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -282,7 +282,9 @@ describe('empty-project CLI adoption journey (issue #161)', () => {
     }
     const hostWrites = plan.mutations.filter((mutation) => mutation.role === 'host-config');
     expect(hostWrites).toHaveLength(1);
-    expect(hostWrites[0]!.path).toBe(join(roots.project, '.pi', 'settings.json'));
+    const hostPath = hostWrites[0]!.path;
+    expect(hostPath.endsWith(join('.pi', 'settings.json'))).toBe(true);
+    expect(await realpath(dirname(dirname(hostPath)))).toBe(await realpath(roots.project));
     for (const expected of expectedPiPackages()) {
       expect(hostWrites[0]!.content).toContain(expected);
     }
@@ -454,6 +456,15 @@ describe('empty-project CLI adoption journey (issue #161)', () => {
       /Stale issue revision/u,
     );
 
+    // Receipt aliases must not bypass the distribution layer's final-component symlink rejection.
+    const receiptAlias = join(roots.root, 'receipt-alias.json');
+    const aliasPlanPath = join(roots.root, 'receipt-alias.plan.json');
+    await symlink(receiptPath, receiptAlias, 'file');
+    const aliasPlan = runCli(['uninstall', '--receipt', receiptAlias, '--output', aliasPlanPath], roots);
+    expect(aliasPlan.code).toBe(1);
+    expect(aliasPlan.stderr).toContain('Installer target is not a regular file');
+    expect(existsSync(aliasPlanPath)).toBe(false);
+
     // Uninstall is receipt-driven and preserves unrelated user-owned
     // host configuration.
     const settingsPath = join(roots.project, '.pi', 'settings.json');
@@ -465,8 +476,8 @@ describe('empty-project CLI adoption journey (issue #161)', () => {
 
     const uninstallPlanPath = join(roots.root, 'uninstall.plan.json');
     const uninstallPlan = runCli(['uninstall', '--receipt', receiptPath, '--output', uninstallPlanPath], roots);
-    expect(uninstallPlan.code).toBe(0);
-    expect(runCli(['apply', '--plan', uninstallPlanPath], roots).code).toBe(0);
+    expect(uninstallPlan).toMatchObject({ code: 0, stderr: '' });
+    expect(runCli(['apply', '--plan', uninstallPlanPath], roots)).toMatchObject({ code: 0, stderr: '' });
 
     for (const command of COMMANDS) {
       expect(existsSync(join(roots.project, '.pi', 'prompts', `${command}.md`))).toBe(false);

@@ -22,20 +22,39 @@ jobs:
       runs-on: ubuntu-latest
 
   test:
-    name: Test (${{ matrix.os }}, ${{ matrix.tier }})
+    name: Test (${{ matrix.os }}, ${{ matrix.architecture }}, ${{ matrix.tier }})
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
+            architecture: x64
             tier: required
             experimental: false
-          - os: macos-latest
-            tier: experimental
-            experimental: true
-          - os: windows-latest
-            tier: experimental
-            experimental: true
+          - os: macos-26
+            architecture: arm64
+            tier: required
+            experimental: false
+          - os: macos-15
+            architecture: arm64
+            tier: required
+            experimental: false
+          - os: macos-26-intel
+            architecture: x64
+            tier: required
+            experimental: false
+          - os: macos-15-intel
+            architecture: x64
+            tier: required
+            experimental: false
+          - os: windows-2025
+            architecture: x64
+            tier: required
+            experimental: false
+          - os: windows-2022
+            architecture: x64
+            tier: required
+            experimental: false
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
@@ -46,6 +65,14 @@ jobs:
           install: true
           cache: true
       - run: mise run deps:sync:pnpm
+      - name: Verify runner architecture
+        env:
+          EXPECTED_ARCHITECTURE: ${{ matrix.architecture }}
+        run: node -e "if (process.arch !== process.env.EXPECTED_ARCHITECTURE) throw new Error('Expected ' + process.env.EXPECTED_ARCHITECTURE + ', got ' + process.arch)"
+      - name: Verify Windows native backend
+        if: runner.os == 'Windows'
+        working-directory: packages/repository-store
+        run: pnpm run build:native && node test/windows-native-smoke.mjs
       - name: Run tests
         id: tests
         continue-on-error: ${{ matrix.experimental }}

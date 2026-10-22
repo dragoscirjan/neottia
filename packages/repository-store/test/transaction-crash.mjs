@@ -1,3 +1,5 @@
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   DEFAULT_STORE_LIMITS,
   applyCanonicalBatch,
@@ -14,6 +16,7 @@ if (authority === undefined || requestedEvent === undefined || !Number.isSafeInt
   throw new Error('Crash worker requires authority, fault-event, and occurrence arguments.');
 
 const encode = (value) => new TextEncoder().encode(value);
+const crashTrigger = join(authority, '.transaction-crash-trigger');
 const root = await resolveManagedRoot({ authorityRoot: authority, limits: DEFAULT_STORE_LIMITS });
 const first = resolveManagedPath(root, 'records/first.txt');
 const second = resolveManagedPath(root, 'records/second.txt');
@@ -29,11 +32,17 @@ await withRepositoryLease(root, (lease) =>
 if (requestedEvent.startsWith('filesystem:')) {
   const filesystemEvent = requestedEvent.slice('filesystem:'.length);
   setFilesystemFaultInjectorForTests((event, _path, occurrence) => {
-    if (event === filesystemEvent && occurrence === requestedOccurrence) process.kill(process.pid, 'SIGKILL');
+    if (event === filesystemEvent && occurrence === requestedOccurrence) {
+      writeFileSync(crashTrigger, `${requestedEvent}:${occurrence}`);
+      process.kill(process.pid, 'SIGKILL');
+    }
   });
 } else {
   setTransactionFaultInjectorForTests((event, occurrence) => {
-    if (event === requestedEvent && occurrence === requestedOccurrence) process.kill(process.pid, 'SIGKILL');
+    if (event === requestedEvent && occurrence === requestedOccurrence) {
+      writeFileSync(crashTrigger, `${requestedEvent}:${occurrence}`);
+      process.kill(process.pid, 'SIGKILL');
+    }
   });
 }
 await withRepositoryLease(

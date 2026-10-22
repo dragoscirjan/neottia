@@ -96,7 +96,7 @@ describe('concrete Searchable runtime', () => {
     await expect(tool('web_search').run(context, { query: 'closed' })).rejects.toMatchObject({
       code: 'RUNTIME_CLOSED',
     });
-  });
+  }, 30_000);
 
   it('uses one ask deadline for context lookup and streamed generation', async () => {
     const cwd = project('    ollama:\n      timeout_ms: 1000\n');

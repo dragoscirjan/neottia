@@ -1,7 +1,7 @@
 import { execFileSync, spawn } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { delimiter, join, resolve } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { SEARCHABLE_TOOLS, searchableToolJsonSchema } from '@neottia/searchable-core';
@@ -33,10 +33,10 @@ beforeAll(() => {
   };
   const mcpTarball = tarballs.get('@neottia/searchable-mcp');
   if (!mcpTarball) throw new Error('pnpm pack did not produce a Searchable MCP tarball.');
-  const entries = execFileSync('tar', ['-tzf', mcpTarball], { encoding: 'utf8' }).split('\n');
+  const entries = execFileSync('tar', ['-tzf', mcpTarball], { encoding: 'utf8' }).split(/\r?\n/u);
   if (!entries.includes('package/dist/cli.js')) throw new Error('Packed Searchable MCP omits dist/cli.js.');
   for (const name of ['pi-searchable', 'opencode-searchable'] as const) {
-    const adapterEntries = execFileSync('tar', ['-tzf', adapterTarballs[name]], { encoding: 'utf8' }).split('\n');
+    const adapterEntries = execFileSync('tar', ['-tzf', adapterTarballs[name]], { encoding: 'utf8' }).split(/\r?\n/u);
     if (!adapterEntries.includes('package/src/index.ts'))
       throw new Error(`Packed ${name} omits its TypeScript entry point.`);
   }
@@ -68,7 +68,7 @@ beforeAll(() => {
     stdio: 'inherit',
     env: {
       ...process.env,
-      PATH: `${join(repoRoot(), 'packages', 'repository-store', 'node_modules', '.bin')}:${process.env.PATH ?? ''}`,
+      PATH: `${join(repoRoot(), 'packages', 'repository-store', 'node_modules', '.bin')}${delimiter}${process.env.PATH ?? ''}`,
     },
   });
   packedEntry = join(packedPackage, 'dist', 'cli.js');
@@ -78,7 +78,7 @@ beforeAll(() => {
     bin?: Record<string, string>;
   };
   if (manifest.bin?.['searchable-mcp'] !== './dist/cli.js') throw new Error('Packed Searchable MCP bin is incorrect.');
-});
+}, 120_000);
 
 afterEach(async () => {
   const activeTransport = transport;
@@ -111,6 +111,8 @@ it('discovers shared contracts and executes canonical storage from the packed CL
     name: 'web_stash',
     arguments: { url: 'https://example.com/packed', title: 'Packed', content: 'packaged marker content' },
   });
+  if (stashed.structuredContent === undefined)
+    throw new Error(`Packed web_stash omitted structured content: ${JSON.stringify(stashed)}`);
   expect(stashed.structuredContent).toEqual({ stashed: true, url: 'https://example.com/packed' });
   const grep = await connected.callTool({ name: 'web_grep', arguments: { query: 'marker' } });
   expect(grep.structuredContent).toMatchObject({ results: [{ title: 'Packed' }] });
@@ -160,7 +162,7 @@ function pack(relativePath: string): string {
     cwd: join(repoRoot(), relativePath),
     encoding: 'utf8',
   }).trim();
-  return resolve(packageRoot, output.split('\n').at(-1) as string);
+  return resolve(packageRoot, output.split(/\r?\n/u).at(-1) as string);
 }
 
 function extract(tarball: string, destination: string): string {

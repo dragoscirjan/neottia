@@ -1,3 +1,5 @@
+import { realpathSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   DEFAULT_STORE_LIMITS,
   rebuildDisposableSqliteCache,
@@ -7,9 +9,10 @@ import {
 } from '../dist/index.js';
 import { setFilesystemFaultInjectorForTests } from '../dist/testing.js';
 
-const [authority, requestedEvent] = process.argv.slice(2);
-if (authority === undefined || requestedEvent === undefined)
+const [requestedAuthority, requestedEvent] = process.argv.slice(2);
+if (requestedAuthority === undefined || requestedEvent === undefined)
   throw new Error('Cache crash worker requires an authority root and filesystem event.');
+const authority = realpathSync.native(requestedAuthority);
 
 const root = await resolveManagedRoot({ authorityRoot: authority, limits: DEFAULT_STORE_LIMITS });
 const path = resolveManagedPath(root, 'cache.db');
@@ -34,7 +37,7 @@ await withRepositoryLease(root, async (lease) => {
   await cache.close();
 });
 
-const activePath = `${authority}/cache.db`;
+const activePath = join(authority, 'cache.db');
 setFilesystemFaultInjectorForTests((event, target) => {
   if (event === requestedEvent && target === activePath) process.kill(process.pid, 'SIGKILL');
 });

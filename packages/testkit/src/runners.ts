@@ -176,16 +176,24 @@ export function runPi(options: HarnessRunOptions & { piPath: string }): HarnessR
     }
     env.HOME = options.homeDir;
   }
-  const result = spawnSync(
-    piPath,
-    ['-p', '--no-session', '--mode', 'text', '-a', '--provider', 'openrouter', '--model', modelId, prompt],
-    {
-      cwd,
-      encoding: 'utf8',
-      timeout: options.timeoutMs ?? 240_000,
-      env,
-    },
-  );
+  const invocation = executableInvocation(piPath, [
+    '-p',
+    '--no-session',
+    '--mode',
+    'text',
+    '-a',
+    '--provider',
+    'openrouter',
+    '--model',
+    modelId,
+    prompt,
+  ]);
+  const result = spawnSync(invocation.command, invocation.arguments, {
+    cwd,
+    encoding: 'utf8',
+    timeout: options.timeoutMs ?? 240_000,
+    env,
+  });
   return { stdout: result.stdout ?? '', stderr: result.stderr ?? '', status: result.status };
 }
 
@@ -212,13 +220,23 @@ export function runOpencode(options: HarnessRunOptions): HarnessRunResult {
   }
   if (options.xdgConfigDir) env.XDG_CONFIG_HOME = options.xdgConfigDir;
   if (options.homeDir) env.HOME = options.homeDir;
-  const result = spawnSync(opencodePath, ['run', '--model', model, prompt], {
+  const invocation = executableInvocation(opencodePath, ['run', '--model', model, prompt]);
+  const result = spawnSync(invocation.command, invocation.arguments, {
     cwd,
     encoding: 'utf8',
     timeout: options.timeoutMs ?? 240_000,
     env,
   });
   return { stdout: result.stdout ?? '', stderr: result.stderr ?? '', status: result.status };
+}
+
+function executableInvocation(
+  command: string,
+  arguments_: readonly string[],
+): { readonly command: string; readonly arguments: readonly string[] } {
+  if (process.platform === 'win32' && /\.(?:cjs|js|mjs)$/iu.test(command))
+    return { command: process.execPath, arguments: [command, ...arguments_] };
+  return { command, arguments: arguments_ };
 }
 
 /**

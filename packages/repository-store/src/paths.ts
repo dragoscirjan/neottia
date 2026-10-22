@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { realpathSync } from 'node:fs';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { PathSafetyError, RepositoryStoreConfigError } from './errors.js';
 import { ensurePrivateDirectory } from './internal/filesystem.js';
@@ -31,7 +32,9 @@ export interface ManagedRootOptions {
 /** Resolves and creates a safe authority and managed root. */
 export async function resolveManagedRoot(options: ManagedRootOptions): Promise<ManagedRoot> {
   validateLimits(options.limits);
-  const authorityRoot = resolve(options.authorityRoot);
+  const requestedAuthorityRoot = resolve(options.authorityRoot);
+  ensurePrivateDirectory(requestedAuthorityRoot);
+  const authorityRoot = realpathSync.native(requestedAuthorityRoot);
   ensurePrivateDirectory(authorityRoot);
   const managedRoot =
     options.managedPath === undefined ? authorityRoot : resolveWithin(authorityRoot, options.managedPath);

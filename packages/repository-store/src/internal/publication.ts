@@ -1,14 +1,4 @@
-import {
-  closeSync,
-  constants as fsConstants,
-  fstatSync,
-  linkSync,
-  lstatSync,
-  openSync,
-  rmSync,
-  writeFileSync,
-  type Stats,
-} from 'node:fs';
+import { closeSync, constants as fsConstants, linkSync, openSync, rmSync, writeFileSync, type Stats } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { PathSafetyError, RecoveryError, UnsupportedRuntimeError } from '../errors.js';
 import { computeByteRevision, type ByteRevision } from '../revision.js';
@@ -17,7 +7,9 @@ import {
   assertSafeRegular,
   captureDirectories,
   ensurePrivateDirectory,
+  fstatSync,
   hasCode,
+  lstatSync,
   noFollowFlag,
   readRegularFile,
   revalidateDirectories,
@@ -86,17 +78,20 @@ export function publishExactRegularFile(
       emitFilesystemFault('before-exact-evacuation', evacuated);
       moveNoReplace(platformBackend as RepositoryPlatformBackend, path, evacuated, 'evacuate destination');
       emitFilesystemFault('destination-evacuated', path);
-      evacuatedIdentity = lstatSync(evacuated);
-      assertSafeRegular(evacuatedIdentity, evacuated);
+      const observedIdentity = lstatSync(evacuated);
+      evacuatedIdentity = observedIdentity;
+      assertSafeRegular(observedIdentity, evacuated);
       const evacuatedBytes = readRegularFile(evacuated, expected.maxBytes);
-      if (
-        !sameIdentity(expected.identity, evacuatedIdentity) ||
-        computeByteRevision(evacuatedBytes) !== expected.revision
-      ) {
+      const evacuatedRevision = computeByteRevision(evacuatedBytes);
+      if (!sameIdentity(expected.identity, observedIdentity) || evacuatedRevision !== expected.revision) {
         restoreEvacuated(platformBackend as RepositoryPlatformBackend, evacuated, path, parent);
         evacuatedIdentity = undefined;
         throw new PathSafetyError(`Destination changed during publication: ${path}`, 'IDENTITY_CHANGED', {
           path,
+          expectedIdentity: identityEvidence(expected.identity),
+          observedIdentity: identityEvidence(observedIdentity),
+          expectedRevision: expected.revision,
+          observedRevision: evacuatedRevision,
         });
       }
       revalidateDirectories(parents);
@@ -283,6 +278,14 @@ function unsupportedLink(error: unknown, path: string): unknown {
   if (['EPERM', 'EXDEV', 'ENOTSUP', 'EOPNOTSUPP', 'ENOSYS'].some((code) => hasCode(error, code)))
     return new UnsupportedRuntimeError(`Filesystem does not support exclusive regular-file publication: ${path}`);
   return error;
+}
+
+function identityEvidence(identity: Stats): Readonly<Record<string, number>> {
+  return {
+    birthtimeMs: identity.birthtimeMs,
+    dev: identity.dev,
+    ino: identity.ino,
+  };
 }
 
 function artifactExists(path: string): boolean {

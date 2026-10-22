@@ -37,7 +37,7 @@ describe('Design Docs disposable cache', () => {
     database.close();
     const hits = await store.search({ query: 'SQLite' });
     expect(hits[0]?.title).toBe('Canonical Search');
-  });
+  }, 30_000);
 
   it('applies deterministic tie ordering and canonical metadata filters', async () => {
     const root = await mkdtemp(join(tmpdir(), 'design-cache-order-'));

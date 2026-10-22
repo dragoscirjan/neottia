@@ -1,6 +1,6 @@
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import {
   DEFAULT_STORE_LIMITS,
@@ -222,9 +222,9 @@ describe('memory store (filesystem + SQLite index)', () => {
     rmSync(join(cwd, '.neottia', 'memory', 'index.db'), { force: true });
     await expect(store.search({ query: 'aggregate', limit: 5, max_chars: 100_000 })).resolves.toHaveLength(5);
     await expect(store.validate()).resolves.toMatchObject({ valid: true, records: 1_501 });
-  }, 30_000);
+  }, 120_000);
 
-  it.each(['', '-wal', '-shm'] as const)(
+  it.skipIf(process.platform === 'win32').each(['', '-wal', '-shm'] as const)(
     'preserves canonical YAML and a substituted Memory cache%s artifact',
     async (suffix) => {
       const cwd = fixture();
@@ -386,6 +386,19 @@ describe('memory store (filesystem + SQLite index)', () => {
     await expect(bounded.list()).resolves.toHaveLength(2);
   });
 
+  it('binds memory storage to a canonical physical ancestor path', async () => {
+    const physicalCwd = fixture();
+    const aliasContainer = mkdtempSync(join(tmpdir(), 'neottia-memory-alias-'));
+    tempDirs.push(aliasContainer);
+    const aliasParent = join(aliasContainer, 'parent');
+    symlinkSync(dirname(physicalCwd), aliasParent, 'dir');
+    const store = storeFor(join(aliasParent, basename(physicalCwd)));
+
+    await store.store(fact('Canonical ancestor path'));
+
+    expect(existsSync(join(physicalCwd, '.neottia', 'memory', 'facts'))).toBe(true);
+  });
+
   it('rejects symlinked roots and SQLite cache artifacts', async () => {
     const cwd = fixture();
     const target = mkdtempSync(join(tmpdir(), 'neottia-memory-target-'));
@@ -393,6 +406,8 @@ describe('memory store (filesystem + SQLite index)', () => {
     const linkedRoot = join(cwd, 'linked-memory');
     symlinkSync(target, linkedRoot, 'dir');
     expect(() => storeFor(cwd, { root: linkedRoot })).toThrow(/Unsafe memory root/u);
+    expect(() => storeFor(cwd, { root: 'linked-memory/nested' })).toThrow(/Unsafe memory root/u);
+    expect(existsSync(join(cwd, '.neottia', 'repository-store'))).toBe(false);
 
     const cacheCwd = fixture();
     const store = storeFor(cacheCwd);

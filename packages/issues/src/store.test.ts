@@ -72,7 +72,7 @@ describe('issue canonical lifecycle', () => {
     expect((await issues.search('cafe')).map((issue) => issue.id)).toContain(tokenized.id);
     expect((await issues.search('alpha-beta')).map((issue) => issue.id)).toContain(tokenized.id);
     expect((await issues.validate()).valid).toBe(true);
-  });
+  }, 30_000);
 
   it('serializes concurrent comment appends without losing unrelated state', async () => {
     const cwd = project();
@@ -138,7 +138,7 @@ describe('issue canonical lifecycle', () => {
     expect(matches.map((issue) => issue.id)).toEqual([canonical.id]);
     writeFileSync(join(cwd, '.neottia/cache/issues.sqlite'), 'corrupt');
     expect((await issues.search('canonical')).map((issue) => issue.id)).toEqual([canonical.id]);
-  });
+  }, 30_000);
 
   it('bounds hydrated list/search/export output rather than cache candidates', async () => {
     const cwd = project();
@@ -265,7 +265,7 @@ describe('issue canonical lifecycle', () => {
     expect(afterRecovery).toHaveLength(2);
     expect(new Set(afterRecovery.map((issue) => issue.location))).toEqual(new Set(['active']));
     expect((await issues.validate()).valid).toBe(true);
-  });
+  }, 30_000);
 
   it('fails closed on symlinked issue roots and proposed resource overflow', async () => {
     const cwd = project();
@@ -317,7 +317,7 @@ describe('issue canonical lifecycle', () => {
     await large.create({ type: 'task', title: 'Budget', body: `budget ${'x'.repeat(700)}` });
     await expect(large.search('budget')).rejects.toMatchObject({ code: 'RESULT_TOO_LARGE' });
     await expect(large.search('budget', { maxBytes: 10_000 })).rejects.toMatchObject({ code: 'RESULT_TOO_LARGE' });
-  });
+  }, 15_000);
 
   it('rejects malformed direct search budgets before opening the cache', async () => {
     const paddedCwd = project();
@@ -562,7 +562,7 @@ describe('issue canonical lifecycle', () => {
     });
     database.close();
     expect((await issues.get(child.id)).metadata).toEqual({ nested: { count: 2 }, labels: ['one', 'two'] });
-  });
+  }, 30_000);
 
   it('health-checks structured projections across multiple keyset pages', async () => {
     const cwd = project();

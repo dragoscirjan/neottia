@@ -14,11 +14,13 @@ The package owns byte-safe paths, SHA-256 revisions, one cross-process authority
 
 - Node.js 22.16 or newer, using `node:sqlite`.
 - Bun 1.3.13 or newer, using `bun:sqlite`.
-- Linux x64 or arm64 with libc/kernel support for `renameat2(..., RENAME_NOREPLACE)`.
-- A C++17 compiler, Python, Make, and Linux development headers so the Node-API addon can be built during installation.
-- A recognized local ext4, XFS, Btrfs, tmpfs, or overlay filesystem with same-volume regular-file hard links.
+- Linux x64 or arm64 with libc/kernel support for `renameat2(..., RENAME_NOREPLACE)` and a recognized local ext4, XFS, Btrfs, tmpfs, or overlay filesystem.
+- macOS 15 or 26 on x64 or arm64 with a local APFS volume that reports hard-link, persistent-identity, and exclusive-rename capabilities.
+- Windows Server 2022 or 2025 on x64 with a fixed local NTFS volume that reports stable file-identity and hard-link capabilities.
+- Same-volume regular-file hard links.
+- A C++17 compiler, Python, Make, and the platform development headers required to build the Node-API addon during installation.
 
-The addon is built from architecture-neutral source and is loaded lazily by both Node and Bun. Repository authority acquisition preflights the addon and authority filesystem before creating claim or lease artifacts. macOS, Windows, missing or unloadable addon builds, kernels/libcs without `renameat2`, unrecognized filesystems, and shared/network filesystems return `UNSUPPORTED_RUNTIME`; leased canonical and cache operations, including read-only operations, are unavailable there.
+The addon is built from architecture-neutral source and is loaded lazily by both Node and Bun. Linux uses `renameat2(..., RENAME_NOREPLACE)` and `fsync`. macOS uses `renamex_np(..., RENAME_EXCL)` and `F_FULLFSYNC`. Windows uses `SetFileInformationByHandle(..., FileRenameInfoEx)` without replacement and the Node/Bun `fsyncSync` descriptor barrier; NTFS journals same-volume namespace mutations because Windows does not expose an unprivileged directory-descriptor flush through Node.js. Repository authority acquisition checks the addon and filesystem capabilities before it creates claim or lease artifacts. FreeBSD, Windows arm64, ReFS, FAT, remote or removable Windows volumes, missing or unloadable addon builds, unavailable native operations, uncertified filesystems, and shared or network filesystems return `UNSUPPORTED_RUNTIME`. Leased canonical and cache operations, including read-only operations, are unavailable in those environments.
 
 ## Canonical files
 

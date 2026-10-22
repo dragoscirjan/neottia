@@ -1,3 +1,5 @@
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { setTransactionFaultInjectorForTests } from '@neottia/repository-store/testing';
 import { MemoryStore, loadMemoryConfig } from './index.js';
 
@@ -5,7 +7,10 @@ const [cwd, requestedEvent] = process.argv.slice(2);
 if (cwd === undefined || requestedEvent === undefined) throw new Error('cwd and event are required');
 const store = MemoryStore.fromConfig(loadMemoryConfig(cwd, { env: {} }), cwd);
 setTransactionFaultInjectorForTests((event) => {
-  if (event === requestedEvent) process.kill(process.pid, 'SIGKILL');
+  if (event === requestedEvent) {
+    writeFileSync(join(cwd, 'crash-trigger'), event);
+    process.kill(process.pid, 'SIGKILL');
+  }
 });
 await store.store({
   memory_type: 'semantic',

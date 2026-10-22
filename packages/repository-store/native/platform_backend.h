@@ -11,4 +11,7 @@ int RenameNoReplace(const char* source, const char* destination);
 /** Reports whether path resides on a certified local filesystem. */
 int SupportsLocalPath(const char* path, bool* supported);
 
+/** Flushes an open file or directory descriptor with platform durability semantics. */
+int SyncDescriptor(int descriptor);
+
 }  // namespace neottia::repository_store

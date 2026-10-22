@@ -1,22 +1,43 @@
 import {
   closeSync,
   constants as fsConstants,
-  fstatSync,
-  fsyncSync,
-  lstatSync,
+  fstatSync as nodeFstatSync,
+  lstatSync as nodeLstatSync,
   mkdirSync,
   openSync,
   readSync,
+  type BigIntStats,
+  type PathLike,
   type Stats,
 } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
-import { DurabilityError, PathSafetyError, ResourceLimitError } from '../errors.js';
+import { DurabilityError, PathSafetyError, ResourceLimitError, UnsupportedRuntimeError } from '../errors.js';
 import { emitFilesystemFault } from './fault-injection.js';
+import { requireRepositoryPlatformBackend } from './platform-backend.js';
 
 /** Stable identity for one existing directory component. */
 export interface DirectoryIdentity {
   readonly path: string;
   readonly stat: Stats;
+}
+
+const exactIdentity = Symbol('repository-store-exact-identity');
+const WINDOWS = 'win32';
+
+type IdentityStats = Stats & {
+  readonly [exactIdentity]?: { readonly dev: bigint; readonly ino: bigint };
+};
+
+/** Captures path metadata with an exact NTFS identity on Windows. */
+export function lstatSync(path: PathLike): Stats {
+  if (process.platform !== WINDOWS) return nodeLstatSync(path);
+  return projectWindowsStat(nodeLstatSync(path, { bigint: true }));
+}
+
+/** Captures descriptor metadata with an exact NTFS identity on Windows. */
+export function fstatSync(descriptor: number): Stats {
+  if (process.platform !== WINDOWS) return nodeFstatSync(descriptor);
+  return projectWindowsStat(nodeFstatSync(descriptor, { bigint: true }));
 }
 
 /** Returns O_NOFOLLOW where the host exposes it. */
@@ -31,7 +52,46 @@ export function hasCode(error: unknown, code: string): boolean {
 
 /** Device and inode identify an opened filesystem object on supported hosts. */
 export function sameIdentity(left: Stats, right: Stats): boolean {
+  const exactLeft = (left as IdentityStats)[exactIdentity];
+  const exactRight = (right as IdentityStats)[exactIdentity];
+  if (exactLeft !== undefined && exactRight !== undefined)
+    return exactLeft.dev === exactRight.dev && exactLeft.ino === exactRight.ino;
   return left.dev === right.dev && left.ino === right.ino;
+}
+
+function projectWindowsStat(exact: BigIntStats): Stats {
+  const milliseconds = (value: bigint): number => Number(value);
+  const stat = {
+    atime: new Date(milliseconds(exact.atimeMs)),
+    atimeMs: milliseconds(exact.atimeMs),
+    birthtime: new Date(milliseconds(exact.birthtimeMs)),
+    birthtimeMs: milliseconds(exact.birthtimeMs),
+    blksize: Number(exact.blksize),
+    blocks: Number(exact.blocks),
+    ctime: new Date(milliseconds(exact.ctimeMs)),
+    ctimeMs: milliseconds(exact.ctimeMs),
+    dev: Number(exact.dev),
+    gid: Number(exact.gid),
+    ino: Number(exact.ino),
+    isBlockDevice: () => exact.isBlockDevice(),
+    isCharacterDevice: () => exact.isCharacterDevice(),
+    isDirectory: () => exact.isDirectory(),
+    isFIFO: () => exact.isFIFO(),
+    isFile: () => exact.isFile(),
+    isSocket: () => exact.isSocket(),
+    isSymbolicLink: () => exact.isSymbolicLink(),
+    mode: Number(exact.mode),
+    mtime: new Date(milliseconds(exact.mtimeMs)),
+    mtimeMs: milliseconds(exact.mtimeMs),
+    nlink: Number(exact.nlink),
+    rdev: Number(exact.rdev),
+    size: Number(exact.size),
+    uid: Number(exact.uid),
+  } as unknown as IdentityStats;
+  Object.defineProperty(stat, exactIdentity, {
+    value: { dev: exact.dev, ino: exact.ino },
+  });
+  return stat;
 }
 
 /** Creates a directory chain without traversing symbolic links. */
@@ -113,6 +173,8 @@ export function readRegularFileWithIdentity(
   const allowedLinkCounts = options.allowedLinkCounts ?? [1];
   let descriptor: number | undefined;
   try {
+    const pathBeforeOpen = lstatSync(path);
+    assertRegularWithLinks(pathBeforeOpen, path, allowedLinkCounts);
     descriptor = openSync(path, fsConstants.O_RDONLY | noFollowFlag());
     const before = fstatSync(descriptor);
     assertRegularWithLinks(before, path, allowedLinkCounts);
@@ -171,8 +233,9 @@ function assertRegularWithLinks(stat: Stats, path: string, allowedLinkCounts: re
 export function syncFileDescriptor(descriptor: number, path: string): void {
   try {
     emitFilesystemFault('file-fsync', path);
-    fsyncSync(descriptor);
+    requireRepositoryPlatformBackend().durability.syncDescriptor(descriptor);
   } catch (error: unknown) {
+    if (error instanceof UnsupportedRuntimeError) throw error;
     throw new DurabilityError(`Failed to synchronize file: ${path}`, {
       cause: error,
       evidence: { operation: 'file-fsync', path },
@@ -184,7 +247,8 @@ export function syncFileDescriptor(descriptor: number, path: string): void {
 export function syncRegularFile(path: string): void {
   let descriptor: number | undefined;
   try {
-    descriptor = openSync(path, fsConstants.O_RDONLY | noFollowFlag());
+    const access = process.platform === 'win32' ? fsConstants.O_RDWR : fsConstants.O_RDONLY;
+    descriptor = openSync(path, access | noFollowFlag());
     const opened = fstatSync(descriptor);
     assertSafeRegular(opened, path);
     syncFileDescriptor(descriptor, path);
@@ -196,8 +260,9 @@ export function syncRegularFile(path: string): void {
   }
 }
 
-/** Synchronizes a directory on POSIX; Windows lacks equivalent guarantees. */
+/** Synchronizes a directory where the platform exposes a descriptor barrier. */
 export function syncDirectory(path: string): void {
+  // NTFS journals namespace mutations but does not expose an unprivileged directory flush through Node descriptors.
   if (process.platform === 'win32') return;
   let descriptor: number | undefined;
   try {
@@ -206,8 +271,9 @@ export function syncDirectory(path: string): void {
     if (!stat.isDirectory()) throw unsafe(`Unsafe directory: ${path}`);
     try {
       emitFilesystemFault('directory-fsync', path);
-      fsyncSync(descriptor);
+      requireRepositoryPlatformBackend().durability.syncDescriptor(descriptor);
     } catch (error: unknown) {
+      if (error instanceof UnsupportedRuntimeError) throw error;
       throw new DurabilityError(`Failed to synchronize directory: ${path}`, {
         cause: error,
         evidence: { operation: 'directory-fsync', path },

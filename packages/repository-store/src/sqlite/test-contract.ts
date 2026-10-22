@@ -37,7 +37,7 @@ export function runSqliteAdapterContract(api: SuiteApi, adapter: SqliteAdapter):
         api.expect(rows).toEqual([{ id: 'one', value: 1 }]);
       } finally {
         await database.close();
-        rmSync(root, { recursive: true, force: true });
+        removeFixture(root);
       }
     });
 
@@ -90,7 +90,7 @@ export function runSqliteAdapterContract(api: SuiteApi, adapter: SqliteAdapter):
         api.expect(count?.count).toBe(2);
       } finally {
         await database.close();
-        rmSync(root, { recursive: true, force: true });
+        removeFixture(root);
       }
     });
 
@@ -113,7 +113,7 @@ export function runSqliteAdapterContract(api: SuiteApi, adapter: SqliteAdapter):
       } finally {
         await contender.close();
         await owner.close();
-        rmSync(root, { recursive: true, force: true });
+        removeFixture(root);
       }
     });
 
@@ -140,8 +140,12 @@ export function runSqliteAdapterContract(api: SuiteApi, adapter: SqliteAdapter):
         api.expect(rows.map((row) => row.id)).toEqual(['a', 'b']);
       } finally {
         await database.close();
-        rmSync(root, { recursive: true, force: true });
+        removeFixture(root);
       }
     });
   });
+}
+
+function removeFixture(path: string): void {
+  rmSync(path, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 });
 }

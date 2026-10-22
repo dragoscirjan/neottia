@@ -1,10 +1,11 @@
-import { lstatSync, readdirSync } from 'node:fs';
+import { readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { PathSafetyError, ResourceLimitError } from './errors.js';
 import {
   assertSafeRegular,
   captureDirectories,
   hasCode,
+  lstatSync,
   readRegularFile,
   revalidateDirectories,
 } from './internal/filesystem.js';

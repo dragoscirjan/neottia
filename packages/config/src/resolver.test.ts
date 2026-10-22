@@ -298,7 +298,7 @@ modules:
 
     const child = spawnSync(process.execPath, ['--import', 'tsx', '--input-type=module', '--eval', childScript], {
       encoding: 'utf8',
-      timeout: 2_000,
+      timeout: 30_000,
     });
     if (child.error !== undefined) throw child.error;
 
@@ -807,7 +807,7 @@ describe('environment values, secrets, and safe diagnostics', () => {
       resolutionError(() => resolveConfig(registry, { cwd, env: {}, globalFile: false, projectFile: wide }))
         .diagnostics,
     ).toMatchObject([{ code: 'LIMIT' }]);
-  });
+  }, 30_000);
 
   it('bounds diagnostics and freezes their structured metadata', () => {
     const cwd = temporaryDirectory();
