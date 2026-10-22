@@ -54,6 +54,12 @@ const backendDefinitions: Partial<Record<NodeJS.Platform, PlatformBackendDefinit
     architectures: ['x64', 'arm64'],
     filesystemRequirement: 'a local APFS filesystem with certified publication and durability capabilities',
   },
+  win32: {
+    id: 'windows-node-api',
+    platform: 'win32',
+    architectures: ['x64'],
+    filesystemRequirement: 'a local NTFS filesystem with stable identity and hard-link capabilities',
+  },
 };
 
 let injectedBackend: RepositoryPlatformBackend | null | undefined;

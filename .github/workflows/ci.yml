@@ -47,7 +47,11 @@ jobs:
             architecture: x64
             tier: required
             experimental: false
-          - os: windows-latest
+          - os: windows-2025
+            architecture: x64
+            tier: experimental
+            experimental: true
+          - os: windows-2022
             architecture: x64
             tier: experimental
             experimental: true

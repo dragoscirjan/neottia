@@ -185,7 +185,8 @@ export function syncFileDescriptor(descriptor: number, path: string): void {
 export function syncRegularFile(path: string): void {
   let descriptor: number | undefined;
   try {
-    descriptor = openSync(path, fsConstants.O_RDONLY | noFollowFlag());
+    const access = process.platform === 'win32' ? fsConstants.O_RDWR : fsConstants.O_RDONLY;
+    descriptor = openSync(path, access | noFollowFlag());
     const opened = fstatSync(descriptor);
     assertSafeRegular(opened, path);
     syncFileDescriptor(descriptor, path);
@@ -197,8 +198,9 @@ export function syncRegularFile(path: string): void {
   }
 }
 
-/** Synchronizes a directory on POSIX; Windows lacks equivalent guarantees. */
+/** Synchronizes a directory where the platform exposes a descriptor barrier. */
 export function syncDirectory(path: string): void {
+  // NTFS journals namespace mutations but does not expose an unprivileged directory flush through Node descriptors.
   if (process.platform === 'win32') return;
   let descriptor: number | undefined;
   try {

@@ -146,10 +146,11 @@ describe('repository canonical store', () => {
     expect(isCertifiedRepositoryPlatform('linux', 'arm64')).toBe(true);
     expect(isCertifiedRepositoryPlatform('darwin', 'x64')).toBe(true);
     expect(isCertifiedRepositoryPlatform('darwin', 'arm64')).toBe(true);
+    expect(isCertifiedRepositoryPlatform('win32', 'x64')).toBe(true);
     expect(isCertifiedRepositoryPlatform('linux', 'ppc64')).toBe(false);
     expect(isCertifiedRepositoryPlatform('linux', 's390x')).toBe(false);
     expect(isCertifiedRepositoryPlatform('darwin', 'ia32')).toBe(false);
-    expect(isCertifiedRepositoryPlatform('win32', 'x64')).toBe(false);
+    expect(isCertifiedRepositoryPlatform('win32', 'arm64')).toBe(false);
   });
 
   it('applies exact write, replacement, move, and removal operations', async () => {
