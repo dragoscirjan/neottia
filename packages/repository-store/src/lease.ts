@@ -287,19 +287,23 @@ function ensureHostId(controlRoot: string): string {
     if (!hasCode(error, 'ENOENT')) throw error;
   }
   const value = randomBytes(32).toString('hex');
+  const candidate = join(controlRoot, `.host-id-${randomBytes(16).toString('hex')}.tmp`);
+  let descriptor: number | undefined;
   try {
-    const descriptor = openSync(path, fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL, 0o600);
-    try {
-      writeFileSync(descriptor, `${value}\n`);
-      syncFileDescriptor(descriptor, path);
-    } finally {
-      closeSync(descriptor);
-    }
+    descriptor = openSync(candidate, fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL, 0o600);
+    writeFileSync(descriptor, `${value}\n`);
+    syncFileDescriptor(descriptor, candidate);
+    closeSync(descriptor);
+    descriptor = undefined;
+    platformRenameNoReplace(requireRepositoryPlatformBackend(), candidate, path);
     syncDirectory(controlRoot);
     return value;
   } catch (error: unknown) {
     if (!hasCode(error, 'EEXIST')) throw error;
     return ensureHostId(controlRoot);
+  } finally {
+    if (descriptor !== undefined) closeSync(descriptor);
+    rmSync(candidate, { force: true });
   }
 }
 
