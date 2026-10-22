@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { link, lstat, mkdir, open, readFile, realpath, unlink, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { homedir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
 import { resolveConfig, type ResolvedConfigSnapshot } from '@neottia/config';
@@ -152,7 +152,7 @@ async function uninstallCommand(
   const values = parseCommon(arguments_);
   if (values.receipt === undefined) throw new TypeError('uninstall requires --receipt.');
   const snapshot = await inspectUninstall(
-    await realpath(resolve(values.receipt)),
+    await canonicalReceiptPath(values.receipt),
     await canonicalInstallRoots(roots(values, env)),
   );
   const plan = authorizePlan(createInstallationPlan(snapshot, 'uninstall'), values.approve);
@@ -529,6 +529,12 @@ function roots(values: CommonValues, env: NodeJS.ProcessEnv): InstallRoots {
       typeof values['xdg-state'] === 'string' ? values['xdg-state'] : (env.XDG_STATE_HOME ?? `${home}/.local/state`),
     ),
   };
+}
+
+/** Canonicalizes receipt ancestors while preserving final-component symlink checks. */
+async function canonicalReceiptPath(receipt: string): Promise<string> {
+  const lexicalPath = resolve(receipt);
+  return join(await realpath(dirname(lexicalPath)), basename(lexicalPath));
 }
 
 async function canonicalInstallRoots(installRoots: InstallRoots): Promise<InstallRoots> {

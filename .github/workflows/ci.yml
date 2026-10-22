@@ -31,7 +31,7 @@ jobs:
             architecture: x64
             tier: required
             experimental: false
-          - os: macos-latest
+          - os: macos-26
             architecture: arm64
             tier: required
             experimental: false

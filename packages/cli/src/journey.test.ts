@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -455,6 +455,15 @@ describe('empty-project CLI adoption journey (issue #161)', () => {
     await expect(issues.comment(epic.id, 'journey', 'stale write', 'v1:' + '0'.repeat(64))).rejects.toThrow(
       /Stale issue revision/u,
     );
+
+    // Receipt aliases must not bypass the distribution layer's final-component symlink rejection.
+    const receiptAlias = join(roots.root, 'receipt-alias.json');
+    const aliasPlanPath = join(roots.root, 'receipt-alias.plan.json');
+    await symlink(receiptPath, receiptAlias, 'file');
+    const aliasPlan = runCli(['uninstall', '--receipt', receiptAlias, '--output', aliasPlanPath], roots);
+    expect(aliasPlan.code).toBe(1);
+    expect(aliasPlan.stderr).toContain('Installer target is not a regular file');
+    expect(existsSync(aliasPlanPath)).toBe(false);
 
     // Uninstall is receipt-driven and preserves unrelated user-owned
     // host configuration.

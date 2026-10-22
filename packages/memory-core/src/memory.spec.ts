@@ -406,6 +406,8 @@ describe('memory store (filesystem + SQLite index)', () => {
     const linkedRoot = join(cwd, 'linked-memory');
     symlinkSync(target, linkedRoot, 'dir');
     expect(() => storeFor(cwd, { root: linkedRoot })).toThrow(/Unsafe memory root/u);
+    expect(() => storeFor(cwd, { root: 'linked-memory/nested' })).toThrow(/Unsafe memory root/u);
+    expect(existsSync(join(cwd, '.neottia', 'repository-store'))).toBe(false);
 
     const cacheCwd = fixture();
     const store = storeFor(cacheCwd);

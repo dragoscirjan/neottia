@@ -80,7 +80,10 @@ export class FilesystemBackend extends MemoryRecordSupport implements StorageBac
   public constructor(options: FilesystemBackendOptions) {
     super();
     const canonicalCwd = canonicalMemoryRoot(resolve(options.cwd));
-    this.root = canonicalMemoryRoot(resolve(canonicalCwd, options.config.root));
+    const absoluteConfiguredRoot = isAbsolute(options.config.root);
+    const configuredRoot = resolve(canonicalCwd, options.config.root);
+    if (!absoluteConfiguredRoot) assertSafeMemoryRoot(configuredRoot);
+    this.root = canonicalMemoryRoot(configuredRoot);
     assertSafeMemoryRoot(this.root);
     this.cacheMaxAgeMs = options.config.cache.max_age_ms;
     this.stalePolicy = options.config.cache.stale_policy;
@@ -90,7 +93,6 @@ export class FilesystemBackend extends MemoryRecordSupport implements StorageBac
       maxFiles: options.config.security.limits.max_files,
       maxTotalBytes: options.config.security.limits.max_total_bytes,
     };
-    const absoluteConfiguredRoot = isAbsolute(options.config.root);
     this.repositoryRootOptions = {
       authorityRoot: absoluteConfiguredRoot ? this.root : canonicalCwd,
       ...(absoluteConfiguredRoot ? {} : { managedPath: options.config.root.split(sep).join('/') }),
