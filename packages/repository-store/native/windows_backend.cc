@@ -99,11 +99,13 @@ int RenameNoReplace(const char* source, const char* destination) {
 
   const std::wstring extended_source = ExtendedPath(source_path);
   const std::wstring extended_destination = ExtendedPath(destination_path);
-  HANDLE handle = CreateFileW(
-      extended_source.c_str(), GENERIC_READ | GENERIC_WRITE | DELETE,
-      FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
-      OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OPEN_REPARSE_POINT,
-      nullptr);
+  HANDLE handle =
+      CreateFileW(extended_source.c_str(), DELETE | FILE_READ_ATTRIBUTES,
+                  FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                  nullptr, OPEN_EXISTING,
+                  FILE_ATTRIBUTE_NORMAL | FILE_FLAG_BACKUP_SEMANTICS |
+                      FILE_FLAG_OPEN_REPARSE_POINT,
+                  nullptr);
   if (handle == INVALID_HANDLE_VALUE) return WindowsError(GetLastError());
 
   FILE_ATTRIBUTE_TAG_INFO attributes = {};
@@ -133,11 +135,6 @@ int RenameNoReplace(const char* source, const char* destination) {
 
   if (!SetFileInformationByHandle(handle, FileRenameInfoEx, rename,
                                   static_cast<DWORD>(storage.size()))) {
-    error = WindowsError(GetLastError());
-    CloseHandle(handle);
-    return error;
-  }
-  if (!FlushFileBuffers(handle)) {
     error = WindowsError(GetLastError());
     CloseHandle(handle);
     return error;

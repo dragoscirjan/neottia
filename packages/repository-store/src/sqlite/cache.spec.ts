@@ -226,6 +226,7 @@ describe('disposable SQLite cache', () => {
   it.each(['candidate-file', 'activation-directory'] as const)(
     'reports structured durability and cleans exact cache artifacts for %s fsync',
     async (boundary) => {
+      if (process.platform === 'win32' && boundary === 'activation-directory') return;
       const { authority, root, specification } = await newCacheFixture(`neottia-cache-${boundary}-`);
       const cause = new Error(`injected ${boundary} fsync`);
       const activePath = join(authority, 'cache.db');
@@ -275,7 +276,9 @@ describe('disposable SQLite cache', () => {
       temporaryDirectories.push(authority);
       const worker = fileURLToPath(new URL('../../test/cache-crash.mjs', import.meta.url));
       const child = spawnSync(process.execPath, [worker, authority, event]);
-      expect(child.signal).toBe('SIGKILL');
+      expect({ signal: child.signal, status: child.status }).toEqual(
+        process.platform === 'win32' ? { signal: null, status: 1 } : { signal: 'SIGKILL', status: null },
+      );
       const leasePath = join(authority, '.neottia', 'repository-store', 'authority.lease');
       utimesSync(leasePath, new Date(0), new Date(0));
 

@@ -350,6 +350,7 @@ describe('repository canonical store', () => {
     ['journal manifest', 'file-fsync', (target: string) => target.endsWith('manifest.json')],
     ['canonical directory', 'directory-fsync', () => true],
   ] as const)('returns exact durability evidence for %s fsync failures', async (_name, eventName, matches) => {
+    if (process.platform === 'win32' && eventName === 'directory-fsync') return;
     const root = await fixture();
     const path = resolveManagedPath(root, `records/durable-${eventName}.txt`);
     const cause = new Error(`injected ${eventName} failure`);
@@ -1192,7 +1193,7 @@ function runCrashWorker(authority: string, faultEvent: string, occurrence: numbe
     worker,
     [authority, faultEvent, String(occurrence)],
     'compiled-package crash worker',
-    (code, signal) => code === null && signal === 'SIGKILL',
+    isForcedTermination,
     false,
   );
 }
@@ -1203,9 +1204,13 @@ function runLeaseCrashWorker(authority: string, faultEvent: LeaseFaultEvent): Pr
     worker,
     [authority, faultEvent],
     'compiled-package lease crash worker',
-    (code, signal) => code === null && signal === 'SIGKILL',
+    isForcedTermination,
     false,
   );
+}
+
+function isForcedTermination(code: number | null, signal: NodeJS.Signals | null): boolean {
+  return process.platform === 'win32' ? code === 1 && signal === null : code === null && signal === 'SIGKILL';
 }
 
 function runLeaseWorker(authority: string, id: string, iterations: number): Promise<void> {

@@ -31,7 +31,7 @@ export function hasCode(error: unknown, code: string): boolean {
 
 /** Device and inode identify an opened filesystem object on supported hosts. */
 export function sameIdentity(left: Stats, right: Stats): boolean {
-  return left.dev === right.dev && left.ino === right.ino;
+  return left.dev === right.dev && left.ino === right.ino && left.birthtimeMs === right.birthtimeMs;
 }
 
 /** Creates a directory chain without traversing symbolic links. */
@@ -113,6 +113,8 @@ export function readRegularFileWithIdentity(
   const allowedLinkCounts = options.allowedLinkCounts ?? [1];
   let descriptor: number | undefined;
   try {
+    const pathBeforeOpen = lstatSync(path);
+    assertRegularWithLinks(pathBeforeOpen, path, allowedLinkCounts);
     descriptor = openSync(path, fsConstants.O_RDONLY | noFollowFlag());
     const before = fstatSync(descriptor);
     assertRegularWithLinks(before, path, allowedLinkCounts);
