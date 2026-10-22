@@ -46,6 +46,7 @@ export function createConfigFixture(options: CreateConfigFixtureOptions = {}): C
   writeDocument(firstConfig, options.project ?? {});
   writeDocument(secondConfig, options.secondProject ?? options.project ?? {});
   const env = Object.freeze({
+    APPDATA: join(root, 'xdg-config'),
     XDG_CONFIG_HOME: join(root, 'xdg-config'),
     ...(options.profile ? { NEOTTIA_PROFILE: options.profile.name } : {}),
     ...(options.env ?? {}),

@@ -1,6 +1,6 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import {
   SEARCHABLE_TOOLS,
   searchableToolJsonSchema,
@@ -32,15 +32,16 @@ it('registers all shared tools, forwards cancellation and CWD, then closes runti
       expect.objectContaining(searchableToolJsonSchema(definition.name, 'input')),
     );
   const controller = new AbortController();
+  const projectCwd = resolve('/tmp/project');
   const webSearch = registered.find((tool) => tool.name === 'web_search');
   await webSearch?.execute('1', { query: 'test' }, controller.signal, vi.fn(), { cwd: '/tmp/project' });
   expect(factory).toHaveBeenCalledWith(
-    expect.objectContaining({ cwd: '/tmp/project', config: expect.objectContaining({ enabled: true }) }),
+    expect.objectContaining({ cwd: projectCwd, config: expect.objectContaining({ enabled: true }) }),
   );
   expect(search).toHaveBeenCalledWith(
     expect.objectContaining({ query: 'test' }),
     expect.objectContaining({
-      cwd: '/tmp/project',
+      cwd: projectCwd,
       signal: controller.signal,
       config: expect.objectContaining({ enabled: true }),
     }),

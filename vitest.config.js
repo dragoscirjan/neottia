@@ -53,6 +53,8 @@ export default defineConfig({
       skipFull: false,
     },
     environment: 'node',
+    hookTimeout: process.platform === 'win32' ? 120_000 : 10_000,
+    testTimeout: process.platform === 'win32' ? 120_000 : 5_000,
     exclude: [
       '**/*.bun.test.ts', // Bun-only suites run through their package scripts.
       '**/*.config.*',

@@ -151,7 +151,10 @@ async function uninstallCommand(
 ): Promise<number> {
   const values = parseCommon(arguments_);
   if (values.receipt === undefined) throw new TypeError('uninstall requires --receipt.');
-  const snapshot = await inspectUninstall(await realpath(resolve(values.receipt)), roots(values, env));
+  const snapshot = await inspectUninstall(
+    await realpath(resolve(values.receipt)),
+    await canonicalInstallRoots(roots(values, env)),
+  );
   const plan = authorizePlan(createInstallationPlan(snapshot, 'uninstall'), values.approve);
   await emitPlan(plan, values.output, output);
   return plan.conflicts.some((conflict) => !conflict.approved) ? 2 : 0;
@@ -526,6 +529,20 @@ function roots(values: CommonValues, env: NodeJS.ProcessEnv): InstallRoots {
       typeof values['xdg-state'] === 'string' ? values['xdg-state'] : (env.XDG_STATE_HOME ?? `${home}/.local/state`),
     ),
   };
+}
+
+async function canonicalInstallRoots(installRoots: InstallRoots): Promise<InstallRoots> {
+  const entries = await Promise.all(
+    Object.entries(installRoots).map(async ([name, path]) => {
+      try {
+        return [name, await realpath(path)] as const;
+      } catch (error: unknown) {
+        if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return [name, path] as const;
+        throw error;
+      }
+    }),
+  );
+  return Object.fromEntries(entries) as unknown as InstallRoots;
 }
 
 /** Validates, deduplicates, and orders optional module enablement. */

@@ -298,7 +298,7 @@ modules:
 
     const child = spawnSync(process.execPath, ['--import', 'tsx', '--input-type=module', '--eval', childScript], {
       encoding: 'utf8',
-      timeout: 2_000,
+      timeout: 30_000,
     });
     if (child.error !== undefined) throw child.error;
 

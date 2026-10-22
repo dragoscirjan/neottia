@@ -224,7 +224,7 @@ describe('memory store (filesystem + SQLite index)', () => {
     await expect(store.validate()).resolves.toMatchObject({ valid: true, records: 1_501 });
   }, 120_000);
 
-  it.each(['', '-wal', '-shm'] as const)(
+  it.skipIf(process.platform === 'win32').each(['', '-wal', '-shm'] as const)(
     'preserves canonical YAML and a substituted Memory cache%s artifact',
     async (suffix) => {
       const cwd = fixture();

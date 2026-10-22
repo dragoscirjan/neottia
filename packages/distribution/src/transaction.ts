@@ -256,7 +256,8 @@ async function syncDirectory(path: string): Promise<void> {
   try {
     await handle.sync();
   } catch (error) {
-    if (!(error instanceof Error && 'code' in error && ['EINVAL', 'ENOTSUP'].includes(String(error.code)))) throw error;
+    if (!(error instanceof Error && 'code' in error && ['EINVAL', 'ENOTSUP', 'EPERM'].includes(String(error.code))))
+      throw error;
   } finally {
     await handle.close();
   }

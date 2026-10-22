@@ -28,6 +28,8 @@ const char* ErrnoCode(int value) {
       return "EPERM";
     case EACCES:
       return "EACCES";
+    case EBUSY:
+      return "EBUSY";
     case EBADF:
       return "EBADF";
     default:

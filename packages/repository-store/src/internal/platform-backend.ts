@@ -1,3 +1,4 @@
+import { fsyncSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { UnsupportedRuntimeError } from '../errors.js';
@@ -54,6 +55,12 @@ const backendDefinitions: Partial<Record<NodeJS.Platform, PlatformBackendDefinit
     architectures: ['x64', 'arm64'],
     filesystemRequirement: 'a local APFS filesystem with certified publication and durability capabilities',
   },
+  win32: {
+    id: 'windows-node-api',
+    platform: 'win32',
+    architectures: ['x64'],
+    filesystemRequirement: 'a local NTFS filesystem with stable identity and hard-link capabilities',
+  },
 };
 
 let injectedBackend: RepositoryPlatformBackend | null | undefined;
@@ -81,7 +88,9 @@ export function requireRepositoryPlatformBackend(): RepositoryPlatformBackend {
       ...definition,
       publication: Object.freeze({ renameNoReplace: nativeModule.renameNoReplace.bind(nativeModule) }),
       filesystem: Object.freeze({ supportsLocalPath: nativeModule.supportsLocalPath.bind(nativeModule) }),
-      durability: Object.freeze({ syncDescriptor: nativeModule.syncDescriptor.bind(nativeModule) }),
+      durability: Object.freeze({
+        syncDescriptor: definition.platform === 'win32' ? fsyncSync : nativeModule.syncDescriptor.bind(nativeModule),
+      }),
     });
     return loadedBackend;
   } catch (error: unknown) {

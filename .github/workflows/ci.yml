@@ -47,10 +47,14 @@ jobs:
             architecture: x64
             tier: required
             experimental: false
-          - os: windows-latest
+          - os: windows-2025
             architecture: x64
-            tier: experimental
-            experimental: true
+            tier: required
+            experimental: false
+          - os: windows-2022
+            architecture: x64
+            tier: required
+            experimental: false
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
@@ -65,6 +69,10 @@ jobs:
         env:
           EXPECTED_ARCHITECTURE: ${{ matrix.architecture }}
         run: node -e "if (process.arch !== process.env.EXPECTED_ARCHITECTURE) throw new Error('Expected ' + process.env.EXPECTED_ARCHITECTURE + ', got ' + process.arch)"
+      - name: Verify Windows native backend
+        if: runner.os == 'Windows'
+        working-directory: packages/repository-store
+        run: pnpm run build:native && node test/windows-native-smoke.mjs
       - name: Run tests
         id: tests
         continue-on-error: ${{ matrix.experimental }}

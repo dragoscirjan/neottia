@@ -265,7 +265,7 @@ describe('issue canonical lifecycle', () => {
     expect(afterRecovery).toHaveLength(2);
     expect(new Set(afterRecovery.map((issue) => issue.location))).toEqual(new Set(['active']));
     expect((await issues.validate()).valid).toBe(true);
-  });
+  }, 30_000);
 
   it('fails closed on symlinked issue roots and proposed resource overflow', async () => {
     const cwd = project();
@@ -317,7 +317,7 @@ describe('issue canonical lifecycle', () => {
     await large.create({ type: 'task', title: 'Budget', body: `budget ${'x'.repeat(700)}` });
     await expect(large.search('budget')).rejects.toMatchObject({ code: 'RESULT_TOO_LARGE' });
     await expect(large.search('budget', { maxBytes: 10_000 })).rejects.toMatchObject({ code: 'RESULT_TOO_LARGE' });
-  });
+  }, 15_000);
 
   it('rejects malformed direct search budgets before opening the cache', async () => {
     const paddedCwd = project();

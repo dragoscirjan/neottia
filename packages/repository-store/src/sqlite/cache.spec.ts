@@ -226,6 +226,7 @@ describe('disposable SQLite cache', () => {
   it.each(['candidate-file', 'activation-directory'] as const)(
     'reports structured durability and cleans exact cache artifacts for %s fsync',
     async (boundary) => {
+      if (process.platform === 'win32' && boundary === 'activation-directory') return;
       const { authority, root, specification } = await newCacheFixture(`neottia-cache-${boundary}-`);
       const cause = new Error(`injected ${boundary} fsync`);
       const activePath = join(authority, 'cache.db');
@@ -275,7 +276,9 @@ describe('disposable SQLite cache', () => {
       temporaryDirectories.push(authority);
       const worker = fileURLToPath(new URL('../../test/cache-crash.mjs', import.meta.url));
       const child = spawnSync(process.execPath, [worker, authority, event]);
-      expect(child.signal).toBe('SIGKILL');
+      expect({ signal: child.signal, status: child.status }).toEqual(
+        process.platform === 'win32' ? { signal: null, status: 1 } : { signal: 'SIGKILL', status: null },
+      );
       const leasePath = join(authority, '.neottia', 'repository-store', 'authority.lease');
       utimesSync(leasePath, new Date(0), new Date(0));
 
@@ -367,49 +370,67 @@ describe('disposable SQLite cache', () => {
     });
   });
 
-  it('detects database replacement while an acquired handle is in use', async () => {
-    const { authority, root, specification } = await newCacheFixture('neottia-cache-identity-');
+  it.skipIf(process.platform === 'win32')(
+    'detects database replacement while an acquired handle is in use',
+    async () => {
+      const { authority, root, specification } = await newCacheFixture('neottia-cache-identity-');
+      await withRepositoryLease(root, async (lease) => {
+        const cache = await rebuildDisposableSqliteCache(root, lease, specification);
+        rmSync(join(authority, 'cache.db'));
+        writeFileSync(join(authority, 'cache.db'), 'replacement');
+        await expect(cache.database.prepare('SELECT 1')).rejects.toMatchObject({ code: 'IDENTITY_CHANGED' });
+        await expect(cache.close()).rejects.toMatchObject({ code: 'IDENTITY_CHANGED' });
+        expect(readFileSync(join(authority, 'cache.db'), 'utf8')).toBe('replacement');
+      });
+    },
+  );
+
+  it.runIf(process.platform === 'win32')('blocks database replacement while an acquired handle is in use', async () => {
+    const { authority, root, specification } = await newCacheFixture('neottia-cache-windows-sharing-');
     await withRepositoryLease(root, async (lease) => {
       const cache = await rebuildDisposableSqliteCache(root, lease, specification);
-      rmSync(join(authority, 'cache.db'));
-      writeFileSync(join(authority, 'cache.db'), 'replacement');
-      await expect(cache.database.prepare('SELECT 1')).rejects.toMatchObject({ code: 'IDENTITY_CHANGED' });
-      await expect(cache.close()).rejects.toMatchObject({ code: 'IDENTITY_CHANGED' });
-      expect(readFileSync(join(authority, 'cache.db'), 'utf8')).toBe('replacement');
+      expect(() => rmSync(join(authority, 'cache.db'))).toThrowError(expect.objectContaining({ code: 'EBUSY' }));
+      await cache.close();
     });
   });
 
-  it.each(['-wal', '-shm'])('detects %s replacement while a cache handle is in use', async (suffix) => {
-    const { authority, root, specification } = await newCacheFixture('neottia-cache-sidecar-');
-    await withRepositoryLease(root, async (lease) => {
-      const cache = await rebuildDisposableSqliteCache(root, lease, specification);
-      const sidecar = join(authority, `cache.db${suffix}`);
-      expect(existsSync(sidecar)).toBe(true);
-      rmSync(sidecar);
-      writeFileSync(sidecar, 'replacement');
-      await expect(cache.database.prepare('SELECT 1')).rejects.toMatchObject({ code: 'IDENTITY_CHANGED' });
-      await expect(cache.close()).rejects.toMatchObject({ code: 'IDENTITY_CHANGED' });
-      expect(readFileSync(sidecar, 'utf8')).toBe('replacement');
-    });
-  });
+  it.skipIf(process.platform === 'win32').each(['-wal', '-shm'])(
+    'detects %s replacement while a cache handle is in use',
+    async (suffix) => {
+      const { authority, root, specification } = await newCacheFixture('neottia-cache-sidecar-');
+      await withRepositoryLease(root, async (lease) => {
+        const cache = await rebuildDisposableSqliteCache(root, lease, specification);
+        const sidecar = join(authority, `cache.db${suffix}`);
+        expect(existsSync(sidecar)).toBe(true);
+        rmSync(sidecar);
+        writeFileSync(sidecar, 'replacement');
+        await expect(cache.database.prepare('SELECT 1')).rejects.toMatchObject({ code: 'IDENTITY_CHANGED' });
+        await expect(cache.close()).rejects.toMatchObject({ code: 'IDENTITY_CHANGED' });
+        expect(readFileSync(sidecar, 'utf8')).toBe('replacement');
+      });
+    },
+  );
 
-  it.each(['', '-wal', '-shm'])('rejects %s replacement while a handle operation is pending', async (suffix) => {
-    const started = deferred();
-    const release = deferred();
-    setSqliteAdapterForTests(delayedPrepareAdapter(started, release));
-    const { authority, root, specification } = await newCacheFixture('neottia-cache-pending-operation-');
-    await withRepositoryLease(root, async (lease) => {
-      const cache = await rebuildDisposableSqliteCache(root, lease, specification);
-      const operation = cache.database.prepare('SELECT 1 /* pending identity check */');
-      await started.promise;
-      const artifact = join(authority, `cache.db${suffix}`);
-      replaceWithSentinel(artifact);
-      release.resolve();
-      await expect(operation).rejects.toMatchObject({ code: 'IDENTITY_CHANGED' });
-      expect(readFileSync(artifact, 'utf8')).toBe('replacement');
-      await expect(cache.close()).rejects.toMatchObject({ code: 'IDENTITY_CHANGED' });
-    });
-  });
+  it.skipIf(process.platform === 'win32').each(['', '-wal', '-shm'])(
+    'rejects %s replacement while a handle operation is pending',
+    async (suffix) => {
+      const started = deferred();
+      const release = deferred();
+      setSqliteAdapterForTests(delayedPrepareAdapter(started, release));
+      const { authority, root, specification } = await newCacheFixture('neottia-cache-pending-operation-');
+      await withRepositoryLease(root, async (lease) => {
+        const cache = await rebuildDisposableSqliteCache(root, lease, specification);
+        const operation = cache.database.prepare('SELECT 1 /* pending identity check */');
+        await started.promise;
+        const artifact = join(authority, `cache.db${suffix}`);
+        replaceWithSentinel(artifact);
+        release.resolve();
+        await expect(operation).rejects.toMatchObject({ code: 'IDENTITY_CHANGED' });
+        expect(readFileSync(artifact, 'utf8')).toBe('replacement');
+        await expect(cache.close()).rejects.toMatchObject({ code: 'IDENTITY_CHANGED' });
+      });
+    },
+  );
 
   it('rejects candidate replacement while close remains pending', async () => {
     const started = deferred();
@@ -429,24 +450,27 @@ describe('disposable SQLite cache', () => {
     });
   });
 
-  it.each(['', '-wal', '-shm'])('preserves an active %s replacement detected before activation', async (suffix) => {
-    const { authority, root, path, specification } = await newCacheFixture('neottia-cache-activation-');
-    await withRepositoryLease(root, async (lease) => {
-      const active = await rebuildDisposableSqliteCache(root, lease, specification);
-      const replacement = cacheSpecification(path, 'replacement-digest');
-      const populate = replacement.populate;
-      replacement.populate = async (database) => {
-        await populate(database);
-        replaceWithSentinel(join(authority, `cache.db${suffix}`));
-      };
-      await expect(rebuildDisposableSqliteCache(root, lease, replacement)).rejects.toMatchObject({
-        code: 'IDENTITY_CHANGED',
+  it.skipIf(process.platform === 'win32').each(['', '-wal', '-shm'])(
+    'preserves an active %s replacement detected before activation',
+    async (suffix) => {
+      const { authority, root, path, specification } = await newCacheFixture('neottia-cache-activation-');
+      await withRepositoryLease(root, async (lease) => {
+        const active = await rebuildDisposableSqliteCache(root, lease, specification);
+        const replacement = cacheSpecification(path, 'replacement-digest');
+        const populate = replacement.populate;
+        replacement.populate = async (database) => {
+          await populate(database);
+          replaceWithSentinel(join(authority, `cache.db${suffix}`));
+        };
+        await expect(rebuildDisposableSqliteCache(root, lease, replacement)).rejects.toMatchObject({
+          code: 'IDENTITY_CHANGED',
+        });
+        expect(readFileSync(join(authority, `cache.db${suffix}`), 'utf8')).toBe('replacement');
+        await expect(active.close()).rejects.toMatchObject({ code: 'IDENTITY_CHANGED' });
+        expect(readFileSync(join(authority, `cache.db${suffix}`), 'utf8')).toBe('replacement');
       });
-      expect(readFileSync(join(authority, `cache.db${suffix}`), 'utf8')).toBe('replacement');
-      await expect(active.close()).rejects.toMatchObject({ code: 'IDENTITY_CHANGED' });
-      expect(readFileSync(join(authority, `cache.db${suffix}`), 'utf8')).toBe('replacement');
-    });
-  });
+    },
+  );
 
   it('preserves a replacement injected at the final activation mutation', async () => {
     const { authority, root, path, specification } = await newCacheFixture('neottia-cache-final-activation-');
@@ -487,25 +511,28 @@ describe('disposable SQLite cache', () => {
     });
   });
 
-  it.each(['', '-wal', '-shm'])('does not close SQLite over a %s replacement during verification', async (suffix) => {
-    const { authority, root, path, specification } = await newCacheFixture('neottia-cache-verification-');
-    await withRepositoryLease(root, async (lease) => {
-      const cache = await rebuildDisposableSqliteCache(root, lease, specification);
-      await cache.close();
-      const adversarial = cacheSpecification(path, specification.canonicalDigest);
-      const healthCheck = adversarial.healthCheck;
-      adversarial.healthCheck = async (database) => {
-        await healthCheck(database);
-        replaceWithSentinel(join(authority, `cache.db${suffix}`));
-      };
-      await expect(openDisposableSqliteCache(root, lease, adversarial)).rejects.toMatchObject({
-        code: 'IDENTITY_CHANGED',
+  it.skipIf(process.platform === 'win32').each(['', '-wal', '-shm'])(
+    'does not close SQLite over a %s replacement during verification',
+    async (suffix) => {
+      const { authority, root, path, specification } = await newCacheFixture('neottia-cache-verification-');
+      await withRepositoryLease(root, async (lease) => {
+        const cache = await rebuildDisposableSqliteCache(root, lease, specification);
+        await cache.close();
+        const adversarial = cacheSpecification(path, specification.canonicalDigest);
+        const healthCheck = adversarial.healthCheck;
+        adversarial.healthCheck = async (database) => {
+          await healthCheck(database);
+          replaceWithSentinel(join(authority, `cache.db${suffix}`));
+        };
+        await expect(openDisposableSqliteCache(root, lease, adversarial)).rejects.toMatchObject({
+          code: 'IDENTITY_CHANGED',
+        });
+        expect(readFileSync(join(authority, `cache.db${suffix}`), 'utf8')).toBe('replacement');
       });
-      expect(readFileSync(join(authority, `cache.db${suffix}`), 'utf8')).toBe('replacement');
-    });
-  });
+    },
+  );
 
-  it('detects cache ancestor rebinding around handle operations', async () => {
+  it.skipIf(process.platform === 'win32')('detects cache ancestor rebinding around handle operations', async () => {
     const container = mkdtempSync(join(tmpdir(), 'neottia-cache-ancestor-'));
     temporaryDirectories.push(container);
     const authority = join(container, 'authority');

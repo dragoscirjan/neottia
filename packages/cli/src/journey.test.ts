@@ -282,7 +282,9 @@ describe('empty-project CLI adoption journey (issue #161)', () => {
     }
     const hostWrites = plan.mutations.filter((mutation) => mutation.role === 'host-config');
     expect(hostWrites).toHaveLength(1);
-    expect(hostWrites[0]!.path).toBe(join(await realpath(roots.project), '.pi', 'settings.json'));
+    const hostPath = hostWrites[0]!.path;
+    expect(hostPath.endsWith(join('.pi', 'settings.json'))).toBe(true);
+    expect(await realpath(dirname(dirname(hostPath)))).toBe(await realpath(roots.project));
     for (const expected of expectedPiPackages()) {
       expect(hostWrites[0]!.content).toContain(expected);
     }
@@ -465,8 +467,8 @@ describe('empty-project CLI adoption journey (issue #161)', () => {
 
     const uninstallPlanPath = join(roots.root, 'uninstall.plan.json');
     const uninstallPlan = runCli(['uninstall', '--receipt', receiptPath, '--output', uninstallPlanPath], roots);
-    expect(uninstallPlan.code).toBe(0);
-    expect(runCli(['apply', '--plan', uninstallPlanPath], roots).code).toBe(0);
+    expect(uninstallPlan).toMatchObject({ code: 0, stderr: '' });
+    expect(runCli(['apply', '--plan', uninstallPlanPath], roots)).toMatchObject({ code: 0, stderr: '' });
 
     for (const command of COMMANDS) {
       expect(existsSync(join(roots.project, '.pi', 'prompts', `${command}.md`))).toBe(false);
