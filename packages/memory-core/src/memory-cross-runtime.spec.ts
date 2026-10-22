@@ -63,7 +63,9 @@ describe('Memory Node/Bun compatibility', () => {
     async (event) => {
       const cwd = memoryFixture(`neottia-memory-crash-${event}-`);
       const child = spawnSync(process.execPath, ['--import', 'tsx', crashWorker, cwd, event]);
-      expect(child.signal).toBe('SIGKILL');
+      expect({ signal: child.signal, status: child.status }).toEqual(
+        process.platform === 'win32' ? { signal: null, status: 1 } : { signal: 'SIGKILL', status: null },
+      );
       const leasePath = join(cwd, '.neottia', 'repository-store', 'authority.lease');
       utimesSync(leasePath, new Date(0), new Date(0));
       const store = MemoryStore.fromConfig(loadMemoryConfig(cwd, { env: {} }), cwd);
