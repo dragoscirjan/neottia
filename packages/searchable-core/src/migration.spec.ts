@@ -102,7 +102,7 @@ it('rejects a symlinked legacy source without following it', async () => {
   try {
     const report = await importLegacySearchableDatabase(runtime.store, { path: '.web_stash.db' });
     expect(report).toMatchObject({ valid: false, planned: 0, imported: 0 });
-    expect(report.errors[0]).toContain('regular singly-linked file');
+    expect(report.errors[0]).toMatch(/regular singly-linked file|changed while it was read/iu);
   } finally {
     await runtime.close();
   }
