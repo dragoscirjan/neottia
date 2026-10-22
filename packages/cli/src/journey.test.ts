@@ -468,7 +468,7 @@ describe('empty-project CLI adoption journey (issue #161)', () => {
     const uninstallPlanPath = join(roots.root, 'uninstall.plan.json');
     const uninstallPlan = runCli(['uninstall', '--receipt', receiptPath, '--output', uninstallPlanPath], roots);
     expect(uninstallPlan.code).toBe(0);
-    expect(runCli(['apply', '--plan', uninstallPlanPath], roots).code).toBe(0);
+    expect(runCli(['apply', '--plan', uninstallPlanPath], roots)).toMatchObject({ code: 0, stderr: '' });
 
     for (const command of COMMANDS) {
       expect(existsSync(join(roots.project, '.pi', 'prompts', `${command}.md`))).toBe(false);
