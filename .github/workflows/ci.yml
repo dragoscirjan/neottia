@@ -33,20 +33,20 @@ jobs:
             experimental: false
           - os: macos-latest
             architecture: arm64
-            tier: experimental
-            experimental: true
+            tier: required
+            experimental: false
           - os: macos-15
             architecture: arm64
-            tier: experimental
-            experimental: true
+            tier: required
+            experimental: false
           - os: macos-26-intel
             architecture: x64
-            tier: experimental
-            experimental: true
+            tier: required
+            experimental: false
           - os: macos-15-intel
             architecture: x64
-            tier: experimental
-            experimental: true
+            tier: required
+            experimental: false
           - os: windows-latest
             architecture: x64
             tier: experimental
