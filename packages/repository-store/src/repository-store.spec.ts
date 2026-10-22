@@ -838,7 +838,7 @@ describe('repository authority lease', () => {
       await withRepositoryLease(root, async () => undefined);
       const control = join(root.authorityRoot, '.neottia', 'repository-store');
       const lock = writeTestOwner(control, process.pid, new Date());
-      const ownerPath = join(lock, 'owner.json');
+      const ownerPath = process.platform === 'freebsd' ? lock : join(lock, 'owner.json');
       const displacedControl = `${control}.operator`;
       const replacementTarget = join(root.authorityRoot, 'replacement-lease-target');
       mkdirSync(replacementTarget);
@@ -1008,7 +1008,7 @@ describe('repository authority lease', () => {
     },
   );
 
-  it.skipIf(process.platform === 'freebsd')('reclaims only a stale, conclusively dead same-host owner', async () => {
+  it('reclaims only a stale, conclusively dead same-host owner', async () => {
     const root = await fixture();
     await withRepositoryLease(root, async () => undefined);
     const control = join(root.authorityRoot, '.neottia', 'repository-store');
@@ -1258,6 +1258,10 @@ function createInterruptedTransaction(
 
 function writeTestOwner(control: string, pid: number, acquiredAt: Date): string {
   const lock = join(control, 'authority.lease');
+  if (process.platform === 'freebsd') {
+    writeOwnerMetadata(lock, control, pid, acquiredAt);
+    return lock;
+  }
   mkdirSync(lock);
   writeOwnerMetadata(join(lock, 'owner.json'), control, pid, acquiredAt);
   return lock;

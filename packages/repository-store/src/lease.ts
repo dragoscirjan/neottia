@@ -783,38 +783,49 @@ function interruptedClaimPeer(
   if (stat.isSymbolicLink() || !stat.isFile() || (stat.nlink !== 1 && stat.nlink !== 2))
     throw new PathSafetyError('Unsafe interrupted repository claim.', 'UNSAFE_HARD_LINK');
   if (stat.nlink === 1) return undefined;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const peers = matchingInterruptedClaimPeers(path, stat, allowReleasePeer);
+    if (peers.length === 1) return peers[0];
+
+    // Publication finalization and release can replace one recognized peer
+    // with another while the inode remains double-linked. Recheck a bounded
+    // number of complete directory snapshots, but never accept an unknown link.
+    let stabilized: Stats;
+    try {
+      stabilized = lstatSync(path);
+    } catch (stabilizationError: unknown) {
+      if (hasCode(stabilizationError, 'ENOENT'))
+        throw new PathSafetyError('Interrupted claim was released during peer verification.', 'IDENTITY_CHANGED');
+      throw stabilizationError;
+    }
+    if (stabilized.isSymbolicLink() || !stabilized.isFile() || !sameIdentity(stat, stabilized))
+      throw new PathSafetyError('Interrupted claim identity changed during peer verification.', 'IDENTITY_CHANGED');
+    if (stabilized.nlink === 1) return undefined;
+    if (stabilized.nlink !== 2) break;
+  }
+  throw new PathSafetyError('Interrupted claim hard link is not package-owned.', 'UNSAFE_HARD_LINK');
+}
+
+function matchingInterruptedClaimPeers(
+  path: string,
+  identity: Stats,
+  allowReleasePeer: boolean,
+): Array<{ readonly token: string }> {
   const base = basename(path);
   const prefixes = [`${base}.prepare-`, ...(allowReleasePeer ? [`${base}.release-`] : [])];
-  const peers = readdirSync(dirname(path)).flatMap((name) => {
+  return readdirSync(dirname(path)).flatMap((name) => {
     const prefix = prefixes.find((candidate) => name.startsWith(candidate));
     if (prefix === undefined) return [];
     const token = name.slice(prefix.length);
     if (!/^[0-9a-f-]{32,64}$/u.test(token)) return [];
     try {
       const peer = lstatSync(join(dirname(path), name));
-      return peer.isFile() && !peer.isSymbolicLink() && sameIdentity(stat, peer) ? [{ token }] : [];
+      return peer.isFile() && !peer.isSymbolicLink() && sameIdentity(identity, peer) ? [{ token }] : [];
     } catch (error: unknown) {
-      // acquireClaim removes its staging name immediately after publication.
       if (hasCode(error, 'ENOENT')) return [];
       throw error;
     }
   });
-  if (peers.length === 1) return peers[0];
-
-  // A legitimate publisher can unlink the sole staging peer between the
-  // claim's nlink observation and directory scan. Accept only that stabilized
-  // transition: the claim must still be the same regular inode with one link.
-  let stabilized: Stats;
-  try {
-    stabilized = lstatSync(path);
-  } catch (stabilizationError: unknown) {
-    if (hasCode(stabilizationError, 'ENOENT'))
-      throw new PathSafetyError('Interrupted claim was released during peer verification.', 'IDENTITY_CHANGED');
-    throw stabilizationError;
-  }
-  if (!stabilized.isSymbolicLink() && stabilized.isFile() && stabilized.nlink === 1 && sameIdentity(stat, stabilized))
-    return undefined;
-  throw new PathSafetyError('Interrupted claim hard link is not package-owned.', 'UNSAFE_HARD_LINK');
 }
 
 function releaseOwnedLease(
