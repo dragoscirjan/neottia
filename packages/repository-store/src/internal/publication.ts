@@ -89,14 +89,16 @@ export function publishExactRegularFile(
       evacuatedIdentity = lstatSync(evacuated);
       assertSafeRegular(evacuatedIdentity, evacuated);
       const evacuatedBytes = readRegularFile(evacuated, expected.maxBytes);
-      if (
-        !sameIdentity(expected.identity, evacuatedIdentity) ||
-        computeByteRevision(evacuatedBytes) !== expected.revision
-      ) {
+      const evacuatedRevision = computeByteRevision(evacuatedBytes);
+      if (!sameIdentity(expected.identity, evacuatedIdentity) || evacuatedRevision !== expected.revision) {
         restoreEvacuated(platformBackend as RepositoryPlatformBackend, evacuated, path, parent);
         evacuatedIdentity = undefined;
         throw new PathSafetyError(`Destination changed during publication: ${path}`, 'IDENTITY_CHANGED', {
           path,
+          expectedIdentity: identityEvidence(expected.identity),
+          observedIdentity: identityEvidence(evacuatedIdentity),
+          expectedRevision: expected.revision,
+          observedRevision: evacuatedRevision,
         });
       }
       revalidateDirectories(parents);
@@ -283,6 +285,14 @@ function unsupportedLink(error: unknown, path: string): unknown {
   if (['EPERM', 'EXDEV', 'ENOTSUP', 'EOPNOTSUPP', 'ENOSYS'].some((code) => hasCode(error, code)))
     return new UnsupportedRuntimeError(`Filesystem does not support exclusive regular-file publication: ${path}`);
   return error;
+}
+
+function identityEvidence(identity: Stats): Readonly<Record<string, number>> {
+  return {
+    birthtimeMs: identity.birthtimeMs,
+    dev: identity.dev,
+    ino: identity.ino,
+  };
 }
 
 function artifactExists(path: string): boolean {
