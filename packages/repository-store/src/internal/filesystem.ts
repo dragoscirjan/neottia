@@ -192,22 +192,54 @@ export function readRegularFileWithIdentity(
       offset += count;
     }
     if (offset > maxBytes) throw new ResourceLimitError(`Managed file exceeds configured byte limit: ${path}`);
-    const after = fstatSync(descriptor);
+    let after = fstatSync(descriptor);
     assertRegularWithLinks(after, path, allowedLinkCounts);
-    if (
-      !sameIdentity(before, after) ||
-      before.size !== after.size ||
-      before.mtimeMs !== after.mtimeMs ||
-      before.ctimeMs !== after.ctimeMs ||
-      before.nlink !== after.nlink ||
-      offset !== before.size
-    )
+    let bytes = buffer.subarray(0, offset);
+    const stableExceptCtime =
+      sameIdentity(before, after) &&
+      before.size === after.size &&
+      before.mtimeMs === after.mtimeMs &&
+      before.nlink === after.nlink &&
+      offset === before.size;
+    if (stableExceptCtime && before.ctimeMs !== after.ctimeMs) {
+      // UFS2 can expose a delayed ctime update after the hard-link publication
+      // transition. Accept it only after a second identical bounded read whose
+      // complete metadata remains stable.
+      const confirmation = Buffer.allocUnsafe(capacity);
+      let confirmationOffset = 0;
+      while (confirmationOffset < confirmation.byteLength) {
+        const count = readSync(
+          descriptor,
+          confirmation,
+          confirmationOffset,
+          confirmation.byteLength - confirmationOffset,
+          confirmationOffset,
+        );
+        if (count === 0) break;
+        confirmationOffset += count;
+      }
+      const confirmed = fstatSync(descriptor);
+      assertRegularWithLinks(confirmed, path, allowedLinkCounts);
+      if (
+        !sameIdentity(after, confirmed) ||
+        after.size !== confirmed.size ||
+        after.mtimeMs !== confirmed.mtimeMs ||
+        after.ctimeMs !== confirmed.ctimeMs ||
+        after.nlink !== confirmed.nlink ||
+        confirmationOffset !== after.size ||
+        !bytes.equals(confirmation.subarray(0, confirmationOffset))
+      )
+        throw unsafe(`Managed file changed during read: ${path}`, 'IDENTITY_CHANGED');
+      bytes = confirmation.subarray(0, confirmationOffset);
+      after = confirmed;
+    } else if (!stableExceptCtime || before.ctimeMs !== after.ctimeMs) {
       throw unsafe(`Managed file changed during read: ${path}`, 'IDENTITY_CHANGED');
+    }
     const pathAfter = lstatSync(path);
     if (pathAfter.isSymbolicLink() || !sameIdentity(after, pathAfter))
       throw unsafe(`Managed file identity changed after read: ${path}`, 'IDENTITY_CHANGED');
     revalidateDirectories(parents);
-    return { bytes: buffer.subarray(0, offset), identity: after };
+    return { bytes, identity: after };
   } catch (error: unknown) {
     if (error instanceof PathSafetyError || error instanceof ResourceLimitError) throw error;
     if (hasCode(error, 'ELOOP')) throw unsafe(`Symbolic link is not allowed: ${path}`, 'UNSAFE_LINK', error);
