@@ -2,7 +2,6 @@ import { createHash } from 'node:crypto';
 import {
   closeSync,
   constants as fsConstants,
-  lstatSync,
   mkdirSync,
   openSync,
   readdirSync,
@@ -16,6 +15,7 @@ import { emitTransactionFault } from '../internal/fault-injection.js';
 import {
   assertSafeRegular,
   ensurePrivateDirectory,
+  lstatSync,
   readRegularFile,
   syncDirectory,
   syncFileDescriptor,

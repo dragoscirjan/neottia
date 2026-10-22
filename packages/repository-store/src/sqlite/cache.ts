@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { lstatSync, type Stats } from 'node:fs';
+import { type Stats } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { CacheSyncError, PathSafetyError, RepositoryStoreError, ResourceLimitError } from '../errors.js';
 import { computeByteRevision } from '../revision.js';
@@ -9,6 +9,7 @@ import {
   assertSafeRegular,
   captureDirectories,
   hasCode,
+  lstatSync,
   readRegularFile,
   revalidateDirectories,
   sameIdentity,

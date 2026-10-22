@@ -20,14 +20,19 @@ if (raceDirective !== undefined) {
   replayClaimReadRace(authority, workerId, raceDirective);
 }
 
+const leaseOptions = process.platform === 'win32' ? { waitMs: 60_000 } : undefined;
 for (let iteration = 0; iteration < iterations; iteration++) {
-  await withRepositoryLease(root, async () => {
-    const trace = join(authority, 'lease-trace.txt');
-    const acquisitionId = `${workerId}-${iteration}`;
-    appendFileSync(trace, `${acquisitionId}:start\n`);
-    await new Promise((resolveDelay) => setTimeout(resolveDelay, 3));
-    appendFileSync(trace, `${acquisitionId}:end\n`);
-  });
+  await withRepositoryLease(
+    root,
+    async () => {
+      const trace = join(authority, 'lease-trace.txt');
+      const acquisitionId = `${workerId}-${iteration}`;
+      appendFileSync(trace, `${acquisitionId}:start\n`);
+      await new Promise((resolveDelay) => setTimeout(resolveDelay, 3));
+      appendFileSync(trace, `${acquisitionId}:end\n`);
+    },
+    leaseOptions,
+  );
 }
 
 /**

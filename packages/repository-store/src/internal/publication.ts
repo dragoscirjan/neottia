@@ -1,14 +1,4 @@
-import {
-  closeSync,
-  constants as fsConstants,
-  fstatSync,
-  linkSync,
-  lstatSync,
-  openSync,
-  rmSync,
-  writeFileSync,
-  type Stats,
-} from 'node:fs';
+import { closeSync, constants as fsConstants, linkSync, openSync, rmSync, writeFileSync, type Stats } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { PathSafetyError, RecoveryError, UnsupportedRuntimeError } from '../errors.js';
 import { computeByteRevision, type ByteRevision } from '../revision.js';
@@ -17,7 +7,9 @@ import {
   assertSafeRegular,
   captureDirectories,
   ensurePrivateDirectory,
+  fstatSync,
   hasCode,
+  lstatSync,
   noFollowFlag,
   readRegularFile,
   revalidateDirectories,

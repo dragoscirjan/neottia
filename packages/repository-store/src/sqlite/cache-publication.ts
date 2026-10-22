@@ -1,8 +1,14 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { lstatSync, mkdirSync, opendirSync, renameSync, rmSync, rmdirSync } from 'node:fs';
+import { mkdirSync, opendirSync, renameSync, rmSync, rmdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { RecoveryError, ResourceLimitError } from '../errors.js';
-import { assertSafeRegular, ensurePrivateDirectory, readRegularFile, syncDirectory } from '../internal/filesystem.js';
+import {
+  assertSafeRegular,
+  ensurePrivateDirectory,
+  lstatSync,
+  readRegularFile,
+  syncDirectory,
+} from '../internal/filesystem.js';
 import {
   getPathState,
   getRootState,
