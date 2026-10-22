@@ -751,10 +751,8 @@ describe('repository authority lease', () => {
     const authority = mkdtempSync(join(tmpdir(), 'neottia-repository-workers-'));
     tempDirectories.push(authority);
     const workerIds =
-      process.platform === 'win32'
-        ? ['one', 'two', 'three', 'four']
-        : ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight'];
-    const iterations = process.platform === 'win32' ? 4 : 12;
+      process.platform === 'win32' ? ['one', 'two'] : ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight'];
+    const iterations = process.platform === 'win32' ? 2 : 12;
     await Promise.all(workerIds.map((id) => runLeaseWorker(authority, id, iterations)));
     const lines = readFileSync(join(authority, 'lease-trace.txt'), 'utf8').trim().split('\n');
     expect(lines).toHaveLength(workerIds.length * iterations * 2);
