@@ -41,13 +41,8 @@ try {
   console.log('windows native smoke: rename');
   backend.renameNoReplace(source, destination);
   const identityAfter = lstatSync(destination);
-  console.log(
-    'windows native smoke: identity',
-    JSON.stringify({
-      after: pickIdentity(identityAfter),
-      before: pickIdentity(identityBefore),
-    }),
-  );
+  console.log('windows native smoke: identity');
+  assert.deepEqual(pickIdentity(identityAfter), pickIdentity(identityBefore));
   assert.equal(readFileSync(destination, 'utf8'), 'source');
 
   writeFileSync(source, 'collision');
@@ -60,5 +55,5 @@ try {
 }
 
 function pickIdentity(stat) {
-  return { birthtimeMs: stat.birthtimeMs, ctimeMs: stat.ctimeMs, dev: stat.dev, ino: stat.ino };
+  return { birthtimeMs: stat.birthtimeMs, dev: stat.dev, ino: stat.ino };
 }
