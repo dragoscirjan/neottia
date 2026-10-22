@@ -1,3 +1,4 @@
+import { fsyncSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { UnsupportedRuntimeError } from '../errors.js';
@@ -87,7 +88,9 @@ export function requireRepositoryPlatformBackend(): RepositoryPlatformBackend {
       ...definition,
       publication: Object.freeze({ renameNoReplace: nativeModule.renameNoReplace.bind(nativeModule) }),
       filesystem: Object.freeze({ supportsLocalPath: nativeModule.supportsLocalPath.bind(nativeModule) }),
-      durability: Object.freeze({ syncDescriptor: nativeModule.syncDescriptor.bind(nativeModule) }),
+      durability: Object.freeze({
+        syncDescriptor: definition.platform === 'win32' ? fsyncSync : nativeModule.syncDescriptor.bind(nativeModule),
+      }),
     });
     return loadedBackend;
   } catch (error: unknown) {

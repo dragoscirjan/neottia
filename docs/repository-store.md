@@ -20,7 +20,7 @@ The following platform combinations are supported:
 
 Repository authority acquisition checks the native addon and filesystem capabilities before it creates claim or lease artifacts. Windows requires a fixed local NTFS volume; ReFS, FAT, UNC and mapped network roots, removable volumes, and Windows arm64 fail closed. FreeBSD, other uncertified filesystems, unavailable native operations, and shared or network filesystems fail with `UnsupportedRuntimeError` before leased work.
 
-Windows synchronizes managed file data and metadata with the native `_commit` descriptor barrier. NTFS journals same-volume namespace mutations; Windows does not expose an unprivileged directory-descriptor flush through Node.js. Repository Store does not substitute copy/delete, replacement rename, or cross-volume behavior for an unsupported operation.
+Windows synchronizes managed file data and metadata with the Node/Bun `fsyncSync` descriptor barrier, which uses the runtime-owned Windows descriptor table. NTFS journals same-volume namespace mutations; Windows does not expose an unprivileged directory-descriptor flush through Node.js. Repository Store does not substitute copy/delete, replacement rename, or cross-volume behavior for an unsupported operation.
 
 ## Paths, reads, and revisions
 

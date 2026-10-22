@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
-import { closeSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { closeSync, fsyncSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createRequire } from 'node:module';
 
 if (process.platform !== 'win32') process.exit(0);
 
@@ -21,7 +21,7 @@ try {
   const descriptor = openSync(source, 'r+');
   try {
     console.log('windows native smoke: flush');
-    backend.syncDescriptor(descriptor);
+    fsyncSync(descriptor);
   } finally {
     closeSync(descriptor);
   }

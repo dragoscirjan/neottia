@@ -4,7 +4,6 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
-#include <io.h>
 #include <windows.h>
 
 #include <cerrno>
@@ -176,9 +175,8 @@ int SupportsLocalPath(const char* path, bool* supported) {
   return 0;
 }
 
-int SyncDescriptor(int descriptor) {
-  if (_commit(descriptor) == 0) return 0;
-  return errno == 0 ? EIO : errno;
-}
+// Node and Bun own the Windows CRT descriptor table. The TypeScript adapter
+// uses their fsyncSync implementation, which can safely reach the owning table.
+int SyncDescriptor(int) { return ENOSYS; }
 
 }  // namespace neottia::repository_store
