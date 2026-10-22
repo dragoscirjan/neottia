@@ -44,6 +44,15 @@ int RenameNoReplace(const char* source, const char* destination) {
   if (unlink(source) == 0) return 0;
 
   const int unlink_error = errno;
+  if (unlink_error == ENOENT) {
+    // Another process can finish a recognized interrupted publication by
+    // removing the source name. The move still succeeded when the published
+    // destination is the original inode.
+    struct stat published_state;
+    if (lstat(destination, &published_state) == 0 && published_state.st_dev == source_state.st_dev &&
+        published_state.st_ino == source_state.st_ino)
+      return 0;
+  }
   // Roll back the new name when source cleanup fails. A process death between
   // link and unlink leaves two names for one inode; higher-level recovery
   // normalizes recognized package-owned states and otherwise fails closed.
