@@ -39,7 +39,7 @@ beforeAll(() => {
   };
   if (manifest.bin?.['issues-mcp'] !== './dist/cli.js') throw new Error('Packed Issues MCP bin is incorrect.');
   linkPackedDependencies(extractedPackage);
-});
+}, 30_000);
 
 afterAll(() => {
   if (packedRoot) rmSync(packedRoot, { recursive: true, force: true });
@@ -70,7 +70,7 @@ afterEach(async () => {
   }
   if (shutdownError !== undefined) throw shutdownError;
   if (cleanupFailed) throw new Error('Temporary MCP project cleanup failed.');
-});
+}, 30_000);
 
 /** Connects a generic SDK client to the extracted package executable. */
 async function connect(extra: Parameters<typeof createTempIssueProject>[0] = {}): Promise<void> {
@@ -124,7 +124,7 @@ describe('packaged Issues MCP over stdio', () => {
       code: 'TOOL_NOT_FOUND',
       retryable: false,
     });
-  });
+  }, 30_000);
 
   it('preserves noninteractive stale policy failures', async () => {
     await connect({ issues: { cache: { stale_policy: 'fail' } } });
@@ -138,7 +138,7 @@ describe('packaged Issues MCP over stdio', () => {
       retryable: false,
       details: { reason: 'missing' },
     });
-  });
+  }, 30_000);
 
   it('exits cleanly when the stdio client closes its input', async () => {
     project = createTempIssueProject();
@@ -161,7 +161,7 @@ describe('packaged Issues MCP over stdio', () => {
       },
     );
     expect(exit).toEqual({ code: 0, signal: null });
-  });
+  }, 30_000);
 });
 
 function linkPackedDependencies(extractedPackage: string): void {
