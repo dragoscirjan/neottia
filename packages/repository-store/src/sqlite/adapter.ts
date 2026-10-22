@@ -103,7 +103,7 @@ export function wrapDatabase(
   suppliedBounds: SqliteConnectionBounds = DEFAULT_CONNECTION_BOUNDS,
 ): SqliteConnection {
   const connectionBounds = validateConnectionBounds(suppliedBounds);
-  const statements = new Set<DriverStatement>();
+  const statements = runtime === 'bun' ? new Set<DriverStatement>() : undefined;
   let closed = false;
   const ensureOpen = (): void => {
     if (closed) throw new Error(`SQLite ${runtime} connection is closed.`);
@@ -123,7 +123,7 @@ export function wrapDatabase(
         () => database.prepare?.(sql) ?? database.query?.(sql),
       );
       if (statement === undefined) throw new CacheSyncError(`SQLite ${runtime} driver cannot prepare statements.`);
-      statements.add(statement);
+      statements?.add(statement);
       return {
         async run(parameters) {
           ensureOpen();
@@ -169,13 +169,13 @@ export function wrapDatabase(
     },
     async close() {
       if (closed) return;
-      if (runtime === 'bun') {
+      if (statements !== undefined) {
         for (const statement of statements) {
           if (statement.finalize !== undefined)
             await driverCall(runtime, 'finalize statement', () => statement.finalize?.());
         }
+        statements.clear();
       }
-      statements.clear();
       await driverCall(runtime, 'close database', () => database.close());
       closed = true;
     },

@@ -523,6 +523,7 @@ describe('repository canonical store', () => {
       const authority = mkdtempSync(join(tmpdir(), 'neottia-transaction-crash-'));
       tempDirectories.push(authority);
       await runCrashWorker(authority, faultEvent, occurrence);
+      expect(readFileSync(join(authority, '.transaction-crash-trigger'), 'utf8')).toBe(`${faultEvent}:${occurrence}`);
       await new Promise((resolveDelay) => setTimeout(resolveDelay, 5));
       const root = await resolveManagedRoot({ authorityRoot: authority, limits: DEFAULT_STORE_LIMITS });
       await withRepositoryLease(root, async () => undefined, { staleMs: 1 });
@@ -544,6 +545,7 @@ describe('repository canonical store', () => {
       const authority = mkdtempSync(join(tmpdir(), `neottia-publication-crash-${event}-`));
       tempDirectories.push(authority);
       await runCrashWorker(authority, `filesystem:${event}`, 1);
+      expect(readFileSync(join(authority, '.transaction-crash-trigger'), 'utf8')).toBe(`filesystem:${event}:1`);
       await new Promise((resolveDelay) => setTimeout(resolveDelay, 5));
       const root = await resolveManagedRoot({ authorityRoot: authority, limits: DEFAULT_STORE_LIMITS });
       await withRepositoryLease(root, async () => undefined, { staleMs: 1 });
@@ -740,6 +742,7 @@ describe('repository authority lease', () => {
     const authority = mkdtempSync(join(tmpdir(), 'neottia-lease-crash-'));
     tempDirectories.push(authority);
     await runLeaseCrashWorker(authority, faultEvent);
+    expect(readFileSync(join(authority, '.lease-crash-trigger'), 'utf8')).toBe(faultEvent);
     await new Promise((resolveDelay) => setTimeout(resolveDelay, 5));
     const root = await resolveManagedRoot({ authorityRoot: authority, limits: DEFAULT_STORE_LIMITS });
     await expect(withRepositoryLease(root, async () => 'recovered', { staleMs: 1 })).resolves.toBe('recovered');

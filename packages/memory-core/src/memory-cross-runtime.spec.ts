@@ -66,6 +66,7 @@ describe('Memory Node/Bun compatibility', () => {
       expect({ signal: child.signal, status: child.status }).toEqual(
         process.platform === 'win32' ? { signal: null, status: 1 } : { signal: 'SIGKILL', status: null },
       );
+      expect(readFileSync(join(cwd, 'crash-trigger'), 'utf8')).toBe(event);
       const leasePath = join(cwd, '.neottia', 'repository-store', 'authority.lease');
       utimesSync(leasePath, new Date(0), new Date(0));
       const store = MemoryStore.fromConfig(loadMemoryConfig(cwd, { env: {} }), cwd);
