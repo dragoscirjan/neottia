@@ -69,6 +69,10 @@ jobs:
         env:
           EXPECTED_ARCHITECTURE: ${{ matrix.architecture }}
         run: node -e "if (process.arch !== process.env.EXPECTED_ARCHITECTURE) throw new Error('Expected ' + process.env.EXPECTED_ARCHITECTURE + ', got ' + process.arch)"
+      - name: Verify Windows native backend
+        if: runner.os == 'Windows'
+        working-directory: packages/repository-store
+        run: pnpm run build:native && node test/windows-native-smoke.mjs
       - name: Run tests
         id: tests
         continue-on-error: ${{ matrix.experimental }}
