@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { link, lstat, mkdir, open, readFile, unlink, writeFile } from 'node:fs/promises';
+import { link, lstat, mkdir, open, readFile, realpath, unlink, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -151,7 +151,7 @@ async function uninstallCommand(
 ): Promise<number> {
   const values = parseCommon(arguments_);
   if (values.receipt === undefined) throw new TypeError('uninstall requires --receipt.');
-  const snapshot = await inspectUninstall(resolve(values.receipt), roots(values, env));
+  const snapshot = await inspectUninstall(await realpath(resolve(values.receipt)), roots(values, env));
   const plan = authorizePlan(createInstallationPlan(snapshot, 'uninstall'), values.approve);
   await emitPlan(plan, values.output, output);
   return plan.conflicts.some((conflict) => !conflict.approved) ? 2 : 0;

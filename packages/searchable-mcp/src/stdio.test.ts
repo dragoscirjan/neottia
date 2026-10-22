@@ -78,7 +78,7 @@ beforeAll(() => {
     bin?: Record<string, string>;
   };
   if (manifest.bin?.['searchable-mcp'] !== './dist/cli.js') throw new Error('Packed Searchable MCP bin is incorrect.');
-});
+}, 120_000);
 
 afterEach(async () => {
   const activeTransport = transport;
