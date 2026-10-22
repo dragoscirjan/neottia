@@ -1,7 +1,9 @@
 #include "platform_backend.h"
 
 #define WIN32_LEAN_AND_MEAN
+#ifndef NOMINMAX
 #define NOMINMAX
+#endif
 #include <io.h>
 #include <windows.h>
 
@@ -175,10 +177,8 @@ int SupportsLocalPath(const char* path, bool* supported) {
 }
 
 int SyncDescriptor(int descriptor) {
-  const intptr_t native = _get_osfhandle(descriptor);
-  if (native == -1) return EBADF;
-  if (FlushFileBuffers(reinterpret_cast<HANDLE>(native))) return 0;
-  return WindowsError(GetLastError());
+  if (_commit(descriptor) == 0) return 0;
+  return errno == 0 ? EIO : errno;
 }
 
 }  // namespace neottia::repository_store

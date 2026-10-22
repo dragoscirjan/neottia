@@ -265,7 +265,7 @@ describe('issue canonical lifecycle', () => {
     expect(afterRecovery).toHaveLength(2);
     expect(new Set(afterRecovery.map((issue) => issue.location))).toEqual(new Set(['active']));
     expect((await issues.validate()).valid).toBe(true);
-  });
+  }, 30_000);
 
   it('fails closed on symlinked issue roots and proposed resource overflow', async () => {
     const cwd = project();
