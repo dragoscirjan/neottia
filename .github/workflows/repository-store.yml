@@ -40,3 +40,32 @@ jobs:
         run: mise run test:repository-store:runtimes
       - name: Verify clean-source test execution
         run: mise run clean && mise run test
+
+  freebsd-ufs2:
+    name: FreeBSD 14.3 x64 / UFS2 / Node.js
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Run native FreeBSD acceptance
+        uses: vmactions/freebsd-vm@c46abacb49f09938ca4e1702d15d836285d694cc # v1
+        with:
+          release: '14.3'
+          copyback: false
+          mem: 4096
+          prepare: |
+            pkg install -y git gmake node22 npm-node22 python311
+            npm install --global pnpm@10.28.2
+          run: |
+            set -eu
+            export MAKE=gmake
+            export PYTHON=/usr/local/bin/python3.11
+            freebsd-version
+            uname -m
+            mount -p
+            pnpm install --frozen-lockfile
+            pnpm --filter @neottia/repository-store build:native
+            node packages/repository-store/test/freebsd-native-smoke.mjs
+            pnpm --filter @neottia/repository-store test:node

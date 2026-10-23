@@ -20,7 +20,7 @@ if (raceDirective !== undefined) {
   replayClaimReadRace(authority, workerId, raceDirective);
 }
 
-const leaseOptions = process.platform === 'win32' ? { waitMs: 60_000 } : undefined;
+const leaseOptions = process.platform === 'win32' || process.platform === 'freebsd' ? { waitMs: 60_000 } : undefined;
 for (let iteration = 0; iteration < iterations; iteration++) {
   await withRepositoryLease(
     root,

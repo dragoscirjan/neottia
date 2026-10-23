@@ -24,6 +24,7 @@ export interface LeaseState {
   readonly authorityId: string;
   readonly token: string;
   readonly lockPath: string;
+  readonly lockKind: 'directory' | 'file';
   readonly lockIdentity: Stats;
   readonly ownerIdentity: Stats;
   readonly pendingOperations: Set<Promise<unknown>>;
