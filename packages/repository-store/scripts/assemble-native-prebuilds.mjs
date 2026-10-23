@@ -1,7 +1,6 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { verify } from 'sigstore';
 import {
   NativePrebuildIntegrityError,
   certifiedTuples,
@@ -81,6 +80,7 @@ export async function assembleNativePrebuilds({
 
 async function verifySigstoreBundle(bundle, binary, artifact) {
   try {
+    const { verify } = await import('sigstore');
     await verify(bundle, binary, {
       certificateIssuer: artifact.signature.certificateIssuer,
       certificateIdentityURI: artifact.signature.certificateIdentityURI,

@@ -106,28 +106,33 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # Tempel versions packages before it can publish them. Do not build assets for
+          # the old package version while any Changeset is waiting to be applied.
+          if find .changeset -maxdepth 1 -type f -name '*.md' ! -name 'README.md' -print -quit | grep -q .; then
+            echo "required=false" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
           current="$(node -p "require('./packages/repository-store/package.json').version")"
           published="$(pnpm view @neottia/repository-store version 2>/dev/null || true)"
           if [[ "${current}" != "${published}" ]]; then
             echo "required=true" >> "${GITHUB_OUTPUT}"
             exit 0
           fi
-          # A pending Changeset will create a new version before native assets are required.
-          if grep -lq '"@neottia/repository-store"' .changeset/*.md 2>/dev/null; then
-            echo "required=false" >> "${GITHUB_OUTPUT}"
-            exit 0
-          fi
           tag="@neottia/repository-store@${current}"
           assets="$(gh release view "${tag}" --json assets --jq '.assets[].name' 2>/dev/null || true)"
-          required=false
+          incomplete=false
           for tuple in linux-x64 linux-arm64 darwin-x64 darwin-arm64 win32-x64 freebsd-x64; do
             name="repository-store-native-v${current}-${tuple}.node"
             for expected in "${name}" "${name}.sigstore.json" "${name}.intoto.jsonl"; do
-              if ! grep -Fxq "${expected}" <<< "${assets}"; then required=true; fi
+              if ! grep -Fxq "${expected}" <<< "${assets}"; then incomplete=true; fi
             done
           done
-          if ! grep -Fxq "native-prebuilds.json" <<< "${assets}"; then required=true; fi
-          echo "required=${required}" >> "${GITHUB_OUTPUT}"
+          if ! grep -Fxq "native-prebuilds.json" <<< "${assets}"; then incomplete=true; fi
+          if [[ "${incomplete}" == 'true' ]]; then
+            echo "::error::The published ${tag} native release is incomplete. Refusing to rebuild published-version assets from ${GITHUB_SHA}."
+            exit 1
+          fi
+          echo "required=false" >> "${GITHUB_OUTPUT}"
 
   native-prebuilds:
     name: Native prebuild (${{ matrix.platform }}, ${{ matrix.architecture }})

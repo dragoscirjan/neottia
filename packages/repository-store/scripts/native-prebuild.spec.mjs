@@ -6,6 +6,7 @@ import { afterEach, describe, it } from 'vitest';
 import { assembleNativePrebuilds } from './assemble-native-prebuilds.mjs';
 import { installNative } from './install-native.mjs';
 import {
+  NativePrebuildAvailabilityError,
   NativePrebuildIntegrityError,
   SIGSTORE_CERTIFICATE_IDENTITY,
   SIGSTORE_CERTIFICATE_ISSUER,
@@ -80,6 +81,24 @@ describe('native prebuild installer', () => {
       architecture: 'x64',
       fetchImplementation: async () => {
         throw new Error('offline');
+      },
+      buildFromSource: () => builds++,
+      logger,
+    });
+    assert.equal(result.status, 'source-build');
+    assert.equal(builds, 1);
+  });
+
+  it('uses source fallback when the optional signature verifier is unavailable', async () => {
+    const fixture = createFixture();
+    let builds = 0;
+    const result = await installNative({
+      root: fixture.root,
+      platform: 'linux',
+      architecture: 'x64',
+      fetchImplementation: fixture.fetch,
+      verifySignature: async () => {
+        throw new NativePrebuildAvailabilityError('Sigstore is unavailable.');
       },
       buildFromSource: () => builds++,
       logger,

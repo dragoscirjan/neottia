@@ -69,7 +69,7 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Publish verified native release assets
-        if: inputs.native-prebuilds
+        if: inputs.native-prebuilds && steps.release.outputs.mode != 'version'
         env:
           GH_TOKEN: ${{ github.token }}
         run: node packages/repository-store/scripts/publish-native-prebuilds.mjs --input native-prebuilds

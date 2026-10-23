@@ -56,7 +56,8 @@ export async function installNative({
     try {
       await verifySignature(bundle, binary, manifest, artifact);
     } catch (error) {
-      if (error instanceof NativePrebuildIntegrityError) throw error;
+      if (error instanceof NativePrebuildAvailabilityError || error instanceof NativePrebuildIntegrityError)
+        throw error;
       throw new NativePrebuildIntegrityError(`Native prebuild ${artifact.name} failed signature verification.`, {
         cause: error,
       });
@@ -72,7 +73,14 @@ export async function installNative({
 }
 
 async function verifySigstoreSignature(bundle, binary, manifest, artifact) {
-  const { verify } = await import('sigstore');
+  let verify;
+  try {
+    ({ verify } = await import('sigstore'));
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ERR_MODULE_NOT_FOUND')
+      throw new NativePrebuildAvailabilityError('The optional Sigstore verifier is unavailable.', { cause: error });
+    throw new NativePrebuildIntegrityError('The Sigstore verifier could not be initialized.', { cause: error });
+  }
   await verify(bundle, binary, {
     certificateIssuer: manifest.signature.certificateIssuer,
     certificateIdentityURI: manifest.signature.certificateIdentityURI,
