@@ -1,5 +1,12 @@
 # @neottia/memory-mcp
 
+## 0.3.4
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @neottia/memory-core@0.3.2
+
 ## 0.3.3
 
 ### Patch Changes

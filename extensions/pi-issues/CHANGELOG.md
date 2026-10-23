@@ -1,5 +1,13 @@
 # @neottia/pi-issues
 
+## 0.2.3
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @neottia/issues@0.2.1
+  - @neottia/issues-design-docs@0.2.1
+
 ## 0.2.2
 
 ### Patch Changes

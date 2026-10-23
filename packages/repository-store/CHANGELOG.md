@@ -1,5 +1,11 @@
 # @neottia/repository-store
 
+## 0.3.0
+
+### Minor Changes
+
+- [#214](https://github.com/dragoscirjan/neottia/pull/214) [`b90998c`](https://github.com/dragoscirjan/neottia/commit/b90998cf93f8aee64e28ef5025c470fcc6402796) Thanks [@dragoscirjan](https://github.com/dragoscirjan)! - Add fail-closed FreeBSD 14.x x64 support for Node.js on local UFS2 filesystems.
+
 ## 0.2.1
 
 ### Patch Changes
