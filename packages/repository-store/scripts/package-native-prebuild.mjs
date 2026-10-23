@@ -1,8 +1,9 @@
 import { appendFileSync, copyFileSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { sign } from 'sigstore';
+import { sign, verify } from 'sigstore';
 import {
+  GITHUB_REPOSITORY,
   NATIVE_BINARY_RELATIVE_PATH,
   SIGSTORE_CERTIFICATE_IDENTITY,
   SIGSTORE_CERTIFICATE_ISSUER,
@@ -51,6 +52,17 @@ export async function packageNativePrebuild({
 
   if (!signArtifact) throw new Error('Release native prebuilds must have a Sigstore signature.');
   const signatureBundle = await sign(bytes);
+  const githubRef = process.env.GITHUB_REF;
+  if (process.env.GITHUB_REPOSITORY !== GITHUB_REPOSITORY || githubRef === undefined)
+    throw new Error('Native prebuild signing requires the trusted GitHub repository and workflow ref.');
+  await verify(signatureBundle, bytes, {
+    certificateIssuer: SIGSTORE_CERTIFICATE_ISSUER,
+    certificateIdentityURI: `https://github.com/${GITHUB_REPOSITORY}/.github/workflows/ci.yml@${githubRef}`,
+    certificateOIDs: {
+      [SIGSTORE_SOURCE_DIGEST_OID]: sourceCommit,
+      [SIGSTORE_RUNNER_ENVIRONMENT_OID]: 'github-hosted',
+    },
+  });
   writeFileSync(join(output, bundle), `${JSON.stringify(signatureBundle)}\n`, { flag: 'wx', mode: 0o600 });
 
   const record = {

@@ -199,7 +199,9 @@ jobs:
         working-directory: packages/repository-store
         run: node test/native-prebuild-smoke.mjs native-prebuilds/${{ steps.package.outputs.asset-name }} ${{ matrix.platform }}
       - name: Verify clean packed install and source fallback
-        if: matrix.platform == 'linux' && matrix.architecture == 'x64'
+        # Release manifests pin the protected main-workflow identity. Branch
+        # validation verifies its actual branch identity in the packaging step.
+        if: matrix.platform == 'linux' && matrix.architecture == 'x64' && github.ref == 'refs/heads/main'
         working-directory: packages/repository-store
         run: node test/packed-prebuild-install.mjs native-prebuilds
       - name: Attest native prebuild
