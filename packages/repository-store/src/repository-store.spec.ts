@@ -43,7 +43,7 @@ import {
 } from './internal/fault-injection.js';
 import { getRootState } from './internal/model.js';
 import { isCertifiedRepositoryPlatform, setRepositoryPlatformBackendForTests } from './internal/platform-backend.js';
-import { restoreQuarantinedLease } from './lease.js';
+import { interruptedClaimPeer, restoreQuarantinedLease } from './lease.js';
 import {
   createTransactionDirectory,
   manifestDigest,
@@ -609,6 +609,37 @@ describe('repository authority lease', () => {
     });
     expect(existsSync(join(control, 'authority.claim'))).toBe(false);
     expect(existsSync(join(control, 'authority.lease'))).toBe(false);
+  });
+
+  it.each([
+    ['symlink', 'UNSAFE_HARD_LINK'],
+    ['directory', 'UNSAFE_HARD_LINK'],
+    ['regular file', 'IDENTITY_CHANGED'],
+  ] as const)('classifies a peer-verification replacement with a %s as %s', (kind, expectedCode) => {
+    const authority = mkdtempSync(join(tmpdir(), 'neottia-lease-peer-race-'));
+    tempDirectories.push(authority);
+    const claim = join(authority, 'authority.lease');
+    writeFileSync(claim, 'owner');
+    linkSync(claim, `${claim}.unknown-peer`);
+    const observed = lstatSync(claim);
+    rmSync(claim);
+    if (kind === 'symlink') {
+      const target = join(authority, 'operator-target');
+      writeFileSync(target, 'operator');
+      symlinkSync(target, claim);
+    } else if (kind === 'directory') {
+      mkdirSync(claim);
+    } else {
+      writeFileSync(claim, 'new owner');
+    }
+
+    let observedError: unknown;
+    try {
+      interruptedClaimPeer(claim, observed);
+    } catch (error: unknown) {
+      observedError = error;
+    }
+    expect(observedError).toMatchObject({ category: 'path_safety', code: expectedCode });
   });
 
   it('uses a regular-file authority lease when directory no-replace moves are unavailable', async () => {

@@ -774,7 +774,7 @@ function readOwner(
 }
 
 /** Returns the sole package-owned peer for an interrupted hard-link move. */
-function interruptedClaimPeer(
+export function interruptedClaimPeer(
   path: string,
   observed?: Stats,
   allowReleasePeer = false,
@@ -798,7 +798,9 @@ function interruptedClaimPeer(
         throw new PathSafetyError('Interrupted claim was released during peer verification.', 'IDENTITY_CHANGED');
       throw stabilizationError;
     }
-    if (stabilized.isSymbolicLink() || !stabilized.isFile() || !sameIdentity(stat, stabilized))
+    if (stabilized.isSymbolicLink() || !stabilized.isFile())
+      throw new PathSafetyError('Interrupted claim path became unsafe during peer verification.', 'UNSAFE_HARD_LINK');
+    if (!sameIdentity(stat, stabilized))
       throw new PathSafetyError('Interrupted claim identity changed during peer verification.', 'IDENTITY_CHANGED');
     if (stabilized.nlink === 1) return undefined;
     if (stabilized.nlink !== 2) break;
