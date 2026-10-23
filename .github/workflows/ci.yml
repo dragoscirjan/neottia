@@ -5,7 +5,13 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      native-prebuilds:
+        description: Build and attest every certified native prebuild without publishing
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -88,7 +94,9 @@ jobs:
   release-state:
     name: Detect native release
     needs: [quality, test]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' && inputs.native-prebuilds)
     runs-on: ubuntu-latest
     outputs:
       repository-store-native-required: ${{ steps.native.outputs.required }}
@@ -106,6 +114,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          if [[ "${GITHUB_EVENT_NAME}" == 'workflow_dispatch' ]]; then
+            echo "required=true" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
           # Tempel versions packages before it can publish them. Do not build assets for
           # the old package version while any Changeset is waiting to be applied.
           if find .changeset -maxdepth 1 -type f -name '*.md' ! -name 'README.md' -print -quit | grep -q .; then
