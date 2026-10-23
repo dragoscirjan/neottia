@@ -9,6 +9,7 @@ import {
   SIGSTORE_CERTIFICATE_ISSUER,
   SIGSTORE_RUNNER_ENVIRONMENT_OID,
   SIGSTORE_SOURCE_DIGEST_OID,
+  assertSigstoreCertificateOids,
   nativeArtifactName,
   nativeAttestationName,
   nativeBundleName,
@@ -55,13 +56,13 @@ export async function packageNativePrebuild({
   const githubRef = process.env.GITHUB_REF;
   if (process.env.GITHUB_REPOSITORY !== GITHUB_REPOSITORY || githubRef === undefined)
     throw new Error('Native prebuild signing requires the trusted GitHub repository and workflow ref.');
-  await verify(signatureBundle, bytes, {
+  const signer = await verify(signatureBundle, bytes, {
     certificateIssuer: SIGSTORE_CERTIFICATE_ISSUER,
     certificateIdentityURI: `https://github.com/${GITHUB_REPOSITORY}/.github/workflows/ci.yml@${githubRef}`,
-    certificateOIDs: {
-      [SIGSTORE_SOURCE_DIGEST_OID]: sourceCommit,
-      [SIGSTORE_RUNNER_ENVIRONMENT_OID]: 'github-hosted',
-    },
+  });
+  assertSigstoreCertificateOids(signer, {
+    [SIGSTORE_SOURCE_DIGEST_OID]: sourceCommit,
+    [SIGSTORE_RUNNER_ENVIRONMENT_OID]: 'github-hosted',
   });
   writeFileSync(join(output, bundle), `${JSON.stringify(signatureBundle)}\n`, { flag: 'wx', mode: 0o600 });
 

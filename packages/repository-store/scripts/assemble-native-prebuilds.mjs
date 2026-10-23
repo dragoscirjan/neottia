@@ -3,6 +3,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   NativePrebuildIntegrityError,
+  assertSigstoreCertificateOids,
   certifiedTuples,
   createManifest,
   nativeMetadataName,
@@ -81,13 +82,13 @@ export async function assembleNativePrebuilds({
 async function verifySigstoreBundle(bundle, binary, artifact) {
   try {
     const { verify } = await import('sigstore');
-    await verify(bundle, binary, {
+    const signer = await verify(bundle, binary, {
       certificateIssuer: artifact.signature.certificateIssuer,
       certificateIdentityURI: artifact.signature.certificateIdentityURI,
-      certificateOIDs: {
-        [artifact.signature.sourceDigestOid]: artifact.sourceCommit,
-        [artifact.signature.runnerEnvironmentOid]: 'github-hosted',
-      },
+    });
+    assertSigstoreCertificateOids(signer, {
+      [artifact.signature.sourceDigestOid]: artifact.sourceCommit,
+      [artifact.signature.runnerEnvironmentOid]: 'github-hosted',
     });
   } catch (error) {
     throw new NativePrebuildIntegrityError(`Native prebuild ${artifact.name} failed signature verification.`, {

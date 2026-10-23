@@ -47,6 +47,21 @@ export class NativePrebuildIntegrityError extends Error {
   }
 }
 
+export function assertSigstoreCertificateOids(signer, expectedOids) {
+  const actualOids = signer?.identity?.oids;
+  if (!Array.isArray(actualOids))
+    throw new NativePrebuildIntegrityError('The Sigstore certificate contains no verifiable OID claims.');
+  for (const [oid, expectedValue] of Object.entries(expectedOids)) {
+    const claim = actualOids.find(
+      (candidate) => candidate?.oid?.id?.join('.') === oid && Buffer.isBuffer(candidate.value),
+    );
+    const expected = Buffer.from(expectedValue, 'utf8');
+    const derExpected = encodeDerUtf8String(expected);
+    if (claim === undefined || (!claim.value.equals(expected) && !claim.value.equals(derExpected)))
+      throw new NativePrebuildIntegrityError(`The Sigstore certificate does not pin ${oid} to ${expectedValue}.`);
+  }
+}
+
 export function tupleKey(platform, architecture) {
   return `${platform}-${architecture}`;
 }
@@ -242,6 +257,12 @@ function parseJson(source, label) {
   } catch (error) {
     throw new NativePrebuildIntegrityError(`${label} is not valid JSON metadata.`, { cause: error });
   }
+}
+
+function encodeDerUtf8String(value) {
+  if (value.byteLength >= 128)
+    throw new NativePrebuildIntegrityError('The Sigstore certificate OID claim is too large.');
+  return Buffer.concat([Buffer.from([0x0c, value.byteLength]), value]);
 }
 
 function isRecord(value) {

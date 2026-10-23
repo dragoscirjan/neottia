@@ -6,6 +6,7 @@ import {
   NativePrebuildAvailabilityError,
   NativePrebuildIntegrityError,
   assertArtifactBytes,
+  assertSigstoreCertificateOids,
   installVerifiedBinary,
   isCertifiedTuple,
   readNativeManifest,
@@ -81,13 +82,13 @@ async function verifySigstoreSignature(bundle, binary, manifest, artifact) {
       throw new NativePrebuildAvailabilityError('The optional Sigstore verifier is unavailable.', { cause: error });
     throw new NativePrebuildIntegrityError('The Sigstore verifier could not be initialized.', { cause: error });
   }
-  await verify(bundle, binary, {
+  const signer = await verify(bundle, binary, {
     certificateIssuer: manifest.signature.certificateIssuer,
     certificateIdentityURI: manifest.signature.certificateIdentityURI,
-    certificateOIDs: {
-      [manifest.signature.sourceDigestOid]: artifact.sourceCommit,
-      [manifest.signature.runnerEnvironmentOid]: 'github-hosted',
-    },
+  });
+  assertSigstoreCertificateOids(signer, {
+    [manifest.signature.sourceDigestOid]: artifact.sourceCommit,
+    [manifest.signature.runnerEnvironmentOid]: 'github-hosted',
   });
 }
 

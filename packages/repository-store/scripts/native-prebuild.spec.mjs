@@ -12,6 +12,7 @@ import {
   SIGSTORE_CERTIFICATE_ISSUER,
   SIGSTORE_RUNNER_ENVIRONMENT_OID,
   SIGSTORE_SOURCE_DIGEST_OID,
+  assertSigstoreCertificateOids,
   certifiedTuples,
   createManifest,
   nativeArtifactName,
@@ -187,6 +188,28 @@ describe('native prebuild installer', () => {
     });
     assert.equal(result.status, 'source-build');
     assert.equal(builds, 1);
+  });
+
+  it('checks DER-encoded source and runner certificate claims', () => {
+    const oid = (name, value) => ({
+      oid: { id: name.split('.').map(Number) },
+      value: Buffer.concat([Buffer.from([0x0c, Buffer.byteLength(value)]), Buffer.from(value)]),
+    });
+    const signer = {
+      identity: {
+        oids: [oid(SIGSTORE_SOURCE_DIGEST_OID, sourceCommit), oid(SIGSTORE_RUNNER_ENVIRONMENT_OID, 'github-hosted')],
+      },
+    };
+    assert.doesNotThrow(() =>
+      assertSigstoreCertificateOids(signer, {
+        [SIGSTORE_SOURCE_DIGEST_OID]: sourceCommit,
+        [SIGSTORE_RUNNER_ENVIRONMENT_OID]: 'github-hosted',
+      }),
+    );
+    assert.throws(
+      () => assertSigstoreCertificateOids(signer, { [SIGSTORE_SOURCE_DIGEST_OID]: 'f'.repeat(40) }),
+      NativePrebuildIntegrityError,
+    );
   });
 
   it('assembles one complete deterministic release manifest', async () => {
