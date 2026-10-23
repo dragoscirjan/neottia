@@ -1,6 +1,6 @@
 {
   "name": "@neottia/design-docs-mcp",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Generic MCP stdio server for Neottia Design Docs",
   "author": "Dragos Cirjan",
   "license": "MIT",

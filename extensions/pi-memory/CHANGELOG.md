@@ -1,5 +1,12 @@
 # @neottia/pi-memory
 
+## 0.2.4
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @neottia/memory-core@0.3.2
+
 ## 0.2.3
 
 ### Patch Changes
