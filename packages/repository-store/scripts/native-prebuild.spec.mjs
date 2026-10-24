@@ -210,6 +210,27 @@ describe('native prebuild installer', () => {
       () => assertSigstoreCertificateOids(signer, { [SIGSTORE_SOURCE_DIGEST_OID]: 'f'.repeat(40) }),
       NativePrebuildIntegrityError,
     );
+    assert.throws(
+      () => assertSigstoreCertificateOids({ identity: { oids: [] } }, { [SIGSTORE_SOURCE_DIGEST_OID]: sourceCommit }),
+      NativePrebuildIntegrityError,
+    );
+    assert.throws(
+      () =>
+        assertSigstoreCertificateOids(
+          {
+            identity: {
+              oids: [
+                {
+                  oid: { id: SIGSTORE_SOURCE_DIGEST_OID.split('.').map(Number) },
+                  value: Buffer.from(sourceCommit),
+                },
+              ],
+            },
+          },
+          { [SIGSTORE_SOURCE_DIGEST_OID]: sourceCommit },
+        ),
+      NativePrebuildIntegrityError,
+    );
   });
 
   it('assembles one complete deterministic release manifest', async () => {

@@ -55,9 +55,8 @@ export function assertSigstoreCertificateOids(signer, expectedOids) {
     const claim = actualOids.find(
       (candidate) => candidate?.oid?.id?.join('.') === oid && Buffer.isBuffer(candidate.value),
     );
-    const expected = Buffer.from(expectedValue, 'utf8');
-    const derExpected = encodeDerUtf8String(expected);
-    if (claim === undefined || (!claim.value.equals(expected) && !claim.value.equals(derExpected)))
+    const expected = encodeDerUtf8String(Buffer.from(expectedValue, 'utf8'));
+    if (claim === undefined || !claim.value.equals(expected))
       throw new NativePrebuildIntegrityError(`The Sigstore certificate does not pin ${oid} to ${expectedValue}.`);
   }
 }
