@@ -20,6 +20,7 @@ import {
   nativeBundleName,
   nativeMetadataName,
   sha256,
+  sigstoreCertificateIdentityPattern,
   writeJson,
 } from './native-prebuild.mjs';
 
@@ -188,6 +189,17 @@ describe('native prebuild installer', () => {
     });
     assert.equal(result.status, 'source-build');
     assert.equal(builds, 1);
+  });
+
+  it('anchors and escapes the Sigstore certificate identity', () => {
+    const identity = 'https://github.com/dragoscirjan/neottia/.github/workflows/ci.yml@refs/heads/main';
+    const pattern = new RegExp(sigstoreCertificateIdentityPattern(identity));
+    assert.equal(pattern.test(identity), true);
+    assert.equal(pattern.test(`${identity}-attacker`), false);
+    assert.equal(
+      pattern.test('https://githubXcom/dragoscirjan/neottia/.github/workflows/ciXyml@refs/heads/main'),
+      false,
+    );
   });
 
   it('checks DER-encoded source and runner certificate claims', () => {

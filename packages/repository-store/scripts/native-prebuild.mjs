@@ -61,6 +61,10 @@ export function assertSigstoreCertificateOids(signer, expectedOids) {
   }
 }
 
+export function sigstoreCertificateIdentityPattern(identity) {
+  return `^${identity.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`;
+}
+
 export function tupleKey(platform, architecture) {
   return `${platform}-${architecture}`;
 }

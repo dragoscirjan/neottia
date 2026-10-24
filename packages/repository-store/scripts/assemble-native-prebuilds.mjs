@@ -9,6 +9,7 @@ import {
   nativeMetadataName,
   readPackageVersion,
   sha256,
+  sigstoreCertificateIdentityPattern,
   tupleKey,
   validateManifestArtifact,
   writeJson,
@@ -84,7 +85,7 @@ async function verifySigstoreBundle(bundle, binary, artifact) {
     const { verify } = await import('sigstore');
     const signer = await verify(bundle, binary, {
       certificateIssuer: artifact.signature.certificateIssuer,
-      certificateIdentityURI: artifact.signature.certificateIdentityURI,
+      certificateIdentityURI: sigstoreCertificateIdentityPattern(artifact.signature.certificateIdentityURI),
     });
     assertSigstoreCertificateOids(signer, {
       [artifact.signature.sourceDigestOid]: artifact.sourceCommit,

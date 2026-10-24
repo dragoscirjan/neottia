@@ -16,6 +16,7 @@ import {
   nativeMetadataName,
   readPackageVersion,
   sha256,
+  sigstoreCertificateIdentityPattern,
   tupleKey,
   writeJson,
 } from './native-prebuild.mjs';
@@ -58,7 +59,9 @@ export async function packageNativePrebuild({
     throw new Error('Native prebuild signing requires the trusted GitHub repository and workflow ref.');
   const signer = await verify(signatureBundle, bytes, {
     certificateIssuer: SIGSTORE_CERTIFICATE_ISSUER,
-    certificateIdentityURI: `https://github.com/${GITHUB_REPOSITORY}/.github/workflows/ci.yml@${githubRef}`,
+    certificateIdentityURI: sigstoreCertificateIdentityPattern(
+      `https://github.com/${GITHUB_REPOSITORY}/.github/workflows/ci.yml@${githubRef}`,
+    ),
   });
   assertSigstoreCertificateOids(signer, {
     [SIGSTORE_SOURCE_DIGEST_OID]: sourceCommit,

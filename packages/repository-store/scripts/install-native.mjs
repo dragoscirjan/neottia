@@ -11,6 +11,7 @@ import {
   isCertifiedTuple,
   readNativeManifest,
   readPackageVersion,
+  sigstoreCertificateIdentityPattern,
   validateManifestArtifact,
 } from './native-prebuild.mjs';
 
@@ -84,7 +85,7 @@ async function verifySigstoreSignature(bundle, binary, manifest, artifact) {
   }
   const signer = await verify(bundle, binary, {
     certificateIssuer: manifest.signature.certificateIssuer,
-    certificateIdentityURI: manifest.signature.certificateIdentityURI,
+    certificateIdentityURI: sigstoreCertificateIdentityPattern(manifest.signature.certificateIdentityURI),
   });
   assertSigstoreCertificateOids(signer, {
     [manifest.signature.sourceDigestOid]: artifact.sourceCommit,
