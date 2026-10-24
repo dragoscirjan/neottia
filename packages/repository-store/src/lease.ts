@@ -724,6 +724,7 @@ function readOwner(
   try {
     file = readRegularFileWithIdentity(path, MAX_LEASE_METADATA_BYTES, {
       allowedLinkCounts: allowInterruptedClaimLink ? [1, 2] : [1],
+      unlinkedAsIdentityChange: true,
     });
   } catch (error: unknown) {
     const recoverableReadRace =

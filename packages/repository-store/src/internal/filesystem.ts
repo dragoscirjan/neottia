@@ -158,7 +158,10 @@ export function revalidateDirectories(identities: readonly DirectoryIdentity[]):
 export function readRegularFile(
   path: string,
   maxBytes: number,
-  options: { readonly allowedLinkCounts?: readonly number[] } = {},
+  options: {
+    readonly allowedLinkCounts?: readonly number[];
+    readonly unlinkedAsIdentityChange?: boolean;
+  } = {},
 ): Uint8Array {
   return readRegularFileWithIdentity(path, maxBytes, options).bytes;
 }
@@ -167,17 +170,21 @@ export function readRegularFile(
 export function readRegularFileWithIdentity(
   path: string,
   maxBytes: number,
-  options: { readonly allowedLinkCounts?: readonly number[] } = {},
+  options: {
+    readonly allowedLinkCounts?: readonly number[];
+    readonly unlinkedAsIdentityChange?: boolean;
+  } = {},
 ): { readonly bytes: Uint8Array; readonly identity: Stats } {
   const parents = captureDirectories(dirname(path));
   const allowedLinkCounts = options.allowedLinkCounts ?? [1];
+  const unlinkedAsIdentityChange = options.unlinkedAsIdentityChange ?? false;
   let descriptor: number | undefined;
   try {
     const pathBeforeOpen = lstatSync(path);
     assertRegularWithLinks(pathBeforeOpen, path, allowedLinkCounts);
     descriptor = openSync(path, fsConstants.O_RDONLY | noFollowFlag());
     const before = fstatSync(descriptor);
-    assertRegularWithLinks(before, path, allowedLinkCounts);
+    assertOpenedRegularWithLinks(before, path, allowedLinkCounts, unlinkedAsIdentityChange);
     if (before.size > maxBytes) throw new ResourceLimitError(`Managed file exceeds configured byte limit: ${path}`);
     const pathBefore = lstatSync(path);
     if (pathBefore.isSymbolicLink() || !sameIdentity(before, pathBefore))
@@ -193,7 +200,7 @@ export function readRegularFileWithIdentity(
     }
     if (offset > maxBytes) throw new ResourceLimitError(`Managed file exceeds configured byte limit: ${path}`);
     let after = fstatSync(descriptor);
-    assertRegularWithLinks(after, path, allowedLinkCounts);
+    assertOpenedRegularWithLinks(after, path, allowedLinkCounts, unlinkedAsIdentityChange);
     let bytes = buffer.subarray(0, offset);
     const stableExceptCtime =
       sameIdentity(before, after) &&
@@ -219,7 +226,7 @@ export function readRegularFileWithIdentity(
         confirmationOffset += count;
       }
       const confirmed = fstatSync(descriptor);
-      assertRegularWithLinks(confirmed, path, allowedLinkCounts);
+      assertOpenedRegularWithLinks(confirmed, path, allowedLinkCounts, unlinkedAsIdentityChange);
       if (
         !sameIdentity(after, confirmed) ||
         after.size !== confirmed.size ||
@@ -257,6 +264,23 @@ export function assertSafeRegular(stat: Stats, path: string): void {
 function assertRegularWithLinks(stat: Stats, path: string, allowedLinkCounts: readonly number[]): void {
   if (stat.isSymbolicLink() || !stat.isFile())
     throw unsafe(`Managed path is not a regular file: ${path}`, 'UNSAFE_LINK');
+  if (!allowedLinkCounts.includes(stat.nlink))
+    throw unsafe(`Managed file has an unsafe hard-link count: ${path}`, 'UNSAFE_HARD_LINK');
+}
+
+function assertOpenedRegularWithLinks(
+  stat: Stats,
+  path: string,
+  allowedLinkCounts: readonly number[],
+  unlinkedAsIdentityChange: boolean,
+): void {
+  if (stat.isSymbolicLink() || !stat.isFile())
+    throw unsafe(`Managed path is not a regular file: ${path}`, 'UNSAFE_LINK');
+  // An opened regular file reaches zero links only after every directory entry
+  // for that exact inode was removed. Lease-owner readers classify that known
+  // release transition as identity contention; all other readers stay strict.
+  if (stat.nlink === 0 && unlinkedAsIdentityChange)
+    throw unsafe(`Managed file was unlinked during access: ${path}`, 'IDENTITY_CHANGED');
   if (!allowedLinkCounts.includes(stat.nlink))
     throw unsafe(`Managed file has an unsafe hard-link count: ${path}`, 'UNSAFE_HARD_LINK');
 }

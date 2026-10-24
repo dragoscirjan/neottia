@@ -1072,6 +1072,29 @@ describe('repository authority lease', () => {
     },
   );
 
+  it.skipIf(process.platform === 'win32' || process.platform === 'freebsd')(
+    'retries when a directory lease is released during owner verification',
+    async () => {
+      const root = await fixture();
+      await withRepositoryLease(root, async () => undefined);
+      const control = join(root.authorityRoot, '.neottia', 'repository-store');
+      const lock = writeTestOwner(control, 16_777_215, new Date(0));
+      const ownerPath = join(lock, 'owner.json');
+      utimesSync(lock, new Date(0), new Date(0));
+      let released = false;
+      setFilesystemFaultInjectorForTests((event, target) => {
+        if (released || event !== 'bounded-read-opened' || target !== ownerPath) return;
+        released = true;
+        rmSync(lock, { recursive: true });
+      });
+
+      await expect(withRepositoryLease(root, async () => 'acquired', { pollMs: 1, waitMs: 1_000 })).resolves.toBe(
+        'acquired',
+      );
+      expect(released).toBe(true);
+    },
+  );
+
   it.skipIf(process.platform === 'freebsd')(
     'reclaims a stale claim whose same-host owner is conclusively dead',
     async () => {
@@ -1196,7 +1219,7 @@ describe('repository authority lease', () => {
       rmSync(claim);
       symlinkSync(target, claim);
       writeFileSync(resumeMarker, 'go');
-      await expect(pending).rejects.toThrow(/unsafe hard-link/i);
+      await expect(pending).rejects.toThrow(/unsafe repository claim symbolic link/i);
 
       // The substituted artifact and its target remain untouched.
       expect(lstatSync(claim).isSymbolicLink()).toBe(true);
