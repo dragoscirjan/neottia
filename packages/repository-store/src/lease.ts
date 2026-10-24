@@ -785,7 +785,11 @@ export function interruptedClaimPeer(
   allowReleasePeer = false,
 ): { readonly token: string } | undefined {
   const stat = observed ?? lstatSync(path);
-  if (stat.isSymbolicLink() || !stat.isFile() || (stat.nlink !== 1 && stat.nlink !== 2))
+  if (stat.isSymbolicLink() || !stat.isFile())
+    throw new PathSafetyError('Unsafe interrupted repository claim.', 'UNSAFE_HARD_LINK');
+  if (stat.nlink === 0)
+    throw new PathSafetyError('Interrupted claim was released before peer verification.', 'IDENTITY_CHANGED');
+  if (stat.nlink !== 1 && stat.nlink !== 2)
     throw new PathSafetyError('Unsafe interrupted repository claim.', 'UNSAFE_HARD_LINK');
   if (stat.nlink === 1) return undefined;
   for (let attempt = 0; attempt < 4; attempt += 1) {
