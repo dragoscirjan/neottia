@@ -1,6 +1,6 @@
 {
   "name": "@neottia/searchable-mcp",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "Generic MCP stdio server for Neottia Searchable",
   "author": "Dragos Cirjan",
   "license": "MIT",

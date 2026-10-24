@@ -1,5 +1,11 @@
 # @neottia/repository-store
 
+## 0.3.3
+
+### Patch Changes
+
+- [#240](https://github.com/dragoscirjan/neottia/pull/240) [`3cc3b71`](https://github.com/dragoscirjan/neottia/commit/3cc3b710e066696910b4e4b7aa7a0145c272eceb) Thanks [@dragoscirjan](https://github.com/dragoscirjan)! - Publish a new signed native prebuild set after release workflow recovery.
+
 ## 0.3.2
 
 ### Patch Changes
