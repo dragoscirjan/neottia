@@ -12,6 +12,8 @@ import { IssueStore } from './store.js';
 import { issueSearchInputSchema } from './tool-contracts.js';
 
 const roots: string[] = [];
+// Keep this multi-store SQLite journey within the Windows policy in vitest.config.js.
+const searchBudgetTestTimeout = process.platform === 'win32' ? 120_000 : 15_000;
 afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
@@ -291,33 +293,37 @@ describe('issue canonical lifecycle', () => {
     expect(validation.findings.every((finding) => finding.path?.endsWith('.yml'))).toBe(true);
   });
 
-  it('clamps direct search budgets to security ceilings before SQLite', async () => {
-    const cwd = project();
-    const issues = new IssueStore(
-      issueConfigSchema.parse({
-        enabled: true,
-        cache: { stale_policy: 'rebuild' },
-        security: { max_query_rows: 1, max_result_bytes: 1000 },
-      }),
-      cwd,
-    );
-    await issues.create({ type: 'task', title: 'Needle one', body: 'needle' });
-    await issues.create({ type: 'task', title: 'Needle two', body: 'needle' });
-    expect(await issues.search('needle', { limit: 2, maxBytes: 10_000 })).toHaveLength(1);
+  it(
+    'clamps direct search budgets to security ceilings before SQLite',
+    async () => {
+      const cwd = project();
+      const issues = new IssueStore(
+        issueConfigSchema.parse({
+          enabled: true,
+          cache: { stale_policy: 'rebuild' },
+          security: { max_query_rows: 1, max_result_bytes: 1000 },
+        }),
+        cwd,
+      );
+      await issues.create({ type: 'task', title: 'Needle one', body: 'needle' });
+      await issues.create({ type: 'task', title: 'Needle two', body: 'needle' });
+      expect(await issues.search('needle', { limit: 2, maxBytes: 10_000 })).toHaveLength(1);
 
-    const large = new IssueStore(
-      issueConfigSchema.parse({
-        enabled: true,
-        root: '.neottia/large-issues',
-        cache: { stale_policy: 'rebuild' },
-        security: { max_result_bytes: 1000 },
-      }),
-      cwd,
-    );
-    await large.create({ type: 'task', title: 'Budget', body: `budget ${'x'.repeat(700)}` });
-    await expect(large.search('budget')).rejects.toMatchObject({ code: 'RESULT_TOO_LARGE' });
-    await expect(large.search('budget', { maxBytes: 10_000 })).rejects.toMatchObject({ code: 'RESULT_TOO_LARGE' });
-  }, 15_000);
+      const large = new IssueStore(
+        issueConfigSchema.parse({
+          enabled: true,
+          root: '.neottia/large-issues',
+          cache: { stale_policy: 'rebuild' },
+          security: { max_result_bytes: 1000 },
+        }),
+        cwd,
+      );
+      await large.create({ type: 'task', title: 'Budget', body: `budget ${'x'.repeat(700)}` });
+      await expect(large.search('budget')).rejects.toMatchObject({ code: 'RESULT_TOO_LARGE' });
+      await expect(large.search('budget', { maxBytes: 10_000 })).rejects.toMatchObject({ code: 'RESULT_TOO_LARGE' });
+    },
+    searchBudgetTestTimeout,
+  );
 
   it('rejects malformed direct search budgets before opening the cache', async () => {
     const paddedCwd = project();
