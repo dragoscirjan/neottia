@@ -7,7 +7,7 @@ import { readNativeManifest, readPackageVersion, sha256 } from './native-prebuil
 
 const packageRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
-export function publishNativePrebuilds({ root = packageRoot, inputDirectory } = {}) {
+export function publishNativePrebuilds({ root = packageRoot, inputDirectory, runGhCommand = runGh } = {}) {
   if (inputDirectory === undefined) throw new Error('A native prebuild input directory is required.');
   const version = readPackageVersion(root);
   const manifest = readNativeManifest(root, version);
@@ -21,7 +21,7 @@ export function publishNativePrebuilds({ root = packageRoot, inputDirectory } = 
       join(input, artifact.attestation),
     ]),
   ];
-  const existing = JSON.parse(runGh(['release', 'view', manifest.releaseTag, '--json', 'assets'])).assets;
+  const existing = JSON.parse(runGhCommand(['release', 'view', manifest.releaseTag, '--json', 'assets'])).assets;
   const temporary = mkdtempSync(join(tmpdir(), 'neottia-native-assets-'));
   const missing = [];
   try {
@@ -32,17 +32,17 @@ export function publishNativePrebuilds({ root = packageRoot, inputDirectory } = 
         missing.push(file);
         continue;
       }
-      runGh(['release', 'download', manifest.releaseTag, '--pattern', name, '--dir', temporary]);
+      runGhCommand(['release', 'download', manifest.releaseTag, '--pattern', name, '--dir', temporary]);
       const remote = readFileSync(join(temporary, name));
       const local = readFileSync(file);
       if (remote.byteLength !== local.byteLength || sha256(remote) !== sha256(local))
         throw new Error(`GitHub Release asset ${name} already exists with different bytes.`);
     }
-    if (missing.length > 0) runGh(['release', 'upload', manifest.releaseTag, ...missing]);
+    if (missing.length > 0) runGhCommand(['release', 'upload', manifest.releaseTag, ...missing]);
   } finally {
     rmSync(temporary, { recursive: true, force: true });
   }
-  return { status: 'published', uploaded: missing.map(basename) };
+  return { status: 'published', uploaded: missing.map((file) => basename(file)) };
 }
 
 function runGh(arguments_) {
