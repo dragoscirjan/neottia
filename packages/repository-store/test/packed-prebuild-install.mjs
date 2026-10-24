@@ -36,16 +36,20 @@ try {
   });
   const address = server.address();
   assert.equal(typeof address, 'object');
+  // pnpm caches lifecycle side effects by package content, not by custom environment variables.
+  // Separate stores ensure that both install environments execute their lifecycle path.
   const verifiedProject = join(temporary, 'verified');
   createProject(verifiedProject, tarball);
-  await runPnpm(['install'], verifiedProject, {
+  await runPnpm(['install', '--store-dir', join(temporary, 'stores', 'verified')], verifiedProject, {
     NEOTTIA_REPOSITORY_STORE_PREBUILD_BASE_URL: `http://127.0.0.1:${String(address.port)}`,
   });
   assert.equal(readReceipt(verifiedProject).origin, 'verified-prebuilt');
 
   const sourceProject = join(temporary, 'source');
   createProject(sourceProject, tarball);
-  await runPnpm(['install'], sourceProject, { NEOTTIA_REPOSITORY_STORE_FORCE_SOURCE_BUILD: '1' });
+  await runPnpm(['install', '--store-dir', join(temporary, 'stores', 'source')], sourceProject, {
+    NEOTTIA_REPOSITORY_STORE_FORCE_SOURCE_BUILD: '1',
+  });
   assert.equal(readReceipt(sourceProject).origin, 'source-build');
   console.log('packed native prebuild and source fallback journeys passed');
 } finally {
