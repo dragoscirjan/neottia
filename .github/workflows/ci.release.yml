@@ -1,7 +1,13 @@
 name: CI » Release
 
 on:
-  workflow_call: {}
+  workflow_call:
+    inputs:
+      native-prebuilds:
+        description: Assemble and publish Repository Store native prebuilds.
+        required: false
+        type: boolean
+        default: false
 
 permissions: {}
 
@@ -16,6 +22,7 @@ jobs:
     environment: npm
     permissions:
       actions: write
+      attestations: read
       contents: write
       pull-requests: write
     steps:
@@ -28,6 +35,25 @@ jobs:
           install: true
           cache: true
       - run: mise run deps:sync:pnpm
+      - name: Download native prebuilds
+        if: inputs.native-prebuilds
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          pattern: repository-store-native-*
+          path: native-prebuilds
+          merge-multiple: true
+      - name: Verify GitHub native provenance
+        if: inputs.native-prebuilds
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          for artifact in native-prebuilds/*.node; do
+            gh attestation verify "${artifact}" --repo "${GITHUB_REPOSITORY}"
+          done
+      - name: Verify native signatures and assemble manifest
+        if: inputs.native-prebuilds
+        run: node packages/repository-store/scripts/assemble-native-prebuilds.mjs --input native-prebuilds
       - name: Configure npm registry authentication
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -42,6 +68,11 @@ jobs:
           config: .github/tempel-release.yml
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Publish verified native release assets
+        if: inputs.native-prebuilds && steps.release.outputs.mode != 'version'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node packages/repository-store/scripts/publish-native-prebuilds.mjs --input native-prebuilds
       # A global release is prepared explicitly and remains outside Changesets.
       - name: Publish the prepared global release
         if: steps.release.outputs.mode != 'version'

@@ -2,6 +2,7 @@ import { fsyncSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { UnsupportedRuntimeError } from '../errors.js';
+import { verifyNativeAddonIntegrity } from './native-integrity.js';
 
 /** Native operation that atomically moves a path without replacing its destination. */
 export interface ExactPublicationBackend {
@@ -153,9 +154,7 @@ function selectBackendDefinition(
 function loadNativeModule(): NativePlatformModule {
   const require = createRequire(import.meta.url);
   const packageRoot = fileURLToPath(new URL('../../', import.meta.url));
-  const candidate = require(
-    `${packageRoot}build/Release/repository_store_native.node`,
-  ) as Partial<NativePlatformModule>;
+  const candidate = require(verifyNativeAddonIntegrity(packageRoot)) as Partial<NativePlatformModule>;
   if (
     typeof candidate.platform !== 'string' ||
     typeof candidate.renameNoReplace !== 'function' ||
