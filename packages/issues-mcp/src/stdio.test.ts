@@ -13,6 +13,8 @@ let transport: StdioClientTransport | undefined;
 let project: TempIssueProject | undefined;
 let packedRoot: string | undefined;
 let packedEntry = '';
+// Keep child cleanup within the Intel macOS timeout policy in vitest.config.js.
+const packagedProcessShutdownTimeout = process.platform === 'darwin' && process.arch === 'x64' ? 15_000 : 5_000;
 
 beforeAll(() => {
   // Package only already-built output; all generated test artifacts stay temporary.
@@ -152,7 +154,7 @@ describe('packaged Issues MCP over stdio', () => {
         const timer = setTimeout(() => {
           child.kill('SIGKILL');
           rejectExit(new Error('Packaged MCP CLI did not exit after stdin closed.'));
-        }, 5_000);
+        }, packagedProcessShutdownTimeout);
         child.once('error', rejectExit);
         child.once('exit', (code, signal) => {
           clearTimeout(timer);
@@ -185,7 +187,10 @@ function linkPackedDependencies(extractedPackage: string): void {
 function transportClosed(current: StdioClientTransport): Promise<void> {
   return new Promise((resolveClosed, rejectClosed) => {
     const previous = current.onclose;
-    const timer = setTimeout(() => rejectClosed(new Error('Packaged MCP process did not shut down.')), 5_000);
+    const timer = setTimeout(
+      () => rejectClosed(new Error('Packaged MCP process did not shut down.')),
+      packagedProcessShutdownTimeout,
+    );
     current.onclose = () => {
       clearTimeout(timer);
       previous?.();
