@@ -82,6 +82,8 @@ const DEFAULT_STALE_MS = 60_000;
 const DEFAULT_POLL_MS = 20;
 const DEFAULT_WAIT_MS = 10_000;
 const MAX_LEASE_METADATA_BYTES = 4 * 1024;
+const WINDOWS_RELEASE_RETRY_ATTEMPTS = 25;
+const WINDOWS_RELEASE_RETRY_DELAY_MS = 10;
 
 /** Holds the sole authority lease across awaited work and performs recovery first. */
 export async function withRepositoryLease<T>(
@@ -178,7 +180,7 @@ export async function withRepositoryLease<T>(
         syncDirectory(controlRoot);
         if (!removeOwnedClaim(claimPath, token)) {
           claimOwnershipUncertain = true;
-          releaseOwnedLease(lockPath, controlRoot, token, lockIdentity, ownerIdentity, lockKind);
+          await releaseOwnedLease(lockPath, controlRoot, token, lockIdentity, ownerIdentity, lockKind);
           throw new LeaseContentionError('Repository initialization claim ownership changed.', 'LEASE_OWNER_UNKNOWN');
         }
         emitLeaseFault('lease-claim-removed');
@@ -222,7 +224,7 @@ export async function withRepositoryLease<T>(
       leaseState.active = false;
     }
     if (acquired && lockIdentity !== undefined && ownerIdentity !== undefined)
-      releaseOwnedLease(lockPath, controlRoot, token, lockIdentity, ownerIdentity, lockKind);
+      await releaseOwnedLease(lockPath, controlRoot, token, lockIdentity, ownerIdentity, lockKind);
     turn.release();
   }
 }
@@ -833,16 +835,16 @@ function matchingInterruptedClaimPeers(
   });
 }
 
-function releaseOwnedLease(
+async function releaseOwnedLease(
   lockPath: string,
   controlRoot: string,
   token: string,
   lockIdentity: Stats,
   ownerIdentity: Stats,
   lockKind: 'directory' | 'file',
-): void {
+): Promise<void> {
   if (lockKind === 'file') {
-    releaseOwnedFileLease(lockPath, controlRoot, token, lockIdentity, ownerIdentity);
+    await releaseOwnedFileLease(lockPath, controlRoot, token, lockIdentity, ownerIdentity);
     return;
   }
   const releasePath = `${lockPath}.release-${token}`;
@@ -864,7 +866,7 @@ function releaseOwnedLease(
       currentOwner.metadata.token !== token
     )
       return;
-    if (!quarantineNoReplace(lockPath, releasePath)) return;
+    if (!(await quarantineOwnedRelease(lockPath, releasePath))) return;
     restorationSafe = true;
     const movedLock = lstatSync(releasePath);
     const movedOwnerPath = join(releasePath, 'owner.json');
@@ -896,13 +898,13 @@ function releaseOwnedLease(
 }
 
 /** Releases only the regular-file authority lease captured at acquisition. */
-function releaseOwnedFileLease(
+async function releaseOwnedFileLease(
   lockPath: string,
   controlRoot: string,
   token: string,
   lockIdentity: Stats,
   ownerIdentity: Stats,
-): void {
+): Promise<void> {
   const releasePath = `${lockPath}.release-${token}`;
   const expected: ReleaseExpectation = { kind: 'file', identity: lockIdentity, token };
   let restorationSafe = false;
@@ -914,7 +916,7 @@ function releaseOwnedFileLease(
       !sameIdentity(current.identity, ownerIdentity)
     )
       return;
-    if (!quarantineNoReplace(lockPath, releasePath)) return;
+    if (!(await quarantineOwnedRelease(lockPath, releasePath))) return;
     restorationSafe = true;
     const moved = readOwner(releasePath);
     if (moved.metadata.token !== token || !sameIdentity(moved.identity, lockIdentity)) {
@@ -1252,6 +1254,22 @@ function acquisitionTimeout(hasExplicitDeadline: boolean): LeaseContentionError 
   return hasExplicitDeadline
     ? new LeaseContentionError('Repository operation deadline was exceeded.', 'DEADLINE_EXCEEDED')
     : new LeaseContentionError('Repository authority lease is busy.', 'LEASE_BUSY');
+}
+
+async function quarantineOwnedRelease(source: string, destination: string): Promise<boolean> {
+  const backend = requireRepositoryPlatformBackend();
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return quarantineNoReplace(source, destination);
+    } catch (error: unknown) {
+      const retryableWindowsSharingFailure =
+        backend.platform === 'win32' && (hasCode(error, 'EBUSY') || hasCode(error, 'EACCES'));
+      if (!retryableWindowsSharingFailure || attempt >= WINDOWS_RELEASE_RETRY_ATTEMPTS) throw error;
+      // A contender can briefly hold an NTFS handle while it verifies the
+      // current owner. Retry without weakening the no-replace or identity checks.
+      await interruptibleDelay(WINDOWS_RELEASE_RETRY_DELAY_MS);
+    }
+  }
 }
 
 function quarantineNoReplace(source: string, destination: string): boolean {
