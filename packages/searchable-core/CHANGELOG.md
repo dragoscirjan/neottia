@@ -1,5 +1,12 @@
 # @neottia/searchable-core
 
+## 0.2.3
+
+### Patch Changes
+
+- Updated dependencies [[`ec60fec`](https://github.com/dragoscirjan/neottia/commit/ec60fec1f046edddf1552a4c65d07bdbca3f9b57), [`57ea813`](https://github.com/dragoscirjan/neottia/commit/57ea813b78491b05bd88ae96e50384fa4064fab1)]:
+  - @neottia/repository-store@0.3.1
+
 ## 0.2.2
 
 ### Patch Changes

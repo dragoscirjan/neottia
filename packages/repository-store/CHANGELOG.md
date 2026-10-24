@@ -1,5 +1,13 @@
 # @neottia/repository-store
 
+## 0.3.1
+
+### Patch Changes
+
+- [#219](https://github.com/dragoscirjan/neottia/pull/219) [`ec60fec`](https://github.com/dragoscirjan/neottia/commit/ec60fec1f046edddf1552a4c65d07bdbca3f9b57) Thanks [@dragoscirjan](https://github.com/dragoscirjan)! - Treat a lease file unlinked during verified owner reads as normal identity contention while preserving fail-closed hard-link checks.
+
+- [#216](https://github.com/dragoscirjan/neottia/pull/216) [`57ea813`](https://github.com/dragoscirjan/neottia/commit/57ea813b78491b05bd88ae96e50384fa4064fab1) Thanks [@dragoscirjan](https://github.com/dragoscirjan)! - Download version-pinned native prebuilds from GitHub Releases, verify their Sigstore signature and SHA-256 digest before installation, detect post-install binary changes before loading, and retain an explicit source-build fallback.
+
 ## 0.3.0
 
 ### Minor Changes
