@@ -373,8 +373,7 @@ function tryReclaimFileLease(lockPath: string, controlRoot: string, hostId: stri
   const controlDirectories = captureDirectories(controlRoot);
   try {
     const preliminary = lstatSync(lockPath);
-    if (preliminary.isSymbolicLink() || !preliminary.isFile() || (preliminary.nlink !== 1 && preliminary.nlink !== 2))
-      throw new PathSafetyError('Unsafe repository file lease.', 'UNSAFE_HARD_LINK');
+    assertPreliminaryFileLeaseIdentity(preliminary);
     const verifiedOwner = readOwner(lockPath, true, true);
     if (!sameIdentity(preliminary, verifiedOwner.identity))
       throw new LeaseContentionError('File lease identity changed before owner verification.', 'LEASE_OWNER_UNKNOWN');
@@ -523,10 +522,7 @@ function tryReclaimClaim(
   const controlDirectories = captureDirectories(controlRoot);
   try {
     const preliminary = lstatSync(claimPath);
-    if (preliminary.isSymbolicLink())
-      throw new PathSafetyError('Unsafe repository claim symbolic link.', 'UNSAFE_LINK');
-    if (!preliminary.isFile() || (preliminary.nlink !== 1 && preliminary.nlink !== 2))
-      throw new PathSafetyError('Unsafe repository claim artifact.', 'UNSAFE_HARD_LINK');
+    assertPreliminaryClaimIdentity(preliminary);
     const verifiedOwner = readOwner(claimPath, true);
     if (!sameIdentity(preliminary, verifiedOwner.identity))
       throw new LeaseContentionError('Claim identity changed before owner verification.', 'LEASE_OWNER_UNKNOWN');
@@ -571,6 +567,26 @@ function tryReclaimClaim(
     // Missing/malformed ownership is unknown and therefore remains locked.
     return false;
   }
+}
+
+/** Validates an initial regular-file lease identity before owner verification. */
+export function assertPreliminaryFileLeaseIdentity(identity: Stats): void {
+  if (identity.isSymbolicLink() || !identity.isFile())
+    throw new PathSafetyError('Unsafe repository file lease.', 'UNSAFE_HARD_LINK');
+  if (identity.nlink === 0)
+    throw new PathSafetyError('Repository file lease was released before owner verification.', 'IDENTITY_CHANGED');
+  if (identity.nlink !== 1 && identity.nlink !== 2)
+    throw new PathSafetyError('Unsafe repository file lease.', 'UNSAFE_HARD_LINK');
+}
+
+/** Validates an initial claim identity before any owner bytes are opened. */
+export function assertPreliminaryClaimIdentity(identity: Stats): void {
+  if (identity.isSymbolicLink()) throw new PathSafetyError('Unsafe repository claim symbolic link.', 'UNSAFE_LINK');
+  if (!identity.isFile()) throw new PathSafetyError('Unsafe repository claim artifact.', 'UNSAFE_HARD_LINK');
+  if (identity.nlink === 0)
+    throw new PathSafetyError('Repository claim was released before owner verification.', 'IDENTITY_CHANGED');
+  if (identity.nlink !== 1 && identity.nlink !== 2)
+    throw new PathSafetyError('Unsafe repository claim artifact.', 'UNSAFE_HARD_LINK');
 }
 
 /** Removes only an empty lock left by the conclusively dead claim owner. */
