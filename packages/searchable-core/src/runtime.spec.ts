@@ -9,6 +9,8 @@ import type { StashedPageRecord } from './stash.js';
 import { findSearchableTool } from './tools.js';
 
 const roots: string[] = [];
+const runtimeJourneyConfig =
+  process.platform === 'darwin' && process.arch === 'x64' ? '    fetch:\n      timeout_ms: 15000\n' : '';
 afterEach(() => roots.splice(0).forEach((root) => rmSync(root, { recursive: true, force: true })));
 
 function project(extra = ''): string {
@@ -68,7 +70,9 @@ describe('concrete Searchable runtime', () => {
   });
 
   it('runs provider search, bounded extraction, canonical stash, grep, and Ollama ask', async () => {
-    const cwd = project();
+    // Worker startup is slower under concurrent Intel macOS CI load. Keep the
+    // broad journey within the repository's bounded 15-second test policy.
+    const cwd = project(runtimeJourneyConfig);
     const transport = new FixtureTransport();
     const runtime = createSearchableRuntime({ cwd, transport });
     const context = { cwd, services: runtime };
