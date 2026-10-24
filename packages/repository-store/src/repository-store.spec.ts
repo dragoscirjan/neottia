@@ -1,11 +1,14 @@
 import { spawn } from 'node:child_process';
 import { randomBytes, randomUUID } from 'node:crypto';
 import {
+  closeSync,
   existsSync,
+  fstatSync,
   linkSync,
   lstatSync,
   mkdirSync,
   mkdtempSync,
+  openSync,
   readFileSync,
   readdirSync,
   realpathSync,
@@ -640,6 +643,31 @@ describe('repository authority lease', () => {
       observedError = error;
     }
     expect(observedError).toMatchObject({ category: 'path_safety', code: expectedCode });
+  });
+
+  it.skipIf(process.platform === 'win32')('classifies a zero-link interrupted claim observation as contention', () => {
+    const authority = mkdtempSync(join(tmpdir(), 'neottia-lease-unlinked-claim-'));
+    tempDirectories.push(authority);
+    const claim = join(authority, 'authority.claim');
+    writeFileSync(claim, 'owner');
+    const descriptor = openSync(claim, 'r');
+    const observed = (() => {
+      try {
+        rmSync(claim);
+        return fstatSync(descriptor);
+      } finally {
+        closeSync(descriptor);
+      }
+    })();
+
+    expect(observed.nlink).toBe(0);
+    let observedError: unknown;
+    try {
+      interruptedClaimPeer(claim, observed);
+    } catch (error: unknown) {
+      observedError = error;
+    }
+    expect(observedError).toMatchObject({ category: 'path_safety', code: 'IDENTITY_CHANGED' });
   });
 
   it('uses a regular-file authority lease when directory no-replace moves are unavailable', async () => {
