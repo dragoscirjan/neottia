@@ -46,7 +46,12 @@ import {
 } from './internal/fault-injection.js';
 import { getRootState } from './internal/model.js';
 import { isCertifiedRepositoryPlatform, setRepositoryPlatformBackendForTests } from './internal/platform-backend.js';
-import { interruptedClaimPeer, restoreQuarantinedLease } from './lease.js';
+import {
+  assertPreliminaryClaimIdentity,
+  assertPreliminaryFileLeaseIdentity,
+  interruptedClaimPeer,
+  restoreQuarantinedLease,
+} from './lease.js';
 import {
   createTransactionDirectory,
   manifestDigest,
@@ -645,30 +650,58 @@ describe('repository authority lease', () => {
     expect(observedError).toMatchObject({ category: 'path_safety', code: expectedCode });
   });
 
-  it.skipIf(process.platform === 'win32')('classifies a zero-link interrupted claim observation as contention', () => {
-    const authority = mkdtempSync(join(tmpdir(), 'neottia-lease-unlinked-claim-'));
-    tempDirectories.push(authority);
-    const claim = join(authority, 'authority.claim');
-    writeFileSync(claim, 'owner');
-    const descriptor = openSync(claim, 'r');
-    const observed = (() => {
-      try {
-        rmSync(claim);
-        return fstatSync(descriptor);
-      } finally {
-        closeSync(descriptor);
-      }
-    })();
+  it.skipIf(process.platform === 'win32')(
+    'classifies zero-link preliminary and peer observations as contention',
+    () => {
+      const authority = mkdtempSync(join(tmpdir(), 'neottia-lease-unlinked-claim-'));
+      tempDirectories.push(authority);
+      const claim = join(authority, 'authority.claim');
+      writeFileSync(claim, 'owner');
+      const descriptor = openSync(claim, 'r');
+      const observed = (() => {
+        try {
+          rmSync(claim);
+          return fstatSync(descriptor);
+        } finally {
+          closeSync(descriptor);
+        }
+      })();
 
-    expect(observed.nlink).toBe(0);
-    let observedError: unknown;
-    try {
-      interruptedClaimPeer(claim, observed);
-    } catch (error: unknown) {
-      observedError = error;
-    }
-    expect(observedError).toMatchObject({ category: 'path_safety', code: 'IDENTITY_CHANGED' });
-  });
+      expect(observed.nlink).toBe(0);
+      for (const inspect of [
+        () => assertPreliminaryClaimIdentity(observed),
+        () => assertPreliminaryFileLeaseIdentity(observed),
+        () => interruptedClaimPeer(claim, observed),
+      ]) {
+        let observedError: unknown;
+        try {
+          inspect();
+        } catch (error: unknown) {
+          observedError = error;
+        }
+        expect(observedError).toMatchObject({ category: 'path_safety', code: 'IDENTITY_CHANGED' });
+      }
+
+      const hostile = join(authority, 'hostile-claim');
+      writeFileSync(hostile, 'owner');
+      linkSync(hostile, `${hostile}.peer-one`);
+      linkSync(hostile, `${hostile}.peer-two`);
+      const hostileIdentity = lstatSync(hostile);
+      expect(hostileIdentity.nlink).toBe(3);
+      for (const inspect of [
+        () => assertPreliminaryClaimIdentity(hostileIdentity),
+        () => assertPreliminaryFileLeaseIdentity(hostileIdentity),
+      ]) {
+        let hostileError: unknown;
+        try {
+          inspect();
+        } catch (error: unknown) {
+          hostileError = error;
+        }
+        expect(hostileError).toMatchObject({ category: 'path_safety', code: 'UNSAFE_HARD_LINK' });
+      }
+    },
+  );
 
   it('uses a regular-file authority lease when directory no-replace moves are unavailable', async () => {
     const root = await fixture();
