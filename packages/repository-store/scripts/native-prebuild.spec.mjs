@@ -23,6 +23,7 @@ import {
   sigstoreCertificateIdentityPattern,
   writeJson,
 } from './native-prebuild.mjs';
+import { publishNativePrebuilds } from './publish-native-prebuilds.mjs';
 
 const roots = [];
 const sourceCommit = '0123456789abcdef0123456789abcdef01234567';
@@ -273,6 +274,49 @@ describe('native prebuild installer', () => {
   });
 });
 
+describe('native prebuild publisher', () => {
+  it('reports uploaded asset basenames after first publication', () => {
+    const fixture = createPublicationFixture();
+    const release = createReleaseStub(fixture);
+    const result = publishNativePrebuilds({
+      root: fixture.root,
+      inputDirectory: fixture.input,
+      runGhCommand: release.run,
+    });
+    assert.deepEqual(result, { status: 'published', uploaded: fixture.names });
+    assert.deepEqual(release.uploaded, fixture.paths);
+  });
+
+  it('skips matching assets on an idempotent rerun', () => {
+    const fixture = createPublicationFixture();
+    const release = createReleaseStub(fixture, { existing: fixture.names });
+    const result = publishNativePrebuilds({
+      root: fixture.root,
+      inputDirectory: fixture.input,
+      runGhCommand: release.run,
+    });
+    assert.deepEqual(result, { status: 'published', uploaded: [] });
+    assert.deepEqual(release.uploaded, []);
+  });
+
+  it('rejects an existing asset with different bytes', () => {
+    const fixture = createPublicationFixture();
+    const release = createReleaseStub(fixture, {
+      existing: [fixture.artifact.name],
+      altered: fixture.artifact.name,
+    });
+    assert.throws(
+      () =>
+        publishNativePrebuilds({
+          root: fixture.root,
+          inputDirectory: fixture.input,
+          runGhCommand: release.run,
+        }),
+      /already exists with different bytes/,
+    );
+  });
+});
+
 function createArtifact(version, platform, architecture) {
   return {
     platform,
@@ -289,6 +333,49 @@ function createArtifact(version, platform, architecture) {
       certificateIdentityURI: SIGSTORE_CERTIFICATE_IDENTITY,
       sourceDigestOid: SIGSTORE_SOURCE_DIGEST_OID,
       runnerEnvironmentOid: SIGSTORE_RUNNER_ENVIRONMENT_OID,
+    },
+  };
+}
+
+function createPublicationFixture() {
+  const root = mkdtempSync(join(tmpdir(), 'neottia-native-publisher-'));
+  roots.push(root);
+  const input = join(root, 'input');
+  mkdirSync(input);
+  writeFileSync(
+    join(root, 'package.json'),
+    `${JSON.stringify({ name: '@neottia/repository-store', version: '1.2.3' })}\n`,
+  );
+  const artifact = createArtifact('1.2.3', 'linux', 'x64');
+  writeFileSync(join(input, artifact.name), bytes);
+  writeFileSync(join(input, artifact.bundle), '{}\n');
+  writeFileSync(join(input, artifact.attestation), '{}\n');
+  writeJson(join(root, 'native-prebuilds.json'), createManifest('1.2.3', sourceCommit, [artifact]));
+  const names = ['native-prebuilds.json', artifact.name, artifact.bundle, artifact.attestation];
+  const paths = [join(root, names[0]), ...names.slice(1).map((name) => join(input, name))];
+  return { root, input, artifact, names, paths, files: new Map(names.map((name, index) => [name, paths[index]])) };
+}
+
+function createReleaseStub(fixture, { existing = [], altered } = {}) {
+  const uploaded = [];
+  return {
+    uploaded,
+    run(arguments_) {
+      assert.equal(arguments_[0], 'release');
+      if (arguments_[1] === 'view') return JSON.stringify({ assets: existing.map((name) => ({ name })) });
+      if (arguments_[1] === 'download') {
+        const name = arguments_[arguments_.indexOf('--pattern') + 1];
+        const directory = arguments_[arguments_.indexOf('--dir') + 1];
+        const source = fixture.files.get(name);
+        assert.notEqual(source, undefined);
+        writeFileSync(join(directory, name), name === altered ? Buffer.from('altered') : readFileSync(source));
+        return '';
+      }
+      if (arguments_[1] === 'upload') {
+        uploaded.push(...arguments_.slice(3));
+        return '';
+      }
+      return assert.fail(`Unexpected gh command: ${arguments_.join(' ')}`);
     },
   };
 }
