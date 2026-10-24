@@ -1,5 +1,11 @@
 # @neottia/repository-store
 
+## 0.3.1
+
+### Patch Changes
+
+- [#216](https://github.com/dragoscirjan/neottia/pull/216) [`57ea813`](https://github.com/dragoscirjan/neottia/commit/57ea813b78491b05bd88ae96e50384fa4064fab1) Thanks [@dragoscirjan](https://github.com/dragoscirjan)! - Download version-pinned native prebuilds from GitHub Releases, verify their Sigstore signature and SHA-256 digest before installation, detect post-install binary changes before loading, and retain an explicit source-build fallback.
+
 ## 0.3.0
 
 ### Minor Changes
