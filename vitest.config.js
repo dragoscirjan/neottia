@@ -1,6 +1,9 @@
 import { resolve } from 'node:path';
 import { defineConfig } from 'vitest/config';
 
+const defaultTestTimeout = process.platform === 'win32' ? 120_000 : 5_000;
+const testTimeout = process.platform === 'darwin' && process.arch === 'x64' ? 15_000 : defaultTestTimeout;
+
 // Vitest resolves workspace packages to source. The root test still builds
 // dist because Bun and child-process suites execute package entry points.
 const workspaceSourceAliases = {
@@ -54,7 +57,9 @@ export default defineConfig({
     },
     environment: 'node',
     hookTimeout: process.platform === 'win32' ? 120_000 : 10_000,
-    testTimeout: process.platform === 'win32' ? 120_000 : 5_000,
+    // Filesystem-heavy tests can exceed five seconds when workspace packages
+    // run concurrently on Intel macOS hosted runners.
+    testTimeout,
     exclude: [
       '**/*.bun.test.ts', // Bun-only suites run through their package scripts.
       '**/*.config.*',
