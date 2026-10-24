@@ -125,7 +125,20 @@ jobs:
             exit 0
           fi
           current="$(node -p "require('./packages/repository-store/package.json').version")"
-          published="$(pnpm view @neottia/repository-store version 2>/dev/null || true)"
+          lookup_error="$(mktemp)"
+          trap 'rm -f "${lookup_error}"' EXIT
+          if published="$(pnpm view @neottia/repository-store version 2>"${lookup_error}")"; then
+            if [[ -z "${published}" ]]; then
+              echo "::error::The npm registry returned no published Repository Store version."
+              exit 1
+            fi
+          elif grep -Eqi 'ERR_PNPM_FETCH_404|E404|404 Not Found|is not in .*registry' "${lookup_error}"; then
+            echo "required=true" >> "${GITHUB_OUTPUT}"
+            exit 0
+          else
+            echo "::error::Could not determine the published Repository Store version. Refusing to build native release assets."
+            exit 1
+          fi
           if [[ "${current}" != "${published}" ]]; then
             echo "required=true" >> "${GITHUB_OUTPUT}"
             exit 0
