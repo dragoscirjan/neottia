@@ -847,6 +847,41 @@ describe('repository authority lease', () => {
     expect(readdirSync(control).filter((name) => name.startsWith('authority.'))).toEqual([]);
   });
 
+  it.each(['EBUSY', 'EACCES'] as const)(
+    'retries transient Windows %s failures while releasing an owned lease',
+    async (code) => {
+      const root = await fixture();
+      const control = join(root.authorityRoot, '.neottia', 'repository-store');
+      const lockPath = join(control, 'authority.lease');
+      let releaseAttempts = 0;
+      setRepositoryPlatformBackendForTests({
+        id: 'test-windows-transient-release',
+        platform: 'win32',
+        filesystemRequirement: 'the test NTFS filesystem',
+        leaseArtifact: 'directory',
+        filesystem: { supportsLocalPath: () => true },
+        durability: { syncDescriptor() {} },
+        publication: {
+          renameNoReplace(source, destination) {
+            if (source === lockPath && destination.startsWith(`${lockPath}.release-`)) {
+              releaseAttempts += 1;
+              if (releaseAttempts < 3) throw Object.assign(new Error('transient Windows sharing failure'), { code });
+            }
+            if (existsSync(destination)) throw Object.assign(new Error('destination exists'), { code: 'EEXIST' });
+            renameSync(source, destination);
+          },
+        },
+      });
+
+      await withRepositoryLease(root, async () => undefined);
+
+      expect(releaseAttempts).toBe(3);
+      expect(readdirSync(control).filter((name) => name.startsWith('authority.'))).toEqual([]);
+      await expect(withRepositoryLease(root, async () => 'reacquired')).resolves.toBe('reacquired');
+      expect(readdirSync(control).filter((name) => name.startsWith('authority.'))).toEqual([]);
+    },
+  );
+
   it('serializes repeated real worker-process acquisitions under one repository authority', async () => {
     const authority = mkdtempSync(join(tmpdir(), 'neottia-repository-workers-'));
     tempDirectories.push(authority);
