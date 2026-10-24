@@ -1072,6 +1072,29 @@ describe('repository authority lease', () => {
     },
   );
 
+  it.skipIf(process.platform === 'win32' || process.platform === 'freebsd')(
+    'retries when a directory lease is released during owner verification',
+    async () => {
+      const root = await fixture();
+      await withRepositoryLease(root, async () => undefined);
+      const control = join(root.authorityRoot, '.neottia', 'repository-store');
+      const lock = writeTestOwner(control, 16_777_215, new Date(0));
+      const ownerPath = join(lock, 'owner.json');
+      utimesSync(lock, new Date(0), new Date(0));
+      let released = false;
+      setFilesystemFaultInjectorForTests((event, target) => {
+        if (released || event !== 'bounded-read-opened' || target !== ownerPath) return;
+        released = true;
+        rmSync(lock, { recursive: true });
+      });
+
+      await expect(withRepositoryLease(root, async () => 'acquired', { pollMs: 1, waitMs: 1_000 })).resolves.toBe(
+        'acquired',
+      );
+      expect(released).toBe(true);
+    },
+  );
+
   it.skipIf(process.platform === 'freebsd')(
     'reclaims a stale claim whose same-host owner is conclusively dead',
     async () => {
@@ -1130,6 +1153,31 @@ describe('repository authority lease', () => {
       await expect(withRepositoryLease(root, async () => 'recovered', { staleMs: 1 })).resolves.toBe('recovered');
       expect(existsSync(staging)).toBe(false);
       expect(existsSync(claim)).toBe(false);
+    },
+  );
+
+  it.skipIf(process.platform === 'win32' || process.platform === 'freebsd')(
+    'retries when an interrupted claim is released during its stabilized owner read',
+    async () => {
+      const root = await fixture();
+      await withRepositoryLease(root, async () => undefined);
+      const control = join(root.authorityRoot, '.neottia', 'repository-store');
+      const staging = join(control, `authority.claim.prepare-${randomUUID()}`);
+      const claim = join(control, 'authority.claim');
+      writeOwnerMetadata(staging, control, process.pid, new Date());
+      linkSync(staging, claim);
+      let opened = 0;
+      setFilesystemFaultInjectorForTests((event, target) => {
+        if (event !== 'bounded-read-opened' || target !== claim || opened >= 2) return;
+        opened += 1;
+        if (opened === 1) rmSync(staging);
+        else rmSync(claim);
+      });
+
+      await expect(withRepositoryLease(root, async () => 'acquired', { pollMs: 1, waitMs: 1_000 })).resolves.toBe(
+        'acquired',
+      );
+      expect(opened).toBe(2);
     },
   );
 
@@ -1196,7 +1244,7 @@ describe('repository authority lease', () => {
       rmSync(claim);
       symlinkSync(target, claim);
       writeFileSync(resumeMarker, 'go');
-      await expect(pending).rejects.toThrow(/unsafe hard-link/i);
+      await expect(pending).rejects.toThrow(/unsafe repository claim symbolic link/i);
 
       // The substituted artifact and its target remain untouched.
       expect(lstatSync(claim).isSymbolicLink()).toBe(true);

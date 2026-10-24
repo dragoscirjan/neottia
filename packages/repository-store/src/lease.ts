@@ -724,6 +724,7 @@ function readOwner(
   try {
     file = readRegularFileWithIdentity(path, MAX_LEASE_METADATA_BYTES, {
       allowedLinkCounts: allowInterruptedClaimLink ? [1, 2] : [1],
+      unlinkedAsIdentityChange: true,
     });
   } catch (error: unknown) {
     const recoverableReadRace =
@@ -747,7 +748,9 @@ function readOwner(
       throw new PathSafetyError('Interrupted claim identity changed during owner verification.', 'IDENTITY_CHANGED');
     if (stabilized.nlink !== 1) throw error;
     // Retry only the legitimate staging-link finalization transition.
-    file = readRegularFileWithIdentity(path, MAX_LEASE_METADATA_BYTES);
+    file = readRegularFileWithIdentity(path, MAX_LEASE_METADATA_BYTES, {
+      unlinkedAsIdentityChange: true,
+    });
   }
   const owner = JSON.parse(new TextDecoder().decode(file.bytes)) as Partial<OwnerMetadata>;
   if (
