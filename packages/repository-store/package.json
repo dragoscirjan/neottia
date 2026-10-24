@@ -1,6 +1,6 @@
 {
   "name": "@neottia/repository-store",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Crash-recoverable repository-local canonical file and disposable SQLite storage primitives",
   "author": "Dragos Cirjan",
   "license": "MIT",
