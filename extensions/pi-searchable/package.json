@@ -1,6 +1,6 @@
 {
   "name": "@neottia/pi-searchable",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "In-process Pi tools for Neottia Searchable",
   "author": "Dragos Cirjan",
   "license": "MIT",

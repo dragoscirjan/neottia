@@ -1,5 +1,15 @@
 # @neottia/repository-store
 
+## 0.3.2
+
+### Patch Changes
+
+- [#232](https://github.com/dragoscirjan/neottia/pull/232) [`24b2975`](https://github.com/dragoscirjan/neottia/commit/24b2975a305a137e4a6841af0caf6cc97febb4c8) Thanks [@dragoscirjan](https://github.com/dragoscirjan)! - Treat preliminary zero-link authority claim and file-lease observations as retryable release contention.
+
+- [#226](https://github.com/dragoscirjan/neottia/pull/226) [`c1ddbac`](https://github.com/dragoscirjan/neottia/commit/c1ddbac158a2ce1fdd6d41a48e183f5be7787a62) Thanks [@dragoscirjan](https://github.com/dragoscirjan)! - Treat zero-link interrupted authority claim observations as retryable release contention.
+
+- [#224](https://github.com/dragoscirjan/neottia/pull/224) [`93060b0`](https://github.com/dragoscirjan/neottia/commit/93060b0d3692ff4501cd67ba299b3c61dba81eec) Thanks [@dragoscirjan](https://github.com/dragoscirjan)! - Retry bounded transient NTFS sharing failures while releasing an owned repository authority lease.
+
 ## 0.3.1
 
 ### Patch Changes
