@@ -1156,6 +1156,31 @@ describe('repository authority lease', () => {
     },
   );
 
+  it.skipIf(process.platform === 'win32' || process.platform === 'freebsd')(
+    'retries when an interrupted claim is released during its stabilized owner read',
+    async () => {
+      const root = await fixture();
+      await withRepositoryLease(root, async () => undefined);
+      const control = join(root.authorityRoot, '.neottia', 'repository-store');
+      const staging = join(control, `authority.claim.prepare-${randomUUID()}`);
+      const claim = join(control, 'authority.claim');
+      writeOwnerMetadata(staging, control, process.pid, new Date());
+      linkSync(staging, claim);
+      let opened = 0;
+      setFilesystemFaultInjectorForTests((event, target) => {
+        if (event !== 'bounded-read-opened' || target !== claim || opened >= 2) return;
+        opened += 1;
+        if (opened === 1) rmSync(staging);
+        else rmSync(claim);
+      });
+
+      await expect(withRepositoryLease(root, async () => 'acquired', { pollMs: 1, waitMs: 1_000 })).resolves.toBe(
+        'acquired',
+      );
+      expect(opened).toBe(2);
+    },
+  );
+
   it.skipIf(process.platform === 'freebsd')(
     'treats a claim released during a reclaim read as contention, not tampering',
     async () => {
