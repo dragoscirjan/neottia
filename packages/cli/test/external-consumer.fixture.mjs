@@ -11,15 +11,37 @@ const project = process.cwd();
 const origin = process.env.EXPECTED_NATIVE_ORIGIN;
 assert.ok(origin === 'verified-prebuilt' || origin === 'source-build');
 
-for (const path of ['.pi/prompts/plan.md', '.pi/settings.json', '.opencode/commands/plan.md', 'opencode.json']) {
+for (const path of [
+  '.pi/prompts/plan.md',
+  '.pi/settings.json',
+  '.opencode/commands/plan.md',
+  'opencode.json',
+  '.claude/commands/plan.md',
+  '.claude/skills/neottia-sdlc/SKILL.md',
+  '.mcp.json',
+]) {
   assert.ok((await readFile(join(project, path), 'utf8')).length > 0, `${path} was not installed`);
 }
 
 const piSettings = JSON.parse(await readFile(join(project, '.pi/settings.json'), 'utf8'));
 const opencodeSettings = JSON.parse(await readFile(join(project, 'opencode.json'), 'utf8'));
+const claudeMcp = JSON.parse(await readFile(join(project, '.mcp.json'), 'utf8'));
 for (const logicalName of ['memory', 'issues', 'design-docs', 'searchable']) {
   assert.ok(piSettings.packages.some((entry) => entry.includes(`@neottia/pi-${logicalName}@`)));
   assert.ok(opencodeSettings.plugin.some((entry) => entry.includes(`@neottia/opencode-${logicalName}@`)));
+}
+for (const [server, packageName, executable] of [
+  ['neottia-memory', '@neottia/memory-mcp', 'memory-mcp'],
+  ['neottia-issues', '@neottia/issues-mcp', 'issues-mcp'],
+  ['neottia-design-docs', '@neottia/design-docs-mcp', 'design-docs-mcp'],
+  ['neottia-searchable', '@neottia/searchable-mcp', 'searchable-mcp'],
+]) {
+  const declaration = claudeMcp.mcpServers[server];
+  assert.equal(declaration.type, 'stdio');
+  assert.equal(declaration.command, 'npx');
+  assert.deepEqual(declaration.args.slice(0, 2), ['--yes', '--package']);
+  assert.ok(declaration.args[2].startsWith(`${packageName}@`));
+  assert.equal(declaration.args[3], executable);
 }
 
 const extensionPackages = [

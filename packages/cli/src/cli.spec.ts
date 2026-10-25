@@ -112,6 +112,67 @@ describe('Neottia CLI', () => {
     });
   });
 
+  it('initializes, installs, and diagnoses the Claude Code lifecycle through project MCP', async () => {
+    const root = await fixture();
+    const initialized = capture();
+
+    expect(
+      await main(
+        ['init', '--harness', 'claude-code', '--enable', 'memory', '--enable', 'searchable', '--project', root],
+        initialized.output,
+      ),
+    ).toBe(0);
+
+    expect(resolveGeneratedConfig(root).toJSON()).toMatchObject({
+      harnesses: { install: { targets: [{ id: 'claude-code', scope: 'project' }] } },
+      agents: { sdlc: { 'claude-code': requiredRoleAssignments() } },
+    });
+    await writeFile(
+      join(root, '.mcp.json'),
+      '{"mcpServers":{"operator":{"type":"http","url":"https://example.test/mcp"}}}\n',
+      'utf8',
+    );
+
+    const applied = capture();
+    expect(await main(['apply', '--project', root], applied.output)).toBe(0);
+    expect(applied.errors).toEqual([]);
+    expect(applied.logs.some((line) => line.includes('Installed claude-code project lifecycle'))).toBe(true);
+    expect(await exists(join(root, '.claude', 'commands', 'plan.md'))).toBe(true);
+    expect(await exists(join(root, '.claude', 'skills', 'neottia-sdlc', 'SKILL.md'))).toBe(true);
+    expect(await exists(join(root, '.neottia', 'install', 'sdlc-claude-code.receipt.json'))).toBe(true);
+
+    const mcp = JSON.parse(await readFile(join(root, '.mcp.json'), 'utf8')) as {
+      mcpServers: Record<string, { type: string; command?: string; args?: string[]; url?: string }>;
+    };
+    expect(mcp.mcpServers.operator).toEqual({ type: 'http', url: 'https://example.test/mcp' });
+    expect(mcp.mcpServers).toMatchObject({
+      'neottia-memory': {
+        type: 'stdio',
+        command: 'npx',
+        args: ['--yes', '--package', '@neottia/memory-mcp@0.3.4', 'memory-mcp'],
+      },
+      'neottia-issues': {
+        type: 'stdio',
+        command: 'npx',
+        args: ['--yes', '--package', '@neottia/issues-mcp@0.2.3', 'issues-mcp'],
+      },
+      'neottia-design-docs': {
+        type: 'stdio',
+        command: 'npx',
+        args: ['--yes', '--package', '@neottia/design-docs-mcp@0.2.3', 'design-docs-mcp'],
+      },
+      'neottia-searchable': {
+        type: 'stdio',
+        command: 'npx',
+        args: ['--yes', '--package', '@neottia/searchable-mcp@0.2.8', 'searchable-mcp'],
+      },
+    });
+
+    const doctor = capture();
+    expect(await main(['doctor', '--project', root], doctor.output)).toBe(0);
+    expect(doctor.logs.join('\n')).toContain('No missing modules or installs detected.');
+  }, 30000);
+
   it('enables Memory only through an explicit opt-in flag', async () => {
     const root = await fixture();
     const result = capture();
@@ -451,7 +512,7 @@ describe('Neottia CLI', () => {
 
   it.each([
     [['init'], 'At least one --harness is required.'],
-    [['init', '--harness', 'claude-code'], 'Unsupported harness: claude-code. Expected one of: opencode, pi.'],
+    [['init', '--harness', 'codex'], 'Unsupported harness: codex. Expected one of: claude-code, opencode, pi.'],
   ] as const)('rejects invalid harness selection before mutation', async (arguments_, message) => {
     const root = await fixture();
     const result = capture();

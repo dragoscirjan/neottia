@@ -23,7 +23,7 @@ claudeCodeHarnessAdapter.planHostConfiguration({
 });
 ```
 
-The adapter returns an operation for `.mcp.json#/mcpServers`. The distribution package applies that operation only after review and preserves unrelated server entries.
+The adapter returns an operation for `.mcp.json#/mcpServers`. The distribution package applies that operation only after review and preserves unrelated server entries. Runtime package declarations map the four Neottia modules to their exact generic MCP packages and launch them with `npx`.
 
 ## Paths
 
@@ -38,10 +38,10 @@ Global commands, skills, and agents use the same directories under `~/.claude`. 
 
 ## Limits
 
-Claude Code plugins require directories with manifests and components. The shared extension request contains one TypeScript source file, so the adapter rejects extension projection instead of inventing a plugin package. Neottia does not publish Claude Code runtime plugins, so package activation is also unsupported.
+Claude Code plugins require directories with manifests and components. The shared extension request contains one TypeScript source file, so the adapter rejects extension projection instead of inventing a plugin package. Runtime packages use project-scoped MCP instead of Claude Code plugins. Global runtime package activation remains unsupported because the adapter does not edit `~/.claude.json`.
 
 Command projection supports description, argument hint, and model metadata. Custom agents support model, effort, and maximum turns. The portable per-tool `allow`, `ask`, and `deny` map has no exact Claude Code agent-file representation, so permission metadata returns a diagnostic.
 
-The declaration leaves `testedHostVersions` empty. Repository tests cover deterministic paths, frontmatter, MCP operation shapes, shared adapter conformance, and SDLC compilation without executing a Claude Code binary.
+The declaration leaves `testedHostVersions` empty. Repository tests cover deterministic paths, frontmatter, exact npm-backed MCP operation shapes, shared adapter conformance, SDLC compilation, CLI installation, and packed external-consumer output without executing a Claude Code binary.
 
 See the [Claude Code setup guide](../../docs/harnesses/claude-code.md) and [adapter contract](../../docs/harnesses/adapters.md).

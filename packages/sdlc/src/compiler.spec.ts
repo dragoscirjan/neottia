@@ -301,6 +301,7 @@ describe('canonical SDLC compiler', () => {
         compilerVersion: '0.1.0',
         harnessId: 'claude-code',
         scope: 'project',
+        runtimePackages,
       }),
       claudeCodeHarnessAdapter,
     );
@@ -318,7 +319,26 @@ describe('canonical SDLC compiler', () => {
       '.claude/commands/verify.md',
       '.claude/skills/neottia-sdlc/SKILL.md',
     ]);
-    expect(claude.assets.assets.filter((asset) => asset.kind === 'host-config')).toEqual([]);
+    const claudeRuntimeAssets = claude.assets.assets.filter(
+      (asset): asset is HostConfigAsset => asset.kind === 'host-config',
+    );
+    expect(claudeRuntimeAssets).toHaveLength(2);
+    expect(claudeRuntimeAssets.map((asset) => asset.plan.operations[0])).toEqual([
+      expect.objectContaining({
+        key: 'neottia-design-docs',
+        value: expect.objectContaining({
+          command: 'npx',
+          args: ['--yes', '--package', '@neottia/design-docs-mcp@0.1.0', 'design-docs-mcp'],
+        }),
+      }),
+      expect.objectContaining({
+        key: 'neottia-issues',
+        value: expect.objectContaining({
+          command: 'npx',
+          args: ['--yes', '--package', '@neottia/issues-mcp@0.1.0', 'issues-mcp'],
+        }),
+      }),
+    ]);
   });
 
   it('projects named OpenCode roles without granting permissions or unsupported thinking metadata', () => {

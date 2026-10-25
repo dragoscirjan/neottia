@@ -4,7 +4,7 @@ Neottia stores software delivery records in formats that people and AI tools can
 
 ## Choose how to use Neottia
 
-- Use a [native Pi or OpenCode extension](/harnesses/) when you want tools inside either supported host.
+- Use a [supported harness distribution](/harnesses/) for Pi, OpenCode, or Claude Code.
 - Use a [generic MCP server](/mcp/) when your client can launch a stdio MCP process.
 - Use a [TypeScript library](/get-started/) when you are building an application or adapter.
 

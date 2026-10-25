@@ -234,7 +234,7 @@ Git workspaces require `local: git`. `createSdlcCompilerContext(snapshot)` also 
 
 Read [provider instruction-pack configuration](./sdlc/providers.md) for the support matrix, independent Atlassian product connections, self-hosted URLs, CLI and MCP setup, authentication, mutation safety, and troubleshooting.
 
-`loadSdlcTemplateLayers()` reads the six published `.md.twig` templates and complete command overrides from `.neottia/templates/sdlc/<command>.md.twig`. It rejects unknown command filenames. Pass its result to `createSdlcCompilerInput()`, which adds resolved template, instruction, role, configuration, and runtime package provenance. `compileSdlc()` then projects the canonical six-command lifecycle through a Pi or OpenCode adapter. Runtime package IDs and exact versions are separate compiler inputs. The compiler never infers packages from provider selections. See [the SDLC compiler guide](./sdlc/) for the complete input, output, and installation handoff.
+`loadSdlcTemplateLayers()` reads the six published `.md.twig` templates and complete command overrides from `.neottia/templates/sdlc/<command>.md.twig`. It rejects unknown command filenames. Pass its result to `createSdlcCompilerInput()`, which adds resolved template, instruction, role, configuration, and runtime package provenance. `compileSdlc()` then projects the canonical six-command lifecycle through a Pi, OpenCode, or Claude Code adapter. Runtime package IDs and exact versions are separate compiler inputs. The compiler never infers packages from provider selections. See [the SDLC compiler guide](./sdlc/) for the complete input, output, and installation handoff.
 
 ## SDLC role assignments
 

@@ -340,10 +340,10 @@ function isHostPackageDeclaration(value: unknown): value is HostPackageDeclarati
     nonblankSafeString(value.source.name) &&
     typeof value.source.version === 'string' &&
     PACKAGE_VERSION_PATTERN.test(value.source.version) &&
-    (value.activation === 'pi-package' || value.activation === 'opencode-plugin') &&
+    (value.activation === 'pi-package' || value.activation === 'opencode-plugin' || value.activation === 'mcp-stdio') &&
     Array.isArray(value.provides) &&
     value.provides.length === 1 &&
-    value.provides[0] === 'extension'
+    (value.activation === 'mcp-stdio' ? value.provides[0] === 'mcp' : value.provides[0] === 'extension')
   );
 }
 

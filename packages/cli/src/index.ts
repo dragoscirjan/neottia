@@ -5,6 +5,7 @@ import { homedir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
+import { claudeCodeHarnessAdapter } from '@neottia/claude-code-adapter';
 import { resolveConfig, type ResolvedConfigSnapshot } from '@neottia/config';
 import { harnessInstallConfigContribution, officialConfigRegistry } from '@neottia/config-registry';
 import { designDocsConfigContribution } from '@neottia/design-docs';
@@ -37,12 +38,17 @@ import { searchableConfigContribution } from '@neottia/searchable-core';
 
 import { catalogEntry } from './catalog.js';
 
-const SUPPORTED_HARNESSES = Object.freeze(['opencode', 'pi'] as const);
+const SUPPORTED_HARNESSES = Object.freeze(['claude-code', 'opencode', 'pi'] as const);
 type SupportedHarness = (typeof SUPPORTED_HARNESSES)[number];
 
 /** First-party adapters addressable by the config-driven commands. */
-const HARNESS_ADAPTERS: Readonly<Record<SupportedHarness, typeof piHarnessAdapter | typeof opencodeHarnessAdapter>> =
-  Object.freeze({ pi: piHarnessAdapter, opencode: opencodeHarnessAdapter });
+const HARNESS_ADAPTERS: Readonly<
+  Record<SupportedHarness, typeof claudeCodeHarnessAdapter | typeof opencodeHarnessAdapter | typeof piHarnessAdapter>
+> = Object.freeze({
+  'claude-code': claudeCodeHarnessAdapter,
+  opencode: opencodeHarnessAdapter,
+  pi: piHarnessAdapter,
+});
 
 /** Optional modules the initializer can enable; each maps to its capability provider. */
 const ENABLED_MODULE_CAPABILITIES = Object.freeze({ memory: 'filesystem', searchable: 'web' } as const);
@@ -860,7 +866,7 @@ async function emitPlan(plan: InstallationPlan, path: string | undefined, output
 function help(): string {
   return [
     'Usage:',
-    '  neottia init [--harness pi|opencode]... [--enable memory] [--preset local] [--project DIR]   # create, or validate if present',
+    '  neottia init [--harness claude-code|opencode|pi]... [--enable memory] [--preset local] [--project DIR]   # create, or validate if present',
     '  neottia apply [--harness ID]... [--scope project|global] [--project DIR]',
     '  neottia doctor [--project DIR] [--json]                   # platform, config, and install report',
     '  neottia sdlc plan --harness ID [--scope project|global] [--output FILE] [--manifest FILE] [--approve ID]...',

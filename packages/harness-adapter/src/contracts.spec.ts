@@ -286,6 +286,21 @@ describe('harness adapter contracts', () => {
     });
     expect(badPackage.declarePackage(packageRequest).diagnostics).toMatchObject([{ code: 'INVALID_ADAPTER_RESULT' }]);
 
+    const mismatchedMcpPackage = defineHarnessAdapter({
+      ...adapter(),
+      declarePackage: () =>
+        projectionSuccess({
+          logicalId: 'memory',
+          scope: 'project',
+          source: { ecosystem: 'npm', name: '@neottia/memory-mcp', version: '1.2.3' },
+          activation: 'mcp-stdio',
+          provides: ['extension'],
+        } as never),
+    });
+    expect(mismatchedMcpPackage.declarePackage(packageRequest).diagnostics).toMatchObject([
+      { code: 'INVALID_ADAPTER_RESULT' },
+    ]);
+
     const configRequest = {
       kind: 'package' as const,
       package: {
