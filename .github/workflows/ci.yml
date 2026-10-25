@@ -328,6 +328,10 @@ jobs:
   # Every successful release republishes the documentation site.
   docs-publish:
     needs: release
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: >-
+      always() &&
+      needs.release.result == 'success' &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main'
     uses: ./.github/workflows/docs.publish.yml
     secrets: inherit
