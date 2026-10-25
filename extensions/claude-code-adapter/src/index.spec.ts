@@ -18,7 +18,10 @@ describe('Claude Code harness adapter', () => {
     expect(Object.keys(claudeCodeHarnessDeclaration.features)).toEqual(HOST_FEATURES);
     expect(claudeCodeHarnessDeclaration.features['asset.agent'].status).toBe('supported');
     expect(claudeCodeHarnessDeclaration.features['asset.extension'].status).toBe('unsupported');
-    expect(claudeCodeHarnessDeclaration.features['config.package'].status).toBe('unsupported');
+    expect(claudeCodeHarnessDeclaration.features['config.package']).toMatchObject({
+      status: 'supported',
+      scopes: ['project'],
+    });
     expect(claudeCodeHarnessDeclaration.features['config.mcp.local']).toMatchObject({
       status: 'supported',
       scopes: ['project'],
@@ -120,6 +123,39 @@ describe('Claude Code harness adapter', () => {
     ]);
   });
 
+  it('projects exact generic runtime packages as project MCP servers', () => {
+    const declaration = claudeCodeHarnessAdapter.declarePackage({
+      logicalId: 'issues',
+      scope: 'project',
+      version: '0.2.3',
+    });
+    expect(declaration.value).toEqual({
+      logicalId: 'issues',
+      scope: 'project',
+      source: { ecosystem: 'npm', name: '@neottia/issues-mcp', version: '0.2.3' },
+      activation: 'mcp-stdio',
+      provides: ['mcp'],
+    });
+    expect(
+      claudeCodeHarnessAdapter.planHostConfiguration({ kind: 'package', package: declaration.value! }).value
+        ?.operations[0],
+    ).toEqual({
+      id: 'mcp:neottia-issues',
+      kind: 'ensure-object-entry',
+      pointer: '/mcpServers',
+      key: 'neottia-issues',
+      owner: 'neottia',
+      value: {
+        type: 'stdio',
+        command: 'npx',
+        args: ['--yes', '--package', '@neottia/issues-mcp@0.2.3', 'issues-mcp'],
+      },
+    });
+    expect(
+      claudeCodeHarnessAdapter.declarePackage({ logicalId: 'issues', scope: 'global', version: '0.2.3' }).diagnostics,
+    ).toMatchObject([{ code: 'UNSUPPORTED_SCOPE', feature: 'config.package' }]);
+  });
+
   it('produces exact project MCP operation shapes', () => {
     const local = claudeCodeHarnessAdapter.planHostConfiguration({
       kind: 'mcp.local',
@@ -196,10 +232,10 @@ describe('Claude Code harness adapter', () => {
     }
   });
 
-  it('rejects unsupported package and non-portable MCP fields', () => {
+  it('rejects malformed package and non-portable MCP fields', () => {
     expect(
-      claudeCodeHarnessAdapter.declarePackage({ logicalId: 'issues', scope: 'project', version: '1.2.3' }).diagnostics,
-    ).toMatchObject([{ code: 'UNSUPPORTED_HOST_FEATURE', feature: 'config.package' }]);
+      claudeCodeHarnessAdapter.declarePackage({ logicalId: 'issues', scope: 'project', version: '01.2.3' }).diagnostics,
+    ).toMatchObject([{ code: 'INVALID_PACKAGE_DECLARATION', feature: 'config.package' }]);
     expect(
       claudeCodeHarnessAdapter.planHostConfiguration({
         kind: 'mcp.local',

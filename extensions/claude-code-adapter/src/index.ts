@@ -1,4 +1,5 @@
 import {
+  PACKAGE_VERSION_PATTERN,
   cloneFrozen,
   defineHarnessAdapter,
   defineHarnessDeclaration,
@@ -29,6 +30,7 @@ import {
   type HostFeature,
   type HostPackageDeclaration,
   type LocalMcpDeclaration,
+  type NeottiaRuntimePackageId,
   type PackageProjectionRequest,
   type ProjectedFile,
   type ProjectionDiagnostic,
@@ -44,6 +46,18 @@ import {
 
 const CLAUDE_CODE_ID = 'claude-code';
 const CLAUDE_CODE_EFFORTS = new Set(['low', 'medium', 'high', 'xhigh', 'max']);
+const CLAUDE_CODE_MCP_PACKAGES: Readonly<
+  Record<NeottiaRuntimePackageId, { readonly name: string; readonly executable: string; readonly server: string }>
+> = Object.freeze({
+  memory: { name: '@neottia/memory-mcp', executable: 'memory-mcp', server: 'neottia-memory' },
+  issues: { name: '@neottia/issues-mcp', executable: 'issues-mcp', server: 'neottia-issues' },
+  'design-docs': {
+    name: '@neottia/design-docs-mcp',
+    executable: 'design-docs-mcp',
+    server: 'neottia-design-docs',
+  },
+  searchable: { name: '@neottia/searchable-mcp', executable: 'searchable-mcp', server: 'neottia-searchable' },
+});
 const PROJECT_CONFIG_SUPPORT: FeatureSupport = Object.freeze({
   status: 'supported',
   scopes: Object.freeze(['project'] as const),
@@ -61,7 +75,7 @@ export const claudeCodeHarnessDeclaration = defineHarnessDeclaration({
     'asset.skill': supportedFeature('file'),
     'asset.extension': unsupportedFeatureSupport('Claude Code plugins require multi-file plugin packages.'),
     'asset.agent': supportedFeature('file'),
-    'config.package': unsupportedFeatureSupport('Neottia does not publish Claude Code runtime plugin packages.'),
+    'config.package': PROJECT_CONFIG_SUPPORT,
     'config.mcp.local': PROJECT_CONFIG_SUPPORT,
     'config.mcp.remote': PROJECT_CONFIG_SUPPORT,
     'prompt.description': supportedFeature('metadata'),
@@ -195,18 +209,27 @@ function projectClaudeCodeAgent(request: AgentProjectionRequest): ProjectionResu
   });
 }
 
-/** Rejects runtime package declarations until Neottia ships Claude plugins. */
+/** Maps one logical Neottia module to its generic MCP package. */
 function declareClaudeCodePackage(request: PackageProjectionRequest): ProjectionResult<HostPackageDeclaration> {
-  return projectionFailure([unsupportedFeature(CLAUDE_CODE_ID, 'config.package', request.scope, request.logicalId)]);
+  const runtime = CLAUDE_CODE_MCP_PACKAGES[request.logicalId];
+  if (request.scope !== 'project') {
+    return projectionFailure([unsupportedScope('config.package', request.scope)]);
+  }
+  if (runtime === undefined || !PACKAGE_VERSION_PATTERN.test(request.version)) {
+    return projectionFailure([invalidPackage(request.scope)]);
+  }
+  return projectionSuccess({
+    logicalId: request.logicalId,
+    scope: request.scope,
+    source: { ecosystem: 'npm' as const, name: runtime.name, version: request.version },
+    activation: 'mcp-stdio' as const,
+    provides: ['mcp'] as const,
+  });
 }
 
 /** Produces project-scoped .mcp.json operations without editing user-managed state. */
 function planClaudeCodeHostConfiguration(request: HostConfigRequest): ProjectionResult<HostConfigPlan> {
-  if (request.kind === 'package') {
-    return projectionFailure([
-      unsupportedFeature(CLAUDE_CODE_ID, 'config.package', request.package.scope, request.package.logicalId),
-    ]);
-  }
+  if (request.kind === 'package') return planPackage(request.package);
   if (request.scope !== 'project') {
     return projectionFailure([unsupportedScope(configFeature(request.kind), request.scope)]);
   }
@@ -237,6 +260,29 @@ function claudeCodeReloadNotice(request: ReloadRequest): ProjectionResult<Reload
     message: 'Restart Claude Code so commands, agents, and MCP configuration are loaded consistently.',
     affectedFeatures: affected,
   });
+}
+
+/** Produces one exact npm-backed MCP server entry from a verified package declaration. */
+function planPackage(declaration: HostPackageDeclaration): ProjectionResult<HostConfigPlan> {
+  const runtime = CLAUDE_CODE_MCP_PACKAGES[declaration.logicalId];
+  if (
+    runtime === undefined ||
+    declaration.scope !== 'project' ||
+    declaration.activation !== 'mcp-stdio' ||
+    declaration.provides[0] !== 'mcp' ||
+    declaration.source.ecosystem !== 'npm' ||
+    declaration.source.name !== runtime.name ||
+    !PACKAGE_VERSION_PATTERN.test(declaration.source.version)
+  ) {
+    return projectionFailure([invalidPackage(declaration.scope)]);
+  }
+  return projectionSuccess(
+    mcpPlan(runtime.server, {
+      type: 'stdio',
+      command: 'npx',
+      args: ['--yes', '--package', `${declaration.source.name}@${declaration.source.version}`, runtime.executable],
+    }),
+  );
 }
 
 /** Produces one Claude stdio server entry with argv boundaries preserved. */
@@ -386,6 +432,17 @@ function invalidAgentContent(request: AgentProjectionRequest): ProjectionDiagnos
     scope: request.scope,
     assetId: request.id,
     message: 'The Claude Code agent declaration contains invalid metadata.',
+  };
+}
+
+/** Returns one value-free invalid package diagnostic. */
+function invalidPackage(scope: HarnessScope): ProjectionDiagnostic {
+  return {
+    code: 'INVALID_PACKAGE_DECLARATION',
+    hostId: CLAUDE_CODE_ID,
+    feature: 'config.package',
+    scope,
+    message: 'The runtime package declaration is not valid for Claude Code project MCP configuration.',
   };
 }
 

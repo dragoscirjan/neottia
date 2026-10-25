@@ -20,7 +20,7 @@ Adapters only return data. They do not read or write files, install packages, ex
 | Project and global prompts                 | Supported                                   | Supported as commands                     | Supported as commands                        |
 | Project and global skills                  | Supported                                   | Supported                                 | Supported                                    |
 | Local extension source                     | Supported                                   | Supported as plugins                      | Unsupported                                  |
-| Package activation                         | Supported through `settings.json#/packages` | Supported through `opencode.json#/plugin` | Unsupported                                  |
+| Package activation                         | Supported through `settings.json#/packages` | Supported through `opencode.json#/plugin` | Project MCP through `.mcp.json#/mcpServers`  |
 | Local and remote MCP configuration         | Unsupported                                 | Supported through `opencode.json#/mcp`    | Project-only through `.mcp.json#/mcpServers` |
 | Native primary and subagents               | Unsupported                                 | Supported                                 | Supported                                    |
 | Prompt description                         | Supported                                   | Supported                                 | Supported                                    |
@@ -89,13 +89,15 @@ adapter.declarePackage({
 
 Pi maps this request to `@neottia/pi-issues`. OpenCode maps it to `@neottia/opencode-issues`. `planHostConfiguration()` then returns one `ensure-array-entry` operation with a stable package identity. It does not return a replacement settings document.
 
-The four supported logical IDs are `memory`, `issues`, `design-docs`, and `searchable`. Versions must be exact SemVer 2 values. Prerelease and build metadata are accepted, while numeric components with forbidden leading zeroes are rejected.
+Claude Code maps the same logical ID to `@neottia/issues-mcp`. Its package declaration uses the `mcp-stdio` activation and produces one named `.mcp.json#/mcpServers` entry. The entry launches `npx --yes --package @neottia/issues-mcp@<exact-version> issues-mcp`. Package-backed MCP activation supports project scope only and preserves unrelated servers.
+
+The four supported logical IDs are `memory`, `issues`, `design-docs`, and `searchable`. Versions must be exact SemVer 2 values. Prerelease and build metadata are accepted, while numeric components with forbidden leading zeroes are rejected. Claude Code maps them to the matching generic MCP packages and explicit executable names.
 
 ## MCP plans
 
 OpenCode accepts local and remote MCP declarations. Local commands remain arrays so no shell parsing is introduced. Environment and header values remain strings such as `{env:API_TOKEN}`; the adapter does not resolve them.
 
-Claude Code accepts the same declarations for project scope only. Local servers become documented `type: "stdio"` entries where the first argv value is `command` and the rest move to `args`; environment values move to `env`. Remote servers become `type: "http"` entries. Both shapes support the documented per-server `timeout` with its 1000 millisecond minimum. The adapter rejects `cwd` and `enabled` because the shared contract has no documented Claude Code representation for them.
+Claude Code accepts the same declarations for project scope only. Local servers become documented `type: "stdio"` entries where the first argv value is `command` and the rest move to `args`; environment values move to `env`. Remote servers become `type: "http"` entries. Both shapes support the documented per-server `timeout` with its 1000 millisecond minimum. The adapter rejects `cwd` and `enabled` because the shared contract has no documented Claude Code representation for them. Package-backed runtime servers use the same named MCP operation shape.
 
 ```ts
 opencodeHarnessAdapter.planHostConfiguration({
@@ -110,7 +112,7 @@ opencodeHarnessAdapter.planHostConfiguration({
 });
 ```
 
-The result contains an `ensure-object-entry` operation at `/mcp`. It never creates an OAuth token or authentication file. Pi returns an unsupported-feature diagnostic for the same request because Pi has no built-in MCP settings. Claude Code returns an equivalent operation at `/mcpServers` in `.mcp.json` for project scope and a scope diagnostic for global scope.
+The result contains an `ensure-object-entry` operation at `/mcp`. It never creates an OAuth token or authentication file. Pi returns an unsupported-feature diagnostic for the same request because Pi has no built-in MCP settings. Claude Code returns an equivalent operation at `/mcpServers` in `.mcp.json` for project scope and a scope diagnostic for global scope. Claude Code package activation returns the same scope diagnostic for global requests.
 
 ## Agents
 

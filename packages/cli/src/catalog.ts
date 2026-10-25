@@ -11,6 +11,12 @@ export interface CatalogEntry {
  * Versions change only through the release pipeline, never from a registry.
  */
 export const RUNTIME_PACKAGE_CATALOG: Readonly<Record<string, readonly CatalogEntry[]>> = Object.freeze({
+  'claude-code': Object.freeze([
+    { logicalId: 'memory', version: '0.3.4' },
+    { logicalId: 'issues', version: '0.2.3' },
+    { logicalId: 'design-docs', version: '0.2.3' },
+    { logicalId: 'searchable', version: '0.2.8' },
+  ] as const),
   pi: Object.freeze([
     { logicalId: 'memory', version: '0.1.1' },
     { logicalId: 'issues', version: '0.2.0' },

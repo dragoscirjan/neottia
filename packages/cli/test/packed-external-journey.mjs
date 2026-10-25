@@ -98,7 +98,20 @@ try {
   const cli = join(project, 'node_modules', '@neottia', 'cli', 'dist', 'cli.js');
   await run(
     process.execPath,
-    [cli, 'init', '--harness', 'pi', '--harness', 'opencode', '--enable', 'memory', '--enable', 'searchable'],
+    [
+      cli,
+      'init',
+      '--harness',
+      'pi',
+      '--harness',
+      'opencode',
+      '--harness',
+      'claude-code',
+      '--enable',
+      'memory',
+      '--enable',
+      'searchable',
+    ],
     project,
     environment,
   );
@@ -108,7 +121,7 @@ try {
   assert.equal(report.status, 'pass');
   assert.equal(report.repositoryStore.status, 'pass');
   assert.equal(report.configuration.status, 'pass');
-  assert.deepEqual(report.configuration.harnesses, ['opencode', 'pi']);
+  assert.deepEqual(report.configuration.harnesses, ['claude-code', 'opencode', 'pi']);
 
   await run(process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm', ['exec', 'tsx', 'external-consumer.mjs'], project, {
     ...environment,

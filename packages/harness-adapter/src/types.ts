@@ -154,8 +154,8 @@ export interface PackageProjectionRequest {
   readonly version: string;
 }
 
-/** Package data reviewed or installed by a later planner. */
-export interface HostPackageDeclaration {
+/** Fields shared by every reviewed runtime package declaration. */
+interface HostPackageDeclarationBase {
   readonly logicalId: NeottiaRuntimePackageId;
   readonly scope: HarnessScope;
   readonly source: {
@@ -163,9 +163,20 @@ export interface HostPackageDeclaration {
     readonly name: string;
     readonly version: string;
   };
-  readonly activation: 'pi-package' | 'opencode-plugin';
-  readonly provides: readonly ['extension'];
 }
+
+/** Package data reviewed or installed by a later planner. */
+export type HostPackageDeclaration = HostPackageDeclarationBase &
+  (
+    | {
+        readonly activation: 'pi-package' | 'opencode-plugin';
+        readonly provides: readonly ['extension'];
+      }
+    | {
+        readonly activation: 'mcp-stdio';
+        readonly provides: readonly ['mcp'];
+      }
+  );
 
 /** Local MCP process declaration with argv boundaries preserved. */
 export interface LocalMcpDeclaration {

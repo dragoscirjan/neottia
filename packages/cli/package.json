@@ -40,6 +40,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@neottia/claude-code-adapter": "workspace:^",
     "@neottia/config": "workspace:^",
     "@neottia/config-registry": "workspace:^",
     "@neottia/design-docs": "workspace:^",

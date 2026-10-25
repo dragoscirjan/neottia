@@ -119,7 +119,7 @@ Enable `modules.searchable` to search DuckDuckGo, Google, Bing, or Brave; extrac
 
 ## Delivery methods
 
-Pi and OpenCode each have native Memory, Issues, Design Docs, and Searchable extensions. Other MCP-compatible clients can launch the four generic stdio servers. TypeScript applications can embed the domain libraries directly.
+Pi and OpenCode each have native Memory, Issues, Design Docs, and Searchable extensions. Claude Code project installations launch the four generic stdio servers through exact `.mcp.json` entries. Other MCP-compatible clients can launch the same servers without supported lifecycle distribution. TypeScript applications can embed the domain libraries directly.
 
 `@neottia/harness-adapter` defines a host-neutral, immutable asset projection contract. `@neottia/pi-adapter`, `@neottia/opencode-adapter`, and `@neottia/claude-code-adapter` return symbolic paths, package declarations, reviewable host-configuration operations, and reload notices without writing files or running host commands. Each adapter declares unsupported features instead of emulating them. See the [harness adapter guide](docs/harnesses/adapters.md).
 

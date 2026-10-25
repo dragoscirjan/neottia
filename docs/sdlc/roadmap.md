@@ -13,14 +13,15 @@ Neottia ships the SDLC as bounded slices. This page states what each capability 
 
 ## Available
 
-- **Project initialization** — `neottia init` writes the minimal project configuration for Pi and OpenCode with the `local` preset. See [shared configuration](/get-started/configuration).
+- **Project initialization** — `neottia init` writes the minimal project configuration for Pi, OpenCode, and Claude Code with the `local` preset. See [shared configuration](/get-started/configuration).
 - **Lifecycle installation** — `neottia plan --manifest manifest.json`, the config-driven `neottia sdlc plan`, and `neottia apply` compile and install the six commands, the operating-protocol skill, and exact runtime package entries; `neottia doctor` reports gaps without changing anything.
 - **Receipt-driven updates and uninstall** — plans are digest-protected, repeated installs are idempotent, and uninstall removes only receipt-owned files and host-configuration entries.
 - **Filesystem Issues and Design Docs** — enabled by initialization; canonical records live under `.neottia/issues/` and `.neottia/design-docs/`.
 - **Local Git source control** — commits stay scoped and reviewable; push, pull requests, and merges require explicit authorization.
 - **Memory lifecycle capability** — `neottia init --enable memory` (or `capabilities.memory.provider`) wires durable memory into every compiled command with read-only retrieval, checkpoint-evidence, and shutdown boundaries; disabled by default. See [shared configuration](/get-started/configuration) and [the Memory capability](/sdlc/).
 - **Searchable lifecycle capability** — `neottia init --enable searchable` (or `capabilities.searchable.provider: web`) wires bounded web retrieval into every compiled command with stash-backed citations and explicit local-Ollama boundaries; disabled by default. See [shared configuration](/get-started/configuration) and [the Searchable capability](/sdlc/).
-- **Global-scope installation** — available through explicit `scope: global` targets in the project configuration or the `neottia apply --scope global` override; project scope remains the default.
+- **Claude Code distribution** — project installation writes commands, the operating-protocol skill, optional role agents, and exact generic MCP package entries to `.mcp.json`. Claude Code requires interactive approval for project MCP servers. Global runtime MCP activation is unsupported.
+- **Global-scope installation** — available through explicit `scope: global` targets in the project configuration or the `neottia apply --scope global` override; project scope remains the default. Claude Code global assets are available only when the lifecycle has no runtime modules.
 
 ## Experimental
 
@@ -34,7 +35,7 @@ Accepted workstreams with tracking issues; each becomes independently releasable
 - **Generic MCP configuration journeys** — installation and configuration guidance for hosts without native MCP support. Same separation requirements apply.
 - **Interactive configuration wizard** — built on top of the deterministic initializer; discovery and recommendations never silently select credentials or mutation routes.
 - **Runtime orchestration evaluations** — durable runtime state, model-tier routing and retries, managed Git worktrees, and grouped `/work` dispatch aliases are evaluated separately and only with explicit cost and authority boundaries.
-- **Claude Code distribution** — coordinated through [#119](https://github.com/dragoscirjan/neottia/issues/119) when the host format can be represented safely.
+- **Additional harnesses** — Codex, Kiro, GitHub Copilot CLI, and Visual Studio Code Copilot remain deferred under [#119](https://github.com/dragoscirjan/neottia/issues/119).
 
 ## Rejected by default
 

@@ -438,6 +438,9 @@ importers:
 
   packages/cli:
     dependencies:
+      '@neottia/claude-code-adapter':
+        specifier: workspace:^
+        version: link:../../extensions/claude-code-adapter
       '@neottia/config':
         specifier: workspace:^
         version: link:../config

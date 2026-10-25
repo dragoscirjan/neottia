@@ -7,7 +7,7 @@ Neottia installs generated prompts, skills, extensions, agents, package declarat
 | `@neottia/distribution` | Manifest, template, receipt, planning, transaction, recovery, and doctor APIs |
 | `@neottia/cli`          | The installable `neottia` command                                             |
 
-The compiler produces an asset manifest. A Pi or OpenCode adapter supplies symbolic destinations and semantic host configuration operations. The installer resolves those values against explicit project, home, XDG config, and XDG state roots.
+The compiler produces an asset manifest. A Pi, OpenCode, or Claude Code adapter supplies symbolic destinations and semantic host configuration operations. The installer resolves those values against explicit project, home, XDG config, and XDG state roots.
 
 ## Plan before applying
 
@@ -130,11 +130,11 @@ The command runs in a temporary project with temporary home and XDG directories.
 - asks the selected adapter for the final skill target;
 - converts staged files into normal manifest assets.
 
-The `skills` package never writes the final Pi or OpenCode directories.
+The `skills` package never writes the final Pi, OpenCode, or Claude Code directories.
 
 ## Host configuration
 
-Harness adapters return semantic operations instead of replacement settings files. The installer supports package array entries and named MCP object entries. It tracks ownership per entry.
+Harness adapters return semantic operations instead of replacement settings files. The installer supports package array entries and named MCP object entries. It tracks ownership per entry. Claude Code runtime package declarations become named project MCP entries that launch exact generic MCP packages through `npx`.
 
 JSONC edits preserve unrelated keys and comments. Planning fails when both configuration candidates exist, such as both `opencode.json` and `opencode.jsonc`. Remove the ambiguity before generating a plan.
 
@@ -151,6 +151,8 @@ harnesses:
         scope: project
       - id: opencode
         scope: global
+      - id: claude-code
+        scope: project
 assets:
   install:
     static_skills:

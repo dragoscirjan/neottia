@@ -1,6 +1,6 @@
 # Compile the canonical SDLC
 
-`@neottia/sdlc` compiles six lifecycle commands into Pi or OpenCode prompt assets. The compiler chooses provider instructions before installation. Generated commands do not route between providers at runtime.
+`@neottia/sdlc` compiles six lifecycle commands into Pi, OpenCode, or Claude Code prompt assets. The compiler chooses provider instructions before installation. Generated commands do not route between providers at runtime.
 
 Each installation also projects one shared operating-protocol skill, `neottia-sdlc`, which defines owning-Epic resolution, durable evidence, checkpointing, and handback rules for every command. See [the operating protocol](/sdlc/protocol).
 
@@ -74,7 +74,7 @@ const input = createSdlcCompilerInput(snapshot, {
 export const output = compileSdlc(input, piHarnessAdapter);
 ```
 
-Compile once per harness and scope. The selected harness must explicitly assign `planner`, `implementer`, `verifier`, and `release-coordinator`. Use `agent: current` when the current agent performs a required role. Pi and OpenCode preserve the same role contracts, but their assignment maps, frontmatter, and paths differ because adapters own host syntax. See [portable role assignments](/sdlc/roles).
+Compile once per harness and scope. The selected harness must explicitly assign `planner`, `implementer`, `verifier`, and `release-coordinator`. Use `agent: current` when the current agent performs a required role. Pi, OpenCode, and Claude Code preserve the same role contracts, but their assignment maps, frontmatter, and paths differ because adapters own host syntax. See [portable role assignments](/sdlc/roles).
 
 ## Provider selection
 
@@ -130,7 +130,7 @@ The shared layout exposes one named Twig block per instruction slot. Command tem
 
 ## Role assignments
 
-Templates name portable roles rather than Pi or OpenCode agents. The published role vocabulary includes `planner`, `researcher`, `implementer`, `reviewer`, `verifier`, `release-coordinator`, and `documentation-writer`.
+Templates name portable roles rather than host-specific agents. The published role vocabulary includes `planner`, `researcher`, `implementer`, `reviewer`, `verifier`, `release-coordinator`, and `documentation-writer`.
 
 Configuration under `agents.sdlc.<harness>` assigns each role to the current agent, a supported named agent, or `false`. The compiler requires explicit assignments for `planner`, `implementer`, `verifier`, and `release-coordinator`. An omitted or disabled optional role falls back to the current agent, so lifecycle work is never silently skipped.
 
