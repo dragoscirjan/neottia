@@ -14,754 +14,750 @@ Use the [requirements page](/get-started/requirements) for operating systems, fi
 
 ## Repository toolchain
 
-| Declaration        | Exact value                                             |
-| ------------------ | ------------------------------------------------------- |
-| Root package       | `neottia-monorepo`                                      |
-| Root version       | `Not declared`                                          |
-| Root private field | `true`                                                  |
-| Package manager    | `pnpm@10.28.2`                                          |
-| Engines            | `node` `>=20.0.0`<br>`pnpm` `>=10.0.0`                  |
-| pnpm overrides     | `vite` `>=6.4.3`<br>`vitest` `^5.0.3`<br>`zod` `^4.5.4` |
+| Declaration        | Exact value                                                                                                                  |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| Root package       | <code>neottia-monorepo</code>                                                                                                |
+| Root version       | <code>Not declared</code>                                                                                                    |
+| Root private field | <code>true</code>                                                                                                            |
+| Package manager    | <code>pnpm@10.28.2</code>                                                                                                    |
+| Engines            | <code>node</code> <code>&gt;=20.0.0</code><br><code>pnpm</code> <code>&gt;=10.0.0</code>                                     |
+| pnpm overrides     | <code>vite</code> <code>&gt;=6.4.3</code><br><code>vitest</code> <code>^5.0.3</code><br><code>zod</code> <code>^4.5.4</code> |
 
 ### Root package dependencies
 
-| Classification | Dependency                     | Exact range |
-| -------------- | ------------------------------ | ----------- |
-| Development    | `@changesets/changelog-github` | `^1.0.0`    |
-| Development    | `@changesets/cli`              | `^3.0.0`    |
-| Development    | `@jscpd/badge-reporter`        | `^4.0.1`    |
-| Development    | `@modelcontextprotocol/sdk`    | `^1.31.0`   |
-| Development    | `@templ-project/eslint`        | `^1.3.0`    |
-| Development    | `@templ-project/prettier`      | `^1.1.0`    |
-| Development    | `@types/node`                  | `^26.6.4`   |
-| Development    | `@vitest/coverage-v8`          | `^5.0.3`    |
-| Development    | `esbuild`                      | `^0.28.2`   |
-| Development    | `eslint`                       | `^10.11.0`  |
-| Development    | `husky`                        | `^9.1.7`    |
-| Development    | `import-sort-style-module`     | `^6.0.0`    |
-| Development    | `jscpd`                        | `^5.4.0`    |
-| Development    | `lint-staged`                  | `^17.6.0`   |
-| Development    | `npm-run-all2`                 | `^9.0.3`    |
-| Development    | `prettier`                     | `^3.9.9`    |
-| Development    | `prettier-plugin-import-sort`  | `^0.0.7`    |
-| Development    | `prettier-plugin-toml`         | `^2.0.6`    |
-| Development    | `rimraf`                       | `^6.1.2`    |
-| Development    | `tsx`                          | `^4.23.15`  |
-| Development    | `typescript`                   | `^5.9.3`    |
-| Development    | `vitepress`                    | `^1.6.4`    |
-| Development    | `vitest`                       | `^5.0.3`    |
-| Development    | `yaml`                         | `^2.9.1`    |
+| Classification | Dependency                                | Exact range           |
+| -------------- | ----------------------------------------- | --------------------- |
+| Development    | <code>@changesets/changelog-github</code> | <code>^1.0.0</code>   |
+| Development    | <code>@changesets/cli</code>              | <code>^3.0.0</code>   |
+| Development    | <code>@jscpd/badge-reporter</code>        | <code>^4.0.1</code>   |
+| Development    | <code>@modelcontextprotocol/sdk</code>    | <code>^1.31.0</code>  |
+| Development    | <code>@templ-project/eslint</code>        | <code>^1.3.0</code>   |
+| Development    | <code>@templ-project/prettier</code>      | <code>^1.1.0</code>   |
+| Development    | <code>@types/node</code>                  | <code>^26.6.4</code>  |
+| Development    | <code>@vitest/coverage-v8</code>          | <code>^5.0.3</code>   |
+| Development    | <code>esbuild</code>                      | <code>^0.28.2</code>  |
+| Development    | <code>eslint</code>                       | <code>^10.11.0</code> |
+| Development    | <code>husky</code>                        | <code>^9.1.7</code>   |
+| Development    | <code>import-sort-style-module</code>     | <code>^6.0.0</code>   |
+| Development    | <code>jscpd</code>                        | <code>^5.4.0</code>   |
+| Development    | <code>lint-staged</code>                  | <code>^17.6.0</code>  |
+| Development    | <code>npm-run-all2</code>                 | <code>^9.0.3</code>   |
+| Development    | <code>prettier</code>                     | <code>^3.9.9</code>   |
+| Development    | <code>prettier-plugin-import-sort</code>  | <code>^0.0.7</code>   |
+| Development    | <code>prettier-plugin-toml</code>         | <code>^2.0.6</code>   |
+| Development    | <code>rimraf</code>                       | <code>^6.1.2</code>   |
+| Development    | <code>tsx</code>                          | <code>^4.23.15</code> |
+| Development    | <code>typescript</code>                   | <code>^5.9.3</code>   |
+| Development    | <code>vitepress</code>                    | <code>^1.6.4</code>   |
+| Development    | <code>vitest</code>                       | <code>^5.0.3</code>   |
+| Development    | <code>yaml</code>                         | <code>^2.9.1</code>   |
 
 ## Workspace module dependencies
 
 Each module section lists its runtime, peer, optional, and package-local development declarations. Root development dependencies still apply to repository-wide tasks.
 
-#### `@neottia/claude-code-adapter`
-
-| Declaration           | Exact value                                                                                                                                    |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| Manifest              | [`extensions/claude-code-adapter/package.json`](https://github.com/dragoscirjan/neottia/blob/main/extensions/claude-code-adapter/package.json) |
-| Version               | `0.3.0`                                                                                                                                        |
-| Private field         | `Not declared`                                                                                                                                 |
-| Engines               | `node` `>=22.16.0`                                                                                                                             |
-| Platform declarations | None                                                                                                                                           |
-
-| Classification | Dependency                 | Exact range   |
-| -------------- | -------------------------- | ------------- |
-| Runtime        | `@neottia/harness-adapter` | `workspace:^` |
-| Development    | `@neottia/testkit`         | `workspace:*` |
-| Development    | `@templ-project/tsconfig`  | `^0.4.2`      |
-| Development    | `@types/node`              | `^26.6.4`     |
-| Development    | `typescript`               | `^5.9.3`      |
-| Development    | `vitest`                   | `^5.0.3`      |
-
-#### `@neottia/cli`
-
-| Declaration           | Exact value                                                                                                |
-| --------------------- | ---------------------------------------------------------------------------------------------------------- |
-| Manifest              | [`packages/cli/package.json`](https://github.com/dragoscirjan/neottia/blob/main/packages/cli/package.json) |
-| Version               | `0.8.0`                                                                                                    |
-| Private field         | `Not declared`                                                                                             |
-| Engines               | `node` `>=22.20.0`                                                                                         |
-| Platform declarations | None                                                                                                       |
-
-| Classification | Dependency                     | Exact range   |
-| -------------- | ------------------------------ | ------------- |
-| Runtime        | `@neottia/claude-code-adapter` | `workspace:^` |
-| Runtime        | `@neottia/config`              | `workspace:^` |
-| Runtime        | `@neottia/config-registry`     | `workspace:^` |
-| Runtime        | `@neottia/design-docs`         | `workspace:^` |
-| Runtime        | `@neottia/distribution`        | `workspace:^` |
-| Runtime        | `@neottia/harness-adapter`     | `workspace:^` |
-| Runtime        | `@neottia/issues`              | `workspace:^` |
-| Runtime        | `@neottia/memory-core`         | `workspace:^` |
-| Runtime        | `@neottia/opencode-adapter`    | `workspace:^` |
-| Runtime        | `@neottia/pi-adapter`          | `workspace:^` |
-| Runtime        | `@neottia/repository-store`    | `workspace:^` |
-| Runtime        | `@neottia/sdlc`                | `workspace:^` |
-| Runtime        | `@neottia/searchable-core`     | `workspace:^` |
-| Development    | `@templ-project/tsconfig`      | `^0.4.2`      |
-| Development    | `@types/node`                  | `^26.6.4`     |
-| Development    | `typescript`                   | `^5.9.3`      |
-| Development    | `vitest`                       | `^5.0.3`      |
-
-#### `@neottia/config`
-
-| Declaration           | Exact value                                                                                                      |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| Manifest              | [`packages/config/package.json`](https://github.com/dragoscirjan/neottia/blob/main/packages/config/package.json) |
-| Version               | `0.2.0`                                                                                                          |
-| Private field         | `Not declared`                                                                                                   |
-| Engines               | `node` `>=22.16.0`                                                                                               |
-| Platform declarations | None                                                                                                             |
-
-| Classification | Dependency                | Exact range |
-| -------------- | ------------------------- | ----------- |
-| Runtime        | `yaml`                    | `^2.9.1`    |
-| Runtime        | `zod`                     | `^4.6.5`    |
-| Development    | `@templ-project/tsconfig` | `^0.4.2`    |
-| Development    | `@types/node`             | `^26.6.4`   |
-| Development    | `typescript`              | `^5.9.3`    |
-| Development    | `vitest`                  | `^5.0.3`    |
-
-#### `@neottia/config-registry`
-
-| Declaration           | Exact value                                                                                                                        |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Manifest              | [`packages/config-registry/package.json`](https://github.com/dragoscirjan/neottia/blob/main/packages/config-registry/package.json) |
-| Version               | `0.4.0`                                                                                                                            |
-| Private field         | `Not declared`                                                                                                                     |
-| Engines               | `node` `>=22.16.0`                                                                                                                 |
-| Platform declarations | None                                                                                                                               |
-
-| Classification | Dependency                 | Exact range   |
-| -------------- | -------------------------- | ------------- |
-| Runtime        | `@neottia/config`          | `workspace:^` |
-| Runtime        | `@neottia/design-docs`     | `workspace:^` |
-| Runtime        | `@neottia/issues`          | `workspace:^` |
-| Runtime        | `@neottia/memory-core`     | `workspace:^` |
-| Runtime        | `@neottia/sdlc`            | `workspace:^` |
-| Runtime        | `@neottia/searchable-core` | `workspace:^` |
-| Runtime        | `zod`                      | `^4.6.5`      |
-| Development    | `@templ-project/tsconfig`  | `^0.4.2`      |
-| Development    | `@types/node`              | `^26.6.4`     |
-| Development    | `typescript`               | `^5.9.3`      |
-| Development    | `vitest`                   | `^5.0.3`      |
-
-#### `@neottia/core`
-
-| Declaration           | Exact value                                                                                                  |
-| --------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Manifest              | [`packages/core/package.json`](https://github.com/dragoscirjan/neottia/blob/main/packages/core/package.json) |
-| Version               | `0.1.0`                                                                                                      |
-| Private field         | `Not declared`                                                                                               |
-| Engines               | `node` `>=20.0.0`                                                                                            |
-| Platform declarations | None                                                                                                         |
-
-| Classification | Dependency                | Exact range |
-| -------------- | ------------------------- | ----------- |
-| Development    | `@templ-project/tsconfig` | `^0.4.2`    |
-| Development    | `esbuild`                 | `^0.28.2`   |
-| Development    | `eslint`                  | `^10.11.0`  |
-| Development    | `npm-run-all2`            | `^9.0.3`    |
-| Development    | `rimraf`                  | `^6.1.2`    |
-| Development    | `tsx`                     | `^4.23.15`  |
-| Development    | `typescript`              | `^5.9.3`    |
-| Development    | `vitest`                  | `^5.0.3`    |
-
-#### `@neottia/design-docs`
-
-| Declaration           | Exact value                                                                                                                |
-| --------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Manifest              | [`packages/design-docs/package.json`](https://github.com/dragoscirjan/neottia/blob/main/packages/design-docs/package.json) |
-| Version               | `0.2.1`                                                                                                                    |
-| Private field         | `Not declared`                                                                                                             |
-| Engines               | `node` `>=22.16.0`                                                                                                         |
-| Platform declarations | None                                                                                                                       |
-
-| Classification | Dependency                  | Exact range   |
-| -------------- | --------------------------- | ------------- |
-| Runtime        | `@neottia/config`           | `workspace:^` |
-| Runtime        | `@neottia/repository-store` | `workspace:^` |
-| Runtime        | `commonmark`                | `^0.31.2`     |
-| Runtime        | `yaml`                      | `^2.9.1`      |
-| Runtime        | `zod`                       | `^4.6.5`      |
-| Development    | `@templ-project/tsconfig`   | `^0.4.2`      |
-| Development    | `@types/commonmark`         | `^0.27.10`    |
-| Development    | `@types/node`               | `^26.6.4`     |
-| Development    | `typescript`                | `^5.9.3`      |
-| Development    | `vitest`                    | `^5.0.3`      |
-
-#### `@neottia/design-docs-mcp`
-
-| Declaration           | Exact value                                                                                                                        |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Manifest              | [`packages/design-docs-mcp/package.json`](https://github.com/dragoscirjan/neottia/blob/main/packages/design-docs-mcp/package.json) |
-| Version               | `0.2.3`                                                                                                                            |
-| Private field         | `Not declared`                                                                                                                     |
-| Engines               | `node` `>=22.16.0`                                                                                                                 |
-| Platform declarations | None                                                                                                                               |
-
-| Classification | Dependency                    | Exact range   |
-| -------------- | ----------------------------- | ------------- |
-| Runtime        | `@modelcontextprotocol/sdk`   | `^1.31.0`     |
-| Runtime        | `@neottia/config`             | `workspace:^` |
-| Runtime        | `@neottia/config-registry`    | `workspace:^` |
-| Runtime        | `@neottia/design-docs`        | `workspace:*` |
-| Runtime        | `@neottia/issues-design-docs` | `workspace:*` |
-| Runtime        | `zod`                         | `^4.6.5`      |
-| Development    | `@neottia/repository-store`   | `workspace:*` |
-| Development    | `@templ-project/tsconfig`     | `^0.4.2`      |
-| Development    | `@types/node`                 | `^26.6.4`     |
-| Development    | `typescript`                  | `^5.9.3`      |
-| Development    | `vitest`                      | `^5.0.3`      |
-
-#### `@neottia/distribution`
-
-| Declaration           | Exact value                                                                                                                  |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| Manifest              | [`packages/distribution/package.json`](https://github.com/dragoscirjan/neottia/blob/main/packages/distribution/package.json) |
-| Version               | `0.2.1`                                                                                                                      |
-| Private field         | `Not declared`                                                                                                               |
-| Engines               | `node` `>=22.20.0`                                                                                                           |
-| Platform declarations | None                                                                                                                         |
-
-| Classification | Dependency                 | Exact range   |
-| -------------- | -------------------------- | ------------- |
-| Runtime        | `@neottia/harness-adapter` | `workspace:^` |
-| Runtime        | `jsonc-parser`             | `^3.3.1`      |
-| Runtime        | `skills`                   | `^1.7.0`      |
-| Development    | `@templ-project/tsconfig`  | `^0.4.2`      |
-| Development    | `@types/node`              | `^26.6.4`     |
-| Development    | `typescript`               | `^5.9.3`      |
-| Development    | `vitest`                   | `^5.0.3`      |
-
-#### `@neottia/harness-adapter`
-
-| Declaration           | Exact value                                                                                                                        |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Manifest              | [`packages/harness-adapter/package.json`](https://github.com/dragoscirjan/neottia/blob/main/packages/harness-adapter/package.json) |
-| Version               | `0.3.0`                                                                                                                            |
-| Private field         | `Not declared`                                                                                                                     |
-| Engines               | `node` `>=22.16.0`                                                                                                                 |
-| Platform declarations | None                                                                                                                               |
-
-| Classification | Dependency                | Exact range |
-| -------------- | ------------------------- | ----------- |
-| Development    | `@templ-project/tsconfig` | `^0.4.2`    |
-| Development    | `@types/node`             | `^26.6.4`   |
-| Development    | `typescript`              | `^5.9.3`    |
-| Development    | `vitest`                  | `^5.0.3`    |
-
-#### `@neottia/issues`
-
-| Declaration           | Exact value                                                                                                      |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| Manifest              | [`packages/issues/package.json`](https://github.com/dragoscirjan/neottia/blob/main/packages/issues/package.json) |
-| Version               | `0.2.1`                                                                                                          |
-| Private field         | `Not declared`                                                                                                   |
-| Engines               | `node` `>=22.16.0`                                                                                               |
-| Platform declarations | None                                                                                                             |
-
-| Classification | Dependency                  | Exact range   |
-| -------------- | --------------------------- | ------------- |
-| Runtime        | `@neottia/config`           | `workspace:^` |
-| Runtime        | `@neottia/repository-store` | `workspace:^` |
-| Runtime        | `yaml`                      | `^2.9.1`      |
-| Runtime        | `zod`                       | `^4.6.5`      |
-| Development    | `@templ-project/tsconfig`   | `^0.4.2`      |
-| Development    | `@types/node`               | `^26.6.4`     |
-| Development    | `typescript`                | `^5.9.3`      |
-| Development    | `vitest`                    | `^5.0.3`      |
-
-#### `@neottia/issues-design-docs`
-
-| Declaration           | Exact value                                                                                                                              |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| Manifest              | [`packages/issues-design-docs/package.json`](https://github.com/dragoscirjan/neottia/blob/main/packages/issues-design-docs/package.json) |
-| Version               | `0.2.1`                                                                                                                                  |
-| Private field         | `Not declared`                                                                                                                           |
-| Engines               | `node` `>=22.16.0`                                                                                                                       |
-| Platform declarations | None                                                                                                                                     |
-
-| Classification | Dependency                  | Exact range   |
-| -------------- | --------------------------- | ------------- |
-| Runtime        | `@neottia/config`           | `workspace:^` |
-| Runtime        | `@neottia/design-docs`      | `workspace:^` |
-| Runtime        | `@neottia/issues`           | `workspace:^` |
-| Runtime        | `@neottia/repository-store` | `workspace:^` |
-| Development    | `@templ-project/tsconfig`   | `^0.4.2`      |
-| Development    | `@types/node`               | `^26.6.4`     |
-| Development    | `typescript`                | `^5.9.3`      |
-| Development    | `vitest`                    | `^5.0.3`      |
-
-#### `@neottia/issues-mcp`
-
-| Declaration           | Exact value                                                                                                              |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Manifest              | [`packages/issues-mcp/package.json`](https://github.com/dragoscirjan/neottia/blob/main/packages/issues-mcp/package.json) |
-| Version               | `0.2.3`                                                                                                                  |
-| Private field         | `Not declared`                                                                                                           |
-| Engines               | `node` `>=22.16.0`                                                                                                       |
-| Platform declarations | None                                                                                                                     |
-
-| Classification | Dependency                    | Exact range   |
-| -------------- | ----------------------------- | ------------- |
-| Runtime        | `@modelcontextprotocol/sdk`   | `^1.31.0`     |
-| Runtime        | `@neottia/config`             | `workspace:^` |
-| Runtime        | `@neottia/config-registry`    | `workspace:^` |
-| Runtime        | `@neottia/issues`             | `workspace:*` |
-| Runtime        | `@neottia/issues-design-docs` | `workspace:*` |
-| Development    | `@neottia/design-docs`        | `workspace:*` |
-| Development    | `@neottia/testkit`            | `workspace:*` |
-| Development    | `@templ-project/tsconfig`     | `^0.4.2`      |
-| Development    | `@types/node`                 | `^26.6.4`     |
-| Development    | `typescript`                  | `^5.9.3`      |
-| Development    | `vitest`                      | `^5.0.3`      |
-
-#### `@neottia/memory-core`
-
-| Declaration           | Exact value                                                                                                                |
-| --------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Manifest              | [`packages/memory-core/package.json`](https://github.com/dragoscirjan/neottia/blob/main/packages/memory-core/package.json) |
-| Version               | `0.3.2`                                                                                                                    |
-| Private field         | `Not declared`                                                                                                             |
-| Engines               | `node` `>=22.16.0`                                                                                                         |
-| Platform declarations | None                                                                                                                       |
-
-| Classification | Dependency                  | Exact range   |
-| -------------- | --------------------------- | ------------- |
-| Runtime        | `@neottia/config`           | `workspace:^` |
-| Runtime        | `@neottia/repository-store` | `workspace:^` |
-| Runtime        | `pg`                        | `^8.23.1`     |
-| Runtime        | `yaml`                      | `^2.9.1`      |
-| Runtime        | `zod`                       | `^4.6.5`      |
-| Development    | `@templ-project/tsconfig`   | `^0.4.2`      |
-| Development    | `@types/node`               | `^26.6.4`     |
-| Development    | `@types/pg`                 | `^8.23.1`     |
-| Development    | `typescript`                | `^5.9.3`      |
-| Development    | `vitest`                    | `^5.0.3`      |
-
-#### `@neottia/memory-mcp`
-
-| Declaration           | Exact value                                                                                                              |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Manifest              | [`packages/memory-mcp/package.json`](https://github.com/dragoscirjan/neottia/blob/main/packages/memory-mcp/package.json) |
-| Version               | `0.3.4`                                                                                                                  |
-| Private field         | `Not declared`                                                                                                           |
-| Engines               | `node` `>=22.16.0`                                                                                                       |
-| Platform declarations | None                                                                                                                     |
-
-| Classification | Dependency                  | Exact range   |
-| -------------- | --------------------------- | ------------- |
-| Runtime        | `@modelcontextprotocol/sdk` | `^1.31.0`     |
-| Runtime        | `@neottia/config`           | `workspace:^` |
-| Runtime        | `@neottia/config-registry`  | `workspace:^` |
-| Runtime        | `@neottia/memory-core`      | `workspace:*` |
-| Runtime        | `zod`                       | `^4.6.5`      |
-| Development    | `@neottia/repository-store` | `workspace:^` |
-| Development    | `@templ-project/tsconfig`   | `^0.4.2`      |
-| Development    | `@types/node`               | `^26.6.4`     |
-| Development    | `typescript`                | `^5.9.3`      |
-| Development    | `vitest`                    | `^5.0.3`      |
-| Development    | `yaml`                      | `^2.9.1`      |
-
-#### `@neottia/opencode-adapter`
-
-| Declaration           | Exact value                                                                                                                              |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| Manifest              | [`extensions/opencode-adapter/package.json`](https://github.com/dragoscirjan/neottia/blob/main/extensions/opencode-adapter/package.json) |
-| Version               | `0.2.1`                                                                                                                                  |
-| Private field         | `Not declared`                                                                                                                           |
-| Engines               | `node` `>=22.16.0`                                                                                                                       |
-| Platform declarations | None                                                                                                                                     |
-
-| Classification | Dependency                 | Exact range   |
-| -------------- | -------------------------- | ------------- |
-| Runtime        | `@neottia/harness-adapter` | `workspace:^` |
-| Development    | `@neottia/pi-adapter`      | `workspace:*` |
-| Development    | `@neottia/testkit`         | `workspace:*` |
-| Development    | `@templ-project/tsconfig`  | `^0.4.2`      |
-| Development    | `@types/node`              | `^26.6.4`     |
-| Development    | `typescript`               | `^5.9.3`      |
-| Development    | `vitest`                   | `^5.0.3`      |
-
-#### `@neottia/opencode-design-docs`
-
-| Declaration           | Exact value                                                                                                                                      |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Manifest              | [`extensions/opencode-design-docs/package.json`](https://github.com/dragoscirjan/neottia/blob/main/extensions/opencode-design-docs/package.json) |
-| Version               | `0.2.3`                                                                                                                                          |
-| Private field         | `Not declared`                                                                                                                                   |
-| Engines               | None                                                                                                                                             |
-| Platform declarations | None                                                                                                                                             |
-
-| Classification | Dependency                    | Exact range   |
-| -------------- | ----------------------------- | ------------- |
-| Runtime        | `@neottia/config-registry`    | `workspace:^` |
-| Runtime        | `@neottia/design-docs`        | `workspace:*` |
-| Runtime        | `@neottia/issues-design-docs` | `workspace:*` |
-| Runtime        | `@opencode-ai/plugin`         | `^1.18.34`    |
-| Runtime        | `zod`                         | `^4.6.5`      |
-| Development    | `@neottia/issues`             | `workspace:*` |
-| Development    | `@neottia/repository-store`   | `workspace:*` |
-| Development    | `@neottia/testkit`            | `workspace:*` |
-| Development    | `@templ-project/tsconfig`     | `^0.4.2`      |
-| Development    | `@types/node`                 | `^26.6.4`     |
-| Development    | `typescript`                  | `^5.9.3`      |
-| Development    | `vitest`                      | `^5.0.3`      |
-
-#### `@neottia/opencode-issues`
-
-| Declaration           | Exact value                                                                                                                            |
-| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Manifest              | [`extensions/opencode-issues/package.json`](https://github.com/dragoscirjan/neottia/blob/main/extensions/opencode-issues/package.json) |
-| Version               | `0.2.4`                                                                                                                                |
-| Private field         | `Not declared`                                                                                                                         |
-| Engines               | `node` `>=22.16.0`                                                                                                                     |
-| Platform declarations | None                                                                                                                                   |
-
-| Classification | Dependency                    | Exact range   |
-| -------------- | ----------------------------- | ------------- |
-| Runtime        | `@neottia/config-registry`    | `workspace:^` |
-| Runtime        | `@neottia/issues`             | `workspace:*` |
-| Runtime        | `@neottia/issues-design-docs` | `workspace:*` |
-| Runtime        | `@neottia/opencode-adapter`   | `workspace:*` |
-| Runtime        | `@opencode-ai/plugin`         | `^1.18.34`    |
-| Development    | `@neottia/design-docs`        | `workspace:*` |
-| Development    | `@neottia/testkit`            | `workspace:*` |
-| Development    | `@templ-project/tsconfig`     | `^0.4.2`      |
-| Development    | `@types/node`                 | `^26.6.4`     |
-| Development    | `typescript`                  | `^5.9.3`      |
-| Development    | `vitest`                      | `^5.0.3`      |
-
-#### `@neottia/opencode-memory`
-
-| Declaration           | Exact value                                                                                                                            |
-| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Manifest              | [`extensions/opencode-memory/package.json`](https://github.com/dragoscirjan/neottia/blob/main/extensions/opencode-memory/package.json) |
-| Version               | `0.2.4`                                                                                                                                |
-| Private field         | `Not declared`                                                                                                                         |
-| Engines               | None                                                                                                                                   |
-| Platform declarations | None                                                                                                                                   |
-
-| Classification | Dependency                 | Exact range   |
-| -------------- | -------------------------- | ------------- |
-| Runtime        | `@neottia/config-registry` | `workspace:^` |
-| Runtime        | `@neottia/memory-core`     | `workspace:*` |
-| Runtime        | `@opencode-ai/plugin`      | `^1.18.34`    |
-| Runtime        | `zod`                      | `^4.6.5`      |
-| Development    | `@neottia/testkit`         | `workspace:*` |
-| Development    | `@templ-project/tsconfig`  | `^0.4.2`      |
-| Development    | `@types/node`              | `^26.6.4`     |
-| Development    | `typescript`               | `^5.9.3`      |
-| Development    | `vitest`                   | `^5.0.3`      |
-
-#### `@neottia/opencode-searchable`
-
-| Declaration           | Exact value                                                                                                                                    |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| Manifest              | [`extensions/opencode-searchable/package.json`](https://github.com/dragoscirjan/neottia/blob/main/extensions/opencode-searchable/package.json) |
-| Version               | `0.2.9`                                                                                                                                        |
-| Private field         | `Not declared`                                                                                                                                 |
-| Engines               | `node` `>=22.16.0`                                                                                                                             |
-| Platform declarations | None                                                                                                                                           |
-
-| Classification | Dependency                  | Exact range   |
-| -------------- | --------------------------- | ------------- |
-| Runtime        | `@neottia/config`           | `workspace:^` |
-| Runtime        | `@neottia/config-registry`  | `workspace:^` |
-| Runtime        | `@neottia/opencode-adapter` | `workspace:*` |
-| Runtime        | `@neottia/searchable-core`  | `workspace:*` |
-| Runtime        | `@opencode-ai/plugin`       | `^1.18.34`    |
-| Development    | `@neottia/testkit`          | `workspace:*` |
-| Development    | `@templ-project/tsconfig`   | `^0.4.2`      |
-| Development    | `@types/node`               | `^26.6.4`     |
-| Development    | `typescript`                | `^5.9.3`      |
-| Development    | `vitest`                    | `^5.0.3`      |
-
-#### `@neottia/pi-adapter`
-
-| Declaration           | Exact value                                                                                                                  |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| Manifest              | [`extensions/pi-adapter/package.json`](https://github.com/dragoscirjan/neottia/blob/main/extensions/pi-adapter/package.json) |
-| Version               | `0.2.1`                                                                                                                      |
-| Private field         | `Not declared`                                                                                                               |
-| Engines               | `node` `>=22.16.0`                                                                                                           |
-| Platform declarations | None                                                                                                                         |
-
-| Classification | Dependency                 | Exact range   |
-| -------------- | -------------------------- | ------------- |
-| Runtime        | `@neottia/harness-adapter` | `workspace:^` |
-| Development    | `@neottia/testkit`         | `workspace:*` |
-| Development    | `@templ-project/tsconfig`  | `^0.4.2`      |
-| Development    | `@types/node`              | `^26.6.4`     |
-| Development    | `typescript`               | `^5.9.3`      |
-| Development    | `vitest`                   | `^5.0.3`      |
-
-#### `@neottia/pi-design-docs`
-
-| Declaration           | Exact value                                                                                                                          |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| Manifest              | [`extensions/pi-design-docs/package.json`](https://github.com/dragoscirjan/neottia/blob/main/extensions/pi-design-docs/package.json) |
-| Version               | `0.2.4`                                                                                                                              |
-| Private field         | `Not declared`                                                                                                                       |
-| Engines               | None                                                                                                                                 |
-| Platform declarations | None                                                                                                                                 |
-
-| Classification | Dependency                    | Exact range   |
-| -------------- | ----------------------------- | ------------- |
-| Runtime        | `@neottia/config-registry`    | `workspace:^` |
-| Runtime        | `@neottia/design-docs`        | `workspace:*` |
-| Runtime        | `@neottia/issues-design-docs` | `workspace:*` |
-| Runtime        | `@neottia/pi-adapter`         | `workspace:*` |
-| Runtime        | `typebox`                     | `^1.3.34`     |
-| Development    | `@neottia/repository-store`   | `workspace:*` |
-| Development    | `@neottia/testkit`            | `workspace:*` |
-| Development    | `@templ-project/tsconfig`     | `^0.4.2`      |
-| Development    | `@types/node`                 | `^26.6.4`     |
-| Development    | `typescript`                  | `^5.9.3`      |
-| Development    | `vitest`                      | `^5.0.3`      |
-
-#### `@neottia/pi-issues`
-
-| Declaration           | Exact value                                                                                                                |
-| --------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Manifest              | [`extensions/pi-issues/package.json`](https://github.com/dragoscirjan/neottia/blob/main/extensions/pi-issues/package.json) |
-| Version               | `0.2.4`                                                                                                                    |
-| Private field         | `Not declared`                                                                                                             |
-| Engines               | `node` `>=22.16.0`                                                                                                         |
-| Platform declarations | None                                                                                                                       |
-
-| Classification | Dependency                    | Exact range   |
-| -------------- | ----------------------------- | ------------- |
-| Runtime        | `@neottia/config-registry`    | `workspace:^` |
-| Runtime        | `@neottia/issues`             | `workspace:*` |
-| Runtime        | `@neottia/issues-design-docs` | `workspace:*` |
-| Runtime        | `@neottia/pi-adapter`         | `workspace:*` |
-| Runtime        | `typebox`                     | `^1.3.34`     |
-| Development    | `@neottia/design-docs`        | `workspace:*` |
-| Development    | `@neottia/testkit`            | `workspace:*` |
-| Development    | `@templ-project/tsconfig`     | `^0.4.2`      |
-| Development    | `@types/node`                 | `^26.6.4`     |
-| Development    | `typescript`                  | `^5.9.3`      |
-| Development    | `vitest`                      | `^5.0.3`      |
-
-#### `@neottia/pi-memory`
-
-| Declaration           | Exact value                                                                                                                |
-| --------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Manifest              | [`extensions/pi-memory/package.json`](https://github.com/dragoscirjan/neottia/blob/main/extensions/pi-memory/package.json) |
-| Version               | `0.2.5`                                                                                                                    |
-| Private field         | `Not declared`                                                                                                             |
-| Engines               | None                                                                                                                       |
-| Platform declarations | None                                                                                                                       |
-
-| Classification | Dependency                 | Exact range   |
-| -------------- | -------------------------- | ------------- |
-| Runtime        | `@neottia/config-registry` | `workspace:^` |
-| Runtime        | `@neottia/memory-core`     | `workspace:*` |
-| Runtime        | `@neottia/pi-adapter`      | `workspace:*` |
-| Runtime        | `typebox`                  | `^1.3.34`     |
-| Development    | `@neottia/testkit`         | `workspace:*` |
-| Development    | `@templ-project/tsconfig`  | `^0.4.2`      |
-| Development    | `@types/node`              | `^26.6.4`     |
-| Development    | `typescript`               | `^5.9.3`      |
-| Development    | `vitest`                   | `^5.0.3`      |
-
-#### `@neottia/pi-searchable`
-
-| Declaration           | Exact value                                                                                                                        |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Manifest              | [`extensions/pi-searchable/package.json`](https://github.com/dragoscirjan/neottia/blob/main/extensions/pi-searchable/package.json) |
-| Version               | `0.2.9`                                                                                                                            |
-| Private field         | `Not declared`                                                                                                                     |
-| Engines               | `node` `>=22.16.0`                                                                                                                 |
-| Platform declarations | None                                                                                                                               |
-
-| Classification | Dependency                 | Exact range   |
-| -------------- | -------------------------- | ------------- |
-| Runtime        | `@neottia/config`          | `workspace:^` |
-| Runtime        | `@neottia/config-registry` | `workspace:^` |
-| Runtime        | `@neottia/pi-adapter`      | `workspace:*` |
-| Runtime        | `@neottia/searchable-core` | `workspace:*` |
-| Runtime        | `typebox`                  | `^1.3.34`     |
-| Development    | `@neottia/testkit`         | `workspace:*` |
-| Development    | `@templ-project/tsconfig`  | `^0.4.2`      |
-| Development    | `@types/node`              | `^26.6.4`     |
-| Development    | `typescript`               | `^5.9.3`      |
-| Development    | `vitest`                   | `^5.0.3`      |
-
-#### `@neottia/release`
-
-| Declaration           | Exact value                                                                                                        |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| Manifest              | [`packages/release/package.json`](https://github.com/dragoscirjan/neottia/blob/main/packages/release/package.json) |
-| Version               | `0.2.1`                                                                                                            |
-| Private field         | `Not declared`                                                                                                     |
-| Engines               | None                                                                                                               |
-| Platform declarations | None                                                                                                               |
-
-| Classification | Dependency                      | Exact range       |
-| -------------- | ------------------------------- | ----------------- |
-| Runtime        | `@neottia/claude-code-adapter`  | `workspace:0.3.0` |
-| Runtime        | `@neottia/cli`                  | `workspace:0.8.0` |
-| Runtime        | `@neottia/config`               | `workspace:0.2.0` |
-| Runtime        | `@neottia/config-registry`      | `workspace:0.4.0` |
-| Runtime        | `@neottia/core`                 | `workspace:0.1.0` |
-| Runtime        | `@neottia/design-docs`          | `workspace:0.2.1` |
-| Runtime        | `@neottia/design-docs-mcp`      | `workspace:0.2.3` |
-| Runtime        | `@neottia/distribution`         | `workspace:0.2.1` |
-| Runtime        | `@neottia/harness-adapter`      | `workspace:0.3.0` |
-| Runtime        | `@neottia/issues`               | `workspace:0.2.1` |
-| Runtime        | `@neottia/issues-design-docs`   | `workspace:0.2.1` |
-| Runtime        | `@neottia/issues-mcp`           | `workspace:0.2.3` |
-| Runtime        | `@neottia/memory-core`          | `workspace:0.3.2` |
-| Runtime        | `@neottia/memory-mcp`           | `workspace:0.3.4` |
-| Runtime        | `@neottia/opencode-adapter`     | `workspace:0.2.1` |
-| Runtime        | `@neottia/opencode-design-docs` | `workspace:0.2.3` |
-| Runtime        | `@neottia/opencode-issues`      | `workspace:0.2.4` |
-| Runtime        | `@neottia/opencode-memory`      | `workspace:0.2.4` |
-| Runtime        | `@neottia/opencode-searchable`  | `workspace:0.2.9` |
-| Runtime        | `@neottia/pi-adapter`           | `workspace:0.2.1` |
-| Runtime        | `@neottia/pi-design-docs`       | `workspace:0.2.4` |
-| Runtime        | `@neottia/pi-issues`            | `workspace:0.2.4` |
-| Runtime        | `@neottia/pi-memory`            | `workspace:0.2.5` |
-| Runtime        | `@neottia/pi-searchable`        | `workspace:0.2.9` |
-| Runtime        | `@neottia/repository-store`     | `workspace:0.3.4` |
-| Runtime        | `@neottia/sdlc`                 | `workspace:0.5.1` |
-| Runtime        | `@neottia/searchable-core`      | `workspace:0.2.6` |
-| Runtime        | `@neottia/searchable-mcp`       | `workspace:0.2.8` |
-
-#### `@neottia/repository-store`
-
-| Declaration           | Exact value                                                                                                                          |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| Manifest              | [`packages/repository-store/package.json`](https://github.com/dragoscirjan/neottia/blob/main/packages/repository-store/package.json) |
-| Version               | `0.3.4`                                                                                                                              |
-| Private field         | `Not declared`                                                                                                                       |
-| Engines               | `node` `>=22.16.0`                                                                                                                   |
-| Platform declarations | None                                                                                                                                 |
-
-| Classification | Dependency                | Exact range |
-| -------------- | ------------------------- | ----------- |
-| Runtime        | `node-gyp`                | `^13.0.2`   |
-| Optional       | `sigstore`                | `^4.1.1`    |
-| Development    | `@templ-project/tsconfig` | `^0.4.2`    |
-| Development    | `@types/node`             | `^26.6.4`   |
-| Development    | `typescript`              | `^5.9.3`    |
-| Development    | `vitest`                  | `^5.0.3`    |
-
-#### `@neottia/sdlc`
-
-| Declaration           | Exact value                                                                                                  |
-| --------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Manifest              | [`packages/sdlc/package.json`](https://github.com/dragoscirjan/neottia/blob/main/packages/sdlc/package.json) |
-| Version               | `0.5.1`                                                                                                      |
-| Private field         | `Not declared`                                                                                               |
-| Engines               | `node` `>=22.16.0`                                                                                           |
-| Platform declarations | None                                                                                                         |
-
-| Classification | Dependency                 | Exact range   |
-| -------------- | -------------------------- | ------------- |
-| Runtime        | `@neottia/config`          | `workspace:^` |
-| Runtime        | `@neottia/design-docs`     | `workspace:^` |
-| Runtime        | `@neottia/distribution`    | `workspace:^` |
-| Runtime        | `@neottia/harness-adapter` | `workspace:^` |
-| Runtime        | `@neottia/issues`          | `workspace:^` |
-| Runtime        | `@neottia/memory-core`     | `workspace:^` |
-| Runtime        | `@neottia/searchable-core` | `workspace:^` |
-| Runtime        | `capitalize`               | `1.0.0`       |
-| Runtime        | `esrever`                  | `0.2.0`       |
-| Runtime        | `iconv-lite`               | `0.6.3`       |
-| Runtime        | `is-plain-object`          | `2.0.4`       |
-| Runtime        | `isobject`                 | `3.0.1`       |
-| Runtime        | `levenshtein`              | `1.0.5`       |
-| Runtime        | `locutus`                  | `3.0.36`      |
-| Runtime        | `luxon`                    | `1.28.1`      |
-| Runtime        | `pad`                      | `2.3.0`       |
-| Runtime        | `regex-parser`             | `2.3.1`       |
-| Runtime        | `runes`                    | `0.4.3`       |
-| Runtime        | `snake-case`               | `2.1.0`       |
-| Runtime        | `source-map`               | `0.6.1`       |
-| Runtime        | `twig-lexer`               | `0.9.2`       |
-| Runtime        | `zod`                      | `^4.6.5`      |
-| Development    | `@templ-project/tsconfig`  | `^0.4.2`      |
-| Development    | `@types/node`              | `^26.6.4`     |
-| Development    | `typescript`               | `^5.9.3`      |
-| Development    | `vitest`                   | `^5.0.3`      |
-
-#### `@neottia/searchable-core`
-
-| Declaration           | Exact value                                                                                                                        |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Manifest              | [`packages/searchable-core/package.json`](https://github.com/dragoscirjan/neottia/blob/main/packages/searchable-core/package.json) |
-| Version               | `0.2.6`                                                                                                                            |
-| Private field         | `Not declared`                                                                                                                     |
-| Engines               | `node` `>=22.16.0`                                                                                                                 |
-| Platform declarations | None                                                                                                                               |
-
-| Classification | Dependency                  | Exact range   |
-| -------------- | --------------------------- | ------------- |
-| Runtime        | `@mozilla/readability`      | `^0.6.0`      |
-| Runtime        | `@neottia/config`           | `workspace:^` |
-| Runtime        | `@neottia/repository-store` | `workspace:*` |
-| Runtime        | `jsdom`                     | `^30.1.1`     |
-| Runtime        | `turndown`                  | `^7.2.4`      |
-| Runtime        | `yaml`                      | `^2.9.1`      |
-| Runtime        | `zod`                       | `^4.6.5`      |
-| Development    | `@templ-project/tsconfig`   | `^0.4.2`      |
-| Development    | `@types/jsdom`              | `^30.0.0`     |
-| Development    | `@types/node`               | `^26.6.4`     |
-| Development    | `@types/turndown`           | `^5.0.6`      |
-| Development    | `typescript`                | `^5.9.3`      |
-| Development    | `vitest`                    | `^5.0.3`      |
-
-#### `@neottia/searchable-mcp`
-
-| Declaration           | Exact value                                                                                                                      |
-| --------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| Manifest              | [`packages/searchable-mcp/package.json`](https://github.com/dragoscirjan/neottia/blob/main/packages/searchable-mcp/package.json) |
-| Version               | `0.2.8`                                                                                                                          |
-| Private field         | `Not declared`                                                                                                                   |
-| Engines               | `node` `>=22.16.0`                                                                                                               |
-| Platform declarations | None                                                                                                                             |
-
-| Classification | Dependency                  | Exact range   |
-| -------------- | --------------------------- | ------------- |
-| Runtime        | `@modelcontextprotocol/sdk` | `^1.31.0`     |
-| Runtime        | `@neottia/config`           | `workspace:^` |
-| Runtime        | `@neottia/config-registry`  | `workspace:^` |
-| Runtime        | `@neottia/searchable-core`  | `workspace:*` |
-| Development    | `@neottia/testkit`          | `workspace:*` |
-| Development    | `@templ-project/tsconfig`   | `^0.4.2`      |
-| Development    | `@types/node`               | `^26.6.4`     |
-| Development    | `typescript`                | `^5.9.3`      |
-| Development    | `vitest`                    | `^5.0.3`      |
-
-#### `@neottia/testkit`
-
-| Declaration           | Exact value                                                                                                        |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| Manifest              | [`packages/testkit/package.json`](https://github.com/dragoscirjan/neottia/blob/main/packages/testkit/package.json) |
-| Version               | `0.1.0`                                                                                                            |
-| Private field         | `true`                                                                                                             |
-| Engines               | None                                                                                                               |
-| Platform declarations | None                                                                                                               |
-
-| Classification | Dependency                 | Exact range   |
-| -------------- | -------------------------- | ------------- |
-| Runtime        | `@neottia/config`          | `workspace:^` |
-| Runtime        | `@neottia/config-registry` | `workspace:^` |
-| Runtime        | `@neottia/design-docs`     | `workspace:*` |
-| Runtime        | `@neottia/harness-adapter` | `workspace:^` |
-| Runtime        | `@neottia/issues`          | `workspace:*` |
-| Runtime        | `@neottia/memory-core`     | `workspace:*` |
-| Development    | `@templ-project/tsconfig`  | `^0.4.2`      |
-| Development    | `@types/node`              | `^26.6.4`     |
-| Development    | `typescript`               | `^5.9.3`      |
-| Development    | `vitest`                   | `^5.0.3`      |
-
-## Freshness contract
-
-Run `mise run docs:dependencies:generate` after a manifest changes. `mise run docs:check` compares this page with every current manifest and fails when the committed reference is stale.
+### <code>@neottia/claude-code-adapter</code>
+
+| Declaration           | Exact value                                                                                                                                               |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Manifest              | [<code>extensions/claude-code-adapter/package.json</code>](https://github.com/dragoscirjan/neottia/blob/main/extensions/claude-code-adapter/package.json) |
+| Version               | <code>0.3.0</code>                                                                                                                                        |
+| Private field         | <code>Not declared</code>                                                                                                                                 |
+| Engines               | <code>node</code> <code>&gt;=22.16.0</code>                                                                                                               |
+| Platform declarations | None                                                                                                                                                      |
+
+| Classification | Dependency                            | Exact range              |
+| -------------- | ------------------------------------- | ------------------------ |
+| Runtime        | <code>@neottia/harness-adapter</code> | <code>workspace:^</code> |
+| Development    | <code>@neottia/testkit</code>         | <code>workspace:*</code> |
+| Development    | <code>@templ-project/tsconfig</code>  | <code>^0.4.2</code>      |
+| Development    | <code>@types/node</code>              | <code>^26.6.4</code>     |
+| Development    | <code>typescript</code>               | <code>^5.9.3</code>      |
+| Development    | <code>vitest</code>                   | <code>^5.0.3</code>      |
+
+### <code>@neottia/cli</code>
+
+| Declaration           | Exact value                                                                                                           |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Manifest              | [<code>packages/cli/package.json</code>](https://github.com/dragoscirjan/neottia/blob/main/packages/cli/package.json) |
+| Version               | <code>0.8.0</code>                                                                                                    |
+| Private field         | <code>Not declared</code>                                                                                             |
+| Engines               | <code>node</code> <code>&gt;=22.20.0</code>                                                                           |
+| Platform declarations | None                                                                                                                  |
+
+| Classification | Dependency                                | Exact range              |
+| -------------- | ----------------------------------------- | ------------------------ |
+| Runtime        | <code>@neottia/claude-code-adapter</code> | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/config</code>              | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/config-registry</code>     | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/design-docs</code>         | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/distribution</code>        | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/harness-adapter</code>     | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/issues</code>              | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/memory-core</code>         | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/opencode-adapter</code>    | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/pi-adapter</code>          | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/repository-store</code>    | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/sdlc</code>                | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/searchable-core</code>     | <code>workspace:^</code> |
+| Development    | <code>@templ-project/tsconfig</code>      | <code>^0.4.2</code>      |
+| Development    | <code>@types/node</code>                  | <code>^26.6.4</code>     |
+| Development    | <code>typescript</code>                   | <code>^5.9.3</code>      |
+| Development    | <code>vitest</code>                       | <code>^5.0.3</code>      |
+
+### <code>@neottia/config</code>
+
+| Declaration           | Exact value                                                                                                                 |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Manifest              | [<code>packages/config/package.json</code>](https://github.com/dragoscirjan/neottia/blob/main/packages/config/package.json) |
+| Version               | <code>0.2.0</code>                                                                                                          |
+| Private field         | <code>Not declared</code>                                                                                                   |
+| Engines               | <code>node</code> <code>&gt;=22.16.0</code>                                                                                 |
+| Platform declarations | None                                                                                                                        |
+
+| Classification | Dependency                           | Exact range          |
+| -------------- | ------------------------------------ | -------------------- |
+| Runtime        | <code>yaml</code>                    | <code>^2.9.1</code>  |
+| Runtime        | <code>zod</code>                     | <code>^4.6.5</code>  |
+| Development    | <code>@templ-project/tsconfig</code> | <code>^0.4.2</code>  |
+| Development    | <code>@types/node</code>             | <code>^26.6.4</code> |
+| Development    | <code>typescript</code>              | <code>^5.9.3</code>  |
+| Development    | <code>vitest</code>                  | <code>^5.0.3</code>  |
+
+### <code>@neottia/config-registry</code>
+
+| Declaration           | Exact value                                                                                                                                   |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Manifest              | [<code>packages/config-registry/package.json</code>](https://github.com/dragoscirjan/neottia/blob/main/packages/config-registry/package.json) |
+| Version               | <code>0.4.0</code>                                                                                                                            |
+| Private field         | <code>Not declared</code>                                                                                                                     |
+| Engines               | <code>node</code> <code>&gt;=22.16.0</code>                                                                                                   |
+| Platform declarations | None                                                                                                                                          |
+
+| Classification | Dependency                            | Exact range              |
+| -------------- | ------------------------------------- | ------------------------ |
+| Runtime        | <code>@neottia/config</code>          | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/design-docs</code>     | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/issues</code>          | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/memory-core</code>     | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/sdlc</code>            | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/searchable-core</code> | <code>workspace:^</code> |
+| Runtime        | <code>zod</code>                      | <code>^4.6.5</code>      |
+| Development    | <code>@templ-project/tsconfig</code>  | <code>^0.4.2</code>      |
+| Development    | <code>@types/node</code>              | <code>^26.6.4</code>     |
+| Development    | <code>typescript</code>               | <code>^5.9.3</code>      |
+| Development    | <code>vitest</code>                   | <code>^5.0.3</code>      |
+
+### <code>@neottia/core</code>
+
+| Declaration           | Exact value                                                                                                             |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Manifest              | [<code>packages/core/package.json</code>](https://github.com/dragoscirjan/neottia/blob/main/packages/core/package.json) |
+| Version               | <code>0.1.0</code>                                                                                                      |
+| Private field         | <code>Not declared</code>                                                                                               |
+| Engines               | <code>node</code> <code>&gt;=20.0.0</code>                                                                              |
+| Platform declarations | None                                                                                                                    |
+
+| Classification | Dependency                           | Exact range           |
+| -------------- | ------------------------------------ | --------------------- |
+| Development    | <code>@templ-project/tsconfig</code> | <code>^0.4.2</code>   |
+| Development    | <code>esbuild</code>                 | <code>^0.28.2</code>  |
+| Development    | <code>eslint</code>                  | <code>^10.11.0</code> |
+| Development    | <code>npm-run-all2</code>            | <code>^9.0.3</code>   |
+| Development    | <code>rimraf</code>                  | <code>^6.1.2</code>   |
+| Development    | <code>tsx</code>                     | <code>^4.23.15</code> |
+| Development    | <code>typescript</code>              | <code>^5.9.3</code>   |
+| Development    | <code>vitest</code>                  | <code>^5.0.3</code>   |
+
+### <code>@neottia/design-docs</code>
+
+| Declaration           | Exact value                                                                                                                           |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Manifest              | [<code>packages/design-docs/package.json</code>](https://github.com/dragoscirjan/neottia/blob/main/packages/design-docs/package.json) |
+| Version               | <code>0.2.1</code>                                                                                                                    |
+| Private field         | <code>Not declared</code>                                                                                                             |
+| Engines               | <code>node</code> <code>&gt;=22.16.0</code>                                                                                           |
+| Platform declarations | None                                                                                                                                  |
+
+| Classification | Dependency                             | Exact range              |
+| -------------- | -------------------------------------- | ------------------------ |
+| Runtime        | <code>@neottia/config</code>           | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/repository-store</code> | <code>workspace:^</code> |
+| Runtime        | <code>commonmark</code>                | <code>^0.31.2</code>     |
+| Runtime        | <code>yaml</code>                      | <code>^2.9.1</code>      |
+| Runtime        | <code>zod</code>                       | <code>^4.6.5</code>      |
+| Development    | <code>@templ-project/tsconfig</code>   | <code>^0.4.2</code>      |
+| Development    | <code>@types/commonmark</code>         | <code>^0.27.10</code>    |
+| Development    | <code>@types/node</code>               | <code>^26.6.4</code>     |
+| Development    | <code>typescript</code>                | <code>^5.9.3</code>      |
+| Development    | <code>vitest</code>                    | <code>^5.0.3</code>      |
+
+### <code>@neottia/design-docs-mcp</code>
+
+| Declaration           | Exact value                                                                                                                                   |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Manifest              | [<code>packages/design-docs-mcp/package.json</code>](https://github.com/dragoscirjan/neottia/blob/main/packages/design-docs-mcp/package.json) |
+| Version               | <code>0.2.3</code>                                                                                                                            |
+| Private field         | <code>Not declared</code>                                                                                                                     |
+| Engines               | <code>node</code> <code>&gt;=22.16.0</code>                                                                                                   |
+| Platform declarations | None                                                                                                                                          |
+
+| Classification | Dependency                               | Exact range              |
+| -------------- | ---------------------------------------- | ------------------------ |
+| Runtime        | <code>@modelcontextprotocol/sdk</code>   | <code>^1.31.0</code>     |
+| Runtime        | <code>@neottia/config</code>             | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/config-registry</code>    | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/design-docs</code>        | <code>workspace:*</code> |
+| Runtime        | <code>@neottia/issues-design-docs</code> | <code>workspace:*</code> |
+| Runtime        | <code>zod</code>                         | <code>^4.6.5</code>      |
+| Development    | <code>@neottia/repository-store</code>   | <code>workspace:*</code> |
+| Development    | <code>@templ-project/tsconfig</code>     | <code>^0.4.2</code>      |
+| Development    | <code>@types/node</code>                 | <code>^26.6.4</code>     |
+| Development    | <code>typescript</code>                  | <code>^5.9.3</code>      |
+| Development    | <code>vitest</code>                      | <code>^5.0.3</code>      |
+
+### <code>@neottia/distribution</code>
+
+| Declaration           | Exact value                                                                                                                             |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Manifest              | [<code>packages/distribution/package.json</code>](https://github.com/dragoscirjan/neottia/blob/main/packages/distribution/package.json) |
+| Version               | <code>0.2.1</code>                                                                                                                      |
+| Private field         | <code>Not declared</code>                                                                                                               |
+| Engines               | <code>node</code> <code>&gt;=22.20.0</code>                                                                                             |
+| Platform declarations | None                                                                                                                                    |
+
+| Classification | Dependency                            | Exact range              |
+| -------------- | ------------------------------------- | ------------------------ |
+| Runtime        | <code>@neottia/harness-adapter</code> | <code>workspace:^</code> |
+| Runtime        | <code>jsonc-parser</code>             | <code>^3.3.1</code>      |
+| Runtime        | <code>skills</code>                   | <code>^1.7.0</code>      |
+| Development    | <code>@templ-project/tsconfig</code>  | <code>^0.4.2</code>      |
+| Development    | <code>@types/node</code>              | <code>^26.6.4</code>     |
+| Development    | <code>typescript</code>               | <code>^5.9.3</code>      |
+| Development    | <code>vitest</code>                   | <code>^5.0.3</code>      |
+
+### <code>@neottia/harness-adapter</code>
+
+| Declaration           | Exact value                                                                                                                                   |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Manifest              | [<code>packages/harness-adapter/package.json</code>](https://github.com/dragoscirjan/neottia/blob/main/packages/harness-adapter/package.json) |
+| Version               | <code>0.3.0</code>                                                                                                                            |
+| Private field         | <code>Not declared</code>                                                                                                                     |
+| Engines               | <code>node</code> <code>&gt;=22.16.0</code>                                                                                                   |
+| Platform declarations | None                                                                                                                                          |
+
+| Classification | Dependency                           | Exact range          |
+| -------------- | ------------------------------------ | -------------------- |
+| Development    | <code>@templ-project/tsconfig</code> | <code>^0.4.2</code>  |
+| Development    | <code>@types/node</code>             | <code>^26.6.4</code> |
+| Development    | <code>typescript</code>              | <code>^5.9.3</code>  |
+| Development    | <code>vitest</code>                  | <code>^5.0.3</code>  |
+
+### <code>@neottia/issues</code>
+
+| Declaration           | Exact value                                                                                                                 |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Manifest              | [<code>packages/issues/package.json</code>](https://github.com/dragoscirjan/neottia/blob/main/packages/issues/package.json) |
+| Version               | <code>0.2.1</code>                                                                                                          |
+| Private field         | <code>Not declared</code>                                                                                                   |
+| Engines               | <code>node</code> <code>&gt;=22.16.0</code>                                                                                 |
+| Platform declarations | None                                                                                                                        |
+
+| Classification | Dependency                             | Exact range              |
+| -------------- | -------------------------------------- | ------------------------ |
+| Runtime        | <code>@neottia/config</code>           | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/repository-store</code> | <code>workspace:^</code> |
+| Runtime        | <code>yaml</code>                      | <code>^2.9.1</code>      |
+| Runtime        | <code>zod</code>                       | <code>^4.6.5</code>      |
+| Development    | <code>@templ-project/tsconfig</code>   | <code>^0.4.2</code>      |
+| Development    | <code>@types/node</code>               | <code>^26.6.4</code>     |
+| Development    | <code>typescript</code>                | <code>^5.9.3</code>      |
+| Development    | <code>vitest</code>                    | <code>^5.0.3</code>      |
+
+### <code>@neottia/issues-design-docs</code>
+
+| Declaration           | Exact value                                                                                                                                         |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Manifest              | [<code>packages/issues-design-docs/package.json</code>](https://github.com/dragoscirjan/neottia/blob/main/packages/issues-design-docs/package.json) |
+| Version               | <code>0.2.1</code>                                                                                                                                  |
+| Private field         | <code>Not declared</code>                                                                                                                           |
+| Engines               | <code>node</code> <code>&gt;=22.16.0</code>                                                                                                         |
+| Platform declarations | None                                                                                                                                                |
+
+| Classification | Dependency                             | Exact range              |
+| -------------- | -------------------------------------- | ------------------------ |
+| Runtime        | <code>@neottia/config</code>           | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/design-docs</code>      | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/issues</code>           | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/repository-store</code> | <code>workspace:^</code> |
+| Development    | <code>@templ-project/tsconfig</code>   | <code>^0.4.2</code>      |
+| Development    | <code>@types/node</code>               | <code>^26.6.4</code>     |
+| Development    | <code>typescript</code>                | <code>^5.9.3</code>      |
+| Development    | <code>vitest</code>                    | <code>^5.0.3</code>      |
+
+### <code>@neottia/issues-mcp</code>
+
+| Declaration           | Exact value                                                                                                                         |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Manifest              | [<code>packages/issues-mcp/package.json</code>](https://github.com/dragoscirjan/neottia/blob/main/packages/issues-mcp/package.json) |
+| Version               | <code>0.2.3</code>                                                                                                                  |
+| Private field         | <code>Not declared</code>                                                                                                           |
+| Engines               | <code>node</code> <code>&gt;=22.16.0</code>                                                                                         |
+| Platform declarations | None                                                                                                                                |
+
+| Classification | Dependency                               | Exact range              |
+| -------------- | ---------------------------------------- | ------------------------ |
+| Runtime        | <code>@modelcontextprotocol/sdk</code>   | <code>^1.31.0</code>     |
+| Runtime        | <code>@neottia/config</code>             | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/config-registry</code>    | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/issues</code>             | <code>workspace:*</code> |
+| Runtime        | <code>@neottia/issues-design-docs</code> | <code>workspace:*</code> |
+| Development    | <code>@neottia/design-docs</code>        | <code>workspace:*</code> |
+| Development    | <code>@neottia/testkit</code>            | <code>workspace:*</code> |
+| Development    | <code>@templ-project/tsconfig</code>     | <code>^0.4.2</code>      |
+| Development    | <code>@types/node</code>                 | <code>^26.6.4</code>     |
+| Development    | <code>typescript</code>                  | <code>^5.9.3</code>      |
+| Development    | <code>vitest</code>                      | <code>^5.0.3</code>      |
+
+### <code>@neottia/memory-core</code>
+
+| Declaration           | Exact value                                                                                                                           |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Manifest              | [<code>packages/memory-core/package.json</code>](https://github.com/dragoscirjan/neottia/blob/main/packages/memory-core/package.json) |
+| Version               | <code>0.3.2</code>                                                                                                                    |
+| Private field         | <code>Not declared</code>                                                                                                             |
+| Engines               | <code>node</code> <code>&gt;=22.16.0</code>                                                                                           |
+| Platform declarations | None                                                                                                                                  |
+
+| Classification | Dependency                             | Exact range              |
+| -------------- | -------------------------------------- | ------------------------ |
+| Runtime        | <code>@neottia/config</code>           | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/repository-store</code> | <code>workspace:^</code> |
+| Runtime        | <code>pg</code>                        | <code>^8.23.1</code>     |
+| Runtime        | <code>yaml</code>                      | <code>^2.9.1</code>      |
+| Runtime        | <code>zod</code>                       | <code>^4.6.5</code>      |
+| Development    | <code>@templ-project/tsconfig</code>   | <code>^0.4.2</code>      |
+| Development    | <code>@types/node</code>               | <code>^26.6.4</code>     |
+| Development    | <code>@types/pg</code>                 | <code>^8.23.1</code>     |
+| Development    | <code>typescript</code>                | <code>^5.9.3</code>      |
+| Development    | <code>vitest</code>                    | <code>^5.0.3</code>      |
+
+### <code>@neottia/memory-mcp</code>
+
+| Declaration           | Exact value                                                                                                                         |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Manifest              | [<code>packages/memory-mcp/package.json</code>](https://github.com/dragoscirjan/neottia/blob/main/packages/memory-mcp/package.json) |
+| Version               | <code>0.3.4</code>                                                                                                                  |
+| Private field         | <code>Not declared</code>                                                                                                           |
+| Engines               | <code>node</code> <code>&gt;=22.16.0</code>                                                                                         |
+| Platform declarations | None                                                                                                                                |
+
+| Classification | Dependency                             | Exact range              |
+| -------------- | -------------------------------------- | ------------------------ |
+| Runtime        | <code>@modelcontextprotocol/sdk</code> | <code>^1.31.0</code>     |
+| Runtime        | <code>@neottia/config</code>           | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/config-registry</code>  | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/memory-core</code>      | <code>workspace:*</code> |
+| Runtime        | <code>zod</code>                       | <code>^4.6.5</code>      |
+| Development    | <code>@neottia/repository-store</code> | <code>workspace:^</code> |
+| Development    | <code>@templ-project/tsconfig</code>   | <code>^0.4.2</code>      |
+| Development    | <code>@types/node</code>               | <code>^26.6.4</code>     |
+| Development    | <code>typescript</code>                | <code>^5.9.3</code>      |
+| Development    | <code>vitest</code>                    | <code>^5.0.3</code>      |
+| Development    | <code>yaml</code>                      | <code>^2.9.1</code>      |
+
+### <code>@neottia/opencode-adapter</code>
+
+| Declaration           | Exact value                                                                                                                                         |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Manifest              | [<code>extensions/opencode-adapter/package.json</code>](https://github.com/dragoscirjan/neottia/blob/main/extensions/opencode-adapter/package.json) |
+| Version               | <code>0.2.1</code>                                                                                                                                  |
+| Private field         | <code>Not declared</code>                                                                                                                           |
+| Engines               | <code>node</code> <code>&gt;=22.16.0</code>                                                                                                         |
+| Platform declarations | None                                                                                                                                                |
+
+| Classification | Dependency                            | Exact range              |
+| -------------- | ------------------------------------- | ------------------------ |
+| Runtime        | <code>@neottia/harness-adapter</code> | <code>workspace:^</code> |
+| Development    | <code>@neottia/pi-adapter</code>      | <code>workspace:*</code> |
+| Development    | <code>@neottia/testkit</code>         | <code>workspace:*</code> |
+| Development    | <code>@templ-project/tsconfig</code>  | <code>^0.4.2</code>      |
+| Development    | <code>@types/node</code>              | <code>^26.6.4</code>     |
+| Development    | <code>typescript</code>               | <code>^5.9.3</code>      |
+| Development    | <code>vitest</code>                   | <code>^5.0.3</code>      |
+
+### <code>@neottia/opencode-design-docs</code>
+
+| Declaration           | Exact value                                                                                                                                                 |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Manifest              | [<code>extensions/opencode-design-docs/package.json</code>](https://github.com/dragoscirjan/neottia/blob/main/extensions/opencode-design-docs/package.json) |
+| Version               | <code>0.2.3</code>                                                                                                                                          |
+| Private field         | <code>Not declared</code>                                                                                                                                   |
+| Engines               | None                                                                                                                                                        |
+| Platform declarations | None                                                                                                                                                        |
+
+| Classification | Dependency                               | Exact range              |
+| -------------- | ---------------------------------------- | ------------------------ |
+| Runtime        | <code>@neottia/config-registry</code>    | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/design-docs</code>        | <code>workspace:*</code> |
+| Runtime        | <code>@neottia/issues-design-docs</code> | <code>workspace:*</code> |
+| Runtime        | <code>@opencode-ai/plugin</code>         | <code>^1.18.34</code>    |
+| Runtime        | <code>zod</code>                         | <code>^4.6.5</code>      |
+| Development    | <code>@neottia/issues</code>             | <code>workspace:*</code> |
+| Development    | <code>@neottia/repository-store</code>   | <code>workspace:*</code> |
+| Development    | <code>@neottia/testkit</code>            | <code>workspace:*</code> |
+| Development    | <code>@templ-project/tsconfig</code>     | <code>^0.4.2</code>      |
+| Development    | <code>@types/node</code>                 | <code>^26.6.4</code>     |
+| Development    | <code>typescript</code>                  | <code>^5.9.3</code>      |
+| Development    | <code>vitest</code>                      | <code>^5.0.3</code>      |
+
+### <code>@neottia/opencode-issues</code>
+
+| Declaration           | Exact value                                                                                                                                       |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Manifest              | [<code>extensions/opencode-issues/package.json</code>](https://github.com/dragoscirjan/neottia/blob/main/extensions/opencode-issues/package.json) |
+| Version               | <code>0.2.4</code>                                                                                                                                |
+| Private field         | <code>Not declared</code>                                                                                                                         |
+| Engines               | <code>node</code> <code>&gt;=22.16.0</code>                                                                                                       |
+| Platform declarations | None                                                                                                                                              |
+
+| Classification | Dependency                               | Exact range              |
+| -------------- | ---------------------------------------- | ------------------------ |
+| Runtime        | <code>@neottia/config-registry</code>    | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/issues</code>             | <code>workspace:*</code> |
+| Runtime        | <code>@neottia/issues-design-docs</code> | <code>workspace:*</code> |
+| Runtime        | <code>@neottia/opencode-adapter</code>   | <code>workspace:*</code> |
+| Runtime        | <code>@opencode-ai/plugin</code>         | <code>^1.18.34</code>    |
+| Development    | <code>@neottia/design-docs</code>        | <code>workspace:*</code> |
+| Development    | <code>@neottia/testkit</code>            | <code>workspace:*</code> |
+| Development    | <code>@templ-project/tsconfig</code>     | <code>^0.4.2</code>      |
+| Development    | <code>@types/node</code>                 | <code>^26.6.4</code>     |
+| Development    | <code>typescript</code>                  | <code>^5.9.3</code>      |
+| Development    | <code>vitest</code>                      | <code>^5.0.3</code>      |
+
+### <code>@neottia/opencode-memory</code>
+
+| Declaration           | Exact value                                                                                                                                       |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Manifest              | [<code>extensions/opencode-memory/package.json</code>](https://github.com/dragoscirjan/neottia/blob/main/extensions/opencode-memory/package.json) |
+| Version               | <code>0.2.4</code>                                                                                                                                |
+| Private field         | <code>Not declared</code>                                                                                                                         |
+| Engines               | None                                                                                                                                              |
+| Platform declarations | None                                                                                                                                              |
+
+| Classification | Dependency                            | Exact range              |
+| -------------- | ------------------------------------- | ------------------------ |
+| Runtime        | <code>@neottia/config-registry</code> | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/memory-core</code>     | <code>workspace:*</code> |
+| Runtime        | <code>@opencode-ai/plugin</code>      | <code>^1.18.34</code>    |
+| Runtime        | <code>zod</code>                      | <code>^4.6.5</code>      |
+| Development    | <code>@neottia/testkit</code>         | <code>workspace:*</code> |
+| Development    | <code>@templ-project/tsconfig</code>  | <code>^0.4.2</code>      |
+| Development    | <code>@types/node</code>              | <code>^26.6.4</code>     |
+| Development    | <code>typescript</code>               | <code>^5.9.3</code>      |
+| Development    | <code>vitest</code>                   | <code>^5.0.3</code>      |
+
+### <code>@neottia/opencode-searchable</code>
+
+| Declaration           | Exact value                                                                                                                                               |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Manifest              | [<code>extensions/opencode-searchable/package.json</code>](https://github.com/dragoscirjan/neottia/blob/main/extensions/opencode-searchable/package.json) |
+| Version               | <code>0.2.9</code>                                                                                                                                        |
+| Private field         | <code>Not declared</code>                                                                                                                                 |
+| Engines               | <code>node</code> <code>&gt;=22.16.0</code>                                                                                                               |
+| Platform declarations | None                                                                                                                                                      |
+
+| Classification | Dependency                             | Exact range              |
+| -------------- | -------------------------------------- | ------------------------ |
+| Runtime        | <code>@neottia/config</code>           | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/config-registry</code>  | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/opencode-adapter</code> | <code>workspace:*</code> |
+| Runtime        | <code>@neottia/searchable-core</code>  | <code>workspace:*</code> |
+| Runtime        | <code>@opencode-ai/plugin</code>       | <code>^1.18.34</code>    |
+| Development    | <code>@neottia/testkit</code>          | <code>workspace:*</code> |
+| Development    | <code>@templ-project/tsconfig</code>   | <code>^0.4.2</code>      |
+| Development    | <code>@types/node</code>               | <code>^26.6.4</code>     |
+| Development    | <code>typescript</code>                | <code>^5.9.3</code>      |
+| Development    | <code>vitest</code>                    | <code>^5.0.3</code>      |
+
+### <code>@neottia/pi-adapter</code>
+
+| Declaration           | Exact value                                                                                                                             |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Manifest              | [<code>extensions/pi-adapter/package.json</code>](https://github.com/dragoscirjan/neottia/blob/main/extensions/pi-adapter/package.json) |
+| Version               | <code>0.2.1</code>                                                                                                                      |
+| Private field         | <code>Not declared</code>                                                                                                               |
+| Engines               | <code>node</code> <code>&gt;=22.16.0</code>                                                                                             |
+| Platform declarations | None                                                                                                                                    |
+
+| Classification | Dependency                            | Exact range              |
+| -------------- | ------------------------------------- | ------------------------ |
+| Runtime        | <code>@neottia/harness-adapter</code> | <code>workspace:^</code> |
+| Development    | <code>@neottia/testkit</code>         | <code>workspace:*</code> |
+| Development    | <code>@templ-project/tsconfig</code>  | <code>^0.4.2</code>      |
+| Development    | <code>@types/node</code>              | <code>^26.6.4</code>     |
+| Development    | <code>typescript</code>               | <code>^5.9.3</code>      |
+| Development    | <code>vitest</code>                   | <code>^5.0.3</code>      |
+
+### <code>@neottia/pi-design-docs</code>
+
+| Declaration           | Exact value                                                                                                                                     |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Manifest              | [<code>extensions/pi-design-docs/package.json</code>](https://github.com/dragoscirjan/neottia/blob/main/extensions/pi-design-docs/package.json) |
+| Version               | <code>0.2.4</code>                                                                                                                              |
+| Private field         | <code>Not declared</code>                                                                                                                       |
+| Engines               | None                                                                                                                                            |
+| Platform declarations | None                                                                                                                                            |
+
+| Classification | Dependency                               | Exact range              |
+| -------------- | ---------------------------------------- | ------------------------ |
+| Runtime        | <code>@neottia/config-registry</code>    | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/design-docs</code>        | <code>workspace:*</code> |
+| Runtime        | <code>@neottia/issues-design-docs</code> | <code>workspace:*</code> |
+| Runtime        | <code>@neottia/pi-adapter</code>         | <code>workspace:*</code> |
+| Runtime        | <code>typebox</code>                     | <code>^1.3.34</code>     |
+| Development    | <code>@neottia/repository-store</code>   | <code>workspace:*</code> |
+| Development    | <code>@neottia/testkit</code>            | <code>workspace:*</code> |
+| Development    | <code>@templ-project/tsconfig</code>     | <code>^0.4.2</code>      |
+| Development    | <code>@types/node</code>                 | <code>^26.6.4</code>     |
+| Development    | <code>typescript</code>                  | <code>^5.9.3</code>      |
+| Development    | <code>vitest</code>                      | <code>^5.0.3</code>      |
+
+### <code>@neottia/pi-issues</code>
+
+| Declaration           | Exact value                                                                                                                           |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Manifest              | [<code>extensions/pi-issues/package.json</code>](https://github.com/dragoscirjan/neottia/blob/main/extensions/pi-issues/package.json) |
+| Version               | <code>0.2.4</code>                                                                                                                    |
+| Private field         | <code>Not declared</code>                                                                                                             |
+| Engines               | <code>node</code> <code>&gt;=22.16.0</code>                                                                                           |
+| Platform declarations | None                                                                                                                                  |
+
+| Classification | Dependency                               | Exact range              |
+| -------------- | ---------------------------------------- | ------------------------ |
+| Runtime        | <code>@neottia/config-registry</code>    | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/issues</code>             | <code>workspace:*</code> |
+| Runtime        | <code>@neottia/issues-design-docs</code> | <code>workspace:*</code> |
+| Runtime        | <code>@neottia/pi-adapter</code>         | <code>workspace:*</code> |
+| Runtime        | <code>typebox</code>                     | <code>^1.3.34</code>     |
+| Development    | <code>@neottia/design-docs</code>        | <code>workspace:*</code> |
+| Development    | <code>@neottia/testkit</code>            | <code>workspace:*</code> |
+| Development    | <code>@templ-project/tsconfig</code>     | <code>^0.4.2</code>      |
+| Development    | <code>@types/node</code>                 | <code>^26.6.4</code>     |
+| Development    | <code>typescript</code>                  | <code>^5.9.3</code>      |
+| Development    | <code>vitest</code>                      | <code>^5.0.3</code>      |
+
+### <code>@neottia/pi-memory</code>
+
+| Declaration           | Exact value                                                                                                                           |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Manifest              | [<code>extensions/pi-memory/package.json</code>](https://github.com/dragoscirjan/neottia/blob/main/extensions/pi-memory/package.json) |
+| Version               | <code>0.2.5</code>                                                                                                                    |
+| Private field         | <code>Not declared</code>                                                                                                             |
+| Engines               | None                                                                                                                                  |
+| Platform declarations | None                                                                                                                                  |
+
+| Classification | Dependency                            | Exact range              |
+| -------------- | ------------------------------------- | ------------------------ |
+| Runtime        | <code>@neottia/config-registry</code> | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/memory-core</code>     | <code>workspace:*</code> |
+| Runtime        | <code>@neottia/pi-adapter</code>      | <code>workspace:*</code> |
+| Runtime        | <code>typebox</code>                  | <code>^1.3.34</code>     |
+| Development    | <code>@neottia/testkit</code>         | <code>workspace:*</code> |
+| Development    | <code>@templ-project/tsconfig</code>  | <code>^0.4.2</code>      |
+| Development    | <code>@types/node</code>              | <code>^26.6.4</code>     |
+| Development    | <code>typescript</code>               | <code>^5.9.3</code>      |
+| Development    | <code>vitest</code>                   | <code>^5.0.3</code>      |
+
+### <code>@neottia/pi-searchable</code>
+
+| Declaration           | Exact value                                                                                                                                   |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Manifest              | [<code>extensions/pi-searchable/package.json</code>](https://github.com/dragoscirjan/neottia/blob/main/extensions/pi-searchable/package.json) |
+| Version               | <code>0.2.9</code>                                                                                                                            |
+| Private field         | <code>Not declared</code>                                                                                                                     |
+| Engines               | <code>node</code> <code>&gt;=22.16.0</code>                                                                                                   |
+| Platform declarations | None                                                                                                                                          |
+
+| Classification | Dependency                            | Exact range              |
+| -------------- | ------------------------------------- | ------------------------ |
+| Runtime        | <code>@neottia/config</code>          | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/config-registry</code> | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/pi-adapter</code>      | <code>workspace:*</code> |
+| Runtime        | <code>@neottia/searchable-core</code> | <code>workspace:*</code> |
+| Runtime        | <code>typebox</code>                  | <code>^1.3.34</code>     |
+| Development    | <code>@neottia/testkit</code>         | <code>workspace:*</code> |
+| Development    | <code>@templ-project/tsconfig</code>  | <code>^0.4.2</code>      |
+| Development    | <code>@types/node</code>              | <code>^26.6.4</code>     |
+| Development    | <code>typescript</code>               | <code>^5.9.3</code>      |
+| Development    | <code>vitest</code>                   | <code>^5.0.3</code>      |
+
+### <code>@neottia/release</code>
+
+| Declaration           | Exact value                                                                                                                   |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Manifest              | [<code>packages/release/package.json</code>](https://github.com/dragoscirjan/neottia/blob/main/packages/release/package.json) |
+| Version               | <code>0.2.1</code>                                                                                                            |
+| Private field         | <code>Not declared</code>                                                                                                     |
+| Engines               | None                                                                                                                          |
+| Platform declarations | None                                                                                                                          |
+
+| Classification | Dependency                                 | Exact range                  |
+| -------------- | ------------------------------------------ | ---------------------------- |
+| Runtime        | <code>@neottia/claude-code-adapter</code>  | <code>workspace:0.3.0</code> |
+| Runtime        | <code>@neottia/cli</code>                  | <code>workspace:0.8.0</code> |
+| Runtime        | <code>@neottia/config</code>               | <code>workspace:0.2.0</code> |
+| Runtime        | <code>@neottia/config-registry</code>      | <code>workspace:0.4.0</code> |
+| Runtime        | <code>@neottia/core</code>                 | <code>workspace:0.1.0</code> |
+| Runtime        | <code>@neottia/design-docs</code>          | <code>workspace:0.2.1</code> |
+| Runtime        | <code>@neottia/design-docs-mcp</code>      | <code>workspace:0.2.3</code> |
+| Runtime        | <code>@neottia/distribution</code>         | <code>workspace:0.2.1</code> |
+| Runtime        | <code>@neottia/harness-adapter</code>      | <code>workspace:0.3.0</code> |
+| Runtime        | <code>@neottia/issues</code>               | <code>workspace:0.2.1</code> |
+| Runtime        | <code>@neottia/issues-design-docs</code>   | <code>workspace:0.2.1</code> |
+| Runtime        | <code>@neottia/issues-mcp</code>           | <code>workspace:0.2.3</code> |
+| Runtime        | <code>@neottia/memory-core</code>          | <code>workspace:0.3.2</code> |
+| Runtime        | <code>@neottia/memory-mcp</code>           | <code>workspace:0.3.4</code> |
+| Runtime        | <code>@neottia/opencode-adapter</code>     | <code>workspace:0.2.1</code> |
+| Runtime        | <code>@neottia/opencode-design-docs</code> | <code>workspace:0.2.3</code> |
+| Runtime        | <code>@neottia/opencode-issues</code>      | <code>workspace:0.2.4</code> |
+| Runtime        | <code>@neottia/opencode-memory</code>      | <code>workspace:0.2.4</code> |
+| Runtime        | <code>@neottia/opencode-searchable</code>  | <code>workspace:0.2.9</code> |
+| Runtime        | <code>@neottia/pi-adapter</code>           | <code>workspace:0.2.1</code> |
+| Runtime        | <code>@neottia/pi-design-docs</code>       | <code>workspace:0.2.4</code> |
+| Runtime        | <code>@neottia/pi-issues</code>            | <code>workspace:0.2.4</code> |
+| Runtime        | <code>@neottia/pi-memory</code>            | <code>workspace:0.2.5</code> |
+| Runtime        | <code>@neottia/pi-searchable</code>        | <code>workspace:0.2.9</code> |
+| Runtime        | <code>@neottia/repository-store</code>     | <code>workspace:0.3.4</code> |
+| Runtime        | <code>@neottia/sdlc</code>                 | <code>workspace:0.5.1</code> |
+| Runtime        | <code>@neottia/searchable-core</code>      | <code>workspace:0.2.6</code> |
+| Runtime        | <code>@neottia/searchable-mcp</code>       | <code>workspace:0.2.8</code> |
+
+### <code>@neottia/repository-store</code>
+
+| Declaration           | Exact value                                                                                                                                     |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Manifest              | [<code>packages/repository-store/package.json</code>](https://github.com/dragoscirjan/neottia/blob/main/packages/repository-store/package.json) |
+| Version               | <code>0.3.4</code>                                                                                                                              |
+| Private field         | <code>Not declared</code>                                                                                                                       |
+| Engines               | <code>node</code> <code>&gt;=22.16.0</code>                                                                                                     |
+| Platform declarations | None                                                                                                                                            |
+
+| Classification | Dependency                           | Exact range          |
+| -------------- | ------------------------------------ | -------------------- |
+| Runtime        | <code>node-gyp</code>                | <code>^13.0.2</code> |
+| Optional       | <code>sigstore</code>                | <code>^4.1.1</code>  |
+| Development    | <code>@templ-project/tsconfig</code> | <code>^0.4.2</code>  |
+| Development    | <code>@types/node</code>             | <code>^26.6.4</code> |
+| Development    | <code>typescript</code>              | <code>^5.9.3</code>  |
+| Development    | <code>vitest</code>                  | <code>^5.0.3</code>  |
+
+### <code>@neottia/sdlc</code>
+
+| Declaration           | Exact value                                                                                                             |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Manifest              | [<code>packages/sdlc/package.json</code>](https://github.com/dragoscirjan/neottia/blob/main/packages/sdlc/package.json) |
+| Version               | <code>0.5.1</code>                                                                                                      |
+| Private field         | <code>Not declared</code>                                                                                               |
+| Engines               | <code>node</code> <code>&gt;=22.16.0</code>                                                                             |
+| Platform declarations | None                                                                                                                    |
+
+| Classification | Dependency                            | Exact range              |
+| -------------- | ------------------------------------- | ------------------------ |
+| Runtime        | <code>@neottia/config</code>          | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/design-docs</code>     | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/distribution</code>    | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/harness-adapter</code> | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/issues</code>          | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/memory-core</code>     | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/searchable-core</code> | <code>workspace:^</code> |
+| Runtime        | <code>capitalize</code>               | <code>1.0.0</code>       |
+| Runtime        | <code>esrever</code>                  | <code>0.2.0</code>       |
+| Runtime        | <code>iconv-lite</code>               | <code>0.6.3</code>       |
+| Runtime        | <code>is-plain-object</code>          | <code>2.0.4</code>       |
+| Runtime        | <code>isobject</code>                 | <code>3.0.1</code>       |
+| Runtime        | <code>levenshtein</code>              | <code>1.0.5</code>       |
+| Runtime        | <code>locutus</code>                  | <code>3.0.36</code>      |
+| Runtime        | <code>luxon</code>                    | <code>1.28.1</code>      |
+| Runtime        | <code>pad</code>                      | <code>2.3.0</code>       |
+| Runtime        | <code>regex-parser</code>             | <code>2.3.1</code>       |
+| Runtime        | <code>runes</code>                    | <code>0.4.3</code>       |
+| Runtime        | <code>snake-case</code>               | <code>2.1.0</code>       |
+| Runtime        | <code>source-map</code>               | <code>0.6.1</code>       |
+| Runtime        | <code>twig-lexer</code>               | <code>0.9.2</code>       |
+| Runtime        | <code>zod</code>                      | <code>^4.6.5</code>      |
+| Development    | <code>@templ-project/tsconfig</code>  | <code>^0.4.2</code>      |
+| Development    | <code>@types/node</code>              | <code>^26.6.4</code>     |
+| Development    | <code>typescript</code>               | <code>^5.9.3</code>      |
+| Development    | <code>vitest</code>                   | <code>^5.0.3</code>      |
+
+### <code>@neottia/searchable-core</code>
+
+| Declaration           | Exact value                                                                                                                                   |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Manifest              | [<code>packages/searchable-core/package.json</code>](https://github.com/dragoscirjan/neottia/blob/main/packages/searchable-core/package.json) |
+| Version               | <code>0.2.6</code>                                                                                                                            |
+| Private field         | <code>Not declared</code>                                                                                                                     |
+| Engines               | <code>node</code> <code>&gt;=22.16.0</code>                                                                                                   |
+| Platform declarations | None                                                                                                                                          |
+
+| Classification | Dependency                             | Exact range              |
+| -------------- | -------------------------------------- | ------------------------ |
+| Runtime        | <code>@mozilla/readability</code>      | <code>^0.6.0</code>      |
+| Runtime        | <code>@neottia/config</code>           | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/repository-store</code> | <code>workspace:*</code> |
+| Runtime        | <code>jsdom</code>                     | <code>^30.1.1</code>     |
+| Runtime        | <code>turndown</code>                  | <code>^7.2.4</code>      |
+| Runtime        | <code>yaml</code>                      | <code>^2.9.1</code>      |
+| Runtime        | <code>zod</code>                       | <code>^4.6.5</code>      |
+| Development    | <code>@templ-project/tsconfig</code>   | <code>^0.4.2</code>      |
+| Development    | <code>@types/jsdom</code>              | <code>^30.0.0</code>     |
+| Development    | <code>@types/node</code>               | <code>^26.6.4</code>     |
+| Development    | <code>@types/turndown</code>           | <code>^5.0.6</code>      |
+| Development    | <code>typescript</code>                | <code>^5.9.3</code>      |
+| Development    | <code>vitest</code>                    | <code>^5.0.3</code>      |
+
+### <code>@neottia/searchable-mcp</code>
+
+| Declaration           | Exact value                                                                                                                                 |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Manifest              | [<code>packages/searchable-mcp/package.json</code>](https://github.com/dragoscirjan/neottia/blob/main/packages/searchable-mcp/package.json) |
+| Version               | <code>0.2.8</code>                                                                                                                          |
+| Private field         | <code>Not declared</code>                                                                                                                   |
+| Engines               | <code>node</code> <code>&gt;=22.16.0</code>                                                                                                 |
+| Platform declarations | None                                                                                                                                        |
+
+| Classification | Dependency                             | Exact range              |
+| -------------- | -------------------------------------- | ------------------------ |
+| Runtime        | <code>@modelcontextprotocol/sdk</code> | <code>^1.31.0</code>     |
+| Runtime        | <code>@neottia/config</code>           | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/config-registry</code>  | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/searchable-core</code>  | <code>workspace:*</code> |
+| Development    | <code>@neottia/testkit</code>          | <code>workspace:*</code> |
+| Development    | <code>@templ-project/tsconfig</code>   | <code>^0.4.2</code>      |
+| Development    | <code>@types/node</code>               | <code>^26.6.4</code>     |
+| Development    | <code>typescript</code>                | <code>^5.9.3</code>      |
+| Development    | <code>vitest</code>                    | <code>^5.0.3</code>      |
+
+### <code>@neottia/testkit</code>
+
+| Declaration           | Exact value                                                                                                                   |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Manifest              | [<code>packages/testkit/package.json</code>](https://github.com/dragoscirjan/neottia/blob/main/packages/testkit/package.json) |
+| Version               | <code>0.1.0</code>                                                                                                            |
+| Private field         | <code>true</code>                                                                                                             |
+| Engines               | None                                                                                                                          |
+| Platform declarations | None                                                                                                                          |
+
+| Classification | Dependency                            | Exact range              |
+| -------------- | ------------------------------------- | ------------------------ |
+| Runtime        | <code>@neottia/config</code>          | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/config-registry</code> | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/design-docs</code>     | <code>workspace:*</code> |
+| Runtime        | <code>@neottia/harness-adapter</code> | <code>workspace:^</code> |
+| Runtime        | <code>@neottia/issues</code>          | <code>workspace:*</code> |
+| Runtime        | <code>@neottia/memory-core</code>     | <code>workspace:*</code> |
+| Development    | <code>@templ-project/tsconfig</code>  | <code>^0.4.2</code>      |
+| Development    | <code>@types/node</code>              | <code>^26.6.4</code>     |
+| Development    | <code>typescript</code>               | <code>^5.9.3</code>      |
+| Development    | <code>vitest</code>                   | <code>^5.0.3</code>      |

@@ -32,9 +32,14 @@ function workspaceManifests() {
     .sort();
 }
 
-/** Keeps generated Markdown table cells safe when a version range contains a pipe. */
+/** Renders exact values as HTML code without letting pipes split Markdown table cells. */
 function markdownCode(value) {
-  return `\`${String(value).replaceAll('|', '&#124;')}\``;
+  const escaped = String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('|', '&#124;');
+  return `<code>${escaped}</code>`;
 }
 
 /** Formats all direct dependency declarations as narrow, readable table rows. */
@@ -119,7 +124,7 @@ function renderReference() {
         ...(manifest.cpu ? { cpu: manifest.cpu.join(', ') } : {}),
       });
       return [
-        `#### ${markdownCode(manifest.name)}`,
+        `### ${markdownCode(manifest.name)}`,
         '',
         '| Declaration | Exact value |',
         '| --- | --- |',
@@ -135,11 +140,6 @@ function renderReference() {
         '',
       ];
     }),
-    '',
-    '## Freshness contract',
-    '',
-    'Run `mise run docs:dependencies:generate` after a manifest changes. `mise run docs:check` compares this page with every current manifest and fails when the committed reference is stale.',
-    '',
   ];
   return lines.join('\n');
 }
