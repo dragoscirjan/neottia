@@ -215,6 +215,8 @@ jobs:
         working-directory: packages/repository-store
         run: node test/native-prebuild-smoke.mjs native-prebuilds/${{ steps.package.outputs.asset-name }} ${{ matrix.platform }}
       - name: Verify clean packed external prebuilt journey
+        # Production manifests trust only the protected main workflow identity.
+        if: github.ref == 'refs/heads/main'
         run: node packages/cli/test/packed-external-journey.mjs --mode prebuilt --artifacts packages/repository-store/native-prebuilds
       - name: Verify clean packed install and source fallback
         # Release manifests pin the protected main-workflow identity. Branch
@@ -258,7 +260,7 @@ jobs:
         with:
           release: '14.3'
           copyback: true
-          envs: 'ACTIONS_ID_TOKEN_REQUEST_TOKEN ACTIONS_ID_TOKEN_REQUEST_URL GITHUB_SHA'
+          envs: 'ACTIONS_ID_TOKEN_REQUEST_TOKEN ACTIONS_ID_TOKEN_REQUEST_URL GITHUB_REF GITHUB_SHA'
           mem: 4096
           prepare: |
             pkg install -y git gmake node22 npm-node22 python311
@@ -273,7 +275,10 @@ jobs:
             node packages/repository-store/scripts/package-native-prebuild.mjs --output packages/repository-store/native-prebuilds
             artifact="$(find packages/repository-store/native-prebuilds -name '*.node' -type f)"
             node packages/repository-store/test/native-prebuild-smoke.mjs "${artifact}" freebsd
-            node packages/cli/test/packed-external-journey.mjs --mode prebuilt --artifacts packages/repository-store/native-prebuilds
+            # Production manifests trust only the protected main workflow identity.
+            if [ "${GITHUB_REF}" = 'refs/heads/main' ]; then
+              node packages/cli/test/packed-external-journey.mjs --mode prebuilt --artifacts packages/repository-store/native-prebuilds
+            fi
       - name: Locate FreeBSD prebuild
         id: package
         shell: bash
