@@ -1,6 +1,19 @@
-# OpenCode extensions
+# Use Neottia with OpenCode
 
-Add the native plugin packages to the OpenCode configuration:
+The recommended path installs the lifecycle and operating-protocol skill, then configures exact native plugin entries from one project configuration. Run it from the target repository root, or pass `--project DIR`:
+
+```sh
+pnpm add --global @neottia/cli
+neottia init --harness opencode
+neottia apply
+neottia doctor
+```
+
+Restart OpenCode in the project, confirm that `/plan` is available, and run the [first successful workflow](/get-started/first-success).
+
+Neottia uses [`@neottia/opencode-adapter`](/harnesses/adapters) to plan plugin, MCP, command, skill, and agent changes without hard-coding OpenCode paths. OpenCode installs configured npm plugins through Bun during startup.
+
+For a capability-only installation without the compiled lifecycle, add individual native plugins to the OpenCode configuration:
 
 ```json
 {
@@ -14,9 +27,7 @@ Add the native plugin packages to the OpenCode configuration:
 }
 ```
 
-OpenCode installs configured npm plugins through Bun during startup. Enable the matching `modules.*` shards in `.neottia/config.yml`. Restart OpenCode and check for 9 `memory_*`, 17 `issue_*`, and 13 `document_*`, and 5 `web_*` tools. Run the calls in [First success](/get-started/first-success).
-
-Generated installers can use [`@neottia/opencode-adapter`](/harnesses/adapters) to plan plugin, MCP, command, skill, and agent changes without hard-coding OpenCode paths.
+Enable the matching `modules.*` shards in `.neottia/config.yml`. After restart, OpenCode exposes 9 `memory_*`, 17 `issue_*`, 13 `document_*`, and 5 `web_*` tools when all four capabilities are enabled.
 
 ## Memory
 

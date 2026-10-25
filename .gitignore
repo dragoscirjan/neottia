@@ -116,6 +116,12 @@ vite.config.ts.timestamp-*
 # vitepress cache directory
 **/.vitepress/cache
 
+# Archify receipts contain machine-local paths
+/docs/public/diagrams/*.delivery.json
+/docs/public/diagrams/*.browser-check.json
+/docs/public/diagrams/*.finalize.json
+/docs/public/diagrams/*.finalize-summary.json
+
 # vuepress build output
 .vuepress/dist
 

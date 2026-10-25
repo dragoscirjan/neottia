@@ -1,21 +1,43 @@
 # Requirements
 
-Check these restrictions before a filesystem quick start. Filesystem-backed Memory, Issues, and Design Docs fail closed outside the supported environment.
+Use this page to decide whether Neottia can safely operate in your environment.
 
-| Component                               | Runtime                                                                        | Other requirements                                                                            |
-| --------------------------------------- | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
-| `@neottia/core`                         | Node.js 20 or newer                                                            | Browser bundles are also published.                                                           |
-| Repository Store and filesystem domains | Node.js 22.16 or newer, or Bun 1.3.13 or newer for direct Repository Store use | Linux x64 or arm64; C++17 compiler, Python, Make, and Linux headers for native builds.        |
-| MCP servers                             | Node.js 22.16 or newer                                                         | The same filesystem requirements as their domain.                                             |
-| Pi and OpenCode extensions              | Host Node.js runtime                                                           | The same requirements as their domain package.                                                |
-| Claude Code distribution                | Claude Code with Node.js 22.20 or newer and `npx` on `PATH`                    | Project MCP approval and the same filesystem requirements as each enabled domain package.     |
-| PostgreSQL Memory                       | Node.js 22.16 or newer                                                         | PostgreSQL credentials and an explicit organization, project, and scope ownership model.      |
-| Searchable                              | Node.js 22.16 or newer                                                         | Repository Store filesystem support; public network access; Ollama only when using `web_ask`. |
+## Recommended user setup
 
-Filesystem domains require a certified local filesystem: ext4, XFS, Btrfs, tmpfs, or overlay on Linux x64 or arm64; APFS on macOS x64 or arm64; NTFS on Windows Server x64; or UFS2 on FreeBSD 14.x x64 with Node.js. The canonical root and control directory must support the platform's documented publication, durability, identity, and same-volume hard-link guarantees. Network, shared, removable, and uncertified filesystems or runtime tuples fail closed for leased operations. See [Repository Store](/repository-store) for the exact matrix and diagnostics.
+| Component                   | Requirement                                                                                                   |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Neottia CLI and MCP servers | Node.js 22.20 or newer and pnpm 10 or newer                                                                   |
+| Pi or OpenCode              | A supported host installation that runs in the target project directory                                       |
+| Claude Code                 | Claude Code, Node.js 22.20 or newer, `npx` on `PATH`, and interactive approval of project `.mcp.json` servers |
+| Source control              | Git for the default lifecycle configuration                                                                   |
 
-All four capability shards default to `enabled: false`. Enable only the capabilities you use.
+`@neottia/core` supports Node.js 20 or newer, but the current CLI and distributed runtime packages require the newer user setup above. See the [dependency reference](/reference/dependencies) for exact package-manager, engine, and direct dependency declarations from every module manifest.
 
-Pi can ask before rebuilding a stale cache. OpenCode, Claude Code MCP, and generic MCP are non-interactive, so `prompt` becomes `rebuild`. An explicit `fail` remains `fail`.
+## Certified Repository Store tuples
 
-If a native addon fails to install, confirm the Node version, architecture, compiler, Python, Make, headers, filesystem, and kernel support. Do not treat `UnsupportedRuntimeError` as canonical-data corruption. See [Repository Store diagnostics](/repository-store).
+Filesystem-backed Memory, Issues, Design Docs, and Searchable use Repository Store. Leased operations fail closed outside these certified tuples:
+
+| Operating system         | Architecture | Runtime                       | Certified local filesystem                |
+| ------------------------ | ------------ | ----------------------------- | ----------------------------------------- |
+| Linux                    | x64, arm64   | Node.js 22.16+ or Bun 1.3.13+ | ext4, XFS, Btrfs, tmpfs, or local overlay |
+| macOS                    | x64, arm64   | Node.js 22.16+ or Bun 1.3.13+ | APFS                                      |
+| Windows Server 2022/2025 | x64          | Node.js 22.16+ or Bun 1.3.13+ | local NTFS                                |
+| FreeBSD 14.x             | x64          | Node.js 22.16+                | local writable UFS2                       |
+
+Windows arm64, FreeBSD arm64, and FreeBSD Bun are not supported. Network, shared, removable, and uncertified filesystems are not supported for leased operations.
+
+Run `neottia doctor` in the actual project directory. Filesystem names alone are not enough: Doctor probes locality, write access, no-replace publication, hard links, stable identity, and durability barriers.
+
+## Native binary installation
+
+Certified tuples use verified native prebuilds when available. Installation verifies the workflow identity, source commit, tuple, size, SHA-256 digest, Sigstore signature, and GitHub attestation before use. The digest is checked again before the addon loads.
+
+An availability failure may fall back to a source build. A source build needs Python, Make, a C++17 compiler, and platform headers. An integrity failure does not fall back; reinstall from a trusted package source and investigate the mismatch.
+
+## Optional services
+
+- PostgreSQL Memory needs PostgreSQL credentials and explicit organization, project, topic, and scope ownership.
+- Searchable needs public network access for web retrieval. `web_ask` additionally needs the configured local Ollama endpoint.
+- Remote issue, document, or source-control providers need the connection and credential environment names described in [provider configuration](/sdlc/providers).
+
+All capability shards default to disabled unless `neottia init` enables them. Enable only what the repository uses.

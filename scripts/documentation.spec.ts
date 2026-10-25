@@ -229,6 +229,50 @@ describe('documentation contracts', () => {
     expect(diagnostics).toEqual([]);
   });
 
+  it('keeps generated learning diagrams pinned, self-contained, and base-aware', () => {
+    const revision = 'd30ecaab86cf2d02a254736221221252c445fdfc';
+    const lock = JSON.parse(readFileSync(join(docs, 'diagrams/archify.lock.json'), 'utf8')) as {
+      version?: unknown;
+      revision?: unknown;
+      evidence_revision?: unknown;
+    };
+    expect(lock).toMatchObject({
+      version: '3.2.0',
+      revision: '208acba8d412335185b2056fedf54b3405df43fb',
+      evidence_revision: revision,
+    });
+    const diagrams = [
+      ['architecture', 'neottia-system.architecture.json', 'neottia-system.html', 'learn/index.md'],
+      ['lifecycle', 'neottia-lifecycle.lifecycle.json', 'neottia-lifecycle.html', 'learn/lifecycle.md'],
+      ['dataflow', 'neottia-runtime.dataflow.json', 'neottia-runtime.html', 'learn/runtime-data.md'],
+    ] as const;
+    for (const [type, sourceName, artifactName, pageName] of diagrams) {
+      const source = JSON.parse(readFileSync(join(docs, 'diagrams/sources', sourceName), 'utf8')) as {
+        diagram_type?: unknown;
+        meta?: { output?: unknown; repository?: { revision?: unknown } };
+      };
+      expect(source.diagram_type).toBe(type);
+      expect(source.meta?.repository?.revision).toBe(revision);
+      expect(source.meta?.output).toBe(`docs/public/diagrams/${artifactName}`);
+
+      const artifact = readFileSync(join(docs, 'public/diagrams', artifactName), 'utf8');
+      expect(artifact).toContain('Archify');
+      expect(artifact).not.toMatch(/<script\b[^>]*\bsrc=/iu);
+      expect(artifact).not.toMatch(/<link\b[^>]*\bhref=/iu);
+      expect(artifact).not.toMatch(/\/home\/[^/\s"']+/u);
+
+      const page = readFileSync(join(docs, pageName), 'utf8');
+      expect(page).toContain(`withBase('/diagrams/${artifactName}')`);
+    }
+    expect(
+      readdirSync(join(docs, 'public/diagrams')).filter((name) =>
+        /\.(?:browser-check|delivery|finalize|finalize-summary)\.json$/u.test(name),
+      ),
+    ).toEqual([]);
+    expect(existsSync(join(docs, 'public/diagrams/ARCHIFY-LICENSE.txt'))).toBe(true);
+    expect(existsSync(join(docs, 'public/diagrams/ARCHIFY-THIRD-PARTY-NOTICES.md'))).toBe(true);
+  });
+
   it('parses JSON and YAML examples and validates configuration shards', () => {
     const diagnostics: string[] = [];
     for (const file of [

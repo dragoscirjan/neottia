@@ -93,6 +93,56 @@ Neottia publishes user documentation from `docs/` with VitePress.
 - Load `asd-ste100-technical` while drafting documentation, then load `unslop` for the final writing pass.
 - Use sentence-case headings, direct language, tested commands, and links to canonical reference pages.
 
+### Generate the dependency reference
+
+After a root or workspace `package.json` changes, run:
+
+```bash
+mise run docs:dependencies:generate
+mise run docs:check
+```
+
+Commit `docs/reference/dependencies.md` with the manifest change. The documentation check fails if the committed reference does not match the current manifests.
+
+### Regenerate the diagrams
+
+Create clean Archify and Neottia evidence checkouts outside the working tree:
+
+```bash
+git clone https://github.com/tt-a1i/archify.git ../archify
+git -C ../archify checkout 208acba8d412335185b2056fedf54b3405df43fb
+git worktree add ../neottia-diagram-evidence \
+  d30ecaab86cf2d02a254736221221252c445fdfc
+```
+
+Run these commands from the current Neottia repository root:
+
+```bash
+export ARCHIFY_UPDATE_CHECK_DISABLED=1
+
+node ../archify/archify/bin/archify.mjs finalize architecture \
+  docs/diagrams/sources/neottia-system.architecture.json \
+  docs/public/diagrams/neottia-system.html \
+  --repo-root ../neottia-diagram-evidence \
+  --quality showcase
+
+node ../archify/archify/bin/archify.mjs finalize lifecycle \
+  docs/diagrams/sources/neottia-lifecycle.lifecycle.json \
+  docs/public/diagrams/neottia-lifecycle.html \
+  --repo-root ../neottia-diagram-evidence \
+  --quality showcase
+
+node ../archify/archify/bin/archify.mjs finalize dataflow \
+  docs/diagrams/sources/neottia-runtime.dataflow.json \
+  docs/public/diagrams/neottia-runtime.html \
+  --repo-root ../neottia-diagram-evidence \
+  --quality showcase
+```
+
+Run all Archify gates, then review the generated routes visually. The system and runtime diagrams can contain valid routed detours that reduce readability.
+
+Archify writes local delivery, finalize, summary, and browser-check JSON receipts during validation. Remove these receipts after validation. They contain machine-local absolute paths and must not be committed.
+
 ## Versions and releases
 
 - Manage module versions only through Changesets with `mise run changeset`. Never edit package versions by hand.

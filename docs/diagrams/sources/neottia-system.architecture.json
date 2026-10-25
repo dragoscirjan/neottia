@@ -1,0 +1,371 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "How Neottia fits together",
+    "subtitle": "Configuration becomes portable lifecycle assets; runtime tools write canonical repository records through bounded storage primitives.",
+    "output": "docs/public/diagrams/neottia-system.html",
+    "animation": "trace",
+    "visual_preset": "signal-flow",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/dragoscirjan/neottia.git",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "d30ecaab86cf2d02a254736221221252c445fdfc"
+    },
+    "views": [
+      {
+        "id": "install",
+        "label": "Install path",
+        "focus": ["config", "cli", "compiler", "adapters", "host-assets"],
+        "note": "One project configuration compiles into harness-specific commands, skills, agents, and runtime activation."
+      },
+      {
+        "id": "runtime",
+        "label": "Runtime path",
+        "focus": ["harness", "runtime-packages", "capabilities", "repository-store", "canonical-files"],
+        "note": "Harness tools reach the same capability packages and canonical repository records."
+      },
+      {
+        "id": "recovery",
+        "label": "Diagnosis and recovery",
+        "focus": ["cli", "installer", "doctor", "repository-store", "sqlite-cache"],
+        "note": "Plans, receipts, doctor checks, and rebuildable indexes keep mutations reviewable and recoverable."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "config",
+      "type": "database",
+      "label": ".neottia/config.yml",
+      "sublabel": "harnesses + capabilities + roles",
+      "pos": [40, 120],
+      "size": [150, 68],
+      "sources": [
+        { "path": "packages/cli/src/index.ts", "line": 93, "end_line": 170, "label": "init writes project config" }
+      ]
+    },
+    {
+      "id": "cli",
+      "type": "backend",
+      "label": "Neottia CLI",
+      "sublabel": "init · apply · doctor · uninstall",
+      "pos": [240, 120],
+      "size": [150, 68],
+      "sources": [
+        { "path": "packages/cli/src/index.ts", "line": 93, "end_line": 230, "label": "init and apply" },
+        { "path": "packages/cli/src/index.ts", "line": 427, "end_line": 500, "label": "doctor" }
+      ]
+    },
+    {
+      "id": "compiler",
+      "type": "backend",
+      "label": "SDLC compiler",
+      "sublabel": "six commands + protocol + roles",
+      "pos": [440, 120],
+      "size": [160, 68],
+      "sources": [
+        { "path": "packages/sdlc/src/compiler.ts", "line": 460, "end_line": 610, "label": "compiler input and output" },
+        { "path": "packages/sdlc/src/lifecycle.ts", "line": 1, "end_line": 58, "label": "canonical lifecycle" }
+      ]
+    },
+    {
+      "id": "adapters",
+      "type": "messagebus",
+      "label": "Harness adapters",
+      "sublabel": "Pi · OpenCode · Claude Code",
+      "pos": [650, 120],
+      "size": [164, 68],
+      "sources": [
+        { "path": "extensions/pi-adapter/src/index.ts", "line": 68, "end_line": 110, "label": "Pi declaration" },
+        {
+          "path": "extensions/opencode-adapter/src/index.ts",
+          "line": 86,
+          "end_line": 128,
+          "label": "OpenCode declaration"
+        },
+        {
+          "path": "extensions/claude-code-adapter/src/index.ts",
+          "line": 68,
+          "end_line": 110,
+          "label": "Claude Code declaration"
+        }
+      ]
+    },
+    {
+      "id": "host-assets",
+      "type": "frontend",
+      "label": "Installed host assets",
+      "sublabel": "commands · skill · agents · config",
+      "pos": [860, 120],
+      "size": [170, 68],
+      "sources": [
+        { "path": "packages/sdlc/src/compiler.ts", "line": 522, "end_line": 610, "label": "projected assets" },
+        { "path": "packages/distribution/src/planner.ts", "line": 29, "end_line": 105, "label": "installation plan" }
+      ]
+    },
+    {
+      "id": "installer",
+      "type": "security",
+      "label": "Plan + receipt installer",
+      "sublabel": "conflicts · checksums · rollback",
+      "pos": [650, 300],
+      "size": [170, 68],
+      "sources": [
+        { "path": "packages/distribution/src/planner.ts", "line": 29, "end_line": 105, "label": "plan creation" },
+        { "path": "packages/distribution/src/transaction.ts", "line": 17, "end_line": 96, "label": "apply and recover" }
+      ]
+    },
+    {
+      "id": "doctor",
+      "type": "security",
+      "label": "Doctor",
+      "sublabel": "platform + install diagnostics",
+      "pos": [240, 300],
+      "size": [164, 68],
+      "sources": [
+        {
+          "path": "packages/distribution/src/doctor.ts",
+          "line": 10,
+          "end_line": 82,
+          "label": "installation diagnosis"
+        },
+        { "path": "packages/cli/src/index.ts", "line": 427, "end_line": 500, "label": "CLI report" }
+      ]
+    },
+    {
+      "id": "harness",
+      "type": "external",
+      "label": "AI coding harness",
+      "sublabel": "Pi · OpenCode · Claude Code",
+      "pos": [40, 540],
+      "size": [170, 68],
+      "sources": [
+        { "path": "packages/cli/src/index.ts", "line": 36, "end_line": 55, "label": "supported harness catalog" }
+      ]
+    },
+    {
+      "id": "runtime-packages",
+      "type": "messagebus",
+      "label": "Runtime integration",
+      "sublabel": "native package or stdio MCP",
+      "pos": [250, 540],
+      "size": [170, 68],
+      "sources": [
+        { "path": "extensions/pi-adapter/src/index.ts", "line": 96, "end_line": 112, "label": "Pi package activation" },
+        {
+          "path": "extensions/opencode-adapter/src/index.ts",
+          "line": 114,
+          "end_line": 130,
+          "label": "OpenCode activation"
+        },
+        {
+          "path": "extensions/claude-code-adapter/src/index.ts",
+          "line": 232,
+          "end_line": 291,
+          "label": "Claude MCP activation"
+        }
+      ]
+    },
+    {
+      "id": "capabilities",
+      "type": "backend",
+      "label": "Capability packages",
+      "sublabel": "Memory · Issues · Design Docs · Searchable",
+      "pos": [450, 540],
+      "size": [190, 68],
+      "sources": [
+        { "path": "README.md", "line": 12, "end_line": 25, "label": "capability modules" },
+        { "path": "packages/memory-mcp/src/server.ts", "line": 35, "end_line": 85, "label": "Memory MCP" },
+        { "path": "packages/issues-mcp/src/server.ts", "line": 24, "end_line": 70, "label": "Issues MCP" }
+      ]
+    },
+    {
+      "id": "repository-store",
+      "type": "security",
+      "label": "Repository Store",
+      "sublabel": "lease + transaction + recovery",
+      "pos": [650, 540],
+      "size": [170, 68],
+      "sources": [
+        { "path": "packages/repository-store/src/lease.ts", "line": 80, "end_line": 145, "label": "repository lease" },
+        {
+          "path": "packages/repository-store/src/transaction/apply.ts",
+          "line": 30,
+          "end_line": 100,
+          "label": "canonical batch"
+        }
+      ]
+    },
+    {
+      "id": "canonical-files",
+      "type": "database",
+      "label": "Canonical records",
+      "sublabel": ".neottia/* tracked with Git",
+      "pos": [870, 450],
+      "size": [170, 68],
+      "sources": [
+        {
+          "path": "packages/memory-core/src/backend/filesystem.ts",
+          "line": 200,
+          "end_line": 285,
+          "label": "Memory files"
+        },
+        { "path": "packages/issues/src/store.ts", "line": 735, "end_line": 780, "label": "Issue files" },
+        { "path": "packages/design-docs/src/store.ts", "line": 745, "end_line": 775, "label": "Design files" }
+      ]
+    },
+    {
+      "id": "sqlite-cache",
+      "type": "database",
+      "label": "Disposable indexes",
+      "sublabel": "SQLite caches can be rebuilt",
+      "pos": [870, 630],
+      "size": [170, 68],
+      "sources": [
+        {
+          "path": "packages/repository-store/src/sqlite/cache.ts",
+          "line": 350,
+          "end_line": 405,
+          "label": "SQLite cache adapter"
+        },
+        {
+          "path": "packages/searchable-core/src/stash.ts",
+          "line": 350,
+          "end_line": 380,
+          "label": "separate cache root"
+        }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Project installation",
+      "wraps": ["config", "cli", "compiler", "adapters", "host-assets", "installer", "doctor"],
+      "pad": 18
+    },
+    {
+      "kind": "region",
+      "label": "Harness runtime",
+      "wraps": ["harness", "runtime-packages", "capabilities"],
+      "pad": 18
+    },
+    {
+      "kind": "region",
+      "label": "Repository-owned state",
+      "wraps": ["repository-store", "canonical-files", "sqlite-cache"],
+      "pad": 18
+    }
+  ],
+  "connections": [
+    { "id": "config-to-cli", "from": "config", "to": "cli", "label": "resolved config", "variant": "emphasis" },
+    { "id": "cli-to-compiler", "from": "cli", "to": "compiler", "label": "compiler input", "variant": "emphasis" },
+    {
+      "id": "compiler-to-adapters",
+      "from": "compiler",
+      "to": "adapters",
+      "label": "portable assets",
+      "variant": "emphasis"
+    },
+    {
+      "id": "adapters-to-assets",
+      "from": "adapters",
+      "to": "host-assets",
+      "label": "host projection",
+      "variant": "emphasis"
+    },
+    {
+      "id": "assets-to-installer",
+      "from": "host-assets",
+      "to": "installer",
+      "label": "reviewable plan",
+      "variant": "security"
+    },
+    { "id": "doctor-to-cli", "from": "doctor", "to": "cli", "label": "diagnostics", "variant": "dashed" },
+    {
+      "id": "assets-to-harness",
+      "from": "host-assets",
+      "to": "harness",
+      "label": "commands + skill",
+      "variant": "emphasis"
+    },
+    {
+      "id": "assets-to-runtime",
+      "from": "host-assets",
+      "to": "runtime-packages",
+      "label": "activation config",
+      "variant": "default"
+    },
+    {
+      "id": "harness-to-runtime",
+      "from": "harness",
+      "to": "runtime-packages",
+      "label": "tool request",
+      "variant": "emphasis"
+    },
+    {
+      "id": "runtime-to-capabilities",
+      "from": "runtime-packages",
+      "to": "capabilities",
+      "label": "domain call",
+      "variant": "emphasis"
+    },
+    {
+      "id": "capabilities-to-store",
+      "from": "capabilities",
+      "to": "repository-store",
+      "label": "bounded mutation",
+      "variant": "security"
+    },
+    {
+      "id": "store-to-canonical",
+      "from": "repository-store",
+      "to": "canonical-files",
+      "label": "journaled files",
+      "variant": "emphasis"
+    },
+    {
+      "id": "store-to-cache",
+      "from": "repository-store",
+      "to": "sqlite-cache",
+      "label": "derived index",
+      "variant": "dashed"
+    },
+    {
+      "id": "doctor-to-store",
+      "from": "doctor",
+      "to": "repository-store",
+      "label": "platform probes",
+      "variant": "security"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "One lifecycle, three hosts",
+      "items": [
+        "The compiler keeps Plan, Build, Verify, Release, Continue, and Refresh semantics host-neutral.",
+        "Adapters change paths, metadata, package activation, and reload instructions for each harness."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Canonical versus disposable",
+      "items": [
+        "Canonical Memory, Issue, Design Doc, and Searchable records live under .neottia and belong in Git.",
+        "SQLite files are derived indexes. Delete or rebuild them without deleting canonical records."
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Mutation boundaries",
+      "items": [
+        "Installation uses reviewable plans, ownership receipts, conflict checks, and recovery.",
+        "Repository Store verifies platform capabilities before leased writes and fails closed on unsupported systems."
+      ]
+    }
+  ]
+}

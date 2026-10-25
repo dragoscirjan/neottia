@@ -1,32 +1,48 @@
-# Neottia
+---
+layout: home
 
-Neottia stores software delivery records in formats that people and AI tools can inspect. Use Memory for project facts and decisions, Issues for work tracking, Design Docs for reviewed technical records, and Searchable for bounded web research grounded in canonical repository files.
+hero:
+  name: Neottia
+  text: A shared delivery workflow for AI coding harnesses
+  tagline: Install one reviewable Plan → Build → Verify → Release lifecycle, then keep issues, design decisions, memory, and research in repository-owned formats.
+  actions:
+    - theme: brand
+      text: Start in five minutes
+      link: /get-started/
+    - theme: alt
+      text: See how it works
+      link: /learn/
 
-## Choose how to use Neottia
+features:
+  - title: One lifecycle, three hosts
+    details: Compile the same six commands for Pi, OpenCode, and Claude Code without putting host-specific paths in the workflow.
+  - title: Repository-owned evidence
+    details: Track Issues, Design Docs, Memory, and Searchable records as reviewable files. Rebuild disposable indexes when needed.
+  - title: Explicit authority boundaries
+    details: Plans, installations, updates, and release actions stop for review. Neottia does not turn workflow text into permission.
+---
 
-- Use a [supported harness distribution](/harnesses/) for Pi, OpenCode, or Claude Code.
-- Use a [generic MCP server](/mcp/) when your client can launch a stdio MCP process.
-- Use a [TypeScript library](/get-started/) when you are building an application or adapter.
+## What do you want to do?
 
-Read the [platform requirements](/get-started/requirements) before enabling a filesystem-backed capability.
+| Goal                                                          | Start here                                       |
+| ------------------------------------------------------------- | ------------------------------------------------ |
+| Add the lifecycle to an existing repository                   | [Install and run your first plan](/get-started/) |
+| Understand the compiler, adapters, and storage model          | [Learn how Neottia fits together](/learn/)       |
+| Use Memory, Issues, Design Docs, or Searchable                | [Choose a capability](/guides/)                  |
+| Diagnose installation or platform problems                    | [Operate Neottia](/operate/)                     |
+| Configure providers, roles, templates, or installation policy | [Configuration reference](/configuration)        |
 
-## Availability
+## The shortest useful path
 
-| Capability  | Library | Native Pi | Native OpenCode | Generic MCP |
-| ----------- | ------- | --------- | --------------- | ----------- |
-| Memory      | Yes     | Yes       | Yes             | Yes         |
-| Issues      | Yes     | Yes       | Yes             | Yes         |
-| Design Docs | Yes     | Yes       | Yes             | Yes         |
-| Searchable  | Yes     | Yes       | Yes             | Yes         |
+Run these commands from the target repository root:
 
-## Modules
+```sh
+pnpm add --global @neottia/cli
+neottia init --harness pi
+neottia apply
+neottia doctor
+```
 
-The [module catalog](/reference/modules) accounts for all 21 published and private workspaces and defines each status label.
+Replace `pi` with `opencode` or `claude-code`. Then restart the host and run `/plan` for one small repository change. Claude Code users must also open `/mcp` and approve the project servers that Neottia added.
 
-## Start a project
-
-1. Check [runtime and filesystem requirements](/get-started/requirements).
-2. Select a [delivery method](/get-started/).
-3. Create the [shared configuration file](/get-started/configuration).
-4. Complete a [first successful operation](/get-started/first-success).
-5. Add the recommended [Git tracking and ignore rules](/guides/repository-files).
+Neottia supports certified local filesystems and runtime tuples only. Check the [requirements](/get-started/requirements) before enabling filesystem-backed capabilities.
