@@ -1,5 +1,14 @@
 # @neottia/cli
 
+## 0.7.2
+
+### Patch Changes
+
+- [#244](https://github.com/dragoscirjan/neottia/pull/244) [`3fa7bf5`](https://github.com/dragoscirjan/neottia/commit/3fa7bf57f687c9939dd1116673aced098755f73d) Thanks [@dragoscirjan](https://github.com/dragoscirjan)! - Add platform-aware Repository Store diagnostics and clean packed-package acceptance for every certified operating system tuple.
+- Updated dependencies [[`3fa7bf5`](https://github.com/dragoscirjan/neottia/commit/3fa7bf57f687c9939dd1116673aced098755f73d)]:
+  - @neottia/repository-store@0.3.4
+  - @neottia/searchable-core@0.2.6
+
 ## 0.7.1
 
 ### Patch Changes

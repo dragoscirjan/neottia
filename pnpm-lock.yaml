@@ -855,7 +855,7 @@ importers:
         specifier: workspace:0.2.0
         version: link:../../extensions/claude-code-adapter
       '@neottia/cli':
-        specifier: workspace:0.7.1
+        specifier: workspace:0.7.2
         version: link:../cli
       '@neottia/config':
         specifier: workspace:0.2.0
@@ -906,7 +906,7 @@ importers:
         specifier: workspace:0.2.4
         version: link:../../extensions/opencode-memory
       '@neottia/opencode-searchable':
-        specifier: workspace:0.2.7
+        specifier: workspace:0.2.8
         version: link:../../extensions/opencode-searchable
       '@neottia/pi-adapter':
         specifier: workspace:0.2.0
@@ -921,19 +921,19 @@ importers:
         specifier: workspace:0.2.4
         version: link:../../extensions/pi-memory
       '@neottia/pi-searchable':
-        specifier: workspace:0.2.7
+        specifier: workspace:0.2.8
         version: link:../../extensions/pi-searchable
       '@neottia/repository-store':
-        specifier: workspace:0.3.3
+        specifier: workspace:0.3.4
         version: link:../repository-store
       '@neottia/sdlc':
         specifier: workspace:0.5.0
         version: link:../sdlc
       '@neottia/searchable-core':
-        specifier: workspace:0.2.5
+        specifier: workspace:0.2.6
         version: link:../searchable-core
       '@neottia/searchable-mcp':
-        specifier: workspace:0.2.7
+        specifier: workspace:0.2.8
         version: link:../searchable-mcp
 
   packages/repository-store:
