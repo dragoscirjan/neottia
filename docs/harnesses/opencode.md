@@ -1,6 +1,6 @@
 # Use Neottia with OpenCode
 
-The recommended path installs the lifecycle, operating-protocol skill, and native runtime plugins from one project configuration:
+The recommended path installs the lifecycle and operating-protocol skill, then configures exact native plugin entries from one project configuration. Run it from the target repository root, or pass `--project DIR`:
 
 ```sh
 pnpm add --global @neottia/cli

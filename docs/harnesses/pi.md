@@ -1,6 +1,6 @@
 # Use Neottia with Pi
 
-The recommended path installs the lifecycle, operating-protocol skill, and runtime packages from one project configuration:
+The recommended path installs the lifecycle and operating-protocol skill, then configures exact runtime package entries from one project configuration. Run it from the target repository root, or pass `--project DIR`:
 
 ```sh
 pnpm add --global @neottia/cli

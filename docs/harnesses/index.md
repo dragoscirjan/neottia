@@ -8,7 +8,7 @@ Neottia compiles the same lifecycle policy for three supported hosts. Choose the
 | [OpenCode](/harnesses/opencode)       | Project commands, skill, and supported agent assets | Native OpenCode plugin packages                   | Restart OpenCode                        |
 | [Claude Code](/harnesses/claude-code) | Project commands, skills, and agent files           | Exact generic MCP packages in project `.mcp.json` | Open `/mcp` and approve project servers |
 
-For all three hosts, the recommended installation is:
+For all three hosts, run the recommended installation from the target repository root, or pass `--project DIR`:
 
 ```sh
 pnpm add --global @neottia/cli

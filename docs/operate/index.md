@@ -8,7 +8,7 @@ Use these tasks after installation or when a project changes runtime, filesystem
 neottia doctor
 ```
 
-Doctor validates configuration, installed harness assets, receipts, the native Repository Store backend, and the actual project filesystem. It changes nothing. Read [Doctor and platform diagnostics](/operate/doctor) for the report fields and CI form.
+Doctor validates configuration, installed harness assets, receipts, the native Repository Store backend, and the actual project filesystem. It leaves project-owned files unchanged but creates and removes a private probe area below the selected project. Read [Doctor and platform diagnostics](/operate/doctor) for the report fields and CI form.
 
 ## Resolve a problem
 

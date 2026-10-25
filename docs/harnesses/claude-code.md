@@ -27,7 +27,7 @@ The default Issues and Design Docs modules use exact `@neottia/issues-mcp` and `
 
 ## Installation
 
-Install Node.js 22.20 or newer, pnpm 10 or newer, and ensure `npx` is on `PATH`. Then run:
+Install Node.js 22.20 or newer, pnpm 10 or newer, and ensure `npx` is on `PATH`. Run the following commands from the target repository root, or pass `--project DIR`:
 
 ```sh
 pnpm add --global @neottia/cli

@@ -50,7 +50,7 @@ neottia init --harness pi --enable memory --enable searchable
 neottia apply
 ```
 
-`apply` compiles six commands and the shared operating-protocol skill for every configured harness. It also installs the exact runtime packages required by enabled modules.
+`apply` compiles six commands and the shared operating-protocol skill for every configured harness. It also writes host configuration entries that reference the exact runtime packages required by enabled modules. Each host fetches those packages during its own startup, trust, or launch step.
 
 Neottia does not overwrite an unowned or modified file. If `apply` reports a conflict, inspect the named path and follow the [conflict procedure](/operate/troubleshooting#apply-reports-a-conflict).
 

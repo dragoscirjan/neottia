@@ -33,7 +33,7 @@ The filesystem probe runs in a private temporary area below the selected project
 neottia doctor --json
 ```
 
-JSON output is deterministic and omits machine-specific paths. Use it in CI to compare status and diagnostic codes. Do not parse the human prose.
+The default project JSON report, without `--manifest`, uses deterministic formatting and omits machine-specific paths. Use it in CI to compare status and diagnostic codes. Do not parse the human prose.
 
 ## Interpret the result
 

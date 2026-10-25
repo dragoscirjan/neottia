@@ -53,7 +53,7 @@ node ../archify/archify/bin/archify.mjs finalize dataflow \
 
 Review the generated routes visually after all automated gates pass. The system and runtime diagrams can contain routed detours that are valid but still benefit from a human readability check.
 
-Archify also writes a local `*.delivery.json` receipt beside each artifact. Remove those receipts after validation. They contain machine-local absolute paths and are intentionally not committed.
+Archify also writes local delivery, finalize, summary, and browser-check JSON receipts during validation. Remove those receipts after validation. They contain machine-local absolute paths and are intentionally ignored and not committed.
 
 ## License material
 

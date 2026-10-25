@@ -46,7 +46,7 @@
       "step": "01",
       "sources": [
         { "path": "packages/sdlc/templates/plan.md.twig", "line": 1, "end_line": 7, "label": "Plan command" },
-        { "path": "packages/sdlc/templates/protocol.md", "line": 40, "end_line": 55, "label": "Plan and approval" }
+        { "path": "packages/sdlc/templates/protocol.md", "line": 38, "end_line": 49, "label": "Plan and approval" }
       ]
     },
     {
@@ -58,7 +58,7 @@
       "step": "02",
       "sources": [
         { "path": "packages/sdlc/templates/build.md.twig", "line": 1, "end_line": 7, "label": "Build command" },
-        { "path": "packages/sdlc/templates/protocol.md", "line": 57, "end_line": 69, "label": "Build procedure" }
+        { "path": "packages/sdlc/templates/protocol.md", "line": 51, "end_line": 62, "label": "Build procedure" }
       ]
     },
     {
@@ -70,7 +70,7 @@
       "step": "03",
       "sources": [
         { "path": "packages/sdlc/templates/verify.md.twig", "line": 1, "end_line": 7, "label": "Verify command" },
-        { "path": "packages/sdlc/templates/protocol.md", "line": 71, "end_line": 79, "label": "Verify procedure" }
+        { "path": "packages/sdlc/templates/protocol.md", "line": 64, "end_line": 74, "label": "Verify procedure" }
       ]
     },
     {
@@ -82,7 +82,7 @@
       "step": "04",
       "sources": [
         { "path": "packages/sdlc/templates/release.md.twig", "line": 1, "end_line": 7, "label": "Release command" },
-        { "path": "packages/sdlc/templates/protocol.md", "line": 81, "end_line": 92, "label": "Release procedure" }
+        { "path": "packages/sdlc/templates/protocol.md", "line": 76, "end_line": 86, "label": "Release procedure" }
       ]
     },
     {
@@ -92,7 +92,7 @@
       "sublabel": "confirmed defect",
       "tag": "returns to Build",
       "sources": [
-        { "path": "packages/sdlc/templates/protocol.md", "line": 71, "end_line": 79, "label": "defect routing" }
+        { "path": "packages/sdlc/templates/protocol.md", "line": 68, "end_line": 70, "label": "defect routing" }
       ]
     },
     {
@@ -104,8 +104,8 @@
       "sources": [
         {
           "path": "packages/sdlc/templates/protocol.md",
-          "line": 81,
-          "end_line": 92,
+          "line": 80,
+          "end_line": 84,
           "label": "remote authority boundary"
         }
       ]
@@ -117,7 +117,7 @@
       "sublabel": "result + follow-up",
       "tag": "recorded outcome",
       "sources": [
-        { "path": "packages/sdlc/templates/protocol.md", "line": 88, "end_line": 92, "label": "release checkpoint" }
+        { "path": "packages/sdlc/templates/protocol.md", "line": 84, "end_line": 86, "label": "release checkpoint" }
       ]
     }
   ],

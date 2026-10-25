@@ -264,7 +264,11 @@ describe('documentation contracts', () => {
       const page = readFileSync(join(docs, pageName), 'utf8');
       expect(page).toContain(`withBase('/diagrams/${artifactName}')`);
     }
-    expect(readdirSync(join(docs, 'public/diagrams')).filter((name) => name.endsWith('.delivery.json'))).toEqual([]);
+    expect(
+      readdirSync(join(docs, 'public/diagrams')).filter((name) =>
+        /\.(?:browser-check|delivery|finalize|finalize-summary)\.json$/u.test(name),
+      ),
+    ).toEqual([]);
     expect(existsSync(join(docs, 'public/diagrams/ARCHIFY-LICENSE.txt'))).toBe(true);
     expect(existsSync(join(docs, 'public/diagrams/ARCHIFY-THIRD-PARTY-NOTICES.md'))).toBe(true);
   });

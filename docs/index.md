@@ -34,6 +34,8 @@ features:
 
 ## The shortest useful path
 
+Run these commands from the target repository root:
+
 ```sh
 pnpm add --global @neottia/cli
 neottia init --harness pi

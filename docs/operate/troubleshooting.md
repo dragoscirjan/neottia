@@ -50,7 +50,7 @@ There is no wildcard approval and no force option.
 
 - **Pi:** restart Pi in the project and inspect project package settings.
 - **OpenCode:** restart OpenCode and inspect its project plugin configuration.
-- **Claude Code:** restart Claude Code, open `/mcp`, and approve each project server from `.mcp.json`.
+- **Claude Code:** inspect every server in `.mcp.json`, restart Claude Code, open `/mcp`, and approve only the expected project servers. Neottia preserves unrelated project entries.
 
 Confirm that the host process uses the repository root as its working directory.
 
