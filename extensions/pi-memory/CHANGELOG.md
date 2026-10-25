@@ -1,5 +1,12 @@
 # @neottia/pi-memory
 
+## 0.2.5
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @neottia/pi-adapter@0.2.1
+
 ## 0.2.4
 
 ### Patch Changes

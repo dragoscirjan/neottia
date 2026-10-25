@@ -1,5 +1,12 @@
 # @neottia/pi-searchable
 
+## 0.2.9
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @neottia/pi-adapter@0.2.1
+
 ## 0.2.8
 
 ### Patch Changes

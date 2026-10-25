@@ -1,5 +1,12 @@
 # @neottia/pi-issues
 
+## 0.2.4
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @neottia/pi-adapter@0.2.1
+
 ## 0.2.3
 
 ### Patch Changes

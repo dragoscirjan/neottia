@@ -1,5 +1,12 @@
 # @neottia/opencode-searchable
 
+## 0.2.9
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @neottia/opencode-adapter@0.2.1
+
 ## 0.2.8
 
 ### Patch Changes

@@ -1,6 +1,6 @@
 {
   "name": "@neottia/opencode-issues",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "In-process OpenCode tools for Neottia Issues",
   "author": "Dragos Cirjan",
   "license": "MIT",
