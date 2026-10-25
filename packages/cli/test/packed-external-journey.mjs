@@ -178,11 +178,14 @@ function closeServer(value) {
 
 function run(command, arguments_, cwd, environment = process.env) {
   return new Promise((resolveRun, reject) => {
-    const executable = process.platform === 'win32' && command === 'pnpm' ? 'pnpm.cmd' : command;
+    const pnpmCommand = command === 'pnpm' || command === 'pnpm.cmd';
+    const executable = pnpmCommand ? 'pnpm' : command;
     const child = spawn(executable, arguments_, {
       cwd,
       env: environment,
-      shell: false,
+      // Windows requires its command shell for the pnpm.cmd shim. Every
+      // argument passed by this acceptance script is repository-owned.
+      shell: process.platform === 'win32' && pnpmCommand,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let stdout = '';
