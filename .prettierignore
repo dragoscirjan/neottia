@@ -21,6 +21,7 @@ coverage/
 dist/
 docs/.vitepress/cache/
 docs/.vitepress/dist/
+docs/public/diagrams/
 LICENSE
 package-lock.json
 pnpm-lock.yaml

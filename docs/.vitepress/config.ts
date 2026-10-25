@@ -3,7 +3,6 @@ import { defineConfig } from 'vitepress';
 /** Deployment base path for the published site; local builds keep '/'. */
 const base = process.env.DOCS_BASE ?? '/';
 
-// Navigation groups follow user tasks rather than workspace layout.
 export default defineConfig({
   title: 'Neottia',
   description: 'A shared SDLC for AI coding harnesses',
@@ -12,84 +11,104 @@ export default defineConfig({
   lastUpdated: true,
   themeConfig: {
     nav: [
-      { text: 'Home', link: '/' },
-      { text: 'Get started', link: '/get-started/' },
-      { text: 'Configuration', link: '/configuration' },
-      { text: 'SDLC', link: '/sdlc/' },
-      { text: 'Distribution', link: '/distribution/' },
+      { text: 'Start', link: '/get-started/' },
+      { text: 'Learn', link: '/learn/' },
       {
-        text: 'Features',
+        text: 'Use',
         items: [
-          { text: 'Memory', link: '/memory/' },
-          { text: 'Issues', link: '/issues/' },
-          { text: 'Design Docs', link: '/design-docs/' },
-          { text: 'Searchable', link: '/searchable/' },
+          { text: 'Choose a capability', link: '/guides/' },
+          { text: 'Supported harnesses', link: '/harnesses/' },
+          { text: 'Generic MCP servers', link: '/mcp/' },
         ],
       },
       {
-        text: 'Harnesses',
+        text: 'Operate',
         items: [
-          { text: 'Overview', link: '/harnesses/' },
-          { text: 'Adapter contract', link: '/harnesses/adapters' },
-          { text: 'Pi', link: '/harnesses/pi' },
-          { text: 'OpenCode', link: '/harnesses/opencode' },
-          { text: 'Claude Code', link: '/harnesses/claude-code' },
+          { text: 'Operations overview', link: '/operate/' },
+          { text: 'Doctor', link: '/operate/doctor' },
+          { text: 'Troubleshooting', link: '/operate/troubleshooting' },
+          { text: 'Repository files', link: '/guides/repository-files' },
+          { text: 'Upgrades and recovery', link: '/guides/upgrades-and-recovery' },
         ],
       },
-      {
-        text: 'MCP',
-        items: [
-          { text: 'Overview', link: '/mcp/' },
-          { text: 'Memory', link: '/mcp/memory' },
-          { text: 'Issues', link: '/mcp/issues' },
-          { text: 'Design Docs', link: '/mcp/design-docs' },
-          { text: 'Searchable', link: '/mcp/searchable' },
-        ],
-      },
-      { text: 'Guides', link: '/guides/' },
       {
         text: 'Reference',
         items: [
-          { text: 'Modules', link: '/reference/modules' },
-          { text: 'Core', link: '/reference/core' },
+          { text: 'Configuration', link: '/configuration' },
+          { text: 'SDLC compiler', link: '/sdlc/' },
+          { text: 'Distribution', link: '/distribution/' },
           { text: 'Repository Store', link: '/repository-store' },
-          { text: 'Release', link: '/reference/release' },
+          { text: 'Module catalog', link: '/reference/modules' },
+          { text: 'Diagram evidence', link: '/reference/diagrams' },
+          { text: 'Release metadata', link: '/reference/release' },
         ],
       },
     ],
     sidebar: {
+      '/get-started/': [
+        {
+          text: 'Start',
+          items: [
+            { text: 'Install Neottia', link: '/get-started/' },
+            { text: 'Requirements', link: '/get-started/requirements' },
+            { text: 'First configuration', link: '/get-started/configuration' },
+            { text: 'First useful workflow', link: '/get-started/first-success' },
+          ],
+        },
+      ],
+      '/learn/': [
+        {
+          text: 'Learn',
+          items: [
+            { text: 'How Neottia fits together', link: '/learn/' },
+            { text: 'Lifecycle and authority', link: '/learn/lifecycle' },
+            { text: 'Runtime and data flow', link: '/learn/runtime-data' },
+          ],
+        },
+      ],
+      '/operate/': [
+        {
+          text: 'Operate',
+          items: [
+            { text: 'Operations overview', link: '/operate/' },
+            { text: 'Doctor', link: '/operate/doctor' },
+            { text: 'Troubleshooting', link: '/operate/troubleshooting' },
+            { text: 'Repository files', link: '/guides/repository-files' },
+            { text: 'Backup and migration', link: '/guides/backup-and-migration' },
+            { text: 'Upgrades and recovery', link: '/guides/upgrades-and-recovery' },
+            { text: 'Security and errors', link: '/guides/security-and-errors' },
+          ],
+        },
+      ],
       '/configuration': [
         {
-          text: 'Configuration',
-          items: [{ text: 'Unified configuration', link: '/configuration' }],
+          text: 'Configuration reference',
+          items: [
+            { text: 'Unified configuration', link: '/configuration' },
+            { text: 'Provider packs', link: '/sdlc/providers' },
+            { text: 'Portable roles', link: '/sdlc/roles' },
+          ],
         },
       ],
       '/distribution/': [
         {
           text: 'Distribution',
-          items: [{ text: 'Install generated assets', link: '/distribution/' }],
+          items: [
+            { text: 'Install generated assets', link: '/distribution/' },
+            { text: 'Doctor', link: '/operate/doctor' },
+            { text: 'Troubleshooting', link: '/operate/troubleshooting' },
+          ],
         },
       ],
       '/sdlc/': [
         {
-          text: 'SDLC',
+          text: 'SDLC reference',
           items: [
-            { text: 'Compile the canonical lifecycle', link: '/sdlc/' },
+            { text: 'Compile the lifecycle', link: '/sdlc/' },
             { text: 'Operating protocol', link: '/sdlc/protocol' },
-            { text: 'Configure provider packs', link: '/sdlc/providers' },
-            { text: 'Configure portable roles', link: '/sdlc/roles' },
+            { text: 'Provider packs', link: '/sdlc/providers' },
+            { text: 'Portable roles', link: '/sdlc/roles' },
             { text: 'Capability roadmap', link: '/sdlc/roadmap' },
-          ],
-        },
-      ],
-      '/get-started/': [
-        {
-          text: 'Get started',
-          items: [
-            { text: 'Choose a delivery method', link: '/get-started/' },
-            { text: 'Requirements', link: '/get-started/requirements' },
-            { text: 'Configuration', link: '/get-started/configuration' },
-            { text: 'First success', link: '/get-started/first-success' },
           ],
         },
       ],
@@ -97,19 +116,19 @@ export default defineConfig({
         {
           text: 'Harnesses',
           items: [
-            { text: 'Overview', link: '/harnesses/' },
-            { text: 'Adapter contract', link: '/harnesses/adapters' },
+            { text: 'Choose a harness', link: '/harnesses/' },
             { text: 'Pi', link: '/harnesses/pi' },
             { text: 'OpenCode', link: '/harnesses/opencode' },
             { text: 'Claude Code', link: '/harnesses/claude-code' },
+            { text: 'Adapter contract', link: '/harnesses/adapters' },
           ],
         },
       ],
       '/mcp/': [
         {
-          text: 'MCP',
+          text: 'Generic MCP',
           items: [
-            { text: 'Overview', link: '/mcp/' },
+            { text: 'Choose a server', link: '/mcp/' },
             { text: 'Memory', link: '/mcp/memory' },
             { text: 'Issues', link: '/mcp/issues' },
             { text: 'Design Docs', link: '/mcp/design-docs' },
@@ -186,9 +205,9 @@ export default defineConfig({
       ],
       '/guides/': [
         {
-          text: 'Guides',
+          text: 'Use and maintain',
           items: [
-            { text: 'Overview', link: '/guides/' },
+            { text: 'Choose a capability', link: '/guides/' },
             { text: 'Repository files', link: '/guides/repository-files' },
             { text: 'Issue, design, and memory workflow', link: '/guides/issue-design-memory-workflow' },
             { text: 'Backup and migration', link: '/guides/backup-and-migration' },
@@ -203,7 +222,9 @@ export default defineConfig({
           items: [
             { text: 'Modules', link: '/reference/modules' },
             { text: 'Core', link: '/reference/core' },
+            { text: 'Diagram evidence', link: '/reference/diagrams' },
             { text: 'Release metadata', link: '/reference/release' },
+            { text: 'Repository Store', link: '/repository-store' },
           ],
         },
       ],

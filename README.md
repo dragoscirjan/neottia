@@ -139,7 +139,9 @@ Pi and OpenCode each have native Memory, Issues, Design Docs, and Searchable ext
 
 ## Documentation
 
-Start with the [delivery chooser](docs/get-started/) and [complete module catalog](docs/reference/modules.md). User documentation is under [`docs/`](docs/) and built with VitePress. `mise run docs:check` validates catalog coverage, routes, links, configuration examples, and documented tool registries.
+Start with the [five-minute repository installation](docs/get-started/index.md), then use the interactive [system](docs/learn/index.md), [lifecycle](docs/learn/lifecycle.md), and [runtime data-flow](docs/learn/runtime-data.md) guides to understand the design. Operational tasks begin at [Operate Neottia](docs/operate/index.md), and the [module catalog](docs/reference/modules.md) remains the package-level reference.
+
+User documentation is under [`docs/`](docs/) and built with VitePress. `mise run docs:check` validates catalog coverage, routes, links, configuration examples, diagram provenance, self-contained artifacts, and documented tool registries.
 
 ## License
 

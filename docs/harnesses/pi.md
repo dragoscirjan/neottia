@@ -1,6 +1,19 @@
-# Pi extensions
+# Use Neottia with Pi
 
-Install the self-describing Pi packages in the project where Pi runs:
+The recommended path installs the lifecycle, operating-protocol skill, and runtime packages from one project configuration:
+
+```sh
+pnpm add --global @neottia/cli
+neottia init --harness pi
+neottia apply
+neottia doctor
+```
+
+Restart Pi in the project, confirm that `/plan` is available, and run the [first successful workflow](/get-started/first-success).
+
+Neottia uses [`@neottia/pi-adapter`](/harnesses/adapters) to plan package entries and resource paths without hard-coding Pi paths. Each runtime package declares its extension entry point through `pi.extensions`. Pi records project packages in `.pi/settings.json` and installs missing packages after the project is trusted.
+
+For a capability-only installation without the compiled lifecycle, install individual packages:
 
 ```sh
 pi install -l npm:@neottia/pi-memory
@@ -9,9 +22,7 @@ pi install -l npm:@neottia/pi-design-docs
 pi install -l npm:@neottia/pi-searchable
 ```
 
-Each package declares its extension entry point through `pi.extensions`. Pi records project packages in `.pi/settings.json` and installs missing packages after the project is trusted. Enable `modules.memory`, `modules.issues`, `modules.design_docs`, and `modules.searchable` in `.neottia/config.yml`. Restart Pi, then inspect its tool list for 9 `memory_*`, 17 `issue_*`, 13 `document_*`, and 5 `web_*` tools. Use the calls in [First success](/get-started/first-success) to verify each capability.
-
-Generated installers can use [`@neottia/pi-adapter`](/harnesses/adapters) to plan package entries and resource paths without hard-coding Pi paths.
+Enable the matching `modules.*` shard in `.neottia/config.yml`. After restart, Pi exposes 9 `memory_*`, 17 `issue_*`, 13 `document_*`, and 5 `web_*` tools when all four capabilities are enabled.
 
 ## Memory
 

@@ -1,0 +1,165 @@
+{
+  "schema_version": 3,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "Neottia lifecycle and approval boundaries",
+    "subtitle": "Each public delivery command owns one bounded phase, records evidence, and stops before the next authority boundary.",
+    "output": "docs/public/diagrams/neottia-lifecycle.html",
+    "animation": "trace",
+    "visual_preset": "editorial",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/dragoscirjan/neottia.git",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "d30ecaab86cf2d02a254736221221252c445fdfc"
+    },
+    "views": [
+      {
+        "id": "primary",
+        "label": "Primary delivery path",
+        "focus": ["plan", "build", "verify", "release", "action-approval", "delivered"],
+        "note": "Plan, Build, Verify, and Release are separate commands. Release prepares an action but cannot authorize it."
+      },
+      {
+        "id": "defects",
+        "label": "Defect loop",
+        "focus": ["build", "verify", "bug"],
+        "note": "A confirmed defect becomes one canonical Bug and returns through Build."
+      },
+      {
+        "id": "authority",
+        "label": "Approval boundary",
+        "focus": ["release", "action-approval", "delivered"],
+        "note": "Push, pull-request mutation, publication, closure, and deployment each need fresh approval."
+      }
+    ]
+  },
+  "mainPath": ["plan", "build", "verify", "release"],
+  "states": [
+    {
+      "id": "plan",
+      "type": "start",
+      "label": "/plan",
+      "sublabel": "approved plan",
+      "tag": "Epic + child work",
+      "step": "01",
+      "sources": [
+        { "path": "packages/sdlc/templates/plan.md.twig", "line": 1, "end_line": 7, "label": "Plan command" },
+        { "path": "packages/sdlc/templates/protocol.md", "line": 40, "end_line": 55, "label": "Plan and approval" }
+      ]
+    },
+    {
+      "id": "build",
+      "type": "active",
+      "label": "/build",
+      "sublabel": "bounded changes",
+      "tag": "approved scope",
+      "step": "02",
+      "sources": [
+        { "path": "packages/sdlc/templates/build.md.twig", "line": 1, "end_line": 7, "label": "Build command" },
+        { "path": "packages/sdlc/templates/protocol.md", "line": 57, "end_line": 69, "label": "Build procedure" }
+      ]
+    },
+    {
+      "id": "verify",
+      "type": "decision",
+      "label": "/verify",
+      "sublabel": "checks + verdict",
+      "tag": "evidence gate",
+      "step": "03",
+      "sources": [
+        { "path": "packages/sdlc/templates/verify.md.twig", "line": 1, "end_line": 7, "label": "Verify command" },
+        { "path": "packages/sdlc/templates/protocol.md", "line": 71, "end_line": 79, "label": "Verify procedure" }
+      ]
+    },
+    {
+      "id": "release",
+      "type": "active",
+      "label": "/release",
+      "sublabel": "action prepared",
+      "tag": "verified only",
+      "step": "04",
+      "sources": [
+        { "path": "packages/sdlc/templates/release.md.twig", "line": 1, "end_line": 7, "label": "Release command" },
+        { "path": "packages/sdlc/templates/protocol.md", "line": 81, "end_line": 92, "label": "Release procedure" }
+      ]
+    },
+    {
+      "id": "bug",
+      "type": "failure",
+      "label": "Canonical Bug",
+      "sublabel": "confirmed defect",
+      "tag": "returns to Build",
+      "sources": [
+        { "path": "packages/sdlc/templates/protocol.md", "line": 71, "end_line": 79, "label": "defect routing" }
+      ]
+    },
+    {
+      "id": "action-approval",
+      "type": "waiting",
+      "label": "Fresh approval",
+      "sublabel": "one remote action",
+      "tag": "human authority",
+      "sources": [
+        {
+          "path": "packages/sdlc/templates/protocol.md",
+          "line": 81,
+          "end_line": 92,
+          "label": "remote authority boundary"
+        }
+      ]
+    },
+    {
+      "id": "delivered",
+      "type": "success",
+      "label": "Delivered evidence",
+      "sublabel": "result + follow-up",
+      "tag": "recorded outcome",
+      "sources": [
+        { "path": "packages/sdlc/templates/protocol.md", "line": 88, "end_line": 92, "label": "release checkpoint" }
+      ]
+    }
+  ],
+  "transitions": [
+    { "id": "plan-build", "from": "plan", "to": "build", "label": "approved", "variant": "security" },
+    { "id": "build-verify", "from": "build", "to": "verify", "label": "evidence", "variant": "emphasis" },
+    { "id": "verify-release", "from": "verify", "to": "release", "label": "pass", "variant": "emphasis" },
+    { "id": "verify-bug", "from": "verify", "to": "bug", "label": "defect", "variant": "security" },
+    { "id": "bug-build", "from": "bug", "to": "build", "label": "fix", "variant": "security" },
+    { "id": "release-approval", "from": "release", "to": "action-approval", "label": "request", "variant": "security" },
+    {
+      "id": "approval-delivered",
+      "from": "action-approval",
+      "to": "delivered",
+      "label": "authorized",
+      "variant": "emphasis"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Commands stop at phase boundaries",
+      "items": [
+        "Plan records approved scope, Build records implementation evidence, Verify records a verdict, and Release prepares one action.",
+        "No command silently invokes the next command."
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Approval does not carry forward",
+      "items": [
+        "Plan approval covers implementation scope, not remote release actions.",
+        "Merge, publication, deployment, remote closure, and destructive actions remain human-authorized."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Continue and Refresh",
+      "items": [
+        "Every phase records append-only checkpoints with revisions, commits, checks, status, and the recommended next command.",
+        "Continue resumes one checkpointed step. Refresh reports changed assumptions without moving the lifecycle."
+      ]
+    }
+  ]
+}

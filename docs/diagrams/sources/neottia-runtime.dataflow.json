@@ -1,0 +1,284 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "Runtime and repository data flow",
+    "subtitle": "Native extensions and stdio MCP servers reach the same domain tools; canonical files remain authoritative while SQLite indexes remain disposable.",
+    "output": "docs/public/diagrams/neottia-runtime.html",
+    "animation": "trace",
+    "visual_preset": "blueprint",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/dragoscirjan/neottia.git",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "d30ecaab86cf2d02a254736221221252c445fdfc"
+    },
+    "views": [
+      {
+        "id": "native",
+        "label": "Pi and OpenCode",
+        "focus": ["harness", "native-extension", "domain-tools", "repository-store", "canonical-records"],
+        "note": "Native host packages call the shared domain libraries in process."
+      },
+      {
+        "id": "mcp",
+        "label": "Claude Code and MCP clients",
+        "focus": ["harness", "mcp-server", "domain-tools", "repository-store", "canonical-records"],
+        "note": "Claude Code and generic clients use exact stdio MCP packages."
+      },
+      {
+        "id": "storage",
+        "label": "Canonical and derived state",
+        "focus": ["domain-tools", "repository-store", "canonical-records", "sqlite-index", "git"],
+        "note": "Canonical records are the source of truth. SQLite files accelerate reads and can be rebuilt."
+      }
+    ]
+  },
+  "stages": [
+    { "label": "Harness" },
+    { "label": "Runtime bridge" },
+    { "label": "Domain authority" },
+    { "label": "Persistence" },
+    { "label": "Repository state" }
+  ],
+  "nodes": [
+    {
+      "id": "harness",
+      "type": "external",
+      "label": "AI coding harness",
+      "sublabel": "command or tool call",
+      "stage": 0,
+      "row": 1,
+      "tag": "project context",
+      "sources": [{ "path": "packages/cli/src/index.ts", "line": 36, "end_line": 55, "label": "supported harnesses" }]
+    },
+    {
+      "id": "native-extension",
+      "type": "frontend",
+      "label": "Native extension",
+      "sublabel": "Pi or OpenCode package",
+      "stage": 1,
+      "row": 0,
+      "tag": "in process",
+      "sources": [
+        { "path": "extensions/pi-adapter/src/index.ts", "line": 96, "end_line": 112, "label": "Pi package activation" },
+        {
+          "path": "extensions/opencode-adapter/src/index.ts",
+          "line": 114,
+          "end_line": 130,
+          "label": "OpenCode activation"
+        }
+      ]
+    },
+    {
+      "id": "mcp-server",
+      "type": "messagebus",
+      "label": "stdio MCP server",
+      "sublabel": "Claude Code or generic client",
+      "stage": 1,
+      "row": 2,
+      "tag": "JSON-RPC",
+      "sources": [
+        {
+          "path": "extensions/claude-code-adapter/src/index.ts",
+          "line": 232,
+          "end_line": 291,
+          "label": "exact MCP command"
+        },
+        { "path": "packages/memory-mcp/src/server.ts", "line": 35, "end_line": 85, "label": "MCP tool dispatch" },
+        { "path": "packages/issues-mcp/src/server.ts", "line": 24, "end_line": 70, "label": "Issues MCP dispatch" }
+      ]
+    },
+    {
+      "id": "domain-tools",
+      "type": "backend",
+      "label": "Domain tools",
+      "sublabel": "four shared capabilities",
+      "stage": 2,
+      "row": 1,
+      "tag": "validated input",
+      "sources": [
+        { "path": "packages/memory-mcp/src/server.ts", "line": 35, "end_line": 85, "label": "Memory registry" },
+        {
+          "path": "packages/design-docs-mcp/src/server.ts",
+          "line": 28,
+          "end_line": 75,
+          "label": "Design Docs registry"
+        },
+        { "path": "packages/searchable-mcp/src/server.ts", "line": 24, "end_line": 70, "label": "Searchable registry" }
+      ]
+    },
+    {
+      "id": "repository-store",
+      "type": "security",
+      "label": "Repository Store",
+      "sublabel": "lease + preconditions + journal",
+      "stage": 3,
+      "row": 1,
+      "tag": "fail closed",
+      "sources": [
+        { "path": "packages/repository-store/src/lease.ts", "line": 80, "end_line": 145, "label": "lease authority" },
+        {
+          "path": "packages/repository-store/src/transaction/apply.ts",
+          "line": 30,
+          "end_line": 100,
+          "label": "canonical transaction"
+        }
+      ]
+    },
+    {
+      "id": "canonical-records",
+      "type": "database",
+      "label": "Canonical records",
+      "sublabel": "YAML · Markdown · JSON",
+      "stage": 4,
+      "row": 0,
+      "tag": ".neottia/*",
+      "sources": [
+        {
+          "path": "packages/memory-core/src/backend/filesystem.ts",
+          "line": 200,
+          "end_line": 285,
+          "label": "Memory writes"
+        },
+        { "path": "packages/issues/src/store.ts", "line": 735, "end_line": 780, "label": "Issue writes" },
+        { "path": "packages/design-docs/src/store.ts", "line": 745, "end_line": 775, "label": "Design Doc writes" }
+      ]
+    },
+    {
+      "id": "sqlite-index",
+      "type": "database",
+      "label": "SQLite projections",
+      "sublabel": "derived read indexes",
+      "stage": 4,
+      "row": 2,
+      "tag": ".neottia/cache/*",
+      "sources": [
+        {
+          "path": "packages/repository-store/src/sqlite/cache.ts",
+          "line": 350,
+          "end_line": 405,
+          "label": "cache adapter"
+        },
+        { "path": "packages/issues/src/store.ts", "line": 762, "end_line": 775, "label": "separate issue cache" },
+        {
+          "path": "packages/searchable-core/src/stash.ts",
+          "line": 361,
+          "end_line": 380,
+          "label": "separate searchable cache"
+        }
+      ]
+    },
+    {
+      "id": "git",
+      "type": "cloud",
+      "label": "Git history",
+      "sublabel": "review · backup · collaboration",
+      "stage": 4,
+      "row": 4,
+      "tag": "canonical files only",
+      "sources": [
+        {
+          "path": "packages/sdlc/templates/protocol.md",
+          "line": 9,
+          "end_line": 20,
+          "label": "canonical authority rules"
+        },
+        { "path": "packages/sdlc/templates/protocol.md", "line": 57, "end_line": 69, "label": "local source control" }
+      ]
+    }
+  ],
+  "flows": [
+    {
+      "id": "harness-native",
+      "from": "harness",
+      "to": "native-extension",
+      "label": "native tool call",
+      "classification": "in-process host API",
+      "variant": "emphasis"
+    },
+    {
+      "id": "harness-mcp",
+      "from": "harness",
+      "to": "mcp-server",
+      "label": "stdio request",
+      "classification": "JSON-RPC message",
+      "variant": "default"
+    },
+    {
+      "id": "native-domain",
+      "from": "native-extension",
+      "to": "domain-tools",
+      "label": "library call",
+      "classification": "typed domain input",
+      "variant": "emphasis"
+    },
+    {
+      "id": "mcp-domain",
+      "from": "mcp-server",
+      "to": "domain-tools",
+      "label": "validated tool input",
+      "classification": "MCP schema",
+      "variant": "default"
+    },
+    {
+      "id": "domain-store",
+      "from": "domain-tools",
+      "to": "repository-store",
+      "label": "canonical operation",
+      "classification": "revision precondition",
+      "variant": "security"
+    },
+    {
+      "id": "store-canonical",
+      "from": "repository-store",
+      "to": "canonical-records",
+      "label": "journaled file batch",
+      "classification": "authoritative state",
+      "variant": "emphasis"
+    },
+    {
+      "id": "store-cache",
+      "from": "repository-store",
+      "to": "sqlite-index",
+      "label": "rebuildable projection",
+      "classification": "derived state",
+      "variant": "dashed"
+    },
+    {
+      "id": "canonical-git",
+      "from": "canonical-records",
+      "to": "git",
+      "label": "reviewed file changes",
+      "classification": "versioned evidence",
+      "variant": "emphasis"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Two runtime routes",
+      "items": [
+        "Pi and OpenCode install native packages that call the shared domain libraries.",
+        "Claude Code and generic clients launch exact stdio MCP packages that expose the same tool registries."
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "One write authority",
+      "items": [
+        "Domain tools validate inputs and revisions before they request a mutation.",
+        "Repository Store owns leased publication, journaling, recovery, and platform checks."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Keep the source of truth",
+      "items": [
+        "Track canonical files in Git for review, backup, and collaboration.",
+        "Ignore SQLite projections. Rebuild them from canonical records after deletion or corruption."
+      ]
+    }
+  ]
+}

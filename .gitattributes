@@ -27,5 +27,8 @@
 *.bat text eol=crlf
 *.cmd text eol=crlf
 
+# Generated diagram artifacts retain upstream whitespace.
+docs/public/diagrams/*.html -whitespace
+
 # Vendored sources retain upstream whitespace.
 packages/sdlc/vendor/** -whitespace
