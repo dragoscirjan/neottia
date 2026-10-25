@@ -1,5 +1,12 @@
 # @neottia/opencode-adapter
 
+## 0.2.1
+
+### Patch Changes
+
+- Updated dependencies [[`01d24e5`](https://github.com/dragoscirjan/neottia/commit/01d24e5ec9099590dd448023d0951e8802bdd2d8)]:
+  - @neottia/harness-adapter@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes
