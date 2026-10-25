@@ -18,6 +18,11 @@ const char* Platform() {
 
 int RenameNoReplace(const char*, const char*) { return ENOSYS; }
 
+int InspectLocalPath(const char*, LocalPathInspection* inspection) {
+  inspection->filesystem_type = "unknown";
+  return 0;
+}
+
 int SupportsLocalPath(const char*, bool* supported) {
   *supported = false;
   return 0;

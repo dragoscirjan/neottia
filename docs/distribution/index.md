@@ -173,7 +173,16 @@ Template packages and skill sources must be explicit. The configuration does not
 
 ## Doctor
 
-Run non-mutating checks with:
+Diagnose the configured project and its Repository Store platform support:
+
+```sh
+neottia doctor --project .
+neottia doctor --project . --json
+```
+
+The report identifies the runtime, operating system, architecture, native backend, filesystem type and locality, write access, atomic no-replace publication, hard links, stable identity, file durability barrier, and namespace durability model. The command probes capabilities only in a private temporary project directory and removes it before returning. Unsupported platform, architecture, or runtime tuples fail before the probe creates files. Human output includes remediation. `--json` emits deterministic structured output without machine-specific paths.
+
+Release pipelines can also run manifest checks:
 
 ```sh
 neottia doctor --manifest manifest.json

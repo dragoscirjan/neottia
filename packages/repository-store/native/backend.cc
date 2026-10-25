@@ -83,6 +83,42 @@ napi_value RenameNoReplace(napi_env env, napi_callback_info info) {
   return undefined;
 }
 
+void SetBooleanProperty(napi_env env, napi_value object, const char* name, bool value) {
+  napi_value property;
+  napi_get_boolean(env, value, &property);
+  napi_set_named_property(env, object, name, property);
+}
+
+napi_value InspectLocalPath(napi_env env, napi_callback_info info) {
+  size_t argc = 1;
+  napi_value argv[1];
+  napi_get_cb_info(env, info, &argc, argv, nullptr, nullptr);
+  std::string path;
+  if (argc != 1 || !ReadPath(env, argv[0], &path)) {
+    napi_throw_type_error(env, nullptr, "inspectLocalPath requires one path");
+    return nullptr;
+  }
+  neottia::repository_store::LocalPathInspection inspection;
+  const int error = neottia::repository_store::InspectLocalPath(path.c_str(), &inspection);
+  if (error != 0) {
+    ThrowErrno(env, error);
+    return nullptr;
+  }
+  napi_value result;
+  napi_create_object(env, &result);
+  napi_value filesystem_type;
+  napi_create_string_utf8(env, inspection.filesystem_type.c_str(), NAPI_AUTO_LENGTH, &filesystem_type);
+  napi_set_named_property(env, result, "filesystemType", filesystem_type);
+  SetBooleanProperty(env, result, "certified", inspection.certified);
+  SetBooleanProperty(env, result, "local", inspection.local);
+  SetBooleanProperty(env, result, "writable", inspection.writable);
+  SetBooleanProperty(env, result, "hardLinks", inspection.hard_links);
+  SetBooleanProperty(env, result, "stableIdentity", inspection.stable_identity);
+  SetBooleanProperty(env, result, "atomicNoReplace", inspection.atomic_no_replace);
+  SetBooleanProperty(env, result, "durability", inspection.durability);
+  return result;
+}
+
 napi_value SupportsLocalPath(napi_env env, napi_callback_info info) {
   size_t argc = 1;
   napi_value argv[1];
@@ -129,6 +165,9 @@ napi_value Initialize(napi_env env, napi_value exports) {
   napi_value rename_function;
   napi_create_function(env, "renameNoReplace", NAPI_AUTO_LENGTH, RenameNoReplace, nullptr, &rename_function);
   napi_set_named_property(env, exports, "renameNoReplace", rename_function);
+  napi_value inspect_function;
+  napi_create_function(env, "inspectLocalPath", NAPI_AUTO_LENGTH, InspectLocalPath, nullptr, &inspect_function);
+  napi_set_named_property(env, exports, "inspectLocalPath", inspect_function);
   napi_value supports_function;
   napi_create_function(env, "supportsLocalPath", NAPI_AUTO_LENGTH, SupportsLocalPath, nullptr, &supports_function);
   napi_set_named_property(env, exports, "supportsLocalPath", supports_function);

@@ -1,7 +1,6 @@
 #include "platform_backend.h"
 
 #include <cerrno>
-#include <cstring>
 #include <fcntl.h>
 #include <sys/mount.h>
 #include <sys/stat.h>
@@ -27,6 +26,7 @@ int SupportsRequiredDurability(const char* path, bool* supported) {
     *supported = false;
     return 0;
   }
+  if (sync_error == 0 && close_error == 0) *supported = true;
   return sync_error != 0 ? sync_error : close_error;
 }
 
@@ -60,13 +60,13 @@ int RenameNoReplace(const char* source, const char* destination) {
   return unlink_error;
 }
 
-int SupportsLocalPath(const char* path, bool* supported) {
-  *supported = false;
+int InspectLocalPath(const char* path, LocalPathInspection* inspection) {
   struct statfs filesystem;
   if (statfs(path, &filesystem) != 0) return errno;
-  if (std::strcmp(filesystem.f_fstypename, "ufs") != 0 || (filesystem.f_flags & MNT_LOCAL) == 0 ||
-      (filesystem.f_flags & MNT_RDONLY) != 0)
-    return 0;
+  inspection->filesystem_type = filesystem.f_fstypename;
+  inspection->local = (filesystem.f_flags & MNT_LOCAL) != 0;
+  inspection->writable = (filesystem.f_flags & MNT_RDONLY) == 0;
+  if (inspection->filesystem_type != "ufs" || !inspection->local || !inspection->writable) return 0;
 
   // FreeBSD reports st_birthtim.tv_sec == -1 for UFS1 and reads the stored
   // birth time for UFS2. This rejects UFS1 without reading the backing device.
@@ -74,8 +74,25 @@ int SupportsLocalPath(const char* path, bool* supported) {
   if (lstat(path, &state) != 0) return errno;
   if (state.st_birthtim.tv_sec == -1) return 0;
 
-  *supported = true;
-  return SupportsRequiredDurability(path, supported);
+  inspection->certified = true;
+  inspection->hard_links = true;
+  inspection->stable_identity = true;
+  inspection->atomic_no_replace = true;
+  bool durability = false;
+  const int durability_error = SupportsRequiredDurability(path, &durability);
+  if (durability_error != 0) return durability_error;
+  inspection->durability = durability;
+  return 0;
+}
+
+int SupportsLocalPath(const char* path, bool* supported) {
+  LocalPathInspection inspection;
+  const int error = InspectLocalPath(path, &inspection);
+  if (error != 0) return error;
+  *supported = inspection.filesystem_type == "ufs" && inspection.local && inspection.writable &&
+               inspection.hard_links && inspection.stable_identity && inspection.atomic_no_replace &&
+               inspection.durability;
+  return 0;
 }
 
 int SyncDescriptor(int descriptor) { return Sync(descriptor); }

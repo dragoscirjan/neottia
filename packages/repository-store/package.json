@@ -56,7 +56,7 @@
     "install": "node scripts/install-native.mjs",
     "test": "pnpm run test:installer && pnpm run test:node && pnpm run test:bun && pnpm run test:cross-runtime",
     "test:installer": "vitest run --root ../.. packages/repository-store/scripts/native-prebuild.spec.mjs",
-    "test:node": "pnpm run build && vitest run --root ../.. packages/repository-store/src/internal/native-integrity.spec.ts packages/repository-store/src/repository-store.spec.ts packages/repository-store/src/sqlite/cache.spec.ts packages/repository-store/src/sqlite/node-adapter.spec.ts",
+    "test:node": "pnpm run build && vitest run --root ../.. packages/repository-store/src/diagnostics.spec.ts packages/repository-store/src/internal/native-integrity.spec.ts packages/repository-store/src/repository-store.spec.ts packages/repository-store/src/sqlite/cache.spec.ts packages/repository-store/src/sqlite/node-adapter.spec.ts",
     "test:bun": "pnpm run build && bun test ./src/sqlite/bun-adapter.bun.test.ts ./src/publication.bun.test.ts",
     "test:cross-runtime": "pnpm run build && vitest run --root ../.. packages/repository-store/src/sqlite/cross-runtime.spec.ts",
     "typecheck": "tsc --noEmit"

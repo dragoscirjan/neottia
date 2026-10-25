@@ -1,5 +1,10 @@
 /** Domain-neutral repository-local persistence primitives. */
 export {
+  diagnoseRepositoryPlatform,
+  type RepositoryPlatformCheck,
+  type RepositoryPlatformDiagnostics,
+} from './diagnostics.js';
+export {
   CacheSyncError,
   DurabilityError,
   LeaseContentionError,

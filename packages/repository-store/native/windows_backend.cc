@@ -85,6 +85,16 @@ bool IsNtfs(const wchar_t* filesystem_name) {
   return _wcsicmp(filesystem_name, L"NTFS") == 0;
 }
 
+int Utf8Text(const wchar_t* value, std::string* output) {
+  const int required = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value, -1, nullptr, 0, nullptr, nullptr);
+  if (required == 0) return WindowsError(GetLastError());
+  std::vector<char> buffer(static_cast<std::size_t>(required));
+  if (WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value, -1, buffer.data(), required, nullptr, nullptr) == 0)
+    return WindowsError(GetLastError());
+  output->assign(buffer.data());
+  return 0;
+}
+
 }  // namespace
 
 const char* Platform() { return "win32"; }
@@ -143,32 +153,43 @@ int RenameNoReplace(const char* source, const char* destination) {
   return 0;
 }
 
-int SupportsLocalPath(const char* path, bool* supported) {
-  *supported = false;
+int InspectLocalPath(const char* path, LocalPathInspection* inspection) {
   std::wstring absolute;
   int error = AbsolutePath(path, &absolute);
   if (error != 0) return error;
 
   const std::wstring extended = ExtendedPath(absolute);
   const DWORD attributes = GetFileAttributesW(extended.c_str());
-  if (attributes == INVALID_FILE_ATTRIBUTES)
-    return WindowsError(GetLastError());
-  if ((attributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0) return 0;
+  if (attributes == INVALID_FILE_ATTRIBUTES) return WindowsError(GetLastError());
+  const bool reparse_point = (attributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0;
 
   wchar_t volume_path[MAX_PATH + 1] = {};
-  if (!GetVolumePathNameW(absolute.c_str(), volume_path, MAX_PATH + 1))
-    return WindowsError(GetLastError());
-  if (GetDriveTypeW(volume_path) != DRIVE_FIXED) return 0;
+  if (!GetVolumePathNameW(absolute.c_str(), volume_path, MAX_PATH + 1)) return WindowsError(GetLastError());
+  inspection->local = GetDriveTypeW(volume_path) == DRIVE_FIXED;
 
   DWORD filesystem_flags = 0;
   wchar_t filesystem_name[MAX_PATH + 1] = {};
-  if (!GetVolumeInformationW(volume_path, nullptr, 0, nullptr, nullptr,
-                             &filesystem_flags, filesystem_name, MAX_PATH + 1))
+  if (!GetVolumeInformationW(volume_path, nullptr, 0, nullptr, nullptr, &filesystem_flags, filesystem_name,
+                             MAX_PATH + 1))
     return WindowsError(GetLastError());
-  const DWORD required =
-      FILE_SUPPORTS_HARD_LINKS | FILE_SUPPORTS_OPEN_BY_FILE_ID;
-  *supported =
-      IsNtfs(filesystem_name) && (filesystem_flags & required) == required;
+  error = Utf8Text(filesystem_name, &inspection->filesystem_type);
+  if (error != 0) return error;
+  inspection->writable = (filesystem_flags & FILE_READ_ONLY_VOLUME) == 0;
+  const bool ntfs = IsNtfs(filesystem_name);
+  inspection->certified = ntfs;
+  inspection->hard_links = ntfs && (filesystem_flags & FILE_SUPPORTS_HARD_LINKS) != 0 && !reparse_point;
+  inspection->stable_identity = ntfs && (filesystem_flags & FILE_SUPPORTS_OPEN_BY_FILE_ID) != 0 && !reparse_point;
+  inspection->atomic_no_replace = ntfs && !reparse_point;
+  inspection->durability = ntfs && inspection->local && inspection->writable && !reparse_point;
+  return 0;
+}
+
+int SupportsLocalPath(const char* path, bool* supported) {
+  LocalPathInspection inspection;
+  const int error = InspectLocalPath(path, &inspection);
+  if (error != 0) return error;
+  *supported = inspection.local && inspection.writable && inspection.hard_links && inspection.stable_identity &&
+               inspection.atomic_no_replace && inspection.durability;
   return 0;
 }
 
