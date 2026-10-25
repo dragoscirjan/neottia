@@ -41,3 +41,5 @@ This catalog distinguishes how each package is delivered.
 | `@neottia/claude-code-adapter`  | library/embedding | [Claude Code setup](/harnesses/claude-code)                                            |
 
 `docs/module-catalog.json` is the machine-readable copy checked against workspace manifests and this table.
+
+See the [dependency reference](/reference/dependencies) for the exact runtime, peer, optional, and development dependency ranges declared by each module.

@@ -11,7 +11,7 @@ Use this page to decide whether Neottia can safely operate in your environment.
 | Claude Code                 | Claude Code, Node.js 22.20 or newer, `npx` on `PATH`, and interactive approval of project `.mcp.json` servers |
 | Source control              | Git for the default lifecycle configuration                                                                   |
 
-`@neottia/core` supports Node.js 20 or newer, but the current CLI and distributed runtime packages require the newer user setup above.
+`@neottia/core` supports Node.js 20 or newer, but the current CLI and distributed runtime packages require the newer user setup above. See the [dependency reference](/reference/dependencies) for exact package-manager, engine, and direct dependency declarations from every module manifest.
 
 ## Certified Repository Store tuples
 

@@ -39,6 +39,7 @@ export default defineConfig({
           { text: 'Distribution', link: '/distribution/' },
           { text: 'Repository Store', link: '/repository-store' },
           { text: 'Module catalog', link: '/reference/modules' },
+          { text: 'Dependencies', link: '/reference/dependencies' },
           { text: 'Diagram evidence', link: '/reference/diagrams' },
           { text: 'Release metadata', link: '/reference/release' },
         ],
@@ -221,6 +222,7 @@ export default defineConfig({
           text: 'Reference',
           items: [
             { text: 'Modules', link: '/reference/modules' },
+            { text: 'Dependencies', link: '/reference/dependencies' },
             { text: 'Core', link: '/reference/core' },
             { text: 'Diagram evidence', link: '/reference/diagrams' },
             { text: 'Release metadata', link: '/reference/release' },
