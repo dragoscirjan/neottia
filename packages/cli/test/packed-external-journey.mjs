@@ -12,7 +12,7 @@ import {
 } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
-import { basename, dirname, join, relative, resolve, sep } from 'node:path';
+import { basename, dirname, join, parse, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { assembleNativePrebuilds } from '../../repository-store/scripts/assemble-native-prebuilds.mjs';
@@ -21,7 +21,10 @@ const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../.
 const repositoryStoreRoot = join(repositoryRoot, 'packages', 'repository-store');
 const fixture = join(repositoryRoot, 'packages', 'cli', 'test', 'external-consumer.fixture.mjs');
 const args = parseArguments(process.argv.slice(2));
-const temporary = mkdtempSync(join(tmpdir(), 'neottia-packed-external-'));
+// Native MSBuild still enforces legacy path ceilings on hosted Windows.
+// Use the workspace drive root and short directory names for packed installs.
+const temporaryBase = process.platform === 'win32' ? parse(repositoryRoot).root : tmpdir();
+const temporary = mkdtempSync(join(temporaryBase, process.platform === 'win32' ? 'nt-' : 'neottia-packed-external-'));
 const manifestPath = join(repositoryStoreRoot, 'native-prebuilds.json');
 const originalManifest = existsSync(manifestPath) ? readFileSync(manifestPath) : undefined;
 let server;
@@ -88,7 +91,9 @@ try {
       ? { NEOTTIA_REPOSITORY_STORE_FORCE_SOURCE_BUILD: '1' }
       : { NEOTTIA_REPOSITORY_STORE_PREBUILD_BASE_URL: prebuildBaseUrl }),
   };
-  await run('pnpm', ['install', '--store-dir', join(temporary, 'store')], project, environment);
+  const installArguments = ['install', '--store-dir', join(temporary, 's')];
+  if (process.platform === 'win32') installArguments.push('--virtual-store-dir', join(temporary, 'v'));
+  await run('pnpm', installArguments, project, environment);
 
   const cli = join(project, 'node_modules', '@neottia', 'cli', 'dist', 'cli.js');
   await run(
