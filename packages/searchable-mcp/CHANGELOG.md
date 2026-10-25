@@ -1,5 +1,12 @@
 # @neottia/searchable-mcp
 
+## 0.2.8
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @neottia/searchable-core@0.2.6
+
 ## 0.2.7
 
 ### Patch Changes

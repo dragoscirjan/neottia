@@ -1,6 +1,6 @@
 {
   "name": "@neottia/cli",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "description": "Command-line planner, installer, updater, uninstaller, and doctor for Neottia assets",
   "author": "Dragos Cirjan",
   "license": "MIT",
