@@ -10,10 +10,8 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: docs-publish-neottia
-  cancel-in-progress: false
-
+# The destination workflow owns docs-publish-neottia. Acquiring the same
+# concurrency group here would deadlock this caller against its nested job.
 jobs:
   build:
     name: Build the site
