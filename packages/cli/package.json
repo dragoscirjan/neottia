@@ -49,6 +49,7 @@
     "@neottia/memory-core": "workspace:^",
     "@neottia/opencode-adapter": "workspace:^",
     "@neottia/pi-adapter": "workspace:^",
+    "@neottia/repository-store": "workspace:^",
     "@neottia/sdlc": "workspace:^",
     "@neottia/searchable-core": "workspace:^"
   },

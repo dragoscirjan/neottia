@@ -87,6 +87,9 @@ jobs:
         id: tests
         continue-on-error: ${{ matrix.experimental }}
         run: mise run test
+      - name: Verify clean packed external source journey
+        if: steps.tests.outcome == 'success'
+        run: node packages/cli/test/packed-external-journey.mjs --mode source
       - name: Report experimental failure
         if: ${{ always() && matrix.experimental && steps.tests.outcome == 'failure' }}
         run: echo "::warning::${{ matrix.os }} remains experimental because its test suite failed."
@@ -211,6 +214,8 @@ jobs:
       - name: Smoke-test packaged addon
         working-directory: packages/repository-store
         run: node test/native-prebuild-smoke.mjs native-prebuilds/${{ steps.package.outputs.asset-name }} ${{ matrix.platform }}
+      - name: Verify clean packed external prebuilt journey
+        run: node packages/cli/test/packed-external-journey.mjs --mode prebuilt --artifacts packages/repository-store/native-prebuilds
       - name: Verify clean packed install and source fallback
         # Release manifests pin the protected main-workflow identity. Branch
         # validation verifies its actual branch identity in the packaging step.
@@ -268,6 +273,7 @@ jobs:
             node packages/repository-store/scripts/package-native-prebuild.mjs --output packages/repository-store/native-prebuilds
             artifact="$(find packages/repository-store/native-prebuilds -name '*.node' -type f)"
             node packages/repository-store/test/native-prebuild-smoke.mjs "${artifact}" freebsd
+            node packages/cli/test/packed-external-journey.mjs --mode prebuilt --artifacts packages/repository-store/native-prebuilds
       - name: Locate FreeBSD prebuild
         id: package
         shell: bash

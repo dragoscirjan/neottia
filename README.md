@@ -131,7 +131,7 @@ Pi and OpenCode each have native Memory, Issues, Design Docs, and Searchable ext
 
 `@neottia/distribution` converts adapter output into checksummed manifests and reviewable plans. Receipts track file ownership and individual host-configuration entries. Apply uses exact checksum guards, before-image journals, rollback, and recovery. Static third-party skills are acquired through the bundled `skills` package in an isolated staging project before adapters select their final paths.
 
-`@neottia/cli` publishes the `neottia` command. `neottia init` writes, or validates an existing, `.neottia/config.yml` for one or more harnesses; `neottia apply` compiles and installs the lifecycle from that configuration in one run, warning and skipping conflicting files; `neottia doctor` statically reports missing modules and installs. The manifest-driven `plan` / `apply --plan` commands remain for the release pipeline, where conflicts require exact per-item approval. See the [distribution guide](docs/distribution/).
+`@neottia/cli` publishes the `neottia` command. `neottia init` writes, or validates an existing, `.neottia/config.yml` for one or more harnesses; `neottia apply` compiles and installs the lifecycle from that configuration in one run, warning and skipping conflicting files; `neottia doctor` reports the Repository Store platform tuple, native backend, filesystem, durability barriers, module catalog, and installed lifecycle state. Use `neottia doctor --json` for deterministic machine-readable output. The manifest-driven `plan` / `apply --plan` commands remain for the release pipeline, where conflicts require exact per-item approval. See the [distribution guide](docs/distribution/).
 
 ## Supporting packages
 

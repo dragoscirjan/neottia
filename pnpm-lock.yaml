@@ -465,6 +465,9 @@ importers:
       '@neottia/pi-adapter':
         specifier: workspace:^
         version: link:../../extensions/pi-adapter
+      '@neottia/repository-store':
+        specifier: workspace:^
+        version: link:../repository-store
       '@neottia/sdlc':
         specifier: workspace:^
         version: link:../sdlc

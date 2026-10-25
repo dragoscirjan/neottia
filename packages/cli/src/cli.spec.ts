@@ -358,6 +358,17 @@ describe('Neottia CLI', () => {
     expect(result.errors).toEqual(['Run neottia init first. Missing project configuration.']);
   });
 
+  it('diagnoses platform support before initialization without retaining artifacts', async () => {
+    const root = await fixture();
+    const result = capture();
+
+    expect(await main(['doctor', '--project', root], result.output)).toBe(2);
+
+    expect(result.logs[0]).toContain(`Repository Store PASS: node ${process.platform}-${process.arch}`);
+    expect(result.errors.join('\n')).toContain('Project configuration is missing. Run neottia init first.');
+    expect(await readdir(root)).toEqual([]);
+  });
+
   it('reports missing installs and unknown modules through doctor', async () => {
     const root = await fixture();
     await main(['init', '--harness', 'pi', '--project', root], capture().output);
@@ -365,7 +376,8 @@ describe('Neottia CLI', () => {
 
     expect(await main(['doctor', '--project', root], result.output)).toBe(2);
 
-    expect(result.logs[0]).toContain('Configuration valid. Harnesses: pi');
+    expect(result.logs[0]).toContain(`Repository Store PASS: node ${process.platform}-${process.arch}`);
+    expect(result.logs.some((line) => line.includes('PASS configuration: Project configuration is valid.'))).toBe(true);
     expect(result.errors.some((line) => line.includes('pi lifecycle is not installed. Run neottia apply.'))).toBe(true);
   });
 
@@ -378,6 +390,33 @@ describe('Neottia CLI', () => {
     expect(await main(['doctor', '--project', root], result.output)).toBe(0);
 
     expect(result.logs.join('\n')).toContain('No missing modules or installs detected.');
+  }, 30000);
+
+  it('emits deterministic machine-readable platform and installation diagnostics', async () => {
+    const root = await fixture();
+    await main(['init', '--harness', 'pi', '--project', root], capture().output);
+    await main(['apply', '--project', root], capture().output);
+    const first = capture();
+    const second = capture();
+
+    expect(await main(['doctor', '--json', '--project', root], first.output)).toBe(0);
+    expect(await main(['doctor', '--json', '--project', root], second.output)).toBe(0);
+
+    expect(first.errors).toEqual([]);
+    expect(first.logs).toEqual(second.logs);
+    const report = JSON.parse(first.logs[0]!) as {
+      status: string;
+      repositoryStore: { status: string; checks: Array<{ id: string; status: string }> };
+      configuration: { status: string; harnesses: string[]; checks: Array<{ id: string; status: string }> };
+    };
+    expect(report).toMatchObject({
+      status: 'pass',
+      repositoryStore: { status: 'pass' },
+      configuration: { status: 'pass', harnesses: ['pi'] },
+    });
+    expect(report.repositoryStore.checks.find((check) => check.id === 'atomic-no-replace')?.status).toBe('pass');
+    expect(report.configuration.checks.find((check) => check.id === 'installation.pi')?.status).toBe('pass');
+    expect(first.logs[0]).not.toContain(root);
   }, 30000);
 
   it('refuses to replace an existing configuration', async () => {

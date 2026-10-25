@@ -31,6 +31,7 @@ import { issueConfigContribution } from '@neottia/issues';
 import { memoryConfigContribution } from '@neottia/memory-core';
 import { opencodeHarnessAdapter } from '@neottia/opencode-adapter';
 import { piHarnessAdapter } from '@neottia/pi-adapter';
+import { diagnoseRepositoryPlatform, type RepositoryPlatformDiagnostics } from '@neottia/repository-store';
 import { compileSdlc, createSdlcCompilerInput, loadSdlcTemplateLayers, type SdlcRuntimePackage } from '@neottia/sdlc';
 import { searchableConfigContribution } from '@neottia/searchable-core';
 
@@ -397,7 +398,26 @@ async function isRegularFile(path: string): Promise<boolean> {
   }
 }
 
-/** Reports static configuration and installation health without changing either. */
+interface CliDoctorCheck {
+  readonly id: string;
+  readonly status: 'pass' | 'fail';
+  readonly message: string;
+  readonly remediation?: string;
+}
+
+interface CliDoctorReport {
+  readonly schemaVersion: 1;
+  readonly status: 'pass' | 'fail';
+  readonly repositoryStore: RepositoryPlatformDiagnostics;
+  readonly configuration: {
+    readonly status: 'pass' | 'fail';
+    readonly harnesses: readonly string[];
+    readonly enabledModules: readonly NeottiaRuntimePackageId[];
+    readonly checks: readonly CliDoctorCheck[];
+  };
+}
+
+/** Reports platform, configuration, and installation health without retaining probe artifacts. */
 async function doctorCommand(
   arguments_: readonly string[],
   output: CliOutput,
@@ -414,54 +434,168 @@ async function doctorCommand(
     output.log(canonicalJson(results));
     return results.some((result) => result.status === 'error') ? 2 : 0;
   }
-  // Config-driven flow: validate configuration and report module and install gaps.
-  if (!(await isRegularFile(join(project, '.neottia', 'config.yml')))) {
-    output.error(`${WARN_PREFIX}Missing project configuration. Run neottia init first.`);
-    return 2;
+
+  const repositoryStore = await diagnoseRepositoryPlatform(project);
+  const configuration = await diagnoseProjectConfiguration(project, env);
+  const report: CliDoctorReport = Object.freeze({
+    schemaVersion: 1,
+    status: repositoryStore.status === 'pass' && configuration.status === 'pass' ? 'pass' : 'fail',
+    repositoryStore,
+    configuration,
+  });
+  if (values.json === true) {
+    output.log(canonicalJson(report));
+  } else {
+    renderDoctorReport(report, output);
   }
-  const snapshot = resolveConfig(officialConfigRegistry, { cwd: project, env });
-  const modules: ReadonlyArray<readonly [NeottiaRuntimePackageId, string, boolean]> = [
-    ['memory', 'modules.memory.enabled', snapshot.get(memoryConfigContribution).enabled],
-    ['issues', 'modules.issues.enabled', snapshot.get(issueConfigContribution).enabled],
-    ['design-docs', 'modules.design_docs.enabled', snapshot.get(designDocsConfigContribution).enabled],
-    ['searchable', 'modules.searchable.enabled', snapshot.get(searchableConfigContribution).enabled],
+  return report.status === 'pass' ? 0 : 2;
+}
+
+/** Diagnoses config, catalog coverage, receipts, and installed assets. */
+async function diagnoseProjectConfiguration(
+  project: string,
+  env: NodeJS.ProcessEnv,
+): Promise<CliDoctorReport['configuration']> {
+  const configPath = join(project, '.neottia', 'config.yml');
+  if (!(await isRegularFile(configPath))) {
+    return freezeConfiguration(
+      [],
+      [],
+      [
+        {
+          id: 'configuration',
+          status: 'fail',
+          message: 'Project configuration is missing.',
+          remediation: 'Run neottia init first.',
+        },
+      ],
+    );
+  }
+
+  let snapshot: ResolvedConfigSnapshot;
+  try {
+    snapshot = resolveConfig(officialConfigRegistry, { cwd: project, env });
+  } catch {
+    return freezeConfiguration(
+      [],
+      [],
+      [
+        {
+          id: 'configuration',
+          status: 'fail',
+          message: 'Project configuration is invalid.',
+          remediation: 'Correct .neottia/config.yml, then run neottia doctor again.',
+        },
+      ],
+    );
+  }
+  const modules: ReadonlyArray<readonly [NeottiaRuntimePackageId, boolean]> = [
+    ['memory', snapshot.get(memoryConfigContribution).enabled],
+    ['issues', snapshot.get(issueConfigContribution).enabled],
+    ['design-docs', snapshot.get(designDocsConfigContribution).enabled],
+    ['searchable', snapshot.get(searchableConfigContribution).enabled],
   ];
-  const harnesses = selectHarnesses([], project, env);
-  let failures = 0;
-  output.log(`Configuration valid. Harnesses: ${harnesses.join(', ')}`);
-  for (const harnessId of harnesses) {
-    for (const [logicalId, configPath, enabled] of modules) {
-      if (!enabled) continue;
-      void configPath;
-      const entry = catalogEntry(harnessId, logicalId);
-      if (entry === undefined) {
-        output.error(
-          `${WARN_PREFIX}No compatible runtime package for ${harnessId} ${logicalId}. Remove the module or extend the catalog.`,
-        );
-        failures += 1;
-      }
-    }
-  }
-  const configuredScopes = new Map(
-    snapshot.get(harnessInstallConfigContribution).targets.map((target) => [target.id, target.scope] as const),
+  const enabledModules = modules.filter(([, enabled]) => enabled).map(([logicalId]) => logicalId);
+  const configuredTargets = snapshot.get(harnessInstallConfigContribution).targets;
+  const harnesses = [...new Set(configuredTargets.map((target) => target.id))].sort((left, right) =>
+    left.localeCompare(right),
   );
+  const checks: CliDoctorCheck[] = [
+    { id: 'configuration', status: 'pass', message: 'Project configuration is valid.' },
+  ];
   for (const harnessId of harnesses) {
-    const scope = configuredScopes.get(harnessId) ?? 'project';
-    const installRoots = installRootsFor(project, env);
-    const receiptPath = receiptPathFor(harnessId, scope, installRoots);
-    if (await isRegularFile(receiptPath)) {
-      // Receipt presence alone does not prove the lifecycle is intact; report
-      // drift through the same diagnosis the manifest flow uses.
-      const inspected = await inspectUninstall(receiptPath, installRoots);
-      if (!diagnoseSnapshot(inspected).some((result) => result.status === 'error')) continue;
-      output.error(`${WARN_PREFIX}${harnessId} lifecycle is installed but drifted. Rerun neottia apply.`);
-    } else {
-      output.error(`${WARN_PREFIX}${harnessId} lifecycle is not installed. Run neottia apply.`);
+    if (!SUPPORTED_HARNESSES.includes(harnessId as SupportedHarness)) {
+      checks.push({
+        id: `harness.${harnessId}`,
+        status: 'fail',
+        message: `Configured harness ${harnessId} is unsupported.`,
+        remediation: `Use one of: ${SUPPORTED_HARNESSES.join(', ')}.`,
+      });
+      continue;
     }
-    failures += 1;
+    for (const logicalId of enabledModules) {
+      if (catalogEntry(harnessId as SupportedHarness, logicalId) !== undefined) continue;
+      checks.push({
+        id: `catalog.${harnessId}.${logicalId}`,
+        status: 'fail',
+        message: `No compatible runtime package exists for ${harnessId} ${logicalId}.`,
+        remediation: 'Remove the module or install a Neottia release whose catalog includes it.',
+      });
+    }
   }
-  if (failures === 0) output.log('No missing modules or installs detected.');
-  return failures > 0 ? 2 : 0;
+
+  const configuredScopes = new Map(configuredTargets.map((target) => [target.id, target.scope] as const));
+  const installRoots = installRootsFor(project, env);
+  for (const harnessId of harnesses.filter((value): value is SupportedHarness =>
+    SUPPORTED_HARNESSES.includes(value as SupportedHarness),
+  )) {
+    const scope = configuredScopes.get(harnessId) ?? 'project';
+    const receiptPath = receiptPathFor(harnessId, scope, installRoots);
+    if (!(await isRegularFile(receiptPath))) {
+      checks.push({
+        id: `installation.${harnessId}`,
+        status: 'fail',
+        message: `${harnessId} lifecycle is not installed.`,
+        remediation: 'Run neottia apply.',
+      });
+      continue;
+    }
+    try {
+      const inspected = await inspectUninstall(receiptPath, installRoots);
+      if (diagnoseSnapshot(inspected).some((result) => result.status === 'error')) {
+        checks.push({
+          id: `installation.${harnessId}`,
+          status: 'fail',
+          message: `${harnessId} lifecycle is installed but drifted.`,
+          remediation: 'Rerun neottia apply.',
+        });
+      } else {
+        checks.push({
+          id: `installation.${harnessId}`,
+          status: 'pass',
+          message: `${harnessId} lifecycle receipt and installed assets are consistent.`,
+        });
+      }
+    } catch {
+      checks.push({
+        id: `installation.${harnessId}`,
+        status: 'fail',
+        message: `${harnessId} lifecycle receipt cannot be verified.`,
+        remediation: 'Inspect the receipt, recover interrupted work if present, then rerun neottia apply.',
+      });
+    }
+  }
+  return freezeConfiguration(harnesses, enabledModules, checks);
+}
+
+function freezeConfiguration(
+  harnesses: readonly string[],
+  enabledModules: readonly NeottiaRuntimePackageId[],
+  checks: readonly CliDoctorCheck[],
+): CliDoctorReport['configuration'] {
+  const frozenChecks = Object.freeze(checks.map((result) => Object.freeze(result)));
+  return Object.freeze({
+    status: frozenChecks.some((result) => result.status === 'fail') ? 'fail' : 'pass',
+    harnesses: Object.freeze([...harnesses]),
+    enabledModules: Object.freeze([...enabledModules]),
+    checks: frozenChecks,
+  });
+}
+
+function renderDoctorReport(report: CliDoctorReport, output: CliOutput): void {
+  output.log(
+    `Repository Store ${report.repositoryStore.status.toUpperCase()}: ${report.repositoryStore.runtime.name} ${report.repositoryStore.runtime.platform}-${report.repositoryStore.runtime.architecture}, filesystem ${report.repositoryStore.filesystem.type ?? 'unknown'}.`,
+  );
+  for (const result of report.repositoryStore.checks) {
+    const line = `${result.status === 'pass' ? 'PASS' : WARN_PREFIX + 'FAIL'} ${result.id}: ${result.message}`;
+    if (result.status === 'pass') output.log(line);
+    else output.error(`${line} ${result.remediation ?? ''}`.trim());
+  }
+  for (const result of report.configuration.checks) {
+    if (result.status === 'pass') output.log(`PASS ${result.id}: ${result.message}`);
+    else output.error(`${WARN_PREFIX}FAIL ${result.id}: ${result.message} ${result.remediation ?? ''}`.trim());
+  }
+  if (report.configuration.status === 'pass') output.log('No missing modules or installs detected.');
 }
 
 /** Computes one harness receipt path without reading it. */
@@ -493,6 +627,7 @@ interface CommonValues {
   readonly home?: string;
   readonly 'xdg-config'?: string;
   readonly 'xdg-state'?: string;
+  readonly json?: boolean;
 }
 
 /** Parses root and planning options without command-specific ambiguity. */
@@ -511,6 +646,7 @@ function parseCommon(arguments_: readonly string[]): CommonValues {
       home: { type: 'string' },
       'xdg-config': { type: 'string' },
       'xdg-state': { type: 'string' },
+      json: { type: 'boolean', default: false },
     },
   });
   return values;
@@ -726,7 +862,7 @@ function help(): string {
     'Usage:',
     '  neottia init [--harness pi|opencode]... [--enable memory] [--preset local] [--project DIR]   # create, or validate if present',
     '  neottia apply [--harness ID]... [--scope project|global] [--project DIR]',
-    '  neottia doctor [--project DIR]                            # static config + install report',
+    '  neottia doctor [--project DIR] [--json]                   # platform, config, and install report',
     '  neottia sdlc plan --harness ID [--scope project|global] [--output FILE] [--manifest FILE] [--approve ID]...',
     '  neottia plan --manifest FILE [--action install|update] [--output FILE] [--approve ID]...',
     '  neottia apply --plan FILE',

@@ -24,6 +24,8 @@ Installation downloads the exact native prebuild for the package version, platfo
 
 The stable C Node-API addon is built from architecture-neutral source. Linux uses `renameat2(..., RENAME_NOREPLACE)` and `fsync`. macOS uses `renamex_np(..., RENAME_EXCL)` and `F_FULLFSYNC`. Windows uses `SetFileInformationByHandle(..., FileRenameInfoEx)` without replacement and the Node/Bun `fsyncSync` descriptor barrier; NTFS journals same-volume namespace mutations because Windows does not expose an unprivileged directory-descriptor flush through Node.js. FreeBSD uses exclusive regular-file hard-link publication and `fsync`; because FreeBSD 14 has no no-replace directory rename, the backend uses a complete regular-file authority lease and never applies its move primitive to directories. Repository authority acquisition checks the addon and filesystem capabilities before it creates claim or lease artifacts. FreeBSD UFS1, ZFS, network filesystems, FreeBSD arm64, Bun on FreeBSD, Windows arm64, ReFS, FAT, remote or removable Windows volumes, missing or unloadable addon builds, unavailable native operations, uncertified filesystems, and shared or network filesystems return `UNSUPPORTED_RUNTIME`. Leased canonical and cache operations, including read-only operations, are unavailable in those environments.
 
+`diagnoseRepositoryPlatform(root)` reports the runtime tuple, loaded backend, filesystem type and locality, and active checks for no-replace publication, hard links, stable identity, and durability. The probe uses a private temporary directory below `root`, removes it on every path, and does not create repository authority artifacts. The `neottia doctor` command renders this report and supports deterministic JSON output.
+
 ## Canonical files
 
 ```ts
