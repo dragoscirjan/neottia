@@ -26,6 +26,7 @@ int SupportsRequiredDurability(const char* path, bool* supported) {
     *supported = false;
     return 0;
   }
+  if (sync_error == 0 && close_error == 0) *supported = true;
   return sync_error != 0 ? sync_error : close_error;
 }
 

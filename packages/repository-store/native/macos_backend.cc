@@ -29,6 +29,7 @@ int SupportsRequiredDurability(const char* path, bool* supported) {
     sync_result = fcntl(descriptor, F_FULLFSYNC, 0);
   } while (sync_result != 0 && errno == EINTR);
   if (sync_result == 0) {
+    *supported = true;
     const int close_result = close(descriptor);
     return close_result == 0 ? 0 : errno;
   }
