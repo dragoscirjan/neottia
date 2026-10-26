@@ -106,6 +106,7 @@ export default defineConfig({
           text: 'SDLC reference',
           items: [
             { text: 'Compile the lifecycle', link: '/sdlc/' },
+            { text: 'Customize prompts', link: '/sdlc/customization' },
             { text: 'Operating protocol', link: '/sdlc/protocol' },
             { text: 'Provider packs', link: '/sdlc/providers' },
             { text: 'Portable roles', link: '/sdlc/roles' },

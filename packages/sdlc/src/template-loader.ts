@@ -9,6 +9,7 @@ import {
   SDLC_CONTENT_TEMPLATE_ID,
   SDLC_LAYOUT_TEMPLATE_ID,
   SDLC_LIFECYCLE_VERSION,
+  SDLC_PROJECT_APPEND_TEMPLATE_IDS,
   SDLC_PROTOCOL_TEMPLATE_ID,
 } from './lifecycle.js';
 
@@ -19,10 +20,18 @@ const TEMPLATE_DIRECTORY_SEGMENTS = ['.neottia', 'templates', 'sdlc'] as const;
 const COMMAND_TEMPLATE_FILENAMES = new Map<string, string>(
   SDLC_COMMAND_IDS.map((command) => [`${command}.md.twig`, `neottia.sdlc.command.${command}`]),
 );
-/** Override layers accept every command template plus the operating protocol. */
+/** Global and project override layers accept every command template plus the operating protocol. */
 const OVERRIDE_TEMPLATE_FILENAMES = new Map<string, string>([
   ...COMMAND_TEMPLATE_FILENAMES,
   ['protocol.md', SDLC_PROTOCOL_TEMPLATE_ID],
+]);
+/** Project layers also accept one plain-Markdown addition for each lifecycle command. */
+const PROJECT_TEMPLATE_FILENAMES = new Map<string, string>([
+  ...OVERRIDE_TEMPLATE_FILENAMES,
+  ...SDLC_COMMAND_IDS.map((command): [string, string] => [
+    `${command}.append.md`,
+    SDLC_PROJECT_APPEND_TEMPLATE_IDS[command],
+  ]),
 ]);
 const PACKAGED_TEMPLATE_FILENAMES = new Map<string, string>([
   ...COMMAND_TEMPLATE_FILENAMES,
@@ -93,7 +102,11 @@ async function loadOverrideLayer(
 ): Promise<TemplateLayer | undefined> {
   const directory = await conventionalTemplateDirectory(root);
   if (directory === undefined) return undefined;
-  const files = await loadTemplateDirectory(directory, maxBytes, OVERRIDE_TEMPLATE_FILENAMES);
+  const files = await loadTemplateDirectory(
+    directory,
+    maxBytes,
+    tier === 'project' ? PROJECT_TEMPLATE_FILENAMES : OVERRIDE_TEMPLATE_FILENAMES,
+  );
   if (files.length === 0) return undefined;
   return freezeLayer({
     tier,

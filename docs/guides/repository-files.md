@@ -8,6 +8,8 @@ Use these exact tracking rules. Do not ignore all of `.neottia/`.
 | `.neottia/memory/{facts,decisions,events,lessons,tombstones}/**/*.yaml` | Canonical filesystem Memory                           | Track         |
 | `.neottia/issues/**/*.yml`                                              | Active and archived Issues                            | Track         |
 | `.neottia/design-docs/**/*.md`                                          | Active and archived Design Docs                       | Track         |
+| `.neottia/templates/sdlc/*.{append.md,md.twig}`                         | Project lifecycle additions and complete overrides    | Track         |
+| `.neottia/templates/sdlc/protocol.md`                                   | Project operating-protocol override                   | Track         |
 | `.neottia/memory/index.db*`                                             | Memory SQLite cache                                   | Ignore        |
 | `.neottia/cache/`                                                       | Issues, Design Docs, and Searchable caches            | Ignore        |
 | `.neottia/repository-store/`                                            | Lease, journal, cache-publication, and recovery state | Ignore        |

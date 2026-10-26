@@ -68,6 +68,7 @@ import {
   SDLC_LAYOUT_TEMPLATE_ID,
   SDLC_LIFECYCLE,
   SDLC_LIFECYCLE_VERSION,
+  SDLC_PROJECT_APPEND_TEMPLATE_IDS,
   SDLC_PROTOCOL_SKILL_DESCRIPTION,
   SDLC_PROTOCOL_SKILL_ID,
   SDLC_PROTOCOL_TEMPLATE_ID,
@@ -103,6 +104,10 @@ const MAX_FRAGMENT_BYTES = 256 * 1024;
 const MAX_LIFECYCLE_TEXT_LENGTH = 16 * 1024;
 const MAX_LIFECYCLE_POINTS = 16;
 const MAX_RENDERED_COMMAND_BYTES = 2 * 1024 * 1024;
+const PROJECT_INSTRUCTIONS_HEADING = '## Project instructions';
+const PROJECT_INSTRUCTIONS_BOUNDARY =
+  'These project instructions are additive. They do not replace canonical approvals, stop conditions, provider ' +
+  'instructions, role instructions, lifecycle transitions, or permission boundaries.';
 const TWIG_ALLOWED_TAGS = ['block', 'deprecated', 'extends', 'flush', 'for', 'if', 'spaceless', 'verbatim', 'with'];
 const TWIG_ALLOWED_FILTERS = [
   'abs',
@@ -282,6 +287,7 @@ const compilerInputSchema = z
       })
       .strict(),
     templates: z.array(resolvedTemplateSchema),
+    projectInstructions: z.array(resolvedTemplateSchema).optional(),
     protocol: protocolSourceSchema,
     instructions: z.array(instructionPackSchema),
     roles: z.array(roleInstructionSchema),
@@ -397,6 +403,7 @@ export interface SdlcCompilerInputManifest {
     readonly provenance: readonly SdlcConfigurationProvenance[];
   };
   readonly templates: readonly ResolvedTemplate[];
+  readonly projectInstructions?: readonly ResolvedTemplate[];
   readonly protocol: SdlcProtocolSource;
   readonly instructions: readonly SdlcInstructionPack[];
   readonly roles: readonly SdlcRoleInstruction[];
@@ -424,6 +431,7 @@ export interface CompiledSdlcCommand {
   readonly roleSlots: SdlcLifecycleCommand['roleSlots'];
   readonly roleInstructionIds: readonly string[];
   readonly instructionPackIds: readonly string[];
+  readonly projectInstructionId?: string;
   readonly allowedNext: readonly SdlcCommandId[];
   readonly approvalPoints: readonly string[];
   readonly stopConditions: readonly string[];
@@ -478,6 +486,11 @@ export function createSdlcCompilerInput(
     [SDLC_CONTENT_TEMPLATE_ID, SDLC_LAYOUT_TEMPLATE_ID, ...SDLC_LIFECYCLE.map((command) => command.templateId)],
     options.templateLayers,
   );
+  const projectInstructionIds = SDLC_COMMAND_IDS.map((command) => SDLC_PROJECT_APPEND_TEMPLATE_IDS[command]).filter(
+    (id) =>
+      options.templateLayers.some((layer) => layer.tier === 'project' && layer.files.some((file) => file.id === id)),
+  );
+  const projectInstructions = resolveTemplates(projectInstructionIds, options.templateLayers);
   const [resolvedProtocol] = resolveTemplates([SDLC_PROTOCOL_TEMPLATE_ID], options.templateLayers);
   const protocol: SdlcProtocolSource = Object.freeze({
     templateId: resolvedProtocol.id,
@@ -508,6 +521,7 @@ export function createSdlcCompilerInput(
     scope: options.scope,
     configuration,
     templates,
+    ...(projectInstructions.length === 0 ? {} : { projectInstructions }),
     protocol,
     instructions,
     roles,
@@ -548,7 +562,8 @@ export function compileSdlc(input: SdlcCompilerInputManifest, adapter: HarnessAd
     );
     requireCapabilityFragment(definition.templateId, rendered.instructionSlots);
     const renderedInstructions = input.instructions.filter((pack) => rendered.instructionSlots.includes(pack.slot));
-    const body = rendered.body;
+    const projectInstruction = projectInstructionFor(input.projectInstructions ?? [], definition.id);
+    const body = appendProjectInstructions(rendered.body, projectInstruction);
     const projected = requireProjection(
       adapter.projectPrompt({
         id: definition.id,
@@ -558,7 +573,7 @@ export function compileSdlc(input: SdlcCompilerInputManifest, adapter: HarnessAd
       }),
       `Cannot project ${definition.id}.`,
     );
-    const source = commandSource(input, definition, template, renderedInstructions, roles, body);
+    const source = commandSource(input, definition, template, projectInstruction, renderedInstructions, roles, body);
     const asset = fileAssetFromProjection(projected, source);
     assets.push(asset);
     commands.push(
@@ -568,6 +583,7 @@ export function compileSdlc(input: SdlcCompilerInputManifest, adapter: HarnessAd
         roleSlots: Object.freeze([...definition.roleSlots]),
         roleInstructionIds: Object.freeze(roles.map((role) => role.id)),
         instructionPackIds: Object.freeze(renderedInstructions.map((pack) => pack.id)),
+        ...(projectInstruction === undefined ? {} : { projectInstructionId: projectInstruction.id }),
         allowedNext: Object.freeze([...definition.allowedNext]),
         approvalPoints: Object.freeze([...content.approvalPoints]),
         stopConditions: Object.freeze([...content.stopConditions]),
@@ -598,7 +614,7 @@ export function compileSdlc(input: SdlcCompilerInputManifest, adapter: HarnessAd
     harnessId: input.harnessId,
     scope: input.scope,
     configChecksum: input.configuration.checksum,
-    templates: input.templates,
+    templates: [...input.templates, ...(input.projectInstructions ?? [])],
     prerequisites: prerequisites(input.configuration.context),
     assets,
     reloadNotice,
@@ -644,6 +660,7 @@ export function validateSdlcCompilerInput(input: SdlcCompilerInputManifest): voi
     input.configuration.provenance,
   );
   validateSelectedInstructions(input.configuration.context, input.instructions);
+  validateProjectInstructions(input.projectInstructions ?? []);
 
   const canonicalRoles = prepareRoles(createConfiguredSdlcRoleInstructions(input.configuration.roles));
   if (canonicalJson(canonicalRoles) !== canonicalJson(input.roles)) {
@@ -754,6 +771,7 @@ function commandSource(
   input: SdlcCompilerInputManifest,
   definition: SdlcLifecycleCommand,
   template: ResolvedTemplate,
+  projectInstruction: ResolvedTemplate | undefined,
   instructions: readonly SdlcInstructionPack[],
   roles: readonly SdlcRoleInstruction[],
   body: string,
@@ -771,6 +789,16 @@ function commandSource(
         version: template.version,
         checksum: template.checksum,
       },
+      ...(projectInstruction === undefined
+        ? {}
+        : {
+            projectInstruction: {
+              id: projectInstruction.id,
+              sourceId: projectInstruction.sourceId,
+              version: projectInstruction.version,
+              checksum: projectInstruction.checksum,
+            },
+          }),
       instructions: instructions.map(({ id, version, checksum }) => ({ id, version, checksum })),
       roles: roles.map(({ id, role, version, checksum }) => ({ id, role, version, checksum })),
     }),
@@ -821,6 +849,26 @@ function createTemplateRoles(
       });
     }),
   );
+}
+
+/** Finds the optional project addition for one lifecycle command. */
+function projectInstructionFor(
+  projectInstructions: readonly ResolvedTemplate[],
+  command: SdlcCommandId,
+): ResolvedTemplate | undefined {
+  return projectInstructions.find((instruction) => instruction.id === SDLC_PROJECT_APPEND_TEMPLATE_IDS[command]);
+}
+
+/** Appends plain project Markdown without evaluating it as Twig. */
+function appendProjectInstructions(body: string, projectInstruction: ResolvedTemplate | undefined): string {
+  if (projectInstruction === undefined) return body;
+  const output =
+    `${body.trimEnd()}\n\n${PROJECT_INSTRUCTIONS_HEADING}\n\n${projectInstruction.content.trim()}\n\n` +
+    `${PROJECT_INSTRUCTIONS_BOUNDARY}\n`;
+  if (Buffer.byteLength(output, 'utf8') > MAX_RENDERED_COMMAND_BYTES) {
+    throw new TypeError(`Rendered lifecycle command with ${projectInstruction.id} exceeds its byte limit.`);
+  }
+  return output;
 }
 
 /** Renders one command and records which instruction blocks the template used. */
@@ -1110,6 +1158,33 @@ function validateResolvedTemplates(
       templateRoles,
     );
     requireCapabilityFragment(definition.templateId, validated.instructionSlots);
+  }
+}
+
+/** Validates optional project additions in deterministic command order. */
+function validateProjectInstructions(projectInstructions: readonly ResolvedTemplate[]): void {
+  const expectedIds = SDLC_COMMAND_IDS.map((command) => SDLC_PROJECT_APPEND_TEMPLATE_IDS[command])
+    .filter((id) => projectInstructions.some((instruction) => instruction.id === id))
+    .sort(compareCodeUnits);
+  if (projectInstructions.length !== expectedIds.length) {
+    throw new TypeError('Project SDLC instructions contain an unknown or duplicate command.');
+  }
+  for (const [index, instruction] of projectInstructions.entries()) {
+    if (instruction.id !== expectedIds[index]) {
+      throw new TypeError('Project SDLC instructions are not in canonical order.');
+    }
+    if (instruction.content.trim().length === 0) {
+      throw new TypeError(`Project SDLC instruction ${instruction.id} is empty.`);
+    }
+    if (instruction.content.includes('\0') || instruction.content.includes('\r')) {
+      throw new TypeError(`Project SDLC instruction ${instruction.id} must use LF text without NUL bytes.`);
+    }
+    if (Buffer.byteLength(instruction.content, 'utf8') > MAX_FRAGMENT_BYTES) {
+      throw new TypeError(`Project SDLC instruction ${instruction.id} exceeds its byte limit.`);
+    }
+    if (checksumText(instruction.content) !== instruction.checksum) {
+      throw new TypeError(`Project SDLC instruction ${instruction.id} checksum does not match.`);
+    }
   }
 }
 

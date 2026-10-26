@@ -347,12 +347,12 @@ describe('empty-project CLI adoption journey (issue #161)', () => {
     expect(runCli(['apply', '--plan', secondPlanPath], roots).code).toBe(0);
     expect(await readFile(receiptPath, 'utf8')).toBe(receiptBytes);
 
-    // A supported configuration change produces a bounded update plan.
+    // A project prompt addition produces a bounded update plan.
     const overrides = join(roots.project, '.neottia', 'templates', 'sdlc');
     await mkdir(overrides, { recursive: true });
     await writeFile(
-      join(overrides, 'plan.md.twig'),
-      '{% extends "neottia.sdlc.layout" %}\n{% block purpose %}Journey-tailored planning override.{% endblock %}\n',
+      join(overrides, 'plan.append.md'),
+      'Inspect the project delivery checklist before approval.\n',
       'utf8',
     );
     const changedPlanPath = join(roots.root, 'changed.plan.json');
@@ -368,7 +368,7 @@ describe('empty-project CLI adoption journey (issue #161)', () => {
     );
     expect(runCli(['apply', '--plan', changedPlanPath], roots).code).toBe(0);
     expect(await readFile(join(roots.project, '.pi', 'prompts', 'plan.md'), 'utf8')).toContain(
-      'Journey-tailored planning override.',
+      'Inspect the project delivery checklist before approval.',
     );
 
     // Doctor reports a healthy static configuration without side effects.
