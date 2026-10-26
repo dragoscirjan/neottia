@@ -37,7 +37,7 @@ jobs:
       - run: mise run deps:sync:pnpm
       - name: Download native prebuilds
         if: inputs.native-prebuilds
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: repository-store-native-*
           path: native-prebuilds
@@ -63,7 +63,7 @@ jobs:
       # only rebuilds package artifacts before Changesets publishes them.
       - name: Create release pull request or publish packages
         id: release
-        uses: dragoscirjan/tempel-javascript/.github/actions/release@e88bf519e8fe731fcb9440e987475fe109076d0a
+        uses: dragoscirjan/tempel-javascript/.github/actions/release@71e3379b37d477ae0e7915f6463b0a3921d28f8d
         with:
           config: .github/tempel-release.yml
         env:
