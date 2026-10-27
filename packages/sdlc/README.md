@@ -1,6 +1,6 @@
 # @neottia/sdlc
 
-`@neottia/sdlc` compiles one canonical Plan, Build, Verify, Release, Continue, and Refresh lifecycle into assets for a Neottia harness adapter. The compiler keeps the semantic command IDs unchanged and projects `/neottia-plan`, `/neottia-build`, `/neottia-verify`, `/neottia-release`, `/neottia-continue`, and `/neottia-refresh` as host-facing commands. The package ships six Markdown/Twig templates plus one plain-markdown operating-protocol template, projected as a shared `neottia-sdlc` skill through every adapter, and loads them before pure compilation. The compiler returns a checksummed `AssetManifest` for `@neottia/distribution` and does not read files, run providers, or install assets.
+`@neottia/sdlc` compiles one canonical Plan, Build, Verify, Release, Continue, Refresh, and Adopt lifecycle into assets for a Neottia harness adapter. The compiler keeps the semantic command IDs unchanged and projects `/neottia-plan`, `/neottia-build`, `/neottia-verify`, `/neottia-release`, `/neottia-continue`, `/neottia-refresh`, and `/neottia-adopt` as host-facing commands. The package ships seven Markdown/Twig templates plus one plain-markdown operating-protocol template, projected as a shared `neottia-sdlc` skill through every adapter, and loads them before pure compilation. The compiler returns a checksummed `AssetManifest` for `@neottia/distribution` and does not read files, run providers, or install assets.
 
 See the [SDLC compiler guide](../../docs/sdlc/) and [configuration reference](../../docs/configuration.md#sdlc-provider-selection).
 
@@ -64,7 +64,7 @@ See the [provider instruction-pack guide](../../docs/sdlc/providers.md) for conf
 
 ## Templates and roles
 
-The package publishes `templates/plan.md.twig`, `build.md.twig`, `verify.md.twig`, `release.md.twig`, `continue.md.twig`, and `refresh.md.twig`, plus their shared `layout.md.twig`, `lifecycle.json` prose, and `protocol.md`, the operating-protocol skill body with ID `neottia.sdlc.protocol`. Twing renders the selected command with strict variables and no HTML escaping. The shared layout has one named block per instruction slot, and command templates leave unused blocks empty. The renderer rejects nondeterministic Twig functions, duplicate instruction fragments, and missing or duplicate role fragments.
+The package publishes `templates/plan.md.twig`, `build.md.twig`, `verify.md.twig`, `release.md.twig`, `continue.md.twig`, `refresh.md.twig`, and `adopt.md.twig`, plus their shared `layout.md.twig`, `lifecycle.json` prose, and `protocol.md`, the operating-protocol skill body with ID `neottia.sdlc.protocol`. Twing renders the selected command with strict variables and no HTML escaping. The shared layout has one named block per instruction slot, and command templates leave unused blocks empty. The renderer rejects nondeterministic Twig functions, duplicate instruction fragments, and missing or duplicate role fragments.
 
 Place a plain project addition at `.neottia/templates/sdlc/<command>.append.md`. The compiler appends it under `## Project instructions` only in the matching command. Addition files are plain Markdown, not Twig, and cannot replace canonical command content.
 
@@ -78,4 +78,4 @@ Assign roles under `agents.sdlc.<harness-id>`, for example `agents.sdlc.pi`, `ag
 
 Generated prompts preserve lifecycle approvals, evidence requirements, stop conditions, and transitions across Pi, OpenCode, and Claude Code. Their permission language is guidance. It does not grant filesystem, process, network, merge, release, or deployment authority.
 
-`/neottia-continue` recommends a next command and stops. `/neottia-release` never grants permission to merge, publish, or deploy.
+`/neottia-continue` recommends a next command and stops. `/neottia-release` never grants permission to merge, publish, or deploy. `/neottia-adopt` remains read-only until the user approves an exact document-operation plan, then requires a non-default branch, remote review preflight, separate deletion approvals, fresh push and draft pull-request approvals, and human review.

@@ -70,14 +70,14 @@ describe('SDLC template loader', () => {
 
   it('loads plain project additions without treating them as complete command overrides', async () => {
     const projectRoot = await temporaryRoot('neottia-sdlc-addition-');
-    const content = 'Run the project-specific viewport checks.\n';
-    await writeOverride(projectRoot, 'verify.append.md', content);
+    const content = 'Preserve the approved project document taxonomy.\n';
+    await writeOverride(projectRoot, 'adopt.append.md', content);
 
     const layers = await loadSdlcTemplateLayers({ projectRoot });
-    const [addition] = resolveTemplates([SDLC_PROJECT_APPEND_TEMPLATE_IDS.verify], layers);
+    const [addition] = resolveTemplates([SDLC_PROJECT_APPEND_TEMPLATE_IDS.adopt], layers);
 
     expect(addition).toMatchObject({
-      id: SDLC_PROJECT_APPEND_TEMPLATE_IDS.verify,
+      id: SDLC_PROJECT_APPEND_TEMPLATE_IDS.adopt,
       content,
       sourceId: 'neottia-project-sdlc',
       shadowed: [],
@@ -86,10 +86,10 @@ describe('SDLC template loader', () => {
 
   it('rejects project additions in the global override directory', async () => {
     const globalRoot = await temporaryRoot('neottia-sdlc-global-addition-');
-    await writeOverride(globalRoot, 'verify.append.md', 'Global addition.\n');
+    await writeOverride(globalRoot, 'adopt.append.md', 'Global addition.\n');
 
     await expect(loadSdlcTemplateLayers({ globalRoot })).rejects.toThrow(
-      'Unknown SDLC template filename verify.append.md.',
+      'Unknown SDLC template filename adopt.append.md.',
     );
   });
 

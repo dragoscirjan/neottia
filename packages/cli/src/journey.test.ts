@@ -244,7 +244,7 @@ describe('empty-project CLI adoption journey (issue #161)', () => {
       roots,
     );
     expect(planned.code).toBe(0);
-    expect(planned.stdout).toContain('Plan install.sdlc-pi: 9 mutation(s), 0 conflict(s).');
+    expect(planned.stdout).toContain('Plan install.sdlc-pi: 10 mutation(s), 0 conflict(s).');
     expect(planned.stdout).toContain('Restart Pi');
 
     const plan = JSON.parse(await readFile(planPath, 'utf8')) as InstallationPlan;
@@ -264,7 +264,7 @@ describe('empty-project CLI adoption journey (issue #161)', () => {
       ),
     ).toBe(true);
     const fileAssets = manifest.assets.filter((asset) => asset.kind === 'file');
-    expect(fileAssets).toHaveLength(7);
+    expect(fileAssets).toHaveLength(8);
     for (const asset of fileAssets) {
       expect(asset.source.kind).toBeDefined();
       expect(asset.source.id).toBeDefined();
@@ -278,11 +278,11 @@ describe('empty-project CLI adoption journey (issue #161)', () => {
       manifest.assets.some((asset) => asset.kind === 'host-config' && asset.id === 'sdlc.runtime.design-docs'),
     ).toBe(true);
 
-    // The saved plan mutates exactly: six commands, one skill, one host
+    // The saved plan mutates exactly: seven commands, one skill, one host
     // configuration, and the receipt.
-    expect(plan.mutations).toHaveLength(9);
+    expect(plan.mutations).toHaveLength(10);
     const fileWrites = plan.mutations.filter((mutation) => mutation.role === 'asset');
-    expect(fileWrites).toHaveLength(7);
+    expect(fileWrites).toHaveLength(8);
     for (const command of COMMANDS) {
       expect(
         fileWrites.some((mutation) => mutation.path.endsWith(join('.pi', 'prompts', `${hostCommandId(command)}.md`))),
@@ -315,6 +315,10 @@ describe('empty-project CLI adoption journey (issue #161)', () => {
     expect(promptContent.get('verify')).toContain('Release requires successful required checks');
     expect(promptContent.get('release')).toContain('Ask before merge, publication, deployment, tagging');
     expect(promptContent.get('continue')).toContain('Recommend exactly one supported next public command');
+    expect(promptContent.get('refresh')).toContain('without mutating work');
+    expect(promptContent.get('adopt')).toContain('Discovery phase');
+    expect(promptContent.get('adopt')).toContain('fail closed if a reviewable pull request cannot be created');
+    expect(promptContent.get('adopt')).toContain('separate explicit approval for every irreversible deletion');
     expect(existsSync(join(roots.project, '.pi', 'skills', 'neottia-sdlc', 'SKILL.md'))).toBe(true);
 
     // Host configuration carries the exact configured package entries.
@@ -328,7 +332,7 @@ describe('empty-project CLI adoption journey (issue #161)', () => {
     const receipt = JSON.parse(await readFile(receiptPath, 'utf8')) as InstallationReceipt;
     validateReceipt(receipt);
     expect(receipt.installationId).toBe('sdlc-pi');
-    expect(receipt.entries).toHaveLength(9);
+    expect(receipt.entries).toHaveLength(10);
     const receiptTargets = receipt.entries.map((entry) => entry.target.segments.join('/'));
     for (const command of COMMANDS) expect(receiptTargets).toContain(`.pi/prompts/${hostCommandId(command)}.md`);
     expect(receiptTargets).toContain('.pi/skills/neottia-sdlc/SKILL.md');
@@ -358,25 +362,21 @@ describe('empty-project CLI adoption journey (issue #161)', () => {
     // A project prompt addition produces a bounded update plan.
     const overrides = join(roots.project, '.neottia', 'templates', 'sdlc');
     await mkdir(overrides, { recursive: true });
-    await writeFile(
-      join(overrides, 'plan.append.md'),
-      'Inspect the project delivery checklist before approval.\n',
-      'utf8',
-    );
+    await writeFile(join(overrides, 'adopt.append.md'), 'Preserve the approved project document taxonomy.\n', 'utf8');
     const changedPlanPath = join(roots.root, 'changed.plan.json');
     const changed = runCli(['sdlc', 'plan', '--harness', 'pi', '--output', changedPlanPath], roots);
     expect(changed.code).toBe(0);
     const changedPlan = JSON.parse(await readFile(changedPlanPath, 'utf8')) as InstallationPlan;
     expect(changedPlan.id).toBe('update.sdlc-pi');
     expect(
-      changedPlan.mutations.some((mutation) => mutation.path.endsWith(join('.pi', 'prompts', 'neottia-plan.md'))),
+      changedPlan.mutations.some((mutation) => mutation.path.endsWith(join('.pi', 'prompts', 'neottia-adopt.md'))),
     ).toBe(true);
     expect(changedPlan.mutations.every((mutation) => mutation.role === 'asset' || mutation.role === 'receipt')).toBe(
       true,
     );
     expect(runCli(['apply', '--plan', changedPlanPath], roots).code).toBe(0);
-    expect(await readFile(join(roots.project, '.pi', 'prompts', 'neottia-plan.md'), 'utf8')).toContain(
-      'Inspect the project delivery checklist before approval.',
+    expect(await readFile(join(roots.project, '.pi', 'prompts', 'neottia-adopt.md'), 'utf8')).toContain(
+      'Preserve the approved project document taxonomy.',
     );
 
     // Doctor reports a healthy static configuration without side effects.
@@ -511,7 +511,7 @@ describe('empty-project CLI adoption journey (issue #161)', () => {
     const planPath = join(roots.root, 'memory.plan.json');
     const planned = runCli(['sdlc', 'plan', '--harness', 'pi', '--output', planPath], roots);
     expect(planned.code).toBe(0);
-    expect(planned.stdout).toContain('Plan install.sdlc-pi: 9 mutation(s), 0 conflict(s).');
+    expect(planned.stdout).toContain('Plan install.sdlc-pi: 10 mutation(s), 0 conflict(s).');
     const plan = JSON.parse(await readFile(planPath, 'utf8')) as InstallationPlan;
     const hostContent = plan.mutations.find((mutation) => mutation.role === 'host-config')!.content;
     for (const expected of expectedPiPackages(['memory', 'issues', 'design-docs'])) {

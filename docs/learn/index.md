@@ -23,7 +23,7 @@ Neottia separates portable lifecycle policy from host syntax and storage mechani
 ## Read the map from left to right
 
 1. **Configuration** — `.neottia/config.yml` selects modules, providers, roles, and installation targets.
-2. **Compilation** — the SDLC compiler renders six commands plus the shared operating protocol from explicit, checksummed inputs.
+2. **Compilation** — the SDLC compiler renders seven commands plus the shared operating protocol from explicit, checksummed inputs.
 3. **Projection** — one harness adapter converts portable assets into host paths, frontmatter, package entries, and MCP settings.
 4. **Installation** — the distribution layer plans mutations, rejects unowned conflicts, writes receipts, and supports rollback and recovery.
 5. **Runtime** — native extensions or stdio MCP servers expose the same domain tools.

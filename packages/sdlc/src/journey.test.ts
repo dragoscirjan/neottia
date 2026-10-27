@@ -50,6 +50,20 @@ const runtimePackages = [
   { logicalId: 'issues' as const, version: '0.1.0' },
   { logicalId: 'design-docs' as const, version: '0.1.0' },
 ];
+const adoptTargets = {
+  pi: {
+    project: ['.pi', 'prompts', 'neottia-adopt.md'],
+    global: ['.pi', 'agent', 'prompts', 'neottia-adopt.md'],
+  },
+  opencode: {
+    project: ['.opencode', 'commands', 'neottia-adopt.md'],
+    global: ['opencode', 'commands', 'neottia-adopt.md'],
+  },
+  'claude-code': {
+    project: ['.claude', 'commands', 'neottia-adopt.md'],
+    global: ['.claude', 'commands', 'neottia-adopt.md'],
+  },
+} as const;
 
 /** Removes every disposable root created by a lifecycle journey. */
 afterEach(async () => {
@@ -57,7 +71,7 @@ afterEach(async () => {
   await Promise.all(temporaryRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
-/** Proves every selected adapter installs the same six commands in both scopes. */
+/** Proves every selected adapter installs the same seven commands in both scopes. */
 describe.each([
   ['pi', piHarnessAdapter, runtimePackages, 2],
   ['opencode', opencodeHarnessAdapter, runtimePackages, 2],
@@ -85,7 +99,7 @@ describe.each([
 
       const promptAssets = first.assets.assets.filter((asset) => asset.kind === 'file');
       const commandAssets = promptAssets.filter((asset) => asset.id.startsWith('asset.prompt.'));
-      expect(promptAssets).toHaveLength(7);
+      expect(promptAssets).toHaveLength(8);
       expect(commandAssets.map((asset) => asset.id).sort()).toEqual(
         Object.values(SDLC_HOST_COMMAND_IDS)
           .map((commandId) => `asset.prompt.${commandId}`)
@@ -95,6 +109,9 @@ describe.each([
         commandAssets.some((asset) => SDLC_COMMAND_IDS.some((commandId) => asset.id === `asset.prompt.${commandId}`)),
       ).toBe(false);
       expect(promptAssets.some((asset) => asset.id === 'asset.skill.neottia-sdlc')).toBe(true);
+      const adopt = commandAssets.find((asset) => asset.id === 'asset.prompt.neottia-adopt')!;
+      expect(adopt.target.segments).toEqual(adoptTargets[harnessId][scope]);
+      expect(await readFile(resolveTarget(adopt.target, roots), 'utf8')).toContain('/neottia-adopt');
       for (const asset of promptAssets) {
         expect(await readFile(resolveTarget(asset.target, roots), 'utf8')).toContain(
           'They do not grant host permissions.',
@@ -176,7 +193,7 @@ it('completes a filesystem and local-Git Plan-to-Release journey under one tempo
     title: 'Canonical lifecycle design',
     kind: 'hld',
     created_by: 'test-operator',
-    body: 'The six commands retain approvals, stop conditions, and permission boundaries.',
+    body: 'The seven commands retain approvals, stop conditions, and permission boundaries.',
   });
   document = await documents.transition(document.id, {
     expected_revision: document.revision,

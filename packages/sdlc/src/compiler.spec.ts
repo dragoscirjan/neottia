@@ -132,7 +132,7 @@ function resignCompilerInput(
 
 describe('canonical SDLC compiler', () => {
   it('keeps semantic command IDs separate from host-facing command IDs', () => {
-    expect(SDLC_COMMAND_IDS).toEqual(['plan', 'build', 'verify', 'release', 'continue', 'refresh']);
+    expect(SDLC_COMMAND_IDS).toEqual(['plan', 'build', 'verify', 'release', 'continue', 'refresh', 'adopt']);
     expect(SDLC_HOST_COMMAND_IDS).toEqual({
       plan: 'neottia-plan',
       build: 'neottia-build',
@@ -140,8 +140,9 @@ describe('canonical SDLC compiler', () => {
       release: 'neottia-release',
       continue: 'neottia-continue',
       refresh: 'neottia-refresh',
+      adopt: 'neottia-adopt',
     });
-    expect(SDLC_LIFECYCLE).toHaveLength(6);
+    expect(SDLC_LIFECYCLE).toHaveLength(7);
     const lifecycleContent = JSON.parse(
       packagedTemplateLayer.files.find((template) => template.id === 'neottia.sdlc.lifecycle')!.content,
     ) as {
@@ -155,10 +156,106 @@ describe('canonical SDLC compiler', () => {
     expect(new Set(lifecycleContent.commands.flatMap((command) => command.approvalPoints)).size).toBeGreaterThan(3);
     expect(lifecycleContent.commands.every((command) => command.stopConditions.length > 0)).toBe(true);
     expect(SDLC_LIFECYCLE.find((command) => command.id === 'plan')?.roleSlots).toEqual(['planner', 'researcher']);
+    expect(SDLC_LIFECYCLE.find((command) => command.id === 'adopt')).toMatchObject({
+      roleSlots: ['researcher', 'documentation-writer', 'release-coordinator'],
+      allowedNext: [],
+    });
+    expect(
+      SDLC_LIFECYCLE.filter((command) => command.id !== 'adopt').every(
+        (command) => !command.allowedNext.includes('adopt'),
+      ),
+    ).toBe(true);
     for (const template of packagedTemplateLayer.files) {
       expect(template.content).not.toMatch(/\b(?:github|gitlab|bitbucket|jira|confluence|filesystem)\b/iu);
       expect(template.content).not.toMatch(/`(?:issue_|document_|git\b)/u);
     }
+  });
+
+  it('compiles adoption safety, provider, approval, pull-request, and repeatability boundaries', () => {
+    const output = compileSdlc(
+      createSdlcCompilerInput(snapshot(), {
+        compilerVersion: '0.1.0',
+        harnessId: 'pi',
+        scope: 'project',
+      }),
+      piHarnessAdapter,
+    );
+    const adopt = promptBody(commandAsset(output, 'adopt'));
+
+    for (const phase of [
+      'Discovery phase',
+      'Classification phase',
+      'Proposal phase',
+      'Approval phase',
+      'Apply phase',
+      'Report phase',
+    ]) {
+      expect(adopt).toContain(phase);
+    }
+    expect(adopt).toContain('Read repository authority and instruction files before other project material');
+    expect(adopt).toContain(
+      'without executing project code, hooks, task runners, installers, builds, tests, or dependency commands',
+    );
+    expect(adopt).toContain('never search, fetch, cite, enrich, or stash web content');
+    expect(adopt).toContain('this whole-command rule overrides compiled Searchable instructions');
+    expect(adopt).toContain('## Adopt capability boundary');
+    expect(adopt).toContain('takes precedence over compiled Searchable instructions');
+    expect(adopt).toContain('the no-mutation rule also takes precedence over generic capability instructions');
+    expect(adopt).toContain('providers read-only until the exact plan is approved');
+    expect(adopt).toContain(
+      'documentation, instruction files, Neottia configuration, issue records, and design records',
+    );
+    expect(adopt).toContain('configured issue and document providers when available');
+    expect(adopt).toContain('report only remaining drift');
+    expect(adopt).toContain('exact plan for each proposed move, merge, archive, provider import, and reference update');
+    expect(adopt).toContain('explicit approval of the exact document-operation plan before any mutation');
+    expect(adopt).toContain('separate explicit approval for every irreversible deletion');
+    expect(adopt).toContain('dedicated non-default branch or isolated workspace');
+    expect(adopt).toContain('Never change the default branch');
+    expect(adopt).toContain('verify a usable Git remote, credentials, and pull-request provider');
+    expect(adopt).toContain('fail closed if a reviewable pull request cannot be created');
+    expect(adopt).toContain('Preserve originals until provider imports are verified');
+    expect(adopt).toContain(
+      'Never modify application source, dependencies, build systems, CI, or project-specific policy',
+    );
+    expect(adopt).toContain('Use hook-bypassing source-control operations for commit and push');
+    expect(adopt).toContain('fresh approval before push');
+    expect(adopt).toContain('fresh approval again before creating a draft pull request');
+    expect(adopt).toContain('never merge, close, or auto-approve it');
+    expect(adopt).toContain('read-only document, reference, provider, and source-control validation evidence');
+    expect(adopt).toContain('Never run target-project validation');
+    expect(adopt).toContain('Use the Neottia `issue_*` tools as the issue authority');
+    expect(adopt).toContain('Use the Neottia `document_*` tools as the document authority');
+    expect(adopt).toContain("This command's semantic ID is `adopt`");
+    expect(adopt).toContain('Invoke it through the public command `/neottia-adopt`');
+    expect(adopt).toContain('The complete public command map is:');
+    expect(adopt).toContain('`adopt` means `/neottia-adopt`');
+    const checkpointGuide = adopt.split(
+      'Translate those IDs before recommending a checkpoint command to the user:',
+    )[1]!;
+    expect(checkpointGuide.split('\n')[0]).not.toContain('adopt');
+  });
+
+  it('preserves existing command approval and read-only recovery boundaries', () => {
+    const output = compileSdlc(
+      createSdlcCompilerInput(snapshot(), {
+        compilerVersion: '0.1.0',
+        harnessId: 'pi',
+        scope: 'project',
+      }),
+      piHarnessAdapter,
+    );
+
+    expect(promptBody(commandAsset(output, 'plan'))).toContain(
+      'Obtain explicit approval for the proposed scope before Build.',
+    );
+    expect(promptBody(commandAsset(output, 'build'))).toContain('Use only the scope approved by Plan');
+    expect(promptBody(commandAsset(output, 'verify'))).toContain('Release requires successful required checks');
+    expect(promptBody(commandAsset(output, 'release'))).toContain('Ask before merge, publication, deployment, tagging');
+    expect(promptBody(commandAsset(output, 'continue'))).toContain('stop without invoking it');
+    const refresh = promptBody(commandAsset(output, 'refresh'));
+    expect(refresh).toContain('without mutating work');
+    expect(refresh).not.toContain('invoke `/neottia-adopt`');
   });
 
   it('compiles optional-capability boundaries only when the lifecycle selects them', () => {
@@ -195,6 +292,9 @@ describe('canonical SDLC compiler', () => {
         'Local Ollama enrichment runs only where the searchable configuration enables it',
       );
     }
+    const enabledAdopt = promptBody(commandAsset(enabled, 'adopt'));
+    expect(enabledAdopt).toContain('never search, fetch, cite, enrich, or stash web content');
+    expect(enabledAdopt).toContain('whole-command rule takes precedence over compiled Searchable instructions');
     expect(enabled.commands.every((command) => command.instructionPackIds.includes('neottia.memory.durable'))).toBe(
       true,
     );
@@ -280,6 +380,7 @@ describe('canonical SDLC compiler', () => {
     );
     expect(promptAssets(pi).map(promptBody)).toEqual(promptAssets(opencode).map(promptBody));
     expect(promptAssets(pi).map((asset) => asset.target.segments.join('/'))).toEqual([
+      '.pi/prompts/neottia-adopt.md',
       '.pi/prompts/neottia-build.md',
       '.pi/prompts/neottia-continue.md',
       '.pi/prompts/neottia-plan.md',
@@ -289,6 +390,7 @@ describe('canonical SDLC compiler', () => {
       '.pi/skills/neottia-sdlc/SKILL.md',
     ]);
     expect(promptAssets(opencode).map((asset) => asset.target.segments.join('/'))).toEqual([
+      '.opencode/commands/neottia-adopt.md',
       '.opencode/commands/neottia-build.md',
       '.opencode/commands/neottia-continue.md',
       '.opencode/commands/neottia-plan.md',
@@ -299,7 +401,7 @@ describe('canonical SDLC compiler', () => {
     ]);
     const skillBody = promptBody(promptAssets(pi).at(-1)!);
     expect(skillBody).toContain('neottia-sdlc:checkpoint');
-    expect(skillBody).toContain('`next` stores one supported semantic command ID');
+    expect(skillBody).toContain('`next` stores one supported delivery or recovery semantic command ID');
     expect(skillBody).toContain('`verify` means `/neottia-verify`');
     expect(skillBody).toContain('They do not grant host permissions.');
     expect(pi.assets.assets.filter((asset): asset is HostConfigAsset => asset.kind === 'host-config')).toHaveLength(2);
@@ -340,6 +442,7 @@ describe('canonical SDLC compiler', () => {
     );
     expect(promptAssets(claude).map(promptBody)).toEqual(promptAssets(pi).map(promptBody));
     expect(promptAssets(claude).map((asset) => asset.target.segments.join('/'))).toEqual([
+      '.claude/commands/neottia-adopt.md',
       '.claude/commands/neottia-build.md',
       '.claude/commands/neottia-continue.md',
       '.claude/commands/neottia-plan.md',
@@ -887,6 +990,7 @@ describe('canonical SDLC compiler', () => {
       '## Project instructions',
     );
 
+    const adoptContent = 'Keep the approved project document taxonomy.\n';
     const buildContent = 'Keep the implementation inside the approved project boundary.\n{{ instructions.issues }}\n';
     const releaseContent = 'Attach the project release checklist.\n';
     const input = createSdlcCompilerInput(snapshot(), {
@@ -900,6 +1004,7 @@ describe('canonical SDLC compiler', () => {
           version: 'revision-1',
           files: [
             { id: SDLC_PROJECT_APPEND_TEMPLATE_IDS.release, content: releaseContent },
+            { id: SDLC_PROJECT_APPEND_TEMPLATE_IDS.adopt, content: adoptContent },
             { id: SDLC_PROJECT_APPEND_TEMPLATE_IDS.build, content: buildContent },
           ],
         },
@@ -907,14 +1012,17 @@ describe('canonical SDLC compiler', () => {
     });
 
     expect(input.projectInstructions?.map((instruction) => instruction.id)).toEqual([
+      SDLC_PROJECT_APPEND_TEMPLATE_IDS.adopt,
       SDLC_PROJECT_APPEND_TEMPLATE_IDS.build,
       SDLC_PROJECT_APPEND_TEMPLATE_IDS.release,
     ]);
     const output = compileSdlc(input, piHarnessAdapter);
+    const adopt = commandAsset(output, 'adopt');
     const build = commandAsset(output, 'build');
     const release = commandAsset(output, 'release');
     const verify = commandAsset(output, 'verify');
 
+    expect(adopt.content).toContain(adoptContent.trim());
     expect(build.content).toContain('## Project instructions');
     expect(build.content).toContain(buildContent.trim());
     expect(build.content).toContain('{{ instructions.issues }}');
@@ -925,6 +1033,9 @@ describe('canonical SDLC compiler', () => {
       SDLC_PROJECT_APPEND_TEMPLATE_IDS.build,
     );
     expect(output.commands.find((command) => command.id === 'verify')?.projectInstructionId).toBeUndefined();
+    expect(output.commands.find((command) => command.id === 'adopt')?.projectInstructionId).toBe(
+      SDLC_PROJECT_APPEND_TEMPLATE_IDS.adopt,
+    );
     expect(output.assets.templates.map((template) => template.id)).toContain(SDLC_PROJECT_APPEND_TEMPLATE_IDS.build);
   });
 
@@ -1216,7 +1327,7 @@ describe('canonical SDLC compiler', () => {
       ],
       [
         resignCompilerInput(input, { templates: [changedTemplate, ...input.templates.slice(1)] }),
-        'template neottia.sdlc.command.build checksum does not match',
+        `template ${changedTemplate.id} checksum does not match`,
       ],
       [
         resignCompilerInput(input, { instructions: [...input.instructions].reverse() }),

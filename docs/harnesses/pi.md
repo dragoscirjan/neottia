@@ -9,7 +9,7 @@ neottia apply
 neottia doctor
 ```
 
-Restart Pi in the project, confirm that `/neottia-plan` is available, and run the [first successful workflow](/get-started/first-success).
+Restart Pi in the project, confirm that `/neottia-plan` and `/neottia-adopt` are available, and run the [first successful workflow](/get-started/first-success).
 
 Neottia uses [`@neottia/pi-adapter`](/harnesses/adapters) to plan package entries and resource paths without hard-coding Pi paths. Each runtime package declares its extension entry point through `pi.extensions`. Pi records project packages in `.pi/settings.json` and installs missing packages after the project is trusted.
 

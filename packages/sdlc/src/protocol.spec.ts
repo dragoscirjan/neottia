@@ -54,6 +54,9 @@ describe('packaged SDLC operating protocol', () => {
     expect(body).toContain('append-only');
     expect(body).toContain('newest valid checkpoint defines the authoritative phase and step');
     expect(body).toContain('may write a `plan` checkpoint only after plan approval');
+    expect(body).toContain('Adopt is standalone and is never a checkpoint transition');
+    const checkpointSection = body.slice(body.indexOf('\n## Durable checkpoint format\n'), body.indexOf('\n## Plan\n'));
+    expect(checkpointSection).not.toContain('`adopt` means `/neottia-adopt`');
     expect(body).toContain('Malformed, incomplete, or out-of-order checkpoints are ignored');
   });
 
@@ -125,6 +128,47 @@ describe('packaged SDLC operating protocol', () => {
     const refresh = commandSections(await protocolBody()).refresh!;
     expect(refresh).toContain('no lifecycle transition');
     expect(refresh).toContain('Recommend Continue or a new Plan and stop');
+  });
+
+  it('keeps Adopt read-only until an exact plan and remote review path are approved', async () => {
+    const adopt = commandSections(await protocolBody()).adopt!;
+    for (const phase of [
+      'Discovery phase',
+      'Classification phase',
+      'Proposal phase',
+      'Approval phase',
+      'Apply phase',
+      'Report phase',
+    ]) {
+      expect(adopt).toContain(phase);
+    }
+    expect(adopt).toContain('Read repository authority and instruction files before all other project material');
+    expect(adopt).toContain(
+      'Do not execute project code, hooks, task runners, installers, builds, tests, or dependency commands',
+    );
+    expect(adopt).toContain('never search, fetch, cite, enrich, or stash web content');
+    expect(adopt).toContain('whole-command rule overrides compiled Searchable instructions');
+    expect(adopt).toContain('During discovery, do not mutate any provider or write durable Memory');
+    expect(adopt).toContain('Use the configured Neottia issue and design-document providers when available');
+    expect(adopt).toContain('report only remaining drift');
+    expect(adopt).toContain('exact document-operation plan');
+    expect(adopt).toContain('Stop before mutation and request explicit approval');
+    expect(adopt).toContain('separate explicit approval for every irreversible deletion');
+    expect(adopt).toContain('dedicated non-default branch or isolated workspace');
+    expect(adopt).toContain('Never change the default branch');
+    expect(adopt).toContain('usable Git-compatible remote, valid credentials, and a configured pull-request provider');
+    expect(adopt).toContain('Fail closed and change no documents');
+    expect(adopt).toContain('Preserve each original until its provider import is verified');
+    expect(adopt).toContain('Never run target-project code or hooks');
+    expect(adopt).toContain('Use hook-bypassing source-control operations for commit and push');
+    expect(adopt).toContain('fresh action-specific approval immediately before push');
+    expect(adopt).toContain('separate fresh approval immediately before creating the draft pull request');
+    expect(adopt).toContain('Never merge, close, or auto-approve the pull request');
+    expect(adopt).toContain('draft pull-request URL');
+    expect(adopt).toContain(
+      'Validation evidence is limited to read-only document, reference, provider, and source-control checks',
+    );
+    expect(adopt).toContain('Never run target-project validation');
   });
 
   it('protects revision semantics across every mutation', async () => {

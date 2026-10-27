@@ -30,6 +30,12 @@ describe('Pi harness adapter', () => {
       anchor: 'home',
       segments: ['.pi', 'agent', 'prompts', 'neottia-plan.md'],
     });
+    expect(
+      piHarnessAdapter.target({ feature: 'asset.prompt', scope: 'project', assetId: 'neottia-adopt' }).value,
+    ).toEqual({ anchor: 'project', segments: ['.pi', 'prompts', 'neottia-adopt.md'] });
+    expect(
+      piHarnessAdapter.target({ feature: 'asset.prompt', scope: 'global', assetId: 'neottia-adopt' }).value,
+    ).toEqual({ anchor: 'home', segments: ['.pi', 'agent', 'prompts', 'neottia-adopt.md'] });
     expect(piHarnessAdapter.target({ feature: 'asset.skill', scope: 'global', assetId: 'review' }).value).toEqual({
       anchor: 'home',
       segments: ['.pi', 'agent', 'skills', 'review', 'SKILL.md'],

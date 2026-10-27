@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "lifecycleVersion": "1.2.0",
+  "lifecycleVersion": "1.3.0",
   "commands": [
     {
       "id": "plan",
@@ -39,6 +39,21 @@
       "description": "Refresh the current SDLC work",
       "approvalPoints": ["Report changed assumptions before resuming work."],
       "stopConditions": ["Refreshing context would require mutation or would discard unresolved evidence."]
+    },
+    {
+      "id": "adopt",
+      "description": "Adopt Neottia in an existing project",
+      "approvalPoints": [
+        "Obtain explicit approval for the exact document-operation plan before any mutation.",
+        "Require separate explicit approval for every irreversible deletion.",
+        "Request fresh action-specific approval before push and again before draft pull-request creation."
+      ],
+      "stopConditions": [
+        "Repository authority, document ownership, or a proposed operation remains ambiguous.",
+        "A dedicated non-default branch or isolated workspace is unavailable.",
+        "A usable Git remote, credentials, or pull-request provider cannot be verified before document mutation.",
+        "A provider import cannot be verified while its original remains preserved."
+      ]
     }
   ]
 }

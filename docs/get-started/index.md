@@ -50,7 +50,7 @@ neottia init --harness pi --enable memory --enable searchable
 neottia apply
 ```
 
-`apply` compiles six commands and the shared operating-protocol skill for every configured harness. It also writes host configuration entries that reference the exact runtime packages required by enabled modules. Each host fetches those packages during its own startup, trust, or launch step.
+`apply` compiles seven commands and the shared operating-protocol skill for every configured harness. It also writes host configuration entries that reference the exact runtime packages required by enabled modules. Each host fetches those packages during its own startup, trust, or launch step.
 
 Neottia does not overwrite an unowned or modified file. If `apply` reports a conflict, inspect the named path and follow the [conflict procedure](/operate/troubleshooting#apply-reports-a-conflict).
 
@@ -76,7 +76,7 @@ Now complete the [first successful lifecycle operation](/get-started/first-succe
 
 The exact paths differ by harness, but the installation contains:
 
-- `/neottia-plan`, `/neottia-build`, `/neottia-verify`, `/neottia-release`, `/neottia-continue`, and `/neottia-refresh`;
+- `/neottia-plan`, `/neottia-build`, `/neottia-verify`, `/neottia-release`, `/neottia-continue`, `/neottia-refresh`, and `/neottia-adopt`;
 - the `neottia-sdlc` operating-protocol skill;
 - runtime package or MCP entries for enabled capabilities;
 - a receipt under `.neottia/install/` that records ownership and checksums.

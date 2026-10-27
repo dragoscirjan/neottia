@@ -14,6 +14,7 @@ Create one plain Markdown file under `.neottia/templates/sdlc/`:
 | Release  | `release.append.md`  |
 | Continue | `continue.append.md` |
 | Refresh  | `refresh.append.md`  |
+| Adopt    | `adopt.append.md`    |
 
 For example, `.neottia/templates/sdlc/verify.append.md` can contain:
 
@@ -38,7 +39,7 @@ Track project additions in Git. The loader rejects unknown filenames, linked fil
 
 ## Replace a complete command
 
-A complete project override uses `.neottia/templates/sdlc/<command>.md.twig`. The accepted command names are `plan`, `build`, `verify`, `release`, `continue`, and `refresh`.
+A complete project override uses `.neottia/templates/sdlc/<command>.md.twig`. The accepted command names are `plan`, `build`, `verify`, `release`, `continue`, `refresh`, and `adopt`.
 
 Complete overrides use the shared Twig layout and can change lifecycle policy. The compiler checks template structure and required capability and role fragments, but it cannot prove that replacement prose preserves the intended workflow. Review a complete override before installation.
 

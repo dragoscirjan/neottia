@@ -138,6 +138,7 @@ describe('Neottia CLI', () => {
     expect(applied.errors).toEqual([]);
     expect(applied.logs.some((line) => line.includes('Installed claude-code project lifecycle'))).toBe(true);
     expect(await exists(join(root, '.claude', 'commands', 'neottia-plan.md'))).toBe(true);
+    expect(await exists(join(root, '.claude', 'commands', 'neottia-adopt.md'))).toBe(true);
     expect(await exists(join(root, '.claude', 'skills', 'neottia-sdlc', 'SKILL.md'))).toBe(true);
     expect(await exists(join(root, '.neottia', 'install', 'sdlc-claude-code.receipt.json'))).toBe(true);
 
@@ -339,7 +340,9 @@ describe('Neottia CLI', () => {
       expect(await exists(join(root, '.neottia', 'install', `sdlc-${harness}.receipt.json`))).toBe(true);
     }
     expect(await exists(join(root, '.pi', 'prompts', 'neottia-plan.md'))).toBe(true);
+    expect(await exists(join(root, '.pi', 'prompts', 'neottia-adopt.md'))).toBe(true);
     expect(await exists(join(root, '.opencode', 'commands', 'neottia-plan.md'))).toBe(true);
+    expect(await exists(join(root, '.opencode', 'commands', 'neottia-adopt.md'))).toBe(true);
     expect(await exists(join(root, '.pi', 'skills', 'neottia-sdlc', 'SKILL.md'))).toBe(true);
     expect(await readFile(join(root, '.pi', 'prompts', 'neottia-plan.md'), 'utf8')).toContain(
       'They do not grant host permissions.',
@@ -382,6 +385,7 @@ describe('Neottia CLI', () => {
 
       expect(await exists(join(xdgState, 'neottia', 'install', 'sdlc-pi.receipt.json'))).toBe(true);
       expect(await exists(join(home, '.pi', 'agent', 'prompts', 'neottia-plan.md'))).toBe(true);
+      expect(await exists(join(home, '.pi', 'agent', 'prompts', 'neottia-adopt.md'))).toBe(true);
       expect(await exists(join(home, '.pi', 'agent', 'skills', 'neottia-sdlc', 'SKILL.md'))).toBe(true);
       expect(await exists(join(root, '.neottia', 'install', 'sdlc-pi.receipt.json'))).toBe(false);
 

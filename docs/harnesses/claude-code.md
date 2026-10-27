@@ -36,7 +36,7 @@ neottia apply
 neottia doctor
 ```
 
-After installation, restart Claude Code so commands, agents, and MCP configuration load together. Confirm that `/neottia-plan` is available. Open `/mcp` and approve each project server from `.mcp.json`. This approval is a Claude Code security boundary. Neottia does not bypass it. The restart recommendation is Neottia adapter policy; Claude Code reloads some resources live but does not document one reload command for every asset type.
+After installation, restart Claude Code so commands, agents, and MCP configuration load together. Confirm that `/neottia-plan` and `/neottia-adopt` are available. Open `/mcp` and approve each project server from `.mcp.json`. This approval is a Claude Code security boundary. Neottia does not bypass it. The restart recommendation is Neottia adapter policy; Claude Code reloads some resources live but does not document one reload command for every asset type.
 
 ## Authentication and configuration
 

@@ -8,15 +8,15 @@ Role assignments choose who performs a lifecycle role. They do not choose an Iss
 
 The compiler owns seven role declarations:
 
-| Role                   | Required assignment | Invocation points | Duty                                                                               |
-| ---------------------- | ------------------- | ----------------- | ---------------------------------------------------------------------------------- |
-| `planner`              | Yes                 | Plan, Continue    | Define scope, dependencies, acceptance evidence, and approval boundaries.          |
-| `researcher`           | No                  | Plan, Refresh     | Resolve bounded unknowns with sources and explicit uncertainty.                    |
-| `implementer`          | Yes                 | Build             | Change only the approved scope and preserve implementation evidence.               |
-| `reviewer`             | No                  | Verify            | Inspect results against requirements without silently changing them.               |
-| `verifier`             | Yes                 | Verify            | Run required checks and return a supported verdict.                                |
-| `release-coordinator`  | Yes                 | Release           | Prepare release evidence while keeping irreversible actions separately authorized. |
-| `documentation-writer` | No                  | Build, Release    | Keep user documentation consistent with verified behavior.                         |
+| Role                   | Required assignment | Invocation points     | Duty                                                                               |
+| ---------------------- | ------------------- | --------------------- | ---------------------------------------------------------------------------------- |
+| `planner`              | Yes                 | Plan, Continue        | Define scope, dependencies, acceptance evidence, and approval boundaries.          |
+| `researcher`           | No                  | Plan, Refresh, Adopt  | Resolve bounded unknowns with sources and explicit uncertainty.                    |
+| `implementer`          | Yes                 | Build                 | Change only the approved scope and preserve implementation evidence.               |
+| `reviewer`             | No                  | Verify                | Inspect results against requirements without silently changing them.               |
+| `verifier`             | Yes                 | Verify                | Run required checks and return a supported verdict.                                |
+| `release-coordinator`  | Yes                 | Release, Adopt        | Prepare release evidence while keeping irreversible actions separately authorized. |
+| `documentation-writer` | No                  | Build, Release, Adopt | Keep user documentation consistent with verified behavior.                         |
 
 Required roles need an explicit assignment for the selected harness. Use `agent: current` when the current agent should perform one. Compilation fails before projection if a required role is absent or set to `false`.
 
