@@ -68,12 +68,14 @@ import {
   SDLC_LAYOUT_TEMPLATE_ID,
   SDLC_LIFECYCLE,
   SDLC_LIFECYCLE_VERSION,
+  SDLC_HOST_COMMAND_IDS,
   SDLC_PROJECT_APPEND_TEMPLATE_IDS,
   SDLC_PROTOCOL_SKILL_DESCRIPTION,
   SDLC_PROTOCOL_SKILL_ID,
   SDLC_PROTOCOL_TEMPLATE_ID,
   SDLC_ROLE_IDS,
   type SdlcCommandId,
+  type SdlcHostCommandId,
   type SdlcLifecycleCommand,
   type SdlcRoleId,
 } from './lifecycle.js';
@@ -108,6 +110,9 @@ const PROJECT_INSTRUCTIONS_HEADING = '## Project instructions';
 const PROJECT_INSTRUCTIONS_BOUNDARY =
   'These project instructions are additive. They do not replace canonical approvals, stop conditions, provider ' +
   'instructions, role instructions, lifecycle transitions, or permission boundaries.';
+const PUBLIC_COMMAND_GUIDE = SDLC_COMMAND_IDS.map(
+  (commandId) => `\`${commandId}\` means \`/${SDLC_HOST_COMMAND_IDS[commandId]}\``,
+).join('; ');
 const TWIG_ALLOWED_TAGS = ['block', 'deprecated', 'extends', 'flush', 'for', 'if', 'spaceless', 'verbatim', 'with'];
 const TWIG_ALLOWED_FILTERS = [
   'abs',
@@ -147,6 +152,8 @@ const TWIG_CONTEXT_PROPERTIES = [
   'local',
   'memory',
   'parent',
+  'publicCommandGuide',
+  'publicId',
   'remote',
   'revindex',
   'revindex0',
@@ -320,6 +327,8 @@ interface SdlcLifecycleContent {
 /** Complete command value exposed to a lifecycle Twig template. */
 export interface SdlcTemplateCommand extends SdlcLifecycleCommand {
   readonly description: string;
+  readonly publicId: SdlcHostCommandId;
+  readonly publicCommandGuide: string;
   readonly approvalPoints: readonly string[];
   readonly stopConditions: readonly string[];
 }
@@ -564,9 +573,10 @@ export function compileSdlc(input: SdlcCompilerInputManifest, adapter: HarnessAd
     const renderedInstructions = input.instructions.filter((pack) => rendered.instructionSlots.includes(pack.slot));
     const projectInstruction = projectInstructionFor(input.projectInstructions ?? [], definition.id);
     const body = appendProjectInstructions(rendered.body, projectInstruction);
+    const hostCommandId = SDLC_HOST_COMMAND_IDS[definition.id];
     const projected = requireProjection(
       adapter.projectPrompt({
-        id: definition.id,
+        id: hostCommandId,
         scope: input.scope,
         body,
         metadata: { description: content.description },
@@ -940,6 +950,8 @@ function createTrackedTemplateContext(
       command: Object.freeze({
         ...command,
         description: content.description,
+        publicId: SDLC_HOST_COMMAND_IDS[command.id],
+        publicCommandGuide: PUBLIC_COMMAND_GUIDE,
         approvalPoints: Object.freeze([...content.approvalPoints]),
         stopConditions: Object.freeze([...content.stopConditions]),
       }),

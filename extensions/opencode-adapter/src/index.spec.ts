@@ -26,12 +26,18 @@ describe('OpenCode harness adapter', () => {
   });
 
   it('projects project and global resource paths plus config candidates', () => {
-    expect(opencodeHarnessAdapter.target({ feature: 'asset.prompt', scope: 'project', assetId: 'plan' }).value).toEqual(
-      {
-        anchor: 'project',
-        segments: ['.opencode', 'commands', 'plan.md'],
-      },
-    );
+    expect(
+      opencodeHarnessAdapter.target({ feature: 'asset.prompt', scope: 'project', assetId: 'neottia-plan' }).value,
+    ).toEqual({
+      anchor: 'project',
+      segments: ['.opencode', 'commands', 'neottia-plan.md'],
+    });
+    expect(
+      opencodeHarnessAdapter.target({ feature: 'asset.prompt', scope: 'global', assetId: 'neottia-plan' }).value,
+    ).toEqual({
+      anchor: 'xdg-config',
+      segments: ['opencode', 'commands', 'neottia-plan.md'],
+    });
     expect(
       opencodeHarnessAdapter.target({ feature: 'asset.agent', scope: 'global', assetId: 'planner' }).value,
     ).toEqual({
@@ -49,7 +55,7 @@ describe('OpenCode harness adapter', () => {
 
   it('renders command and native agent metadata in stable order', () => {
     const prompt = opencodeHarnessAdapter.projectPrompt({
-      id: 'plan',
+      id: 'neottia-plan',
       scope: 'project',
       body: 'Plan this change.\n',
       metadata: {

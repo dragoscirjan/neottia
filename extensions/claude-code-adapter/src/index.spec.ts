@@ -33,8 +33,11 @@ describe('Claude Code harness adapter', () => {
 
   it('projects documented project and user asset paths', () => {
     expect(
-      claudeCodeHarnessAdapter.target({ feature: 'asset.prompt', scope: 'project', assetId: 'plan' }).value,
-    ).toEqual({ anchor: 'project', segments: ['.claude', 'commands', 'plan.md'] });
+      claudeCodeHarnessAdapter.target({ feature: 'asset.prompt', scope: 'project', assetId: 'neottia-plan' }).value,
+    ).toEqual({ anchor: 'project', segments: ['.claude', 'commands', 'neottia-plan.md'] });
+    expect(
+      claudeCodeHarnessAdapter.target({ feature: 'asset.prompt', scope: 'global', assetId: 'neottia-plan' }).value,
+    ).toEqual({ anchor: 'home', segments: ['.claude', 'commands', 'neottia-plan.md'] });
     expect(
       claudeCodeHarnessAdapter.target({ feature: 'asset.skill', scope: 'global', assetId: 'review' }).value,
     ).toEqual({ anchor: 'home', segments: ['.claude', 'skills', 'review', 'SKILL.md'] });
@@ -52,7 +55,7 @@ describe('Claude Code harness adapter', () => {
 
   it('renders command and agent metadata without granting permissions', () => {
     const prompt = claudeCodeHarnessAdapter.projectPrompt({
-      id: 'plan',
+      id: 'neottia-plan',
       scope: 'project',
       body: 'Plan this change.\n',
       metadata: {

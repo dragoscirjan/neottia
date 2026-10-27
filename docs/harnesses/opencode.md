@@ -9,7 +9,7 @@ neottia apply
 neottia doctor
 ```
 
-Restart OpenCode in the project, confirm that `/plan` is available, and run the [first successful workflow](/get-started/first-success).
+Restart OpenCode in the project, confirm that `/neottia-plan` is available, and run the [first successful workflow](/get-started/first-success).
 
 Neottia uses [`@neottia/opencode-adapter`](/harnesses/adapters) to plan plugin, MCP, command, skill, and agent changes without hard-coding OpenCode paths. OpenCode installs configured npm plugins through Bun during startup.
 

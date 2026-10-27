@@ -7,7 +7,7 @@ Start with a planning task. It proves that the lifecycle loaded, can read the re
 In Pi, OpenCode, or Claude Code, run a request like:
 
 ```text
-/plan Add a short contributor note that explains how to run the project's existing validation command.
+/neottia-plan Add a short contributor note that explains how to run the project's existing validation command.
 ```
 
 Choose a real but small outcome in your repository. The Plan command should:
@@ -37,12 +37,12 @@ The exact record content depends on the request. The important result is that th
 
 ## 3. Decide whether to continue
 
-- Approve the recorded scope, then invoke `/build` yourself.
-- Reject or narrow the scope, then rerun `/plan` with the correction.
-- Use `/continue` later to ask which one public command the current evidence supports.
-- Use `/refresh` when repository or provider state changed and you want a drift report without a lifecycle transition.
+- Approve the recorded scope, then invoke `/neottia-build` yourself.
+- Reject or narrow the scope, then rerun `/neottia-plan` with the correction.
+- Use `/neottia-continue` later to ask which one public command the current evidence supports.
+- Use `/neottia-refresh` when repository or provider state changed and you want a drift report without a lifecycle transition.
 
-Read [the lifecycle and authority boundaries](/learn/lifecycle) before using `/release`.
+Read [the lifecycle and authority boundaries](/learn/lifecycle) before using `/neottia-release`.
 
 ## Optional capability smoke tests
 

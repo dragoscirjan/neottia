@@ -22,7 +22,13 @@ import {
 } from './config.js';
 import { forgeConnectionsConfigContribution } from './forge-config.js';
 import { BUILTIN_SDLC_INSTRUCTION_PACKS, createSdlcInstructionPack } from './instructions.js';
-import { SDLC_COMMAND_IDS, SDLC_LIFECYCLE, SDLC_PROJECT_APPEND_TEMPLATE_IDS } from './lifecycle.js';
+import {
+  SDLC_COMMAND_IDS,
+  SDLC_HOST_COMMAND_IDS,
+  SDLC_LIFECYCLE,
+  SDLC_PROJECT_APPEND_TEMPLATE_IDS,
+  type SdlcCommandId,
+} from './lifecycle.js';
 import { sdlcRoleAssignmentsConfigContribution } from './role-config.js';
 import { loadPackagedSdlcTemplateLayer } from './template-loader.js';
 
@@ -98,6 +104,14 @@ function promptAssets(output: ReturnType<typeof compileSdlc>): readonly FileAsse
     .sort((left, right) => left.id.localeCompare(right.id));
 }
 
+/** Returns one projected lifecycle command by its semantic identifier. */
+function commandAsset(output: ReturnType<typeof compileSdlc>, commandId: SdlcCommandId): FileAsset {
+  const assetId = `asset.prompt.${SDLC_HOST_COMMAND_IDS[commandId]}`;
+  const asset = promptAssets(output).find((candidate) => candidate.id === assetId);
+  if (asset === undefined) throw new Error(`Missing projected command asset: ${assetId}`);
+  return asset;
+}
+
 /** Removes adapter-owned frontmatter while retaining the canonical body. */
 function promptBody(asset: FileAsset): string {
   return asset.content.replace(/^---\n[\s\S]*?\n---\n/u, '');
@@ -117,8 +131,16 @@ function resignCompilerInput(
 }
 
 describe('canonical SDLC compiler', () => {
-  it('publishes six provider-neutral lifecycle commands', () => {
+  it('keeps semantic command IDs separate from host-facing command IDs', () => {
     expect(SDLC_COMMAND_IDS).toEqual(['plan', 'build', 'verify', 'release', 'continue', 'refresh']);
+    expect(SDLC_HOST_COMMAND_IDS).toEqual({
+      plan: 'neottia-plan',
+      build: 'neottia-build',
+      verify: 'neottia-verify',
+      release: 'neottia-release',
+      continue: 'neottia-continue',
+      refresh: 'neottia-refresh',
+    });
     expect(SDLC_LIFECYCLE).toHaveLength(6);
     const lifecycleContent = JSON.parse(
       packagedTemplateLayer.files.find((template) => template.id === 'neottia.sdlc.lifecycle')!.content,
@@ -246,10 +268,11 @@ describe('canonical SDLC compiler', () => {
     const pi = compileSdlc(piInput, piHarnessAdapter);
     const opencode = compileSdlc(opencodeInput, opencodeHarnessAdapter);
 
-    expect(pi.commands.find((command) => command.id === 'plan')?.approvalPoints).toEqual([
-      'Obtain explicit approval for the proposed scope before Build.',
-    ]);
-    expect(promptBody(promptAssets(pi).find((asset) => asset.target.segments.at(-1) === 'plan.md')!)).toContain(
+    expect(pi.commands.find((command) => command.id === 'plan')).toMatchObject({
+      id: 'plan',
+      approvalPoints: ['Obtain explicit approval for the proposed scope before Build.'],
+    });
+    expect(promptBody(commandAsset(pi, 'plan'))).toContain(
       'Obtain explicit approval for the proposed scope before Build.',
     );
     expect(pi.commands.map((command) => ({ ...command, target: undefined }))).toEqual(
@@ -257,32 +280,38 @@ describe('canonical SDLC compiler', () => {
     );
     expect(promptAssets(pi).map(promptBody)).toEqual(promptAssets(opencode).map(promptBody));
     expect(promptAssets(pi).map((asset) => asset.target.segments.join('/'))).toEqual([
-      '.pi/prompts/build.md',
-      '.pi/prompts/continue.md',
-      '.pi/prompts/plan.md',
-      '.pi/prompts/refresh.md',
-      '.pi/prompts/release.md',
-      '.pi/prompts/verify.md',
+      '.pi/prompts/neottia-build.md',
+      '.pi/prompts/neottia-continue.md',
+      '.pi/prompts/neottia-plan.md',
+      '.pi/prompts/neottia-refresh.md',
+      '.pi/prompts/neottia-release.md',
+      '.pi/prompts/neottia-verify.md',
       '.pi/skills/neottia-sdlc/SKILL.md',
     ]);
     expect(promptAssets(opencode).map((asset) => asset.target.segments.join('/'))).toEqual([
-      '.opencode/commands/build.md',
-      '.opencode/commands/continue.md',
-      '.opencode/commands/plan.md',
-      '.opencode/commands/refresh.md',
-      '.opencode/commands/release.md',
-      '.opencode/commands/verify.md',
+      '.opencode/commands/neottia-build.md',
+      '.opencode/commands/neottia-continue.md',
+      '.opencode/commands/neottia-plan.md',
+      '.opencode/commands/neottia-refresh.md',
+      '.opencode/commands/neottia-release.md',
+      '.opencode/commands/neottia-verify.md',
       '.opencode/skills/neottia-sdlc/SKILL.md',
     ]);
     const skillBody = promptBody(promptAssets(pi).at(-1)!);
     expect(skillBody).toContain('neottia-sdlc:checkpoint');
+    expect(skillBody).toContain('`next` stores one supported semantic command ID');
+    expect(skillBody).toContain('`verify` means `/neottia-verify`');
     expect(skillBody).toContain('They do not grant host permissions.');
     expect(pi.assets.assets.filter((asset): asset is HostConfigAsset => asset.kind === 'host-config')).toHaveLength(2);
     expect(
       opencode.assets.assets.filter((asset): asset is HostConfigAsset => asset.kind === 'host-config'),
     ).toHaveLength(2);
     expect(promptAssets(pi).every((asset) => !asset.content.includes('{{neottia.'))).toBe(true);
-    const continueBody = promptBody(promptAssets(pi).find((asset) => asset.target.segments.at(-1) === 'continue.md')!);
+    const continueBody = promptBody(commandAsset(pi, 'continue'));
+    expect(continueBody).toContain("This command's semantic ID is `continue`");
+    expect(continueBody).toContain('Invoke it through the public command `/neottia-continue`');
+    expect(continueBody).toContain('`verify` means `/neottia-verify`');
+    expect(continueBody).toContain("Translate the checkpoint's semantic `next` ID");
     expect(continueBody).toContain('Recommend exactly one supported next public command with its evidence');
     expect(continueBody).toContain('stop without invoking it');
   });
@@ -311,12 +340,12 @@ describe('canonical SDLC compiler', () => {
     );
     expect(promptAssets(claude).map(promptBody)).toEqual(promptAssets(pi).map(promptBody));
     expect(promptAssets(claude).map((asset) => asset.target.segments.join('/'))).toEqual([
-      '.claude/commands/build.md',
-      '.claude/commands/continue.md',
-      '.claude/commands/plan.md',
-      '.claude/commands/refresh.md',
-      '.claude/commands/release.md',
-      '.claude/commands/verify.md',
+      '.claude/commands/neottia-build.md',
+      '.claude/commands/neottia-continue.md',
+      '.claude/commands/neottia-plan.md',
+      '.claude/commands/neottia-refresh.md',
+      '.claude/commands/neottia-release.md',
+      '.claude/commands/neottia-verify.md',
       '.claude/skills/neottia-sdlc/SKILL.md',
     ]);
     const claudeRuntimeAssets = claude.assets.assets.filter(
@@ -368,7 +397,7 @@ describe('canonical SDLC compiler', () => {
     const agent = output.assets.assets.find(
       (asset) => asset.kind === 'file' && asset.id === 'asset.agent.neottia-planner',
     );
-    const plan = output.assets.assets.find((asset) => asset.kind === 'file' && asset.id === 'asset.prompt.plan');
+    const plan = commandAsset(output, 'plan');
 
     expect(agent).toMatchObject({
       kind: 'file',
@@ -622,10 +651,9 @@ describe('canonical SDLC compiler', () => {
       { compilerVersion: '0.1.0', harnessId: 'pi', scope: 'project' },
     );
     const output = compileSdlc(input, piHarnessAdapter);
-    const body = (command: string): string =>
-      promptBody(promptAssets(output).find((asset) => asset.target.segments.at(-1) === `${command}.md`)!);
+    const body = (command: SdlcCommandId): string => promptBody(commandAsset(output, command));
 
-    for (const command of ['plan', 'build']) {
+    for (const command of ['plan', 'build'] as const) {
       expect(body(command)).not.toContain('## Compiled remote source-control instructions');
       expect(output.commands.find((candidate) => candidate.id === command)?.instructionPackIds).not.toContain(
         'neottia.source-control.remote.github',
@@ -831,8 +859,8 @@ describe('canonical SDLC compiler', () => {
       ],
     });
     const output = compileSdlc(input, piHarnessAdapter);
-    const plan = promptAssets(output).find((asset) => asset.target.segments.at(-1) === 'plan.md')!;
-    const build = promptAssets(output).find((asset) => asset.target.segments.at(-1) === 'build.md')!;
+    const plan = commandAsset(output, 'plan');
+    const build = commandAsset(output, 'build');
 
     expect(plan.content).toContain('Turn the reviewed request');
     expect(plan.content).toContain(addition.trim());
@@ -883,9 +911,9 @@ describe('canonical SDLC compiler', () => {
       SDLC_PROJECT_APPEND_TEMPLATE_IDS.release,
     ]);
     const output = compileSdlc(input, piHarnessAdapter);
-    const build = promptAssets(output).find((asset) => asset.target.segments.at(-1) === 'build.md')!;
-    const release = promptAssets(output).find((asset) => asset.target.segments.at(-1) === 'release.md')!;
-    const verify = promptAssets(output).find((asset) => asset.target.segments.at(-1) === 'verify.md')!;
+    const build = commandAsset(output, 'build');
+    const release = commandAsset(output, 'release');
+    const verify = commandAsset(output, 'verify');
 
     expect(build.content).toContain('## Project instructions');
     expect(build.content).toContain(buildContent.trim());
@@ -1049,12 +1077,8 @@ describe('canonical SDLC compiler', () => {
 
     expect(plannerRoles.map((role) => role.command)).toEqual(['plan', 'continue']);
     expect(new Set(plannerRoles.map((role) => role.checksum)).size).toBe(1);
-    expect(promptBody(promptAssets(output).find((asset) => asset.target.segments.at(-1) === 'plan.md')!)).toContain(
-      'Portable role: planner.',
-    );
-    expect(promptBody(promptAssets(output).find((asset) => asset.target.segments.at(-1) === 'continue.md')!)).toContain(
-      'Portable role: planner.',
-    );
+    expect(promptBody(commandAsset(output, 'plan'))).toContain('Portable role: planner.');
+    expect(promptBody(commandAsset(output, 'continue'))).toContain('Portable role: planner.');
   });
 
   it('restores replacement-token fragments literally after tracked rendering', () => {
@@ -1081,7 +1105,7 @@ describe('canonical SDLC compiler', () => {
       ),
       piHarnessAdapter,
     );
-    const plan = promptBody(promptAssets(output).find((asset) => asset.target.segments.at(-1) === 'plan.md')!);
+    const plan = promptBody(commandAsset(output, 'plan'));
 
     expect(plan.split(instruction.trimEnd())).toHaveLength(2);
     expect(plan).not.toContain('NEOTTIA_FRAGMENT_');

@@ -18,9 +18,17 @@ describe('Pi harness adapter', () => {
   });
 
   it('projects project and global resource paths', () => {
-    expect(piHarnessAdapter.target({ feature: 'asset.prompt', scope: 'project', assetId: 'plan' }).value).toEqual({
+    expect(
+      piHarnessAdapter.target({ feature: 'asset.prompt', scope: 'project', assetId: 'neottia-plan' }).value,
+    ).toEqual({
       anchor: 'project',
-      segments: ['.pi', 'prompts', 'plan.md'],
+      segments: ['.pi', 'prompts', 'neottia-plan.md'],
+    });
+    expect(
+      piHarnessAdapter.target({ feature: 'asset.prompt', scope: 'global', assetId: 'neottia-plan' }).value,
+    ).toEqual({
+      anchor: 'home',
+      segments: ['.pi', 'agent', 'prompts', 'neottia-plan.md'],
     });
     expect(piHarnessAdapter.target({ feature: 'asset.skill', scope: 'global', assetId: 'review' }).value).toEqual({
       anchor: 'home',
@@ -34,7 +42,7 @@ describe('Pi harness adapter', () => {
 
   it('renders supported prompt metadata and rejects execution metadata', () => {
     const prompt = piHarnessAdapter.projectPrompt({
-      id: 'plan',
+      id: 'neottia-plan',
       scope: 'project',
       body: 'Plan this change.\n',
       metadata: { description: 'Plan a change', argumentHint: '<issue>' },

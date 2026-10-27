@@ -137,7 +137,7 @@ describe('Neottia CLI', () => {
     expect(await main(['apply', '--project', root], applied.output)).toBe(0);
     expect(applied.errors).toEqual([]);
     expect(applied.logs.some((line) => line.includes('Installed claude-code project lifecycle'))).toBe(true);
-    expect(await exists(join(root, '.claude', 'commands', 'plan.md'))).toBe(true);
+    expect(await exists(join(root, '.claude', 'commands', 'neottia-plan.md'))).toBe(true);
     expect(await exists(join(root, '.claude', 'skills', 'neottia-sdlc', 'SKILL.md'))).toBe(true);
     expect(await exists(join(root, '.neottia', 'install', 'sdlc-claude-code.receipt.json'))).toBe(true);
 
@@ -338,10 +338,10 @@ describe('Neottia CLI', () => {
     for (const harness of ['pi', 'opencode']) {
       expect(await exists(join(root, '.neottia', 'install', `sdlc-${harness}.receipt.json`))).toBe(true);
     }
-    expect(await exists(join(root, '.pi', 'prompts', 'plan.md'))).toBe(true);
-    expect(await exists(join(root, '.opencode', 'commands', 'plan.md'))).toBe(true);
+    expect(await exists(join(root, '.pi', 'prompts', 'neottia-plan.md'))).toBe(true);
+    expect(await exists(join(root, '.opencode', 'commands', 'neottia-plan.md'))).toBe(true);
     expect(await exists(join(root, '.pi', 'skills', 'neottia-sdlc', 'SKILL.md'))).toBe(true);
-    expect(await readFile(join(root, '.pi', 'prompts', 'plan.md'), 'utf8')).toContain(
+    expect(await readFile(join(root, '.pi', 'prompts', 'neottia-plan.md'), 'utf8')).toContain(
       'They do not grant host permissions.',
     );
   }, 30000);
@@ -381,6 +381,7 @@ describe('Neottia CLI', () => {
       expect(await main(['apply', '--project', root], result.output)).toBe(0);
 
       expect(await exists(join(xdgState, 'neottia', 'install', 'sdlc-pi.receipt.json'))).toBe(true);
+      expect(await exists(join(home, '.pi', 'agent', 'prompts', 'neottia-plan.md'))).toBe(true);
       expect(await exists(join(home, '.pi', 'agent', 'skills', 'neottia-sdlc', 'SKILL.md'))).toBe(true);
       expect(await exists(join(root, '.neottia', 'install', 'sdlc-pi.receipt.json'))).toBe(false);
 
@@ -396,7 +397,7 @@ describe('Neottia CLI', () => {
   it('skips conflicting files with warnings, installs the rest, and exits non-zero', async () => {
     const root = await fixture();
     await main(['init', '--harness', 'pi', '--project', root], capture().output);
-    const contested = join(root, '.pi', 'prompts', 'plan.md');
+    const contested = join(root, '.pi', 'prompts', 'neottia-plan.md');
     await mkdir(dirname(contested), { recursive: true });
     await writeFile(contested, 'user-owned\n', 'utf8');
     const result = capture();
@@ -407,7 +408,7 @@ describe('Neottia CLI', () => {
     expect(result.errors.some((line) => line.includes('WARN:') && line.includes(contested))).toBe(true);
     expect(result.errors.some((line) => line.includes('1 file(s) skipped'))).toBe(true);
     expect(await readFile(contested, 'utf8')).toBe('user-owned\n');
-    expect(await exists(join(root, '.pi', 'prompts', 'build.md'))).toBe(true);
+    expect(await exists(join(root, '.pi', 'prompts', 'neottia-build.md'))).toBe(true);
   }, 30000);
 
   it('fails closed when apply runs without a configuration', async () => {

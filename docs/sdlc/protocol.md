@@ -28,13 +28,15 @@ next: verify
 -->
 ```
 
-`phase` is one of the four delivery phases. A run without an earlier checkpoint may write a `plan` checkpoint only after plan approval; otherwise a checkpoint never writes a phase an earlier checkpoint does not support. `step` is a short stable identifier for the work item or action. `status` is `completed`, `blocked`, or `needs-approval`. `evidence` lists exact record references with revisions, commit hashes, and check results. `next` names one supported next public command or the next same-phase step as a recommendation, never an invocation.
+`phase` is one of the four delivery phases. A run without an earlier checkpoint may write a `plan` checkpoint only after plan approval; otherwise a checkpoint never writes a phase an earlier checkpoint does not support. `step` is a short stable identifier for the work item or action. `status` is `completed`, `blocked`, or `needs-approval`. `evidence` lists exact record references with revisions, commit hashes, and check results. `next` stores a semantic command ID or the next same-phase step as a recommendation, never an invocation.
+
+Translate semantic IDs before presenting commands to the user: `plan` means `/neottia-plan`; `build` means `/neottia-build`; `verify` means `/neottia-verify`; `release` means `/neottia-release`; `continue` means `/neottia-continue`; and `refresh` means `/neottia-refresh`.
 
 Rules: checkpoints are append-only, the newest valid checkpoint defines the authoritative phase and step, and malformed, incomplete, or out-of-order checkpoints are ignored. Never reconstruct a missing phase from prose or memory.
 
 ## Per-command procedure
 
-The skill gives each of the six commands its own section with authoritative inputs, a numbered procedure, and stopping outcomes. Highlights:
+The skill gives each of the six public commands its own section with authoritative inputs, a numbered procedure, and stopping outcomes. These commands are `/neottia-plan`, `/neottia-build`, `/neottia-verify`, `/neottia-release`, `/neottia-continue`, and `/neottia-refresh`.
 
 - Plan resolves exactly one owning Epic. Ambiguous requests surface at most five candidates and stop for selection. Plan records plan approval as an explicit Epic comment and stops before Build.
 - Build requires current plan approval, selects ready child work owned by the Epic, and implements bounded slices. Scope or ownership drift produces a `blocked` checkpoint and a stop.

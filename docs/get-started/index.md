@@ -64,11 +64,11 @@ A successful report confirms the configuration, installation receipts, native ba
 
 ## 6. Reload the host
 
-| Harness     | Finish setup                                                                        |
-| ----------- | ----------------------------------------------------------------------------------- |
-| Pi          | Restart Pi in the project and confirm that `/plan` is available.                    |
-| OpenCode    | Restart OpenCode in the project and confirm that `/plan` is available.              |
-| Claude Code | Restart Claude Code, open `/mcp`, and approve each project server from `.mcp.json`. |
+| Harness     | Finish setup                                                                          |
+| ----------- | ------------------------------------------------------------------------------------- |
+| Pi          | Restart Pi in the project and confirm that `/neottia-plan` is available.              |
+| OpenCode    | Restart OpenCode in the project and confirm that `/neottia-plan` is available.        |
+| Claude Code | Restart Claude Code, confirm `/neottia-plan`, then approve project servers in `/mcp`. |
 
 Now complete the [first successful lifecycle operation](/get-started/first-success).
 
@@ -76,7 +76,7 @@ Now complete the [first successful lifecycle operation](/get-started/first-succe
 
 The exact paths differ by harness, but the installation contains:
 
-- `/plan`, `/build`, `/verify`, `/release`, `/continue`, and `/refresh`;
+- `/neottia-plan`, `/neottia-build`, `/neottia-verify`, `/neottia-release`, `/neottia-continue`, and `/neottia-refresh`;
 - the `neottia-sdlc` operating-protocol skill;
 - runtime package or MCP entries for enabled capabilities;
 - a receipt under `.neottia/install/` that records ownership and checksums.

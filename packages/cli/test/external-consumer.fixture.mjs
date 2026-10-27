@@ -12,11 +12,11 @@ const origin = process.env.EXPECTED_NATIVE_ORIGIN;
 assert.ok(origin === 'verified-prebuilt' || origin === 'source-build');
 
 for (const path of [
-  '.pi/prompts/plan.md',
+  '.pi/prompts/neottia-plan.md',
   '.pi/settings.json',
-  '.opencode/commands/plan.md',
+  '.opencode/commands/neottia-plan.md',
   'opencode.json',
-  '.claude/commands/plan.md',
+  '.claude/commands/neottia-plan.md',
   '.claude/skills/neottia-sdlc/SKILL.md',
   '.mcp.json',
 ]) {

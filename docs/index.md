@@ -43,6 +43,6 @@ neottia apply
 neottia doctor
 ```
 
-Replace `pi` with `opencode` or `claude-code`. Then restart the host and run `/plan` for one small repository change. Claude Code users must also open `/mcp` and approve the project servers that Neottia added.
+Replace `pi` with `opencode` or `claude-code`. Then restart the host and run `/neottia-plan` for one small repository change. Claude Code users must also open `/mcp` and approve the project servers that Neottia added.
 
 Neottia supports certified local filesystems and runtime tuples only. Check the [requirements](/get-started/requirements) before enabling filesystem-backed capabilities.

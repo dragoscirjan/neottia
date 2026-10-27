@@ -1,8 +1,24 @@
 /** Version of the canonical lifecycle semantics and packaged templates. */
 export const SDLC_LIFECYCLE_VERSION = '1.2.0';
 
-/** Public commands exposed by every compiled harness. */
+/** Stable semantic command identifiers used by lifecycle content and templates. */
 export const SDLC_COMMAND_IDS = Object.freeze(['plan', 'build', 'verify', 'release', 'continue', 'refresh'] as const);
+
+/** Stable identifier for one canonical command. */
+export type SdlcCommandId = (typeof SDLC_COMMAND_IDS)[number];
+
+/** Host-facing command identifiers projected without changing lifecycle semantics. */
+export const SDLC_HOST_COMMAND_IDS = Object.freeze({
+  plan: 'neottia-plan',
+  build: 'neottia-build',
+  verify: 'neottia-verify',
+  release: 'neottia-release',
+  continue: 'neottia-continue',
+  refresh: 'neottia-refresh',
+} satisfies Readonly<Record<SdlcCommandId, string>>);
+
+/** Public command identifier installed into a supported host. */
+export type SdlcHostCommandId = (typeof SDLC_HOST_COMMAND_IDS)[SdlcCommandId];
 
 /** Internal packaged lifecycle content loaded outside the pure compiler. */
 export const SDLC_CONTENT_TEMPLATE_ID = 'neottia.sdlc.lifecycle';
@@ -21,9 +37,6 @@ export const SDLC_PROTOCOL_SKILL_DESCRIPTION =
   'Canonical Neottia SDLC operating protocol. Defines the Epic-first Plan, Build, Verify, Release, Continue, and ' +
   'Refresh procedures plus the durable checkpoint format, evidence, approval, and handback rules that every compiled ' +
   'lifecycle command shares.';
-
-/** Stable identifier for one canonical command. */
-export type SdlcCommandId = (typeof SDLC_COMMAND_IDS)[number];
 
 /** Optional project Markdown appended to one generated lifecycle command. */
 export const SDLC_PROJECT_APPEND_TEMPLATE_IDS = Object.freeze({

@@ -9,6 +9,7 @@ import { DesignDocumentStore, loadDesignDocsConfig } from '@neottia/design-docs'
 import { validateReceipt, type InstallationPlan, type InstallationReceipt } from '@neottia/distribution';
 import { IssueStore, loadIssueConfig } from '@neottia/issues';
 import { loadMemoryConfig, MemoryStore } from '@neottia/memory-core';
+import { SDLC_COMMAND_IDS, SDLC_HOST_COMMAND_IDS } from '@neottia/sdlc';
 import { loadSearchableConfig, SearchableStore } from '@neottia/searchable-core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -33,8 +34,13 @@ const CLI_ENTRY = join(dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'c
 /** Disposable roots created by the running tests, removed after each test. */
 const temporaryRoots: string[] = [];
 
-/** Canonical command order compiled for every harness. */
-const COMMANDS = ['plan', 'build', 'verify', 'release', 'continue', 'refresh'] as const;
+/** Canonical semantic command order compiled for every harness. */
+const COMMANDS = SDLC_COMMAND_IDS;
+
+/** Returns the public command identifier installed into a host. */
+function hostCommandId(command: (typeof COMMANDS)[number]) {
+  return SDLC_HOST_COMMAND_IDS[command];
+}
 
 /** Expected exact Pi package entries for the enabled modules, from the shipped catalog. */
 function expectedPiPackages(enabled: readonly string[] = ['issues', 'design-docs']): readonly string[] {
@@ -194,7 +200,7 @@ describe('empty-project CLI adoption journey (issue #161)', () => {
   it('refuses plans with unapproved conflicts and leaves the target untouched', async () => {
     const roots = await createRoots('conflict');
     expect(runCli(['init', '--harness', 'pi'], roots).code).toBe(0);
-    const contested = join(roots.project, '.pi', 'prompts', 'build.md');
+    const contested = join(roots.project, '.pi', 'prompts', 'neottia-build.md');
     await mkdir(dirname(contested), { recursive: true });
     await writeFile(contested, 'user-owned\n', 'utf8');
     const planPath = join(roots.root, 'plan.json');
@@ -208,7 +214,7 @@ describe('empty-project CLI adoption journey (issue #161)', () => {
     expect(applied.code).toBe(1);
     expect(applied.stderr).toContain('unapproved conflict');
     expect(await readFile(contested, 'utf8')).toBe('user-owned\n');
-    expect(existsSync(join(roots.project, '.pi', 'prompts', 'plan.md'))).toBe(false);
+    expect(existsSync(join(roots.project, '.pi', 'prompts', 'neottia-plan.md'))).toBe(false);
   }, 60000);
 
   it('completes the empty-project adoption journey through the public CLI', async () => {
@@ -278,7 +284,9 @@ describe('empty-project CLI adoption journey (issue #161)', () => {
     const fileWrites = plan.mutations.filter((mutation) => mutation.role === 'asset');
     expect(fileWrites).toHaveLength(7);
     for (const command of COMMANDS) {
-      expect(fileWrites.some((mutation) => mutation.path.endsWith(join('.pi', 'prompts', `${command}.md`)))).toBe(true);
+      expect(
+        fileWrites.some((mutation) => mutation.path.endsWith(join('.pi', 'prompts', `${hostCommandId(command)}.md`))),
+      ).toBe(true);
     }
     const hostWrites = plan.mutations.filter((mutation) => mutation.role === 'host-config');
     expect(hostWrites).toHaveLength(1);
@@ -298,7 +306,7 @@ describe('empty-project CLI adoption journey (issue #161)', () => {
     // Every installed command carries the concrete lifecycle contracts.
     const promptContent = new Map<string, string>();
     for (const command of COMMANDS) {
-      const content = await readFile(join(roots.project, '.pi', 'prompts', `${command}.md`), 'utf8');
+      const content = await readFile(join(roots.project, '.pi', 'prompts', `${hostCommandId(command)}.md`), 'utf8');
       promptContent.set(command, content);
       expect(content).toContain('They do not grant host permissions.');
     }
@@ -322,7 +330,7 @@ describe('empty-project CLI adoption journey (issue #161)', () => {
     expect(receipt.installationId).toBe('sdlc-pi');
     expect(receipt.entries).toHaveLength(9);
     const receiptTargets = receipt.entries.map((entry) => entry.target.segments.join('/'));
-    for (const command of COMMANDS) expect(receiptTargets).toContain(`.pi/prompts/${command}.md`);
+    for (const command of COMMANDS) expect(receiptTargets).toContain(`.pi/prompts/${hostCommandId(command)}.md`);
     expect(receiptTargets).toContain('.pi/skills/neottia-sdlc/SKILL.md');
     expect(receiptTargets).toContain('.pi/settings.json');
 
@@ -332,7 +340,7 @@ describe('empty-project CLI adoption journey (issue #161)', () => {
       [
         '.neottia/config.yml',
         '.neottia/install/sdlc-pi.receipt.json',
-        ...COMMANDS.map((command) => `.pi/prompts/${command}.md`),
+        ...COMMANDS.map((command) => `.pi/prompts/${hostCommandId(command)}.md`),
         '.pi/settings.json',
         '.pi/skills/neottia-sdlc/SKILL.md',
       ].sort(),
@@ -360,14 +368,14 @@ describe('empty-project CLI adoption journey (issue #161)', () => {
     expect(changed.code).toBe(0);
     const changedPlan = JSON.parse(await readFile(changedPlanPath, 'utf8')) as InstallationPlan;
     expect(changedPlan.id).toBe('update.sdlc-pi');
-    expect(changedPlan.mutations.some((mutation) => mutation.path.endsWith(join('.pi', 'prompts', 'plan.md')))).toBe(
-      true,
-    );
+    expect(
+      changedPlan.mutations.some((mutation) => mutation.path.endsWith(join('.pi', 'prompts', 'neottia-plan.md'))),
+    ).toBe(true);
     expect(changedPlan.mutations.every((mutation) => mutation.role === 'asset' || mutation.role === 'receipt')).toBe(
       true,
     );
     expect(runCli(['apply', '--plan', changedPlanPath], roots).code).toBe(0);
-    expect(await readFile(join(roots.project, '.pi', 'prompts', 'plan.md'), 'utf8')).toContain(
+    expect(await readFile(join(roots.project, '.pi', 'prompts', 'neottia-plan.md'), 'utf8')).toContain(
       'Inspect the project delivery checklist before approval.',
     );
 
@@ -480,7 +488,7 @@ describe('empty-project CLI adoption journey (issue #161)', () => {
     expect(runCli(['apply', '--plan', uninstallPlanPath], roots)).toMatchObject({ code: 0, stderr: '' });
 
     for (const command of COMMANDS) {
-      expect(existsSync(join(roots.project, '.pi', 'prompts', `${command}.md`))).toBe(false);
+      expect(existsSync(join(roots.project, '.pi', 'prompts', `${hostCommandId(command)}.md`))).toBe(false);
     }
     expect(existsSync(join(roots.project, '.pi', 'skills', 'neottia-sdlc', 'SKILL.md'))).toBe(false);
     expect(await readFile(userPrompt, 'utf8')).toBe('user-owned\n');
@@ -513,7 +521,7 @@ describe('empty-project CLI adoption journey (issue #161)', () => {
 
     // Every compiled command carries retrieval, checkpoint, and shutdown boundaries.
     for (const command of COMMANDS) {
-      const content = await readFile(join(roots.project, '.pi', 'prompts', `${command}.md`), 'utf8');
+      const content = await readFile(join(roots.project, '.pi', 'prompts', `${hostCommandId(command)}.md`), 'utf8');
       expect(content).toContain('Use the Neottia `memory_*` tools as the durable memory authority.');
       expect(content).toContain('Retrieve relevant durable memories before planning or resuming work');
       expect(content).toContain('Retrieval is read-only');
@@ -568,7 +576,7 @@ describe('empty-project CLI adoption journey (issue #161)', () => {
 
     // Every compiled command carries the web boundaries.
     for (const command of COMMANDS) {
-      const content = await readFile(join(roots.project, '.pi', 'prompts', `${command}.md`), 'utf8');
+      const content = await readFile(join(roots.project, '.pi', 'prompts', `${hostCommandId(command)}.md`), 'utf8');
       expect(content).toContain('Use the Neottia `web_*` tools as the web-retrieval authority.');
       expect(content).toContain('record every cited web page as a canonical stash through `web_stash`');
       expect(content).toContain('Local Ollama enrichment runs only where the searchable configuration enables it');
