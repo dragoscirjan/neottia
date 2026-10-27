@@ -25,6 +25,16 @@ export const SDLC_PROTOCOL_SKILL_DESCRIPTION =
 /** Stable identifier for one canonical command. */
 export type SdlcCommandId = (typeof SDLC_COMMAND_IDS)[number];
 
+/** Optional project Markdown appended to one generated lifecycle command. */
+export const SDLC_PROJECT_APPEND_TEMPLATE_IDS = Object.freeze({
+  plan: 'neottia.sdlc.append.plan',
+  build: 'neottia.sdlc.append.build',
+  verify: 'neottia.sdlc.append.verify',
+  release: 'neottia.sdlc.append.release',
+  continue: 'neottia.sdlc.append.continue',
+  refresh: 'neottia.sdlc.append.refresh',
+} satisfies Readonly<Record<SdlcCommandId, string>>);
+
 /** Portable role vocabulary consumed by configured harness assignments. */
 export const SDLC_ROLE_IDS = Object.freeze([
   'planner',

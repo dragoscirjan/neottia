@@ -66,7 +66,9 @@ See the [provider instruction-pack guide](../../docs/sdlc/providers.md) for conf
 
 The package publishes `templates/plan.md.twig`, `build.md.twig`, `verify.md.twig`, `release.md.twig`, `continue.md.twig`, and `refresh.md.twig`, plus their shared `layout.md.twig`, `lifecycle.json` prose, and `protocol.md`, the operating-protocol skill body with ID `neottia.sdlc.protocol`. Twing renders the selected command with strict variables and no HTML escaping. The shared layout has one named block per instruction slot, and command templates leave unused blocks empty. The renderer rejects nondeterministic Twig functions, duplicate instruction fragments, and missing or duplicate role fragments.
 
-Place a complete project override at `.neottia/templates/sdlc/<command>.md.twig`. The loader rejects unknown filenames. It applies packaged, package, global, then project precedence and records selected and shadowed checksums in compiler input provenance. A whole-template override can change lifecycle policy, so review it before installation.
+Place a plain project addition at `.neottia/templates/sdlc/<command>.append.md`. The compiler appends it under `## Project instructions` only in the matching command. Addition files are plain Markdown, not Twig, and cannot replace canonical command content.
+
+Place a complete project override at `.neottia/templates/sdlc/<command>.md.twig`. The loader rejects unknown filenames. It applies packaged, package, global, then project precedence and records selected and shadowed checksums in compiler input provenance. A whole-template override can change lifecycle policy, so review it before installation. See [Customize lifecycle prompts](../../docs/sdlc/customization.md) for the accepted files and safety limits.
 
 The Twig context exposes `command`, `instructions`, and `roles`. Provider and role packages supply checksummed fragments through those fields instead of owning command templates. The compiler publishes `planner`, `researcher`, `implementer`, `reviewer`, `verifier`, `release-coordinator`, and `documentation-writer` as portable role names.
 

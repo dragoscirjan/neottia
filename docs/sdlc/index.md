@@ -4,6 +4,16 @@
 
 Each installation also projects one shared operating-protocol skill, `neottia-sdlc`, which defines owning-Epic resolution, durable evidence, checkpointing, and handback rules for every command. See [the operating protocol](/sdlc/protocol).
 
+## Find the right page
+
+| Task                                                    | Page                                               |
+| ------------------------------------------------------- | -------------------------------------------------- |
+| Add repository requirements to one command              | [Customize lifecycle prompts](/sdlc/customization) |
+| Understand checkpoints and phase handoffs               | [Operating protocol](/sdlc/protocol)               |
+| Configure issue, document, and source-control providers | [Provider instruction packs](/sdlc/providers)      |
+| Assign portable lifecycle roles                         | [Portable roles](/sdlc/roles)                      |
+| Inspect current and planned capability support          | [Capability roadmap](/sdlc/roadmap)                |
+
 ## Commands
 
 | Command  | Instruction blocks                                 | Required behavior                                                                                                                       |
@@ -107,26 +117,11 @@ Searchable is optional. `capabilities.searchable.provider` defaults to `none`, w
 
 Memory is optional. `capabilities.memory.provider` defaults to `none`, which renders a boundary fragment that keeps durable memory out of every lifecycle run. Selecting `filesystem` or `postgres` requires the Memory module to be enabled and to use the same backend; resolution fails closed otherwise. The enabled fragments define the only permitted memory interactions: read-only retrieval before planning or resuming work, checkpoint evidence recorded through the `memory_*` authority with exact ownership and revision evidence, and a durable outcome summary before a lifecycle run stops. Memory never authorizes mutation, bypasses the issue or document authorities, or grants host permissions.
 
-## Template layers
+## Customize commands
 
-The package publishes six `.md.twig` command files, their shared `layout.md.twig`, and `lifecycle.json` under `templates/`. The JSON file contains command descriptions, approval text, and stop-condition text. TypeScript retains stable IDs and graph structure, not rendered lifecycle prose. Twing renders the resolved template from an in-memory loader with strict missing-variable checks and Markdown output without HTML escaping.
+Add plain project requirements with `.neottia/templates/sdlc/<command>.append.md`. Neottia appends the text only to the matching generated command and does not evaluate it as Twig.
 
-`loadSdlcTemplateLayers()` resolves this precedence order:
-
-1. packaged files;
-2. explicit installed-package layers;
-3. a global override;
-4. a project override.
-
-A project can replace one complete command at `.neottia/templates/sdlc/<command>.md.twig`. Valid command filenames are `plan.md.twig`, `build.md.twig`, `verify.md.twig`, `release.md.twig`, `continue.md.twig`, and `refresh.md.twig`. An unknown filename fails loading. The same convention applies below the supplied global root.
-
-The Twig context has three top-level values:
-
-- `command` contains the canonical command ID, transitions, approval points, stop conditions, roles, and enforcement mode;
-- `instructions` contains the selected Issues, Documents, local source-control, and remote source-control fragments;
-- `roles` contains one ordered entry for each command role, including its ID, rendered fragment, assignment state, and optional instruction ID.
-
-The shared layout exposes one named Twig block per instruction slot. Command templates override blocks they do not need with an empty block. The renderer rejects duplicate instruction fragments and requires every role fragment exactly once. It also rejects dynamic template dependencies, recursive inheritance, unbounded `range()`, includes, and nondeterministic functions such as `random()`. These checks protect template assembly but cannot prove that replacement prose preserves lifecycle policy. Review complete overrides before installation. Compiler provenance records the rendered instruction packs, selected template, and every shadowed source.
+Complete `.md.twig` command overrides and the `protocol.md` override remain available for advanced replacements. Read [Customize lifecycle prompts](/sdlc/customization) for file names, precedence, safety limits, and the difference between additions and replacements.
 
 ## Role assignments
 

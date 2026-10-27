@@ -22,7 +22,7 @@ import {
 } from './config.js';
 import { forgeConnectionsConfigContribution } from './forge-config.js';
 import { BUILTIN_SDLC_INSTRUCTION_PACKS, createSdlcInstructionPack } from './instructions.js';
-import { SDLC_COMMAND_IDS, SDLC_LIFECYCLE } from './lifecycle.js';
+import { SDLC_COMMAND_IDS, SDLC_LIFECYCLE, SDLC_PROJECT_APPEND_TEMPLATE_IDS } from './lifecycle.js';
 import { sdlcRoleAssignmentsConfigContribution } from './role-config.js';
 import { loadPackagedSdlcTemplateLayer } from './template-loader.js';
 
@@ -813,6 +813,7 @@ describe('canonical SDLC compiler', () => {
   it('records complete template overrides and configured role instructions', () => {
     const packagedPlan = packagedTemplateLayer.files.find((template) => template.id === 'neottia.sdlc.command.plan')!;
     const override = packagedPlan.content.replace('Turn the request', 'Turn the reviewed request');
+    const addition = 'Apply the project planning checklist.\n';
     const input = createSdlcCompilerInput(snapshot(), {
       compilerVersion: '0.1.0',
       harnessId: 'pi',
@@ -822,7 +823,10 @@ describe('canonical SDLC compiler', () => {
           tier: 'project',
           sourceId: 'project-templates',
           version: 'revision-1',
-          files: [{ id: packagedPlan.id, content: override }],
+          files: [
+            { id: packagedPlan.id, content: override },
+            { id: SDLC_PROJECT_APPEND_TEMPLATE_IDS.plan, content: addition },
+          ],
         },
       ],
     });
@@ -831,6 +835,7 @@ describe('canonical SDLC compiler', () => {
     const build = promptAssets(output).find((asset) => asset.target.segments.at(-1) === 'build.md')!;
 
     expect(plan.content).toContain('Turn the reviewed request');
+    expect(plan.content).toContain(addition.trim());
     expect(plan.content).toContain('The selected assignment explicitly requires the current agent');
     expect(plan.content).toContain('No dedicated agent is assigned for this optional role');
     expect(plan.content).toContain('at most 20 evidence entries');
@@ -841,6 +846,91 @@ describe('canonical SDLC compiler', () => {
       checksum: checksumText(override),
       shadowed: [expect.objectContaining({ sourceId: '@neottia/sdlc' })],
     });
+  });
+
+  it('appends plain project instructions only to their matching commands', () => {
+    const unchangedInput = createSdlcCompilerInput(snapshot(), {
+      compilerVersion: '0.1.0',
+      harnessId: 'pi',
+      scope: 'project',
+    });
+    expect(unchangedInput).not.toHaveProperty('projectInstructions');
+    expect(promptAssets(compileSdlc(unchangedInput, piHarnessAdapter)).map(promptBody).join('\n')).not.toContain(
+      '## Project instructions',
+    );
+
+    const buildContent = 'Keep the implementation inside the approved project boundary.\n{{ instructions.issues }}\n';
+    const releaseContent = 'Attach the project release checklist.\n';
+    const input = createSdlcCompilerInput(snapshot(), {
+      compilerVersion: '0.1.0',
+      harnessId: 'pi',
+      scope: 'project',
+      templateLayers: [
+        {
+          tier: 'project',
+          sourceId: 'project-templates',
+          version: 'revision-1',
+          files: [
+            { id: SDLC_PROJECT_APPEND_TEMPLATE_IDS.release, content: releaseContent },
+            { id: SDLC_PROJECT_APPEND_TEMPLATE_IDS.build, content: buildContent },
+          ],
+        },
+      ],
+    });
+
+    expect(input.projectInstructions?.map((instruction) => instruction.id)).toEqual([
+      SDLC_PROJECT_APPEND_TEMPLATE_IDS.build,
+      SDLC_PROJECT_APPEND_TEMPLATE_IDS.release,
+    ]);
+    const output = compileSdlc(input, piHarnessAdapter);
+    const build = promptAssets(output).find((asset) => asset.target.segments.at(-1) === 'build.md')!;
+    const release = promptAssets(output).find((asset) => asset.target.segments.at(-1) === 'release.md')!;
+    const verify = promptAssets(output).find((asset) => asset.target.segments.at(-1) === 'verify.md')!;
+
+    expect(build.content).toContain('## Project instructions');
+    expect(build.content).toContain(buildContent.trim());
+    expect(build.content).toContain('{{ instructions.issues }}');
+    expect(build.content).toContain('These project instructions are additive.');
+    expect(release.content).toContain(releaseContent.trim());
+    expect(verify.content).not.toContain('## Project instructions');
+    expect(output.commands.find((command) => command.id === 'build')?.projectInstructionId).toBe(
+      SDLC_PROJECT_APPEND_TEMPLATE_IDS.build,
+    );
+    expect(output.commands.find((command) => command.id === 'verify')?.projectInstructionId).toBeUndefined();
+    expect(output.assets.templates.map((template) => template.id)).toContain(SDLC_PROJECT_APPEND_TEMPLATE_IDS.build);
+  });
+
+  it('rejects invalid project instructions before projection', () => {
+    expect(() =>
+      createSdlcCompilerInput(snapshot(), {
+        compilerVersion: '0.1.0',
+        harnessId: 'pi',
+        scope: 'project',
+        templateLayers: [
+          {
+            tier: 'project',
+            sourceId: 'project-templates',
+            version: 'revision-1',
+            files: [{ id: SDLC_PROJECT_APPEND_TEMPLATE_IDS.plan, content: 'x'.repeat(256 * 1024 + 1) }],
+          },
+        ],
+      }),
+    ).toThrow('exceeds its byte limit');
+
+    const valid = createSdlcCompilerInput(snapshot(), {
+      compilerVersion: '0.1.0',
+      harnessId: 'pi',
+      scope: 'project',
+    });
+    const unknown = {
+      ...valid.templates[0]!,
+      id: 'neottia.sdlc.append.deploy',
+      content: 'Unknown command.\n',
+      checksum: checksumText('Unknown command.\n'),
+    };
+    expect(() => compileSdlc(resignCompilerInput(valid, { projectInstructions: [unknown] }), piHarnessAdapter)).toThrow(
+      'unknown or duplicate command',
+    );
   });
 
   it('fails compilation before projection when a selected instruction pack is missing', () => {
