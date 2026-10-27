@@ -1,8 +1,8 @@
 # Compile the canonical SDLC
 
-`@neottia/sdlc` compiles six lifecycle commands into Pi, OpenCode, or Claude Code prompt assets. The compiler chooses provider instructions before installation. Generated commands do not route between providers at runtime.
+`@neottia/sdlc` compiles seven lifecycle commands into Pi, OpenCode, or Claude Code prompt assets. The compiler chooses provider instructions before installation. Generated commands do not route between providers at runtime.
 
-Each installation also projects one shared operating-protocol skill, `neottia-sdlc`, which defines owning-Epic resolution, durable evidence, checkpointing, and handback rules for every command. See [the operating protocol](/sdlc/protocol).
+Each installation also projects one shared operating-protocol skill, `neottia-sdlc`, which defines command-specific authority resolution, durable evidence, checkpointing where applicable, and handback rules. See [the operating protocol](/sdlc/protocol).
 
 ## Find the right page
 
@@ -24,8 +24,21 @@ Each installation also projects one shared operating-protocol skill, `neottia-sd
 | Release  | Issues, local and remote source control            | Require approved scope and passing verification, prepare release evidence, and request explicit authorization for irreversible actions. |
 | Continue | Issues, Documents, local and remote source control | Inspect durable evidence, recommend one next public command, and stop without running it.                                               |
 | Refresh  | Issues, Documents, local and remote source control | Reload authoritative state, report drift, and avoid silent lifecycle transitions.                                                       |
+| Adopt    | Issues, Documents, local and remote source control | Inventory existing records, stop for an exact document-operation approval, then deliver approved document-only changes in a draft PR.   |
 
 Release instructions never authorize an autonomous merge, publication, or deployment. Every command states that workflow text does not grant host permissions.
+
+## Adopt an existing project
+
+Run `/neottia-adopt` when a repository already has documents, instructions, task records, or design records that need to fit the configured Neottia authorities. Adopt is an LLM-driven prompt, not a CLI migration engine.
+
+Adopt first reads repository authority and instruction files. It then performs read-only discovery and classification. It must not execute project code, hooks, task runners, installers, builds, tests, or dependency commands. It does not search, fetch, cite, enrich, or stash web content at any phase, even when Searchable is enabled. The command inventories documentation, instruction files, Neottia configuration, issue records, and design records. It uses the configured issue and design-document providers when available, and it preserves project-specific engineering policy.
+
+The command reports an exact operation plan and stops. The plan can include document moves, merges, archival, provider imports, and reference updates. Approval applies only to the listed operations. Each irreversible deletion needs its own explicit approval. Provider imports must be verified before the original is removed.
+
+After plan approval, Adopt uses a dedicated non-default branch or isolated workspace and never changes the default branch. Before changing documents, it verifies a usable Git remote, credentials, and pull-request provider. It changes nothing if it cannot create a reviewable pull request. Adopt never changes application source, dependencies, build systems, CI, or project-specific policy. It bypasses repository hooks for commit and push and never runs target-project validation.
+
+The command commits only approved operations. It requests fresh approval before push and separate fresh approval before creating a draft pull request. It reports the pull-request URL, applied and skipped work, ambiguities, validation evidence, and remaining drift. It never merges, closes, or auto-approves the pull request. Later runs recognize verified work and report only remaining drift.
 
 ## Inputs and outputs
 
@@ -38,7 +51,7 @@ Release instructions never authorize an autonomous merge, publication, or deploy
 - runtime package IDs with exact versions;
 - one harness adapter and installation scope.
 
-`createSdlcCompilerInput()` resolves template precedence, selects one instruction pack for each configured capability, and derives role instructions from the selected harness map. Each command template renders only the provider and role blocks that command uses. `compileSdlc()` records those rendered packs in the command provenance, then projects the six prompts, the shared operating-protocol skill, supported native role agents, and explicit package configuration through the adapter. The returned output manifest contains semantic command records and a checksummed distribution `AssetManifest`.
+`createSdlcCompilerInput()` resolves template precedence, selects one instruction pack for each configured capability, and derives role instructions from the selected harness map. Each command template renders only the provider and role blocks that command uses. `compileSdlc()` records those rendered packs in the command provenance, then projects the seven prompts, the shared operating-protocol skill, supported native role agents, and explicit package configuration through the adapter. The returned output manifest contains semantic command records and a checksummed distribution `AssetManifest`.
 
 The compiler does not read files, invoke Git, contact providers, install packages, or change host configuration.
 

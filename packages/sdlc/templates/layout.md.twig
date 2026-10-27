@@ -10,9 +10,9 @@
 
 ## Command identity
 
-This command's semantic ID is `{{ command.id }}`. Invoke it through the public command `/{{ command.publicId }}`.
+This command's semantic ID is `{{ command.id }}`. Invoke it through the public command `/{{ command.publicId }}`. The complete public command map is: {{ command.publicCommandGuide }}.
 
-Durable checkpoint `next` values use semantic IDs. Translate a semantic ID to its public command before recommending it to the user: {{ command.publicCommandGuide }}.
+Durable checkpoint `next` values use delivery or recovery semantic IDs only. Translate those IDs before recommending a checkpoint command to the user: {{ command.checkpointCommandGuide }}.
 
 ## Approval points
 
@@ -48,10 +48,11 @@ Durable checkpoint `next` values use semantic IDs. Translate a semantic ID to it
 
 {{ instructions.sourceControl.remote }}
 {% endblock %}
+{% block command_specific_boundary %}{% endblock %}
 
 ## Operating protocol
 
-Load the `neottia-sdlc` skill and follow its {{ command.id }} procedure. The skill defines owning-Epic resolution, durable evidence, the checkpoint format, approval recording, and handback rules for this lifecycle.
+Load the `neottia-sdlc` skill and follow its {{ command.id }} procedure. The skill defines command-specific authority resolution, durable evidence, checkpoint rules where applicable, approval recording, and handback rules for this lifecycle.
 
 ## Role invocation
 

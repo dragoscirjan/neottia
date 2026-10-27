@@ -63,7 +63,7 @@
       "id": "compiler",
       "type": "backend",
       "label": "SDLC compiler",
-      "sublabel": "six commands + protocol + roles",
+      "sublabel": "seven commands + protocol + roles",
       "pos": [440, 120],
       "size": [160, 68],
       "sources": [
@@ -347,7 +347,7 @@
       "dot": "cyan",
       "title": "One lifecycle, three hosts",
       "items": [
-        "The compiler keeps Plan, Build, Verify, Release, Continue, and Refresh semantics host-neutral.",
+        "The compiler keeps Plan, Build, Verify, Release, Continue, Refresh, and Adopt semantics host-neutral.",
         "Adapters change paths, metadata, package activation, and reload instructions for each harness."
       ]
     },

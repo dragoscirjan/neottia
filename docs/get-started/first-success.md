@@ -41,6 +41,7 @@ The exact record content depends on the request. The important result is that th
 - Reject or narrow the scope, then rerun `/neottia-plan` with the correction.
 - Use `/neottia-continue` later to ask which one public command the current evidence supports.
 - Use `/neottia-refresh` when repository or provider state changed and you want a drift report without a lifecycle transition.
+- Use `/neottia-adopt` when an existing repository needs a reviewed document reorganization before normal delivery work.
 
 Read [the lifecycle and authority boundaries](/learn/lifecycle) before using `/neottia-release`.
 

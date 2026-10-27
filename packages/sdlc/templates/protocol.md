@@ -1,17 +1,17 @@
 # Neottia SDLC operating protocol
 
-This skill carries the concrete operating procedure for the six canonical lifecycle commands: Plan, Build, Verify, Release, Continue, and Refresh. The compiled commands own lifecycle policy, provider instructions, role invocation, and approval points. This skill owns how the work is resolved, evidenced, checkpointed, approved, and handed back.
+This skill carries the concrete operating procedure for the seven canonical lifecycle commands: Plan, Build, Verify, Release, Continue, Refresh, and Adopt. The compiled commands own lifecycle policy, provider instructions, role invocation, and approval points. This skill owns how the work is resolved, evidenced, checkpointed when applicable, approved, and handed back.
 
 Follow this protocol whenever a compiled lifecycle command is running. When this skill and the running command disagree, the running command wins.
 
 ## Shared rules
 
-- One lifecycle run owns exactly one Epic. Every command resolves that Epic first; a command that cannot resolve one stops instead of inventing ownership.
+- Plan, Build, Verify, Release, Continue, and Refresh each own exactly one Epic. Each of those commands resolves that Epic first and stops instead of inventing ownership. Adopt is a standalone document-reorganization procedure. It does not create or mutate an Epic during read-only discovery.
 - Durable lifecycle state lives only in the configured issue and document authorities. The compiled command instructions name the exact tools for the selected providers. Never edit the backing files of canonical records directly, and never bypass their authorities; ordinary source-file edits follow the compiled local source-control workflow instead. Every record mutation carries the latest known revision; a stale or missing revision is an error, never an overwrite.
-- Record material progress as append-only comments or status transitions with the acting role, the intent, and evidence references. Comments are history. Never rewrite or delete them except through the authorities' documented archival operations.
+- For Plan, Build, Verify, Release, Continue, and Refresh, record material progress as append-only comments or status transitions with the acting role, the intent, and evidence references. Comments are history. Never rewrite or delete them except through the authorities' documented archival operations. Adopt reports read-only discovery in its proposal and does not mutate provider records before plan approval.
 - Approval is explicit, current, and scoped to the stated action. Silence, prior consent, and role assignment are not approval.
 - These instructions are guidance. They do not grant host permissions. Honor host-enforced restrictions and request approval where a command requires it.
-- Record every stopping outcome on the owning Epic before the run stops, so Continue can recover without guessing. A stop that happens before an owning Epic is resolved, such as waiting for candidate selection, returns candidates without a checkpoint; record a checkpoint once ownership is resolved.
+- For Plan, Build, Verify, Release, Continue, and Refresh, record every stopping outcome on the owning Epic before the run stops, so Continue can recover without guessing. A stop that happens before an owning Epic is resolved, such as waiting for candidate selection, returns candidates without a checkpoint; record a checkpoint once ownership is resolved. Adopt reports its stopping outcome to the user and does not create an Epic during discovery.
 
 ## Durable checkpoint format
 
@@ -32,7 +32,7 @@ Checkpoint rules:
 - `step` is a short stable identifier for the work item or action, such as a child issue ID or a release action.
 - `status` is `completed` for finished steps, `blocked` when work cannot proceed, and `needs-approval` when the next action awaits an approval that has not been given.
 - `evidence` lists exact record references with revisions, commit hashes, and check results. References must let a later command re-read the evidence without searching.
-- `next` stores one supported semantic command ID (`plan`, `build`, `verify`, `release`, `continue`, or `refresh`) or the next same-phase step. It is a recommendation only; a checkpoint never invokes a command.
+- `next` stores one supported delivery or recovery semantic command ID (`plan`, `build`, `verify`, `release`, `continue`, or `refresh`) or the next same-phase step. Adopt is standalone and is never a checkpoint transition. A checkpoint recommendation never invokes a command.
 - Translate a semantic `next` ID before presenting a public command to the user: `plan` means `/neottia-plan`; `build` means `/neottia-build`; `verify` means `/neottia-verify`; `release` means `/neottia-release`; `continue` means `/neottia-continue`; `refresh` means `/neottia-refresh`.
 - Malformed, incomplete, or out-of-order checkpoints are ignored. Never reconstruct a missing phase from prose or memory.
 
@@ -108,6 +108,19 @@ Authoritative inputs: resolved configuration, provider records, repository state
 
 Stopping outcomes: a drift report with current evidence, or a report that nothing changed.
 
+## Adopt
+
+Authoritative inputs: repository authority and instruction files, existing documentation, Neottia configuration, configured issue and document providers, source-control state, and remote review prerequisites.
+
+1. **Discovery phase.** Read repository authority and instruction files before all other project material. Inspect files and configured providers only through read operations. Do not execute project code, hooks, task runners, installers, builds, tests, or dependency commands from the target project. Throughout Adopt, never search, fetch, cite, enrich, or stash web content; this whole-command rule overrides compiled Searchable instructions. During discovery, do not mutate any provider or write durable Memory.
+2. **Classification phase.** Inventory documentation, instruction files, Neottia configuration, issue records, and design records. Classify each item by authority, owner, purpose, canonical provider, references, duplication, and current status. Preserve project-specific authority and engineering policy. Use the configured Neottia issue and design-document providers when available.
+3. **Proposal phase.** Compare the classified inventory with existing Neottia records and prior adoption results. Treat already completed and verified operations as complete, and report only remaining drift. Produce an exact document-operation plan that names each source, destination or provider record, operation, reference update, import verification, retained original, validation step, and ambiguity. The plan may propose moves, merges, archival, provider imports, and reference updates. It must not propose application-source, dependency, build-system, CI, or project-policy changes.
+4. **Approval phase.** Stop before mutation and request explicit approval for the exact plan. Approval covers only the listed reversible operations. Require separate explicit approval for every irreversible deletion, one deletion at a time. Silence, plan approval, push approval, and pull-request approval do not authorize deletion.
+5. **Apply phase.** After plan approval, create or enter a dedicated non-default branch or isolated workspace. Never change the default branch. Before any document mutation, verify a usable Git-compatible remote, valid credentials, and a configured pull-request provider that can create a reviewable draft pull request. Fail closed and change no documents if any prerequisite is missing. Apply only approved document and Neottia-facing instruction or configuration operations. Preserve each original until its provider import is verified by rereading the created record and its stable identity, content, and revision. Never run target-project code or hooks. Use hook-bypassing source-control operations for commit and push. Commit only the approved operations. Request fresh action-specific approval immediately before push, then request separate fresh approval immediately before creating the draft pull request. Never merge, close, or auto-approve the pull request.
+6. **Report phase.** Report the draft pull-request URL, applied and skipped operations, unresolved ambiguities, preserved originals, and remaining drift. Validation evidence is limited to read-only document, reference, provider, and source-control checks. Never run target-project validation. Stop for human review.
+
+Stopping outcomes: an exact plan awaiting approval; a closed preflight with no document mutation; an approved draft pull request awaiting human review; or a report that no adoption drift remains.
+
 ## Migration from earlier tooling
 
-Earlier Neottia tooling exposed a larger per-phase command vocabulary. The six public commands `/neottia-plan`, `/neottia-build`, `/neottia-verify`, `/neottia-release`, `/neottia-continue`, and `/neottia-refresh` are the only entry points now. Their procedures absorb the earlier behavior: intake and design belong to Plan, implementation and child-work selection to Build, review to Verify, delivery to Release, resumption to Continue, and reconciliation to Refresh. Earlier work-item vocabularies map onto the canonical issue types carried by the issue authority: initiative, epic, story, task, and bug.
+Earlier Neottia tooling exposed a larger per-phase command vocabulary. The seven public commands `/neottia-plan`, `/neottia-build`, `/neottia-verify`, `/neottia-release`, `/neottia-continue`, `/neottia-refresh`, and `/neottia-adopt` are the only entry points now. Their procedures absorb the earlier behavior: intake and design belong to Plan, implementation and child-work selection to Build, review to Verify, delivery to Release, resumption to Continue, reconciliation to Refresh, and existing-project document reorganization to Adopt. Earlier work-item vocabularies map onto the canonical issue types carried by the issue authority: initiative, epic, story, task, and bug.

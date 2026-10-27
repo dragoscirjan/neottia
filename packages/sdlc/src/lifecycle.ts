@@ -1,8 +1,16 @@
 /** Version of the canonical lifecycle semantics and packaged templates. */
-export const SDLC_LIFECYCLE_VERSION = '1.2.0';
+export const SDLC_LIFECYCLE_VERSION = '1.3.0';
 
 /** Stable semantic command identifiers used by lifecycle content and templates. */
-export const SDLC_COMMAND_IDS = Object.freeze(['plan', 'build', 'verify', 'release', 'continue', 'refresh'] as const);
+export const SDLC_COMMAND_IDS = Object.freeze([
+  'plan',
+  'build',
+  'verify',
+  'release',
+  'continue',
+  'refresh',
+  'adopt',
+] as const);
 
 /** Stable identifier for one canonical command. */
 export type SdlcCommandId = (typeof SDLC_COMMAND_IDS)[number];
@@ -15,6 +23,7 @@ export const SDLC_HOST_COMMAND_IDS = Object.freeze({
   release: 'neottia-release',
   continue: 'neottia-continue',
   refresh: 'neottia-refresh',
+  adopt: 'neottia-adopt',
 } satisfies Readonly<Record<SdlcCommandId, string>>);
 
 /** Public command identifier installed into a supported host. */
@@ -23,7 +32,7 @@ export type SdlcHostCommandId = (typeof SDLC_HOST_COMMAND_IDS)[SdlcCommandId];
 /** Internal packaged lifecycle content loaded outside the pure compiler. */
 export const SDLC_CONTENT_TEMPLATE_ID = 'neottia.sdlc.lifecycle';
 
-/** Internal packaged Twig layout shared by the six command templates. */
+/** Internal packaged Twig layout shared by the seven command templates. */
 export const SDLC_LAYOUT_TEMPLATE_ID = 'neottia.sdlc.layout';
 
 /** Internal packaged operating protocol projected as the shared lifecycle skill. */
@@ -35,8 +44,8 @@ export const SDLC_PROTOCOL_SKILL_ID = 'neottia-sdlc';
 /** Stable skill description rendered into every projected protocol asset. */
 export const SDLC_PROTOCOL_SKILL_DESCRIPTION =
   'Canonical Neottia SDLC operating protocol. Defines the Epic-first Plan, Build, Verify, Release, Continue, and ' +
-  'Refresh procedures plus the durable checkpoint format, evidence, approval, and handback rules that every compiled ' +
-  'lifecycle command shares.';
+  'Refresh procedures, plus the standalone Adopt procedure and the evidence, approval, checkpoint, and handback rules ' +
+  'that compiled lifecycle commands share.';
 
 /** Optional project Markdown appended to one generated lifecycle command. */
 export const SDLC_PROJECT_APPEND_TEMPLATE_IDS = Object.freeze({
@@ -46,6 +55,7 @@ export const SDLC_PROJECT_APPEND_TEMPLATE_IDS = Object.freeze({
   release: 'neottia.sdlc.append.release',
   continue: 'neottia.sdlc.append.continue',
   refresh: 'neottia.sdlc.append.refresh',
+  adopt: 'neottia.sdlc.append.adopt',
 } satisfies Readonly<Record<SdlcCommandId, string>>);
 
 /** Portable role vocabulary consumed by configured harness assignments. */
@@ -79,6 +89,7 @@ export const SDLC_LIFECYCLE = Object.freeze([
   command('release', ['release-coordinator', 'documentation-writer'], ['continue', 'refresh']),
   command('continue', ['planner'], ['plan', 'build', 'verify', 'release', 'refresh']),
   command('refresh', ['researcher'], ['continue', 'plan']),
+  command('adopt', ['researcher', 'documentation-writer', 'release-coordinator'], []),
 ] satisfies readonly SdlcLifecycleCommand[]);
 
 /** Creates one immutable lifecycle graph node. */

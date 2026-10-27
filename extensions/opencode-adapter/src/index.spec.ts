@@ -39,6 +39,18 @@ describe('OpenCode harness adapter', () => {
       segments: ['opencode', 'commands', 'neottia-plan.md'],
     });
     expect(
+      opencodeHarnessAdapter.target({ feature: 'asset.prompt', scope: 'project', assetId: 'neottia-adopt' }).value,
+    ).toEqual({
+      anchor: 'project',
+      segments: ['.opencode', 'commands', 'neottia-adopt.md'],
+    });
+    expect(
+      opencodeHarnessAdapter.target({ feature: 'asset.prompt', scope: 'global', assetId: 'neottia-adopt' }).value,
+    ).toEqual({
+      anchor: 'xdg-config',
+      segments: ['opencode', 'commands', 'neottia-adopt.md'],
+    });
+    expect(
       opencodeHarnessAdapter.target({ feature: 'asset.agent', scope: 'global', assetId: 'planner' }).value,
     ).toEqual({
       anchor: 'xdg-config',

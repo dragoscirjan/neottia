@@ -15,7 +15,7 @@ hero:
 
 features:
   - title: One lifecycle, three hosts
-    details: Compile the same six commands for Pi, OpenCode, and Claude Code without putting host-specific paths in the workflow.
+    details: Compile the same seven commands for Pi, OpenCode, and Claude Code without putting host-specific paths in the workflow.
   - title: Repository-owned evidence
     details: Track Issues, Design Docs, Memory, and Searchable records as reviewable files. Rebuild disposable indexes when needed.
   - title: Explicit authority boundaries

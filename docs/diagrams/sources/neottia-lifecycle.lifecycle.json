@@ -155,9 +155,9 @@
     },
     {
       "dot": "emerald",
-      "title": "Continue and Refresh",
+      "title": "Adopt, Continue, and Refresh",
       "items": [
-        "Every phase records append-only checkpoints with revisions, commits, checks, status, and the recommended next command.",
+        "Adopt reorganizes documents only after an exact plan is approved and delivers the result through a draft pull request.",
         "Continue resumes one checkpointed step. Refresh reports changed assumptions without moving the lifecycle."
       ]
     }

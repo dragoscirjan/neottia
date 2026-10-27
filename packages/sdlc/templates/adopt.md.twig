@@ -1,0 +1,19 @@
+{% extends "neottia.sdlc.layout" %}
+
+{% block title %}Adopt{% endblock %}
+
+{% block purpose %}Reorganize existing project documents and Neottia-facing records through an approved, reviewable pull request without changing product code or project policy.{% endblock %}
+
+{% block sequence %}
+1. **Discovery phase.** Read repository authority and instruction files before other project material. Inspect files, Neottia configuration, and configured providers without executing project code, hooks, task runners, installers, builds, tests, or dependency commands. Throughout Adopt, never search, fetch, cite, enrich, or stash web content; this whole-command rule overrides compiled Searchable instructions. During discovery, do not mutate any provider or write durable Memory.
+2. **Classification phase.** Inventory and classify documentation, instruction files, Neottia configuration, issue records, and design records. Preserve project-specific authority and engineering policy, and use the configured issue and document providers when available.
+3. **Proposal phase.** Compare the inventory with the current Neottia model. On later runs, recognize completed operations and report only remaining drift. Produce an exact plan for each proposed move, merge, archive, provider import, and reference update.
+4. **Approval phase.** Stop for explicit approval of the exact document-operation plan before any mutation. Require separate explicit approval for every irreversible deletion. A plan approval never authorizes a deletion, push, or pull-request action.
+5. **Apply phase.** After plan approval, establish a dedicated non-default branch or isolated workspace. Never change the default branch. Before document mutation, verify a usable Git remote, credentials, and pull-request provider; fail closed if a reviewable pull request cannot be created. Apply only approved document and Neottia-facing instruction or configuration operations. Preserve originals until provider imports are verified. Never modify application source, dependencies, build systems, CI, or project-specific policy. Use hook-bypassing source-control operations for commit and push. Commit the approved operations, request fresh approval before push, request fresh approval again before creating a draft pull request, and never merge, close, or auto-approve it.
+6. **Report phase.** Report the draft pull-request URL, applied and skipped operations, unresolved ambiguities, read-only document, reference, provider, and source-control validation evidence, and remaining drift. Never run target-project validation. Stop for human review.
+{% endblock %}
+
+{% block command_specific_boundary %}## Adopt capability boundary
+
+Throughout Adopt, never search, fetch, cite, enrich, or stash web content. This whole-command rule takes precedence over compiled Searchable instructions. During Discovery, Classification, Proposal, and Approval, the no-mutation rule also takes precedence over generic capability instructions to record progress or write durable Memory. Keep issue, document, Memory, local source-control, and remote source-control providers read-only until the exact plan is approved. After approval, perform only the provider mutations listed in that plan.
+{% endblock %}

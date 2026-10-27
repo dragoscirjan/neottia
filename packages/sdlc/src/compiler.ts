@@ -110,7 +110,18 @@ const PROJECT_INSTRUCTIONS_HEADING = '## Project instructions';
 const PROJECT_INSTRUCTIONS_BOUNDARY =
   'These project instructions are additive. They do not replace canonical approvals, stop conditions, provider ' +
   'instructions, role instructions, lifecycle transitions, or permission boundaries.';
+const CHECKPOINT_COMMAND_IDS = Object.freeze([
+  'plan',
+  'build',
+  'verify',
+  'release',
+  'continue',
+  'refresh',
+] satisfies readonly SdlcCommandId[]);
 const PUBLIC_COMMAND_GUIDE = SDLC_COMMAND_IDS.map(
+  (commandId) => `\`${commandId}\` means \`/${SDLC_HOST_COMMAND_IDS[commandId]}\``,
+).join('; ');
+const CHECKPOINT_COMMAND_GUIDE = CHECKPOINT_COMMAND_IDS.map(
   (commandId) => `\`${commandId}\` means \`/${SDLC_HOST_COMMAND_IDS[commandId]}\``,
 ).join('; ');
 const TWIG_ALLOWED_TAGS = ['block', 'deprecated', 'extends', 'flush', 'for', 'if', 'spaceless', 'verbatim', 'with'];
@@ -137,6 +148,7 @@ const TWIG_CONTEXT_PROPERTIES = [
   'allowedNext',
   'approvalPoints',
   'assigned',
+  'checkpointCommandGuide',
   'content',
   'description',
   'documents',
@@ -329,6 +341,7 @@ export interface SdlcTemplateCommand extends SdlcLifecycleCommand {
   readonly description: string;
   readonly publicId: SdlcHostCommandId;
   readonly publicCommandGuide: string;
+  readonly checkpointCommandGuide: string;
   readonly approvalPoints: readonly string[];
   readonly stopConditions: readonly string[];
 }
@@ -952,6 +965,7 @@ function createTrackedTemplateContext(
         description: content.description,
         publicId: SDLC_HOST_COMMAND_IDS[command.id],
         publicCommandGuide: PUBLIC_COMMAND_GUIDE,
+        checkpointCommandGuide: CHECKPOINT_COMMAND_GUIDE,
         approvalPoints: Object.freeze([...content.approvalPoints]),
         stopConditions: Object.freeze([...content.stopConditions]),
       }),

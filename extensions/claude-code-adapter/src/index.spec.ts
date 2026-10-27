@@ -39,6 +39,12 @@ describe('Claude Code harness adapter', () => {
       claudeCodeHarnessAdapter.target({ feature: 'asset.prompt', scope: 'global', assetId: 'neottia-plan' }).value,
     ).toEqual({ anchor: 'home', segments: ['.claude', 'commands', 'neottia-plan.md'] });
     expect(
+      claudeCodeHarnessAdapter.target({ feature: 'asset.prompt', scope: 'project', assetId: 'neottia-adopt' }).value,
+    ).toEqual({ anchor: 'project', segments: ['.claude', 'commands', 'neottia-adopt.md'] });
+    expect(
+      claudeCodeHarnessAdapter.target({ feature: 'asset.prompt', scope: 'global', assetId: 'neottia-adopt' }).value,
+    ).toEqual({ anchor: 'home', segments: ['.claude', 'commands', 'neottia-adopt.md'] });
+    expect(
       claudeCodeHarnessAdapter.target({ feature: 'asset.skill', scope: 'global', assetId: 'review' }).value,
     ).toEqual({ anchor: 'home', segments: ['.claude', 'skills', 'review', 'SKILL.md'] });
     expect(

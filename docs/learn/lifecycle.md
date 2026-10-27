@@ -10,7 +10,7 @@ const diagram = withBase('/diagrams/neottia-lifecycle.html')
 
 # Lifecycle and authority boundaries
 
-Neottia installs six public commands. Four advance delivery work. Two help recover context without silently advancing it.
+Neottia installs seven public commands. Four advance delivery work. Two help recover context without silently advancing it. Adopt reorganizes existing project documents through a separate approval and pull-request workflow.
 
 <div class="diagram-links">
   <a :href="diagram" target="_blank" rel="noreferrer">Open the interactive lifecycle in a new tab</a>
@@ -33,6 +33,16 @@ Neottia installs six public commands. Four advance delivery work. Two help recov
 
 - `/neottia-continue` reads durable records and recommends exactly one next public command. It does not invoke that command.
 - `/neottia-refresh` reloads configuration, provider records, repository state, and source-control state. It reports drift without changing phase.
+
+## Project adoption
+
+Use `/neottia-adopt` when an existing repository has legacy documents, instruction files, issue records, or design records that need to move into the configured Neottia model.
+
+Adopt reads repository authority first and performs read-only discovery. It does not execute project code, hooks, task runners, installers, builds, tests, or dependency commands. It reports an exact document-operation plan and stops for approval before mutation. Every irreversible deletion needs separate approval.
+
+After approval, Adopt verifies a dedicated non-default branch or isolated workspace, a usable Git remote, credentials, and a pull-request provider before document mutation. It never changes the default branch. It applies only approved document and Neottia-facing configuration operations, preserves originals until provider imports are verified, and never changes application source, dependencies, build systems, CI, or project-specific policy. It bypasses repository hooks for commit and push and never runs target-project validation.
+
+Push and draft pull-request creation each need fresh action-specific approval. Adopt reports the draft pull-request URL and never merges, closes, or auto-approves it. Later runs report only remaining drift.
 
 ## Approval rules
 
