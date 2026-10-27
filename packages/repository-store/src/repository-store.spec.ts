@@ -44,6 +44,7 @@ import {
   type LeaseFaultEvent,
   type TransactionFaultEvent,
 } from './internal/fault-injection.js';
+import { lstatSync as identityLstatSync } from './internal/filesystem.js';
 import { getRootState } from './internal/model.js';
 import { isCertifiedRepositoryPlatform, setRepositoryPlatformBackendForTests } from './internal/platform-backend.js';
 import {
@@ -629,7 +630,7 @@ describe('repository authority lease', () => {
     const claim = join(authority, 'authority.lease');
     writeFileSync(claim, 'owner');
     linkSync(claim, `${claim}.unknown-peer`);
-    const observed = lstatSync(claim);
+    const observed = identityLstatSync(claim);
     rmSync(claim);
     if (kind === 'symlink') {
       const target = join(authority, 'operator-target');
@@ -639,6 +640,12 @@ describe('repository authority lease', () => {
       mkdirSync(claim);
     } else {
       writeFileSync(claim, 'new owner');
+      if (process.platform === 'win32') {
+        // Force equal numeric projections without changing the captured exact
+        // identity. NTFS file IDs can differ only in bits lost by Number.
+        const replacement = identityLstatSync(claim);
+        Object.assign(observed, { dev: replacement.dev, ino: replacement.ino });
+      }
     }
 
     let observedError: unknown;
