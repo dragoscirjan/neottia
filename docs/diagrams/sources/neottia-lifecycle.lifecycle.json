@@ -40,7 +40,7 @@
     {
       "id": "plan",
       "type": "start",
-      "label": "/plan",
+      "label": "/neottia-plan",
       "sublabel": "approved plan",
       "tag": "Epic + child work",
       "step": "01",
@@ -52,7 +52,7 @@
     {
       "id": "build",
       "type": "active",
-      "label": "/build",
+      "label": "/neottia-build",
       "sublabel": "bounded changes",
       "tag": "approved scope",
       "step": "02",
@@ -64,7 +64,7 @@
     {
       "id": "verify",
       "type": "decision",
-      "label": "/verify",
+      "label": "/neottia-verify",
       "sublabel": "checks + verdict",
       "tag": "evidence gate",
       "step": "03",
@@ -76,7 +76,7 @@
     {
       "id": "release",
       "type": "active",
-      "label": "/release",
+      "label": "/neottia-release",
       "sublabel": "action prepared",
       "tag": "verified only",
       "step": "04",

@@ -1,6 +1,6 @@
 # @neottia/sdlc
 
-`@neottia/sdlc` compiles one canonical Plan, Build, Verify, Release, Continue, and Refresh lifecycle into assets for a Neottia harness adapter. The package ships six Markdown/Twig templates plus one plain-markdown operating-protocol template, projected as a shared `neottia-sdlc` skill through every adapter, and loads them before pure compilation. The compiler returns a checksummed `AssetManifest` for `@neottia/distribution` and does not read files, run providers, or install assets.
+`@neottia/sdlc` compiles one canonical Plan, Build, Verify, Release, Continue, and Refresh lifecycle into assets for a Neottia harness adapter. The compiler keeps the semantic command IDs unchanged and projects `/neottia-plan`, `/neottia-build`, `/neottia-verify`, `/neottia-release`, `/neottia-continue`, and `/neottia-refresh` as host-facing commands. The package ships six Markdown/Twig templates plus one plain-markdown operating-protocol template, projected as a shared `neottia-sdlc` skill through every adapter, and loads them before pure compilation. The compiler returns a checksummed `AssetManifest` for `@neottia/distribution` and does not read files, run providers, or install assets.
 
 See the [SDLC compiler guide](../../docs/sdlc/) and [configuration reference](../../docs/configuration.md#sdlc-provider-selection).
 
@@ -76,6 +76,6 @@ Assign roles under `agents.sdlc.<harness-id>`, for example `agents.sdlc.pi`, `ag
 
 ## Safety boundaries
 
-Generated prompts preserve lifecycle approvals, evidence requirements, stop conditions, and transitions across Pi and OpenCode. Their permission language is guidance. It does not grant filesystem, process, network, merge, release, or deployment authority.
+Generated prompts preserve lifecycle approvals, evidence requirements, stop conditions, and transitions across Pi, OpenCode, and Claude Code. Their permission language is guidance. It does not grant filesystem, process, network, merge, release, or deployment authority.
 
-`continue` recommends a next command and stops. `release` never grants permission to merge, publish, or deploy.
+`/neottia-continue` recommends a next command and stops. `/neottia-release` never grants permission to merge, publish, or deploy.

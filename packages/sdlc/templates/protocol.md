@@ -32,7 +32,8 @@ Checkpoint rules:
 - `step` is a short stable identifier for the work item or action, such as a child issue ID or a release action.
 - `status` is `completed` for finished steps, `blocked` when work cannot proceed, and `needs-approval` when the next action awaits an approval that has not been given.
 - `evidence` lists exact record references with revisions, commit hashes, and check results. References must let a later command re-read the evidence without searching.
-- `next` names one supported next public command or the next same-phase step. It is a recommendation only; a checkpoint never invokes a command.
+- `next` stores one supported semantic command ID (`plan`, `build`, `verify`, `release`, `continue`, or `refresh`) or the next same-phase step. It is a recommendation only; a checkpoint never invokes a command.
+- Translate a semantic `next` ID before presenting a public command to the user: `plan` means `/neottia-plan`; `build` means `/neottia-build`; `verify` means `/neottia-verify`; `release` means `/neottia-release`; `continue` means `/neottia-continue`; `refresh` means `/neottia-refresh`.
 - Malformed, incomplete, or out-of-order checkpoints are ignored. Never reconstruct a missing phase from prose or memory.
 
 ## Plan
@@ -109,4 +110,4 @@ Stopping outcomes: a drift report with current evidence, or a report that nothin
 
 ## Migration from earlier tooling
 
-Earlier Neottia tooling exposed a larger per-phase command vocabulary. The six public commands are the only entry points now, and their procedures absorb that behavior: intake and design belong to Plan, implementation and child-work selection to Build, review to Verify, delivery to Release, resumption to Continue, and reconciliation to Refresh. Earlier work-item vocabularies map onto the canonical issue types carried by the issue authority: initiative, epic, story, task, and bug.
+Earlier Neottia tooling exposed a larger per-phase command vocabulary. The six public commands `/neottia-plan`, `/neottia-build`, `/neottia-verify`, `/neottia-release`, `/neottia-continue`, and `/neottia-refresh` are the only entry points now. Their procedures absorb the earlier behavior: intake and design belong to Plan, implementation and child-work selection to Build, review to Verify, delivery to Release, resumption to Continue, and reconciliation to Refresh. Earlier work-item vocabularies map onto the canonical issue types carried by the issue authority: initiative, epic, story, task, and bug.

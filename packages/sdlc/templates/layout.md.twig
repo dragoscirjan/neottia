@@ -8,6 +8,12 @@
 
 {% block sequence %}{% endblock %}
 
+## Command identity
+
+This command's semantic ID is `{{ command.id }}`. Invoke it through the public command `/{{ command.publicId }}`.
+
+Durable checkpoint `next` values use semantic IDs. Translate a semantic ID to its public command before recommending it to the user: {{ command.publicCommandGuide }}.
+
 ## Approval points
 
 {% for point in command.approvalPoints %}- {{ point }}

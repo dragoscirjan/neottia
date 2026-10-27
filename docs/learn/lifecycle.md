@@ -22,17 +22,17 @@ Neottia installs six public commands. Four advance delivery work. Two help recov
 
 ## Delivery commands
 
-| Command    | Owns                                                                         | Required stop                                             |
-| ---------- | ---------------------------------------------------------------------------- | --------------------------------------------------------- |
-| `/plan`    | Requirements, repository evidence, owning Epic, child work, and design scope | Stop for current scope or design approval                 |
-| `/build`   | Only the approved implementation scope                                       | Stop with implementation evidence for Verify              |
-| `/verify`  | Requirement coverage, checks, user-visible behavior, and verdict             | Return defects to Build or present a current pass verdict |
-| `/release` | Release metadata and one explicitly selected action                          | Stop before any action that lacks fresh authorization     |
+| Command            | Owns                                                                         | Required stop                                             |
+| ------------------ | ---------------------------------------------------------------------------- | --------------------------------------------------------- |
+| `/neottia-plan`    | Requirements, repository evidence, owning Epic, child work, and design scope | Stop for current scope or design approval                 |
+| `/neottia-build`   | Only the approved implementation scope                                       | Stop with implementation evidence for Verify              |
+| `/neottia-verify`  | Requirement coverage, checks, user-visible behavior, and verdict             | Return defects to Build or present a current pass verdict |
+| `/neottia-release` | Release metadata and one explicitly selected action                          | Stop before any action that lacks fresh authorization     |
 
 ## Recovery commands
 
-- `/continue` reads durable records and recommends exactly one next public command. It does not invoke that command.
-- `/refresh` reloads configuration, provider records, repository state, and source-control state. It reports drift without changing phase.
+- `/neottia-continue` reads durable records and recommends exactly one next public command. It does not invoke that command.
+- `/neottia-refresh` reloads configuration, provider records, repository state, and source-control state. It reports drift without changing phase.
 
 ## Approval rules
 

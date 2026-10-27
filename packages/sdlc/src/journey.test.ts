@@ -13,6 +13,7 @@ import {
   resolveTarget,
   type InstallRoots,
 } from '@neottia/distribution';
+import type { HarnessAdapter } from '@neottia/harness-adapter';
 import { IssueStore, issueConfigContribution, loadIssueConfig } from '@neottia/issues';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -25,6 +26,7 @@ import {
   sourceControlCapabilityConfigContribution,
 } from './config.js';
 import { forgeConnectionsConfigContribution } from './forge-config.js';
+import { SDLC_COMMAND_IDS, SDLC_HOST_COMMAND_IDS } from './lifecycle.js';
 import { sdlcRoleAssignmentsConfigContribution } from './role-config.js';
 import { loadSdlcTemplateLayers } from './template-loader.js';
 
@@ -82,7 +84,16 @@ describe.each([
       await applyInstallationPlan(plan);
 
       const promptAssets = first.assets.assets.filter((asset) => asset.kind === 'file');
+      const commandAssets = promptAssets.filter((asset) => asset.id.startsWith('asset.prompt.'));
       expect(promptAssets).toHaveLength(7);
+      expect(commandAssets.map((asset) => asset.id).sort()).toEqual(
+        Object.values(SDLC_HOST_COMMAND_IDS)
+          .map((commandId) => `asset.prompt.${commandId}`)
+          .sort(),
+      );
+      expect(
+        commandAssets.some((asset) => SDLC_COMMAND_IDS.some((commandId) => asset.id === `asset.prompt.${commandId}`)),
+      ).toBe(false);
       expect(promptAssets.some((asset) => asset.id === 'asset.skill.neottia-sdlc')).toBe(true);
       for (const asset of promptAssets) {
         expect(await readFile(resolveTarget(asset.target, roots), 'utf8')).toContain(
@@ -92,6 +103,38 @@ describe.each([
       expect(first.assets.assets.filter((asset) => asset.kind === 'host-config')).toHaveLength(hostConfigCount);
     },
   );
+});
+
+it('uses receipt-driven stale-path cleanup when command paths change', async () => {
+  const roots = await createRoots();
+  const input = createSdlcCompilerInput(compilerSnapshot(), {
+    compilerVersion: '0.1.0',
+    harnessId: 'pi',
+    harnessDeclaration: piHarnessAdapter.declaration,
+    scope: 'project',
+    templateLayers: await loadSdlcTemplateLayers({ projectRoot: roots.project }),
+    runtimePackages,
+  });
+  const unprefixedAdapter: HarnessAdapter = {
+    ...piHarnessAdapter,
+    projectPrompt(request) {
+      return piHarnessAdapter.projectPrompt({ ...request, id: request.id.replace(/^neottia-/u, '') });
+    },
+  };
+  const oldOutput = compileSdlc(input, unprefixedAdapter);
+  await applyInstallationPlan(createInstallationPlan(await inspectInstallation(oldOutput.assets, roots), 'install'));
+
+  const currentOutput = compileSdlc(input, piHarnessAdapter);
+  const update = createInstallationPlan(await inspectInstallation(currentOutput.assets, roots), 'update');
+
+  expect(update.conflicts).toEqual([]);
+  expect(update.mutations.some((mutation) => mutation.path.endsWith(join('.pi', 'prompts', 'plan.md')))).toBe(true);
+  expect(update.mutations.some((mutation) => mutation.path.endsWith(join('.pi', 'prompts', 'neottia-plan.md')))).toBe(
+    true,
+  );
+  await applyInstallationPlan(update);
+  expect(existsSync(join(roots.project, '.pi', 'prompts', 'plan.md'))).toBe(false);
+  expect(existsSync(join(roots.project, '.pi', 'prompts', 'neottia-plan.md'))).toBe(true);
 });
 
 /** Exercises durable Plan-to-Release evidence with filesystem providers and local Git. */
@@ -183,8 +226,8 @@ it('completes a filesystem and local-Git Plan-to-Release journey under one tempo
   expect(issue.status).toBe('done');
   expect((await documents.get(document.id)).status).toBe('approved');
   expect(git(roots.project, 'log', '-1', '--pretty=%s')).toBe('feat: implement canonical lifecycle');
-  expect(existsSync(join(roots.project, '.pi', 'prompts', 'release.md'))).toBe(true);
-  expect(existsSync(join(roots.project, '.opencode', 'commands', 'release.md'))).toBe(true);
+  expect(existsSync(join(roots.project, '.pi', 'prompts', 'neottia-release.md'))).toBe(true);
+  expect(existsSync(join(roots.project, '.opencode', 'commands', 'neottia-release.md'))).toBe(true);
   expect(existsSync(join(roots.project, '.neottia', 'issues'))).toBe(true);
   expect(existsSync(join(roots.project, '.neottia', 'design-docs'))).toBe(true);
 

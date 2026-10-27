@@ -42,7 +42,7 @@ neottia apply --plan install.plan.json
 
 There is no wildcard approval and no force option.
 
-## The host does not show `/plan`
+## The host does not show `/neottia-plan`
 
 **Check:** Run `neottia doctor`, then inspect the harness receipt under `.neottia/install/`.
 
