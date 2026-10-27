@@ -1,4 +1,15 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -161,6 +172,67 @@ function documentedTools(path: string): string[] {
 }
 
 describe('documentation contracts', () => {
+  it('regenerates dependency references before the release action commits version changes', () => {
+    const config = parseDocument(readFileSync(join(root, '.github/tempel-release.yml'), 'utf8')).toJS() as {
+      versioning: { update_lockfile: boolean; after: string[] };
+    };
+    const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as {
+      scripts: Record<string, string>;
+    };
+    expect(config.versioning.update_lockfile).toBe(true);
+    expect(config.versioning.after).toContain('docs:dependencies:generate');
+    expect(manifest.scripts['docs:dependencies:generate']).toBe('node scripts/dependency-reference.mjs --write');
+  });
+
+  it('rejects version-induced reference drift until the post-version generator runs', () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), 'neottia-version-reference-'));
+    try {
+      for (const directory of ['scripts', 'docs/reference', 'packages/example', 'packages/release']) {
+        mkdirSync(join(fixtureRoot, directory), { recursive: true });
+      }
+      symlinkSync(join(root, 'node_modules'), join(fixtureRoot, 'node_modules'), 'junction');
+      const script = join(fixtureRoot, 'scripts/dependency-reference.mjs');
+      copyFileSync(join(root, 'scripts/dependency-reference.mjs'), script);
+      writeFileSync(
+        join(fixtureRoot, 'package.json'),
+        JSON.stringify({ name: 'version-reference-fixture', private: true }),
+      );
+      writeFileSync(join(fixtureRoot, 'pnpm-workspace.yaml'), 'packages:\n  - packages/*\n');
+      const writeVersion = (version: string): void => {
+        writeFileSync(
+          join(fixtureRoot, 'packages/example/package.json'),
+          JSON.stringify({ name: '@neottia/example', version }),
+        );
+        writeFileSync(
+          join(fixtureRoot, 'packages/release/package.json'),
+          JSON.stringify({
+            name: '@neottia/release',
+            version: '1.0.0',
+            dependencies: { '@neottia/example': `workspace:${version}` },
+          }),
+        );
+      };
+      const generate = (...args: string[]) =>
+        spawnSync(process.execPath, [script, ...args], { cwd: fixtureRoot, encoding: 'utf8', timeout: 10_000 });
+
+      writeVersion('1.0.0');
+      expect(generate('--write').status).toBe(0);
+      expect(generate().status).toBe(0);
+      writeVersion('1.1.0');
+      const stale = generate();
+      expect(stale.status).toBe(1);
+      expect(stale.stderr).toContain('docs/reference/dependencies.md is stale');
+      expect(generate('--write').status).toBe(0);
+      expect(generate().status).toBe(0);
+      const reference = readFileSync(join(fixtureRoot, 'docs/reference/dependencies.md'), 'utf8');
+      expect(reference).toContain('<code>1.1.0</code>');
+      expect(reference).toContain('<code>workspace:1.1.0</code>');
+      expect(reference).not.toContain('<code>workspace:1.0.0</code>');
+    } finally {
+      rmSync(fixtureRoot, { recursive: true, force: true });
+    }
+  });
+
   it('catalogues every workspace manifest exactly once', () => {
     const manifests = workspaceManifests();
     expect(catalog.map((entry) => entry.manifest).sort()).toEqual(manifests.sort());

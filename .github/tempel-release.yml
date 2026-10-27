@@ -10,6 +10,8 @@ project:
 
 versioning:
   update_lockfile: true
+  after:
+    - docs:dependencies:generate
 
 publishing:
   # The publish job starts from a clean checkout, so rebuild package artifacts.
