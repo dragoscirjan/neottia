@@ -80,7 +80,7 @@ Each module section lists its runtime, peer, optional, and package-local develop
 | Declaration           | Exact value                                                                                                           |
 | --------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | Manifest              | [<code>packages/cli/package.json</code>](https://github.com/dragoscirjan/neottia/blob/main/packages/cli/package.json) |
-| Version               | <code>0.8.0</code>                                                                                                    |
+| Version               | <code>0.9.0</code>                                                                                                    |
 | Private field         | <code>Not declared</code>                                                                                             |
 | Engines               | <code>node</code> <code>&gt;=22.20.0</code>                                                                           |
 | Platform declarations | None                                                                                                                  |
@@ -129,7 +129,7 @@ Each module section lists its runtime, peer, optional, and package-local develop
 | Declaration           | Exact value                                                                                                                                   |
 | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | Manifest              | [<code>packages/config-registry/package.json</code>](https://github.com/dragoscirjan/neottia/blob/main/packages/config-registry/package.json) |
-| Version               | <code>0.4.0</code>                                                                                                                            |
+| Version               | <code>0.4.1</code>                                                                                                                            |
 | Private field         | <code>Not declared</code>                                                                                                                     |
 | Engines               | <code>node</code> <code>&gt;=22.16.0</code>                                                                                                   |
 | Platform declarations | None                                                                                                                                          |
@@ -605,9 +605,9 @@ Each module section lists its runtime, peer, optional, and package-local develop
 | Classification | Dependency                                 | Exact range                  |
 | -------------- | ------------------------------------------ | ---------------------------- |
 | Runtime        | <code>@neottia/claude-code-adapter</code>  | <code>workspace:0.3.0</code> |
-| Runtime        | <code>@neottia/cli</code>                  | <code>workspace:0.8.0</code> |
+| Runtime        | <code>@neottia/cli</code>                  | <code>workspace:0.9.0</code> |
 | Runtime        | <code>@neottia/config</code>               | <code>workspace:0.2.0</code> |
-| Runtime        | <code>@neottia/config-registry</code>      | <code>workspace:0.4.0</code> |
+| Runtime        | <code>@neottia/config-registry</code>      | <code>workspace:0.4.1</code> |
 | Runtime        | <code>@neottia/core</code>                 | <code>workspace:0.1.0</code> |
 | Runtime        | <code>@neottia/design-docs</code>          | <code>workspace:0.2.1</code> |
 | Runtime        | <code>@neottia/design-docs-mcp</code>      | <code>workspace:0.2.3</code> |
@@ -629,7 +629,7 @@ Each module section lists its runtime, peer, optional, and package-local develop
 | Runtime        | <code>@neottia/pi-memory</code>            | <code>workspace:0.2.5</code> |
 | Runtime        | <code>@neottia/pi-searchable</code>        | <code>workspace:0.2.9</code> |
 | Runtime        | <code>@neottia/repository-store</code>     | <code>workspace:0.3.4</code> |
-| Runtime        | <code>@neottia/sdlc</code>                 | <code>workspace:0.5.1</code> |
+| Runtime        | <code>@neottia/sdlc</code>                 | <code>workspace:0.6.0</code> |
 | Runtime        | <code>@neottia/searchable-core</code>      | <code>workspace:0.2.6</code> |
 | Runtime        | <code>@neottia/searchable-mcp</code>       | <code>workspace:0.2.8</code> |
 
@@ -657,7 +657,7 @@ Each module section lists its runtime, peer, optional, and package-local develop
 | Declaration           | Exact value                                                                                                             |
 | --------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | Manifest              | [<code>packages/sdlc/package.json</code>](https://github.com/dragoscirjan/neottia/blob/main/packages/sdlc/package.json) |
-| Version               | <code>0.5.1</code>                                                                                                      |
+| Version               | <code>0.6.0</code>                                                                                                      |
 | Private field         | <code>Not declared</code>                                                                                               |
 | Engines               | <code>node</code> <code>&gt;=22.16.0</code>                                                                             |
 | Platform declarations | None                                                                                                                    |

@@ -1,5 +1,15 @@
 # @neottia/sdlc
 
+## 0.6.0
+
+### Minor Changes
+
+- [#261](https://github.com/dragoscirjan/neottia/pull/261) [`89f8f11`](https://github.com/dragoscirjan/neottia/commit/89f8f11cd9a57fc0e03de3fd03ce931eca39c013) Thanks [@dragoscirjan](https://github.com/dragoscirjan)! - Add `/neottia-adopt` as the seventh standard lifecycle command. It inventories existing project documents and configured provider records, requires approval of an exact operation plan, and delivers approved document-only changes through a draft pull request.
+
+- [#260](https://github.com/dragoscirjan/neottia/pull/260) [`02b89ed`](https://github.com/dragoscirjan/neottia/commit/02b89ed82dc754bb6551f6e8adfe86046700d756) Thanks [@dragoscirjan](https://github.com/dragoscirjan)! - Install lifecycle commands as `neottia-plan`, `neottia-build`, `neottia-verify`, `neottia-release`, `neottia-continue`, and `neottia-refresh` while preserving the existing semantic and template identifiers.
+
+- [#256](https://github.com/dragoscirjan/neottia/pull/256) [`e806c58`](https://github.com/dragoscirjan/neottia/commit/e806c58022ef2a7d859f15c0db394432b43e18a8) Thanks [@dragoscirjan](https://github.com/dragoscirjan)! - Add project-scoped, append-only Markdown instructions for individual SDLC commands without replacing canonical lifecycle templates.
+
 ## 0.5.1
 
 ### Patch Changes

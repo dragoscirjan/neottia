@@ -16,9 +16,9 @@
   },
   "dependencies": {
     "@neottia/claude-code-adapter": "workspace:0.3.0",
-    "@neottia/cli": "workspace:0.8.0",
+    "@neottia/cli": "workspace:0.9.0",
     "@neottia/config": "workspace:0.2.0",
-    "@neottia/config-registry": "workspace:0.4.0",
+    "@neottia/config-registry": "workspace:0.4.1",
     "@neottia/core": "workspace:0.1.0",
     "@neottia/design-docs": "workspace:0.2.1",
     "@neottia/design-docs-mcp": "workspace:0.2.3",
@@ -40,7 +40,7 @@
     "@neottia/pi-memory": "workspace:0.2.5",
     "@neottia/pi-searchable": "workspace:0.2.9",
     "@neottia/repository-store": "workspace:0.3.4",
-    "@neottia/sdlc": "workspace:0.5.1",
+    "@neottia/sdlc": "workspace:0.6.0",
     "@neottia/searchable-core": "workspace:0.2.6",
     "@neottia/searchable-mcp": "workspace:0.2.8"
   },
