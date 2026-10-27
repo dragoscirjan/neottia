@@ -1,5 +1,19 @@
 # @neottia/cli
 
+## 0.9.0
+
+### Minor Changes
+
+- [#260](https://github.com/dragoscirjan/neottia/pull/260) [`02b89ed`](https://github.com/dragoscirjan/neottia/commit/02b89ed82dc754bb6551f6e8adfe86046700d756) Thanks [@dragoscirjan](https://github.com/dragoscirjan)! - Install lifecycle commands as `neottia-plan`, `neottia-build`, `neottia-verify`, `neottia-release`, `neottia-continue`, and `neottia-refresh` while preserving the existing semantic and template identifiers.
+
+- [#256](https://github.com/dragoscirjan/neottia/pull/256) [`e806c58`](https://github.com/dragoscirjan/neottia/commit/e806c58022ef2a7d859f15c0db394432b43e18a8) Thanks [@dragoscirjan](https://github.com/dragoscirjan)! - Add project-scoped, append-only Markdown instructions for individual SDLC commands without replacing canonical lifecycle templates.
+
+### Patch Changes
+
+- Updated dependencies [[`02b89ed`](https://github.com/dragoscirjan/neottia/commit/02b89ed82dc754bb6551f6e8adfe86046700d756), [`e806c58`](https://github.com/dragoscirjan/neottia/commit/e806c58022ef2a7d859f15c0db394432b43e18a8)]:
+  - @neottia/sdlc@0.6.0
+  - @neottia/config-registry@0.4.1
+
 ## 0.8.0
 
 ### Minor Changes

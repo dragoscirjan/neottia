@@ -1,5 +1,12 @@
 # @neottia/config-registry
 
+## 0.4.1
+
+### Patch Changes
+
+- Updated dependencies [[`02b89ed`](https://github.com/dragoscirjan/neottia/commit/02b89ed82dc754bb6551f6e8adfe86046700d756), [`e806c58`](https://github.com/dragoscirjan/neottia/commit/e806c58022ef2a7d859f15c0db394432b43e18a8)]:
+  - @neottia/sdlc@0.6.0
+
 ## 0.4.0
 
 ### Minor Changes
