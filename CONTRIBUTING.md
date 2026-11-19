@@ -2,20 +2,24 @@
 
 Contributions through focused issues and pull requests are welcome. This guide applies to human contributors and coding agents.
 
-Read this document before planning or performing repository architecture, design, implementation, documentation, configuration, policy, or publication changes.
+Read before planning or changing the repository. Follow `AGENTS.md` for phase prerequisites, workspaces, safety, and owner authority.
 
-## Contribution workflow
+This includes architecture, design, implementation, documentation, configuration, policy, and publication work.
 
-1. Clarify ambiguous requirements.
-2. Create or link a GitHub issue before architecture, design, implementation, or policy changes. Typo, broken-link, and internal instruction fixes do not require an issue.
-3. Keep each change focused on one issue or task.
-4. Follow the isolated-workspace gate and configuration in `AGENTS.md` before changing repository state.
-5. Use the required code index before relying on code inspection.
-6. Add tests for behavior changes and update user documentation for behavior, API, or configuration changes.
-7. Add a Changeset for user-visible changes to published modules.
-8. Read and follow [`VALIDATION.md`](VALIDATION.md) before validation, commits, pushes, or publication.
-9. Commit with [Conventional Commits](https://www.conventionalcommits.org/).
-10. Open a pull request linked to the issue when an issue is required.
+## Task records and scope
+
+Clarify ambiguous requirements. Create or link a GitHub issue before architecture, design, implementation, or policy changes. Typo, broken-link, and internal instruction fixes do not require an issue. Keep each change focused on one issue or task.
+
+## Workflow
+
+1. Confirm the outcome, scope, and required task record.
+2. Satisfy the mutation and workspace rules in `AGENTS.md`.
+3. Implement a focused change using the rules below.
+4. Follow `DOCUMENTATION.md` while implementing. Explain any no-change documentation assessment.
+5. Run applicable checks from `VALIDATION.md`. Report missing checks.
+6. Follow the commit, PR, versioning, and publication rules. One phase does not authorize the next.
+
+Use the required code index before relying on code inspection. Add tests for behavior changes and update user documentation for behavior, API, or configuration changes. Add a Changeset for user-visible changes to published modules.
 
 Do not merge or release without explicit owner instruction.
 
@@ -55,7 +59,7 @@ This adaptation workflow covers instruction routes, deferred policy documents, d
 
 ## Code and package rules
 
-- Load the generic `coding` skill before code changes. Load matching language and extension skills after it.
+- Load the generic `coding` skill, then `coding-with-rules`, before code design, edits, tests, or review. Read the wrapper's matching language and extension references in their declared order. Project configuration and the rules below take precedence.
 - Neottia uses TypeScript for project code. Compile only generic modules or modules whose target harness cannot consume TypeScript directly.
 - Follow the [Google TypeScript Style Guide](https://google.github.io/styleguide/tsguide.html) unless repository configuration or established safe conventions are stricter.
 - Comment public contracts, invariants, security boundaries, and non-obvious decisions. Simplify code that needs commentary only because it is unnecessarily complex.
@@ -82,66 +86,13 @@ Every Node package must:
 - Integration tests must use temporary directories. They must not mutate the repository checkout or active worktree.
 - Test observable behavior, failure paths, and relevant compatibility boundaries. A successful compile is not behavior evidence.
 
+## Configuration
+
+Use `docs/configuration.md` as the canonical reference for supported configuration sources, keys, defaults, required groups, and precedence. Use `packages/config/config.schema.json` for the complete public schema. Preserve the global/project resolver contract and module boundaries; do not infer configuration from unrelated installed packages. Keep credentials out of reusable examples, logs, artifacts, and model context.
+
 ## Documentation
 
-Neottia publishes user documentation from `docs/` with VitePress.
-
-- Document user behavior, configuration, operations, and limitations thoroughly enough that users do not need to inspect source code.
-- Do not put contributor procedures in the user documentation site.
-- Summarize user documentation in the root `README.md`.
-- The root README may include a development section with project structure and mise commands.
-- Load `asd-ste100-technical` while drafting documentation, then load `unslop` for the final writing pass.
-- Use sentence-case headings, direct language, tested commands, and links to canonical reference pages.
-
-### Generate the dependency reference
-
-After a root or workspace `package.json` changes, run:
-
-```bash
-mise run docs:dependencies:generate
-mise run docs:check
-```
-
-Commit `docs/reference/dependencies.md` with the manifest change. The documentation check fails if the committed reference does not match the current manifests.
-
-### Regenerate the diagrams
-
-Create clean Archify and Neottia evidence checkouts outside the working tree:
-
-```bash
-git clone https://github.com/tt-a1i/archify.git ../archify
-git -C ../archify checkout 208acba8d412335185b2056fedf54b3405df43fb
-git worktree add ../neottia-diagram-evidence \
-  d30ecaab86cf2d02a254736221221252c445fdfc
-```
-
-Run these commands from the current Neottia repository root:
-
-```bash
-export ARCHIFY_UPDATE_CHECK_DISABLED=1
-
-node ../archify/archify/bin/archify.mjs finalize architecture \
-  docs/diagrams/sources/neottia-system.architecture.json \
-  docs/public/diagrams/neottia-system.html \
-  --repo-root ../neottia-diagram-evidence \
-  --quality showcase
-
-node ../archify/archify/bin/archify.mjs finalize lifecycle \
-  docs/diagrams/sources/neottia-lifecycle.lifecycle.json \
-  docs/public/diagrams/neottia-lifecycle.html \
-  --repo-root ../neottia-diagram-evidence \
-  --quality showcase
-
-node ../archify/archify/bin/archify.mjs finalize dataflow \
-  docs/diagrams/sources/neottia-runtime.dataflow.json \
-  docs/public/diagrams/neottia-runtime.html \
-  --repo-root ../neottia-diagram-evidence \
-  --quality showcase
-```
-
-Run all Archify gates, then review the generated routes visually. The system and runtime diagrams can contain valid routed detours that reduce readability.
-
-Archify writes local delivery, finalize, summary, and browser-check JSON receipts during validation. Remove these receipts after validation. They contain machine-local absolute paths and must not be committed.
+Read and follow `DOCUMENTATION.md` for audience, engine, ownership, commands, and maintenance rules. Follow it while implementing. Explain any no-change documentation assessment.
 
 ## Versions and releases
 
@@ -150,7 +101,11 @@ Archify writes local delivery, finalize, summary, and browser-check JSON receipt
 - Never edit `packages/release/release-manifest.json`; release tasks generate it.
 - Do not publish or create a release without explicit owner instruction.
 
-## Pull requests
+Release procedures do not grant publication authority. Follow `AGENTS.md`.
+
+## Commits and pull requests
+
+Commit with [Conventional Commits](https://www.conventionalcommits.org/). Open a pull request linked to the issue when an issue is required.
 
 A pull request must:
 
