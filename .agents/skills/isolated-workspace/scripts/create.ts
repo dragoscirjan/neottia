@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { existsSync, realpathSync } from 'node:fs';
+import { existsSync, realpathSync } from "node:fs";
 import {
   EXIT,
   WorkspaceError,
@@ -26,22 +26,22 @@ import {
   planId as hashPlan,
   requireBun,
   resolveJjRevision,
-} from './lib.ts';
+} from "./lib.ts";
 
 interface CreateOptions {
   vcs: Vcs;
   branch: string;
   base?: string;
-  'dry-run': boolean;
+  "dry-run": boolean;
   apply: boolean;
   confirm: boolean;
-  'plan-id'?: string;
+  "plan-id"?: string;
   format: OutputFormat;
   help: boolean;
 }
 
 interface PlannedCommand {
-  command: 'git' | 'jj';
+  command: "git" | "jj";
   args: string[];
   cwd?: string;
 }
@@ -51,11 +51,13 @@ interface CreatePlan {
   repository: RepositoryContext;
   layout: WorkspaceLayout;
   base: BaseRevision;
-  action: 'attach' | 'create' | 'repair-bookmark' | 'reuse';
+  action: "attach" | "create" | "repair-bookmark" | "reuse";
   branchExists?: boolean;
   status: string;
   commands: PlannedCommand[];
 }
+
+const LANE_MARKER = "--lane-";
 
 const HELP = `Usage:
   bun scripts/create.ts --vcs git|jj --branch NAME [--base REVISION] [--dry-run]
@@ -84,48 +86,104 @@ Exit codes:
 Examples:
   bun scripts/create.ts --vcs git --branch change/issue-42
   bun scripts/create.ts --vcs git --branch change/issue-42 --apply --confirm --plan-id PLAN_ID
+  bun scripts/create.ts --vcs git --branch change/issue-42--lane-worker-a --base change/issue-42
   bun scripts/create.ts --vcs jj --branch change/issue-42 --base main --apply --confirm --plan-id PLAN_ID`;
 
+function laneCanonicalRef(branch: string): string | null {
+  const markerIndex = branch.indexOf(LANE_MARKER);
+  return markerIndex === -1 ? null : branch.slice(0, markerIndex);
+}
+
+function validateLaneIdentity(options: CreateOptions): void {
+  const markerIndex = options.branch.indexOf(LANE_MARKER);
+  if (markerIndex === -1) return;
+  if (markerIndex === 0 || markerIndex !== options.branch.lastIndexOf(LANE_MARKER)) {
+    throw new WorkspaceError(
+      `Temporary lane refs must use CANONICAL_REF${LANE_MARKER}LANE_KEY exactly once`,
+      EXIT.USAGE,
+    );
+  }
+  const canonicalRef = options.branch.slice(0, markerIndex);
+  const laneKey = options.branch.slice(markerIndex + LANE_MARKER.length);
+  const canonicalLeaf = assertSafeBranch(canonicalRef);
+  if (!laneKey || assertSafeBranch(laneKey) !== laneKey) {
+    throw new WorkspaceError("Temporary lane keys must be one safe path component", EXIT.USAGE);
+  }
+  if (assertSafeBranch(options.branch) !== `${canonicalLeaf}${LANE_MARKER}${laneKey}`) {
+    throw new WorkspaceError(
+      "A temporary lane workspace leaf must be the basename of its full lane ref",
+      EXIT.USAGE,
+    );
+  }
+  if (options.base !== canonicalRef) {
+    throw new WorkspaceError(
+      "A temporary lane requires --base to equal its canonical ref exactly",
+      EXIT.USAGE,
+    );
+  }
+}
+
 function gitPlan(options: CreateOptions): CreatePlan {
-  const repository = detectRepository('git');
+  const repository = detectRepository("git");
   const layout = deriveLayout(repository.primaryRoot, options.branch);
-  const checked = command(repository.primaryRoot, 'git', ['check-ref-format', '--branch', options.branch], {
-    allowFailure: true,
-  });
+  const checked = command(repository.primaryRoot, "git", [
+    "check-ref-format",
+    "--branch",
+    options.branch,
+  ], { allowFailure: true });
   if (checked.status !== 0) {
     throw new WorkspaceError(`Invalid Git branch name: ${options.branch}`, EXIT.USAGE);
   }
-  const base = gitBase(repository.primaryRoot, options.base);
+  const canonicalRef = laneCanonicalRef(options.branch);
+  const resolvedBase = gitBase(
+    repository.primaryRoot,
+    canonicalRef ? `refs/heads/${canonicalRef}` : options.base,
+  );
+  const base = canonicalRef
+    ? { expression: canonicalRef, commit: resolvedBase.commit }
+    : resolvedBase;
   const worktrees = listGitWorktrees(repository.primaryRoot);
   const expectedPath = canonicalIfExists(layout.workspacePath);
-  const atPath = worktrees.find((entry) => canonicalIfExists(entry.worktree) === expectedPath);
+  const atPath = worktrees.find(
+    (entry) => canonicalIfExists(entry.worktree) === expectedPath,
+  );
   const branchRef = `refs/heads/${options.branch}`;
   const attached = worktrees.find((entry) => entry.branch === branchRef);
-  const branchExists =
-    command(repository.primaryRoot, 'git', ['show-ref', '--verify', '--quiet', branchRef], { allowFailure: true })
-      .status === 0;
+  const branchExists = command(repository.primaryRoot, "git", [
+    "show-ref",
+    "--verify",
+    "--quiet",
+    branchRef,
+  ], { allowFailure: true }).status === 0;
 
   if (atPath) {
     if (atPath.branch !== branchRef) {
       throw new WorkspaceError(
-        `Workspace path is registered to ${atPath.branch ?? 'a detached HEAD'}: ${expectedPath}`,
+        `Workspace path is registered to ${atPath.branch ?? "a detached HEAD"}: ${expectedPath}`,
         EXIT.CONFLICT,
       );
     }
-    const status = command(expectedPath, 'git', ['status', '--porcelain=v1', '--untracked-files=all']).stdout;
+    const status = command(expectedPath, "git", [
+      "status",
+      "--porcelain=v1",
+      "--untracked-files=all",
+    ]).stdout;
     return {
-      vcs: 'git',
+      vcs: "git",
       repository,
       layout,
       base,
-      action: 'reuse',
+      action: "reuse",
       branchExists: true,
-      status: status === '' ? 'clean' : 'has-changes',
+      status: status === "" ? "clean" : "has-changes",
       commands: [],
     };
   }
   if (attached) {
-    throw new WorkspaceError(`Branch is already attached to another worktree: ${attached.worktree}`, EXIT.CONFLICT);
+    throw new WorkspaceError(
+      `Branch is already attached to another worktree: ${attached.worktree}`,
+      EXIT.CONFLICT,
+    );
   }
   if (existsSync(layout.workspacePath)) {
     throw new WorkspaceError(
@@ -135,17 +193,17 @@ function gitPlan(options: CreateOptions): CreatePlan {
   }
 
   const args = branchExists
-    ? ['worktree', 'add', layout.workspacePath, options.branch]
-    : ['worktree', 'add', layout.workspacePath, '-b', options.branch, base.commit];
+    ? ["worktree", "add", layout.workspacePath, options.branch]
+    : ["worktree", "add", layout.workspacePath, "-b", options.branch, base.commit];
   return {
-    vcs: 'git',
+    vcs: "git",
     repository,
     layout,
     base,
-    action: branchExists ? 'attach' : 'create',
+    action: branchExists ? "attach" : "create",
     branchExists,
-    status: 'not-created',
-    commands: [{ command: 'git', args, cwd: repository.primaryRoot }],
+    status: "not-created",
+    commands: [{ command: "git", args, cwd: repository.primaryRoot }],
   };
 }
 
@@ -154,19 +212,19 @@ function jjBookmarkTarget(repository: string, name: string): string {
 }
 
 function jjDescription(repository: string, revision: string): string {
-  return command(repository, 'jj', [
-    'log',
-    '--ignore-working-copy',
-    '-r',
+  return command(repository, "jj", [
+    "log",
+    "--ignore-working-copy",
+    "-r",
     revision,
-    '--no-graph',
-    '-T',
-    'description',
+    "--no-graph",
+    "-T",
+    "description",
   ]).stdout.trim();
 }
 
 function jjPlan(options: CreateOptions): CreatePlan {
-  const repository = detectRepository('jj');
+  const repository = detectRepository("jj");
   const layout = deriveLayout(repository.primaryRoot, options.branch);
   const base = jjBase(repository.primaryRoot, options.base);
   const workspaces = listJjWorkspaces(repository.primaryRoot);
@@ -175,18 +233,25 @@ function jjPlan(options: CreateOptions): CreatePlan {
   const bookmarkExists = bookmarks.includes(options.branch);
 
   if (existing) {
-    const rootResult = command(
-      repository.primaryRoot,
-      'jj',
-      ['workspace', 'root', '--name', layout.workspaceName, '--ignore-working-copy'],
-      { allowFailure: true },
-    );
+    const rootResult = command(repository.primaryRoot, "jj", [
+      "workspace",
+      "root",
+      "--name",
+      layout.workspaceName,
+      "--ignore-working-copy",
+    ], { allowFailure: true });
     if (rootResult.status !== 0) {
-      throw new WorkspaceError(`Jujutsu workspace registration is stale: ${layout.workspaceName}`, EXIT.CONFLICT);
+      throw new WorkspaceError(
+        `Jujutsu workspace registration is stale: ${layout.workspaceName}`,
+        EXIT.CONFLICT,
+      );
     }
     const registeredPath = canonicalIfExists(rootResult.stdout.trim());
     if (registeredPath !== canonicalIfExists(layout.workspacePath)) {
-      throw new WorkspaceError(`Workspace name is registered at another path: ${registeredPath}`, EXIT.CONFLICT);
+      throw new WorkspaceError(
+        `Workspace name is registered at another path: ${registeredPath}`,
+        EXIT.CONFLICT,
+      );
     }
     if (bookmarkExists) {
       const target = jjBookmarkTarget(repository.primaryRoot, options.branch);
@@ -203,15 +268,15 @@ function jjPlan(options: CreateOptions): CreatePlan {
       );
     }
     return {
-      vcs: 'jj',
+      vcs: "jj",
       repository,
       layout,
       base,
-      action: bookmarkExists ? 'reuse' : 'repair-bookmark',
-      status: 'registered; inspect with jj status before editing',
+      action: bookmarkExists ? "reuse" : "repair-bookmark",
+      status: "registered; inspect with jj status before editing",
       commands: bookmarkExists
         ? []
-        : [{ command: 'jj', args: ['bookmark', 'create', options.branch, '-r', '@'], cwd: registeredPath }],
+        : [{ command: "jj", args: ["bookmark", "create", options.branch, "-r", "@"], cwd: registeredPath }],
     };
   }
   if (existsSync(layout.workspacePath)) {
@@ -221,25 +286,36 @@ function jjPlan(options: CreateOptions): CreatePlan {
     );
   }
   if (bookmarkExists) {
-    throw new WorkspaceError(`Bookmark already exists without the derived workspace: ${options.branch}`, EXIT.CONFLICT);
+    throw new WorkspaceError(
+      `Bookmark already exists without the derived workspace: ${options.branch}`,
+      EXIT.CONFLICT,
+    );
   }
   return {
-    vcs: 'jj',
+    vcs: "jj",
     repository,
     layout,
     base,
-    action: 'create',
-    status: 'not-created',
+    action: "create",
+    status: "not-created",
     commands: [
       {
-        command: 'jj',
-        args: ['workspace', 'add', '--name', layout.workspaceName, '-r', base.commit, layout.workspacePath],
+        command: "jj",
+        args: [
+          "workspace",
+          "add",
+          "--name",
+          layout.workspaceName,
+          "-r",
+          base.commit,
+          layout.workspacePath,
+        ],
         cwd: repository.primaryRoot,
       },
-      { command: 'jj', args: ['describe', '-m', options.branch], cwd: layout.workspacePath },
+      { command: "jj", args: ["describe", "-m", options.branch], cwd: layout.workspacePath },
       {
-        command: 'jj',
-        args: ['bookmark', 'create', options.branch, '-r', '@'],
+        command: "jj",
+        args: ["bookmark", "create", options.branch, "-r", "@"],
         cwd: layout.workspacePath,
       },
     ],
@@ -247,10 +323,13 @@ function jjPlan(options: CreateOptions): CreatePlan {
 }
 
 function buildPlan(options: CreateOptions): CreatePlan {
-  return options.vcs === 'git' ? gitPlan(options) : jjPlan(options);
+  return options.vcs === "git" ? gitPlan(options) : jjPlan(options);
 }
 
-function createPlanId(plan: CreatePlan, workspaceRootAction: 'create-directory' | 'reuse-directory'): string {
+function createPlanId(
+  plan: CreatePlan,
+  workspaceRootAction: "create-directory" | "reuse-directory",
+): string {
   return hashPlan({
     vcs: plan.vcs,
     primaryRoot: plan.repository.primaryRoot,
@@ -265,14 +344,14 @@ function createPlanId(plan: CreatePlan, workspaceRootAction: 'create-directory' 
 }
 
 function applyPlan(plan: CreatePlan, options: CreateOptions): void {
-  if (plan.action === 'reuse') return;
+  if (plan.action === "reuse") return;
   const current = buildPlan(options);
   if (
     current.action !== plan.action ||
     current.layout.workspacePath !== plan.layout.workspacePath ||
     current.base.commit !== plan.base.commit
   ) {
-    throw new WorkspaceError('Workspace state changed after planning; run the plan again', EXIT.CONFLICT);
+    throw new WorkspaceError("Workspace state changed after planning; run the plan again", EXIT.CONFLICT);
   }
   ensureWorkspaceRoot(plan.layout);
   for (const step of current.commands) {
@@ -282,8 +361,8 @@ function applyPlan(plan: CreatePlan, options: CreateOptions): void {
 
 function verify(options: CreateOptions): Record<string, unknown> {
   const verified = buildPlan(options);
-  if (verified.action !== 'reuse') {
-    throw new WorkspaceError('Workspace creation did not reach a reusable state', EXIT.COMMAND);
+  if (verified.action !== "reuse") {
+    throw new WorkspaceError("Workspace creation did not reach a reusable state", EXIT.COMMAND);
   }
   const path = realpathSync(verified.layout.workspacePath);
   return {
@@ -300,29 +379,32 @@ function verify(options: CreateOptions): Record<string, unknown> {
 async function main() {
   requireBun();
   const options = parseArgs(process.argv.slice(2), {
-    vcs: { type: 'string', required: true, choices: ['git', 'jj'] },
-    branch: { type: 'string', required: true },
-    base: { type: 'string' },
-    'dry-run': { type: 'boolean' },
-    apply: { type: 'boolean' },
-    confirm: { type: 'boolean' },
-    'plan-id': { type: 'string' },
-    format: { type: 'string', choices: ['json', 'text'], default: 'json' },
-    help: { type: 'boolean' },
+    vcs: { type: "string", required: true, choices: ["git", "jj"] },
+    branch: { type: "string", required: true },
+    base: { type: "string" },
+    "dry-run": { type: "boolean" },
+    apply: { type: "boolean" },
+    confirm: { type: "boolean" },
+    "plan-id": { type: "string" },
+    format: { type: "string", choices: ["json", "text"], default: "json" },
+    help: { type: "boolean" },
   }) as unknown as CreateOptions;
   if (options.help) {
     process.stdout.write(`${HELP}\n`);
     return;
   }
-  if (options.apply && !options['plan-id']) {
-    throw new WorkspaceError('--apply requires --plan-id from the approved plan', EXIT.USAGE);
+  if (options.apply && !options["plan-id"]) {
+    throw new WorkspaceError("--apply requires --plan-id from the approved plan", EXIT.USAGE);
   }
   assertSafeBranch(options.branch);
+  validateLaneIdentity(options);
   const plan = buildPlan(options);
-  const workspaceRootAction = existsSync(plan.layout.workspaceRoot) ? 'reuse-directory' : 'create-directory';
+  const workspaceRootAction = existsSync(plan.layout.workspaceRoot)
+    ? "reuse-directory"
+    : "create-directory";
   const approvedPlanId = createPlanId(plan, workspaceRootAction);
-  if (options.apply && options['plan-id'] !== approvedPlanId) {
-    throw new WorkspaceError('The approved plan ID does not match current state', EXIT.CONFLICT);
+  if (options.apply && options["plan-id"] !== approvedPlanId) {
+    throw new WorkspaceError("The approved plan ID does not match current state", EXIT.CONFLICT);
   }
   if (options.apply) applyPlan(plan, options);
   const result = options.apply
@@ -346,8 +428,8 @@ async function main() {
       };
   emit(
     {
-      skill: 'isolated-workspace',
-      mode: options.apply ? 'apply' : 'plan',
+      skill: "isolated-workspace",
+      mode: options.apply ? "apply" : "plan",
       repository: {
         currentRoot: plan.repository.currentRoot,
         primaryRoot: plan.repository.primaryRoot,
