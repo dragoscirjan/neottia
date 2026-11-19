@@ -1,21 +1,21 @@
 # Validation
 
-Read this document before validating, committing, pushing, or publishing a repository change. Run the checks that match the changed files and behavior.
+Read before validating, committing, pushing, or publishing. Use configured checks for the changed files and behavior. Do not invent commands or thresholds.
 
 Record each check that ran. If a required check cannot run, state why. Do not claim that an unexecuted check passed.
 
 ## Every change
 
+- Review status and the complete diff. Keep changes within approved scope and preserve unrelated work.
+- Check documentation, examples, paths, and links against implemented behavior.
+- Report each check as passed, failed, not run, or unsupported. An unexecuted check has not passed.
 - Run `git diff --check`.
-- Review `git status` and the complete diff.
-- Confirm that only files required by the issue or task changed.
-- Check that examples describe behavior that exists.
 - Remove generated changes created by validation only when they are known artifacts and contain no user work.
 - Run `mise run validate` before pushing unless the task changes only files that cannot affect that task. Record any narrower validation and the reason the full task did not run.
 
 ## Code changes
 
-- Load the generic `coding` skill and every matching language or extension skill.
+- Load the generic `coding` skill, then `coding-with-rules`, and every matching language or extension reference in the wrapper's declared order.
 - Build every affected package through mise.
 - Run focused tests while developing and the applicable workspace validation before pushing.
 - Confirm that integration tests use temporary directories and leave the repository and worktree unchanged.
@@ -39,10 +39,10 @@ When a change adds or modifies a skill:
 When a change adds or modifies `coding` or a `coding-*` skill:
 
 - Confirm that all coding skills are sibling directories directly under `.agents/skills/`.
-- Confirm that language skills require `coding` and extension skills require both `coding` and their language skill.
-- Confirm that dependencies resolve through advertised skill names and paths without a harness-specific Skill tool.
-- Test generic-to-language-to-extension load order, missing-dependency stops, and dependency-cycle rejection when those relationships exist.
-- Confirm that wrappers contain only extension-specific differences.
+- Confirm that `coding-with-rules` requires `coding`, maps each supported language and extension to an existing reference, and loads base-language guidance before extension-specific guidance.
+- Confirm that dependencies resolve through advertised skill names and paths without a harness-specific Skill tool or assumed native `requires` loader.
+- Test generic-to-wrapper-to-language-to-extension load order, missing-dependency or missing-reference stops, and dependency-cycle rejection when those relationships exist.
+- Confirm that language references contain language rules and extension references contain only their extension-specific differences. Keep shared workflow rules in `coding`.
 - Confirm that project configuration takes precedence over fallback tools.
 - Confirm that no skill installs, replaces, or reconfigures tools without owner approval.
 - Confirm that numeric thresholds come only from project configuration.
@@ -62,12 +62,18 @@ When a change modifies `isolated-workspace` or `cleanup-workspaces`:
 
 ## Instruction changes
 
+- Check scope, phase routes, references, and required targets for missing files, conflicts, duplication, and ambiguity.
+- Check requirement load order, missing targets, and cycles using the project's actual dependency convention.
+- Verify selected skill metadata and complete support files.
+- Preserve safety rules, approval gates, validation requirements, and publication authority. Record approval for consequential instruction changes.
+
 When a change modifies `AGENTS.md`, `CONTRIBUTING.md`, `VALIDATION.md`, or instruction routing metadata:
 
 - Confirm that `AGENTS.md` contains startup routing, project configuration, always-on security rules, and owner authority rather than detailed procedures.
 - Confirm that every deferred document or mandatory skill has a clear trigger.
 - Confirm that planning or code inspection loads `CONTRIBUTING.md`.
-- Confirm that mutation requires `isolated-workspace`.
+- Confirm that mutation requires `isolated-workspace` and that any helper/configured-path mismatch stops for an explicit owner-approved resolution.
+- Confirm that implementation or documentation changes load `DOCUMENTATION.md`, that implementation loads `document-project`, and that documentation writing also loads `asd-ste100-technical` and `unslop`.
 - Confirm that validation, commits, pushes, and publication require `VALIDATION.md`.
 - Confirm that cleanup requires `cleanup-workspaces`.
 - Confirm that instruction drift requires `instruction-maintenance` before an adaptation proposal.
@@ -77,7 +83,12 @@ When a change modifies `AGENTS.md`, `CONTRIBUTING.md`, `VALIDATION.md`, or instr
 
 ## Markdown and documentation changes
 
-- Load `unslop` for user documentation.
+Use `DOCUMENTATION.md` for the approved engine, configuration, sources, and canonical commands.
+
+- Load `document-project` and `asd-ste100-technical`, then load `unslop` for the final writing pass.
+- Assess documentation impact during implementation. Update affected documentation or give a concrete no-change reason.
+- Run `mise run docs:check` when documentation sources, examples, schemas, catalogs, or relevant instruction links change.
+- Report builds, executed examples, agent walkthroughs, and actual user testing separately. Rendering does not prove task usability.
 - Review heading order and section structure.
 - Check local links and relevant external links.
 - Review code fences, commands, paths, and examples manually.
@@ -91,6 +102,14 @@ When a change modifies `AGENTS.md`, `CONTRIBUTING.md`, `VALIDATION.md`, or instr
 - Confirm that `packages/release/release-manifest.json` was generated by the approved release task.
 - Verify package contents and public entry points for affected published modules.
 - Do not publish, tag, create a release, merge, or change release environments without explicit owner instruction.
+
+## Limits and completion
+
+Obtain approval before installing or reconfiguring tools, suppressing failures, lowering thresholds, or replacing a missing gate with a no-op. A passing build does not prove example correctness, reader comprehension, live service behavior, or production compatibility.
+
+Report each applicable check as passed, failed, not run, or unsupported. Distinguish static reference checks from observed live harness loading. Keep a blocked check blocked until an explicit owner decision; do not present a substitute as the original gate.
+
+Required documentation is part of completion. Report changed files, check results, gaps, and remaining owner actions. If a required check is blocked, obtain an explicit owner decision before calling the work complete. Validation does not authorize publication.
 
 ## Publication report
 

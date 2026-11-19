@@ -1,6 +1,6 @@
 # Cleanup workspaces
 
-`cleanup-workspaces` is the destructive companion to [`isolated-workspace`](../isolated-workspace/SKILL.md). It plans and safely removes clean integrated workspaces and prunes stale registrations after explicit confirmation.
+`cleanup-workspaces` is the destructive companion to [`isolated-workspace`](../isolated-workspace/SKILL.md). It plans and safely removes clean integrated workspaces and prunes safe stale registrations after explicit confirmation. It also has exact-target cleanup for a temporary lane created under [`subagent-orchestration`](https://github.com/dragoscirjan/ai/blob/7c0599e3fa167004b5adb6cb38d46faa5f356e5e/.agents/skills/unpolished/subagent-orchestration/SKILL.md).
 
 ## Automation
 
@@ -10,7 +10,7 @@ The skill includes Bun-executed TypeScript automation:
 - [`scripts/cleanup.test.ts`](scripts/cleanup.test.ts) exercises successful and protected Git and Jujutsu states.
 - Shared repository and path helpers come from [`isolated-workspace/scripts/lib.ts`](../isolated-workspace/scripts/lib.ts).
 
-`isolated-workspace` is a required sibling dependency. Consumers must resolve it by its advertised skill name and path; the cleanup skill never installs it automatically.
+The skill is model-discoverable, but loading it authorizes audit only. Read [`SKILL.md`](SKILL.md) before applying a plan. For the relative commands below, use this skill's directory inside a surviving target checkout as the working directory. If the helper is outside that checkout, invoke its absolute path from the surviving target checkout instead.
 
 The caller must select the VCS explicitly:
 
@@ -28,30 +28,38 @@ bun scripts/cleanup.ts --vcs git --base main \
   --apply --confirm --plan-id PLAN_ID
 ```
 
+To clean one integrated orchestration lane, run from the surviving canonical sibling workspace, name the lane workspace leaf, and use the canonical ref as the explicit base:
+
+```sh
+bun scripts/cleanup.ts --vcs git \
+  --lane issue-44--lane-worker-a --base change/issue-44
+bun scripts/cleanup.ts --vcs git \
+  --lane issue-44--lane-worker-a --base change/issue-44 \
+  --apply --confirm --plan-id PLAN_ID
+```
+
+Use `--vcs jj` for Jujutsu. Before planning a lane, read [exact-lane identity, authorization, and cleanup](references/orchestration-lanes.md).
+
 ## Safety model
 
-Git candidates require a clean status, matching registration and branch tip, no active operation, and exact local ancestry to the selected base. Removal uses `git worktree remove` and `git branch -d` without force.
+Ordinary cleanup requires the owner's exact-plan approval. The current-task lane exception permits only the parent to confirm the exact plan covered by its initial orchestration authorization.
 
-Git stale pruning runs only when every prunable registration is in scope. This prevents repository-wide `git worktree prune --expire now` from silently affecting another workspace root.
-
-Jujutsu 0.38 or newer is required. Candidates require an exact integrated working-copy commit or an empty child whose parents are integrated. Cleanup uses `jj workspace forget` and `jj bookmark forget`, then removes only the revalidated workspace directory. An unresolved workspace root is skipped rather than inferred stale. Cleanup never abandons commits or propagates bookmark deletion.
-
-Primary, active, dirty, locked, conflicted, unmerged, out-of-scope, and ambiguous workspaces remain protected. Apply mode repeats the audit and rechecks each candidate immediately before removal.
+Read the applicable eligibility and stale-registration rules before auditing or applying: [Git](references/git.md) or [Jujutsu](references/jj.md). The main workflow defines universal protected states and confirmation gates. These checks keep unproven or changed targets intact rather than forcing removal.
 
 ## Tests
 
 Run the cleanup tests from the repository root:
 
 ```sh
-bun test ./.agents/skills/cleanup-workspaces/scripts/cleanup.test.ts
+bun test ./.agents/skills/utility/cleanup-workspaces/scripts/cleanup.test.ts
 ```
 
 Run the complete workspace automation suite:
 
 ```sh
 bun test \
-  ./.agents/skills/isolated-workspace/scripts/create.test.ts \
-  ./.agents/skills/cleanup-workspaces/scripts/cleanup.test.ts
+  ./.agents/skills/utility/isolated-workspace/scripts/create.test.ts \
+  ./.agents/skills/utility/cleanup-workspaces/scripts/cleanup.test.ts
 ```
 
-See [`SKILL.md`](SKILL.md) for the complete agent workflow, safety stops, and exit codes.
+See [`SKILL.md`](SKILL.md) for the complete agent workflow and safety stops. Report the helper's actual diagnostics and exit status; partial cleanup failure is not success.
