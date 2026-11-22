@@ -13,7 +13,7 @@ Planned harnesses include Claude Code, Codex, Copilot, and Kiro. They are not cu
 
 Read and follow every applicable phase below. Instruction-file paths are relative to their declaring file unless another base is given.
 
-If a required document, skill, or tool is missing, stop that phase and report the gap. Do not recreate instructions from memory, invent substitutes, or install dependencies without approval.
+If an applicable instruction requires a document, skill, configured tool, or runtime capability that is missing or unavailable, stop the affected phase. Name the missing prerequisite and provide its documented installation or setup instructions. Do not silently skip the requirement, disable the configured integration, invent a substitute, or install or reconfigure anything without approval. Work whose applicable instructions do not require that prerequisite may continue.
 
 ## Read-only work
 
